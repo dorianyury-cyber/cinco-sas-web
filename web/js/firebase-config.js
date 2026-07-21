@@ -13,4 +13,4 @@ export const firebaseConfig = {
 // Site key de reCAPTCHA v3 para Firebase App Check — se completa cuando se
 // active App Check en Firebase Console (paso manual, ver README/plan). Con
 // "PENDIENTE" el formulario de PQR funciona igual, solo sin esa capa extra.
-export const RECAPTCHA_SITE_KEY = "PENDIENTE";
+export const RECAPTCHA_SITE_KEY = "6Lfebl0tAAAAANxv3J0WXCV_SQ1f_ioBh0_WMBu-";

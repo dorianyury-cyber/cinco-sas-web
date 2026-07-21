@@ -70,7 +70,7 @@ async function enviarCorreoPQR(datos) {
   });
 }
 
-const enviarPQR = onCall(async (request) => {
+const enviarPQR = onCall({ enforceAppCheck: true }, async (request) => {
   const data = request.data || {};
 
   // Campo trampa: si viene lleno, es casi seguro un bot — se responde éxito
