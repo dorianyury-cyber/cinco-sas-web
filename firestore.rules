@@ -1,0 +1,16 @@
+rules_version = '2';
+
+// Este sitio no tiene cuentas de usuario ni inicio de sesión: es un sitio
+// público informativo. La única colección ("pqr") solo la escribe la Cloud
+// Function enviarPQR con el Admin SDK, que no pasa por estas reglas — por
+// eso aquí se niega TODO acceso directo desde el cliente (lectura y
+// escritura), sin excepciones. Esto es intencionalmente más estricto que
+// LBDC Neiva/Copropiedad Saludable, que sí necesitan reglas de lectura/
+// escritura para usuarios autenticados.
+service cloud.firestore {
+  match /databases/{database}/documents {
+    match /{document=**} {
+      allow read, write: if false;
+    }
+  }
+}
