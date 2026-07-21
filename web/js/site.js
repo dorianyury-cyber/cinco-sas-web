@@ -9,6 +9,22 @@ document.querySelectorAll(".anio-actual").forEach((el) => {
   el.textContent = new Date().getFullYear();
 });
 
+// Años de trayectoria desde la fundación (29 de diciembre de 2009) — se
+// calcula solo, para no volver a quedar con un número fijo desactualizado
+// (como pasaba con "más de una década" o el "15+" de la franja de cifras).
+const FUNDACION = new Date(2009, 11, 29);
+function aniosDeTrayectoria() {
+  const hoy = new Date();
+  let anios = hoy.getFullYear() - FUNDACION.getFullYear();
+  const aunNoCumpleAnios = hoy.getMonth() < FUNDACION.getMonth() ||
+    (hoy.getMonth() === FUNDACION.getMonth() && hoy.getDate() < FUNDACION.getDate());
+  if (aunNoCumpleAnios) anios -= 1;
+  return anios;
+}
+document.querySelectorAll(".anios-cinco").forEach((el) => {
+  el.textContent = aniosDeTrayectoria();
+});
+
 // Animación sutil de aparición al hacer scroll (tarjetas, filas de servicio,
 // etc.) — si el navegador no soporta IntersectionObserver, se muestran
 // directamente sin animar.
