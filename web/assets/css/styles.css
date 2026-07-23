@@ -538,27 +538,34 @@ form.pqr-form button { margin-top: 20px; width: 100%; }
 .frutos-fondo .fruto {
   position: absolute;
   font-family: "Poppins", sans-serif;
-  font-weight: 700;
+  font-weight: 800;
   letter-spacing: 0.03em;
   text-transform: uppercase;
-  color: var(--cinco-amber);
-  opacity: 0.16;
   white-space: nowrap;
+  /* Dorado metálico moderno: degradado con varios tonos de ámbar/dorado
+     recortado al texto, en vez de un solo color plano. */
+  background: linear-gradient(135deg, #fff3cf 0%, #ffd873 22%, #feb209 48%, #d99400 70%, #ffe9a8 88%, #feb209 100%);
+  -webkit-background-clip: text;
+  background-clip: text;
+  color: transparent;
+  -webkit-text-fill-color: transparent;
+  filter: drop-shadow(0 1px 3px rgba(151, 105, 0, 0.28));
+  opacity: 0.6;
 }
 @media (prefers-color-scheme: dark) {
-  .frutos-fondo .fruto { opacity: 0.12; }
+  .frutos-fondo .fruto { opacity: 0.45; filter: drop-shadow(0 1px 4px rgba(0, 0, 0, 0.5)); }
 }
 @media (max-width: 900px) {
   .frutos-fondo { display: none; }
 }
 .section-frutos .container { position: relative; z-index: 1; }
 
-.fruto-1 { top: 3%;  left: 4%;  font-size: 2.3rem; transform: rotate(-13deg); }
-.fruto-2 { top: 9%;  left: 80%; font-size: 1.6rem; transform: rotate(10deg); }
-.fruto-3 { top: 22%; left: 14%; font-size: 1.9rem; transform: rotate(7deg); }
-.fruto-4 { top: 33%; left: 84%; font-size: 2.1rem; transform: rotate(-9deg); }
-.fruto-5 { top: 46%; left: 3%;  font-size: 1.7rem; transform: rotate(-5deg); }
-.fruto-6 { top: 57%; left: 88%; font-size: 1.5rem; transform: rotate(15deg); }
-.fruto-7 { top: 69%; left: 7%;  font-size: 2rem;   transform: rotate(11deg); }
-.fruto-8 { top: 80%; left: 78%; font-size: 1.6rem; transform: rotate(-12deg); }
-.fruto-9 { top: 92%; left: 42%; font-size: 1.8rem; transform: rotate(6deg); }
+.fruto-1 { top: 3%;  left: 4%;  font-size: 3.4rem; transform: rotate(-13deg); }
+.fruto-2 { top: 9%;  left: 78%; font-size: 2.4rem; transform: rotate(10deg); }
+.fruto-3 { top: 22%; left: 12%; font-size: 2.8rem; transform: rotate(7deg); }
+.fruto-4 { top: 33%; left: 82%; font-size: 3.1rem; transform: rotate(-9deg); }
+.fruto-5 { top: 46%; left: 2%;  font-size: 2.5rem; transform: rotate(-5deg); }
+.fruto-6 { top: 57%; left: 85%; font-size: 2.3rem; transform: rotate(15deg); }
+.fruto-7 { top: 69%; left: 5%;  font-size: 3rem;   transform: rotate(11deg); }
+.fruto-8 { top: 80%; left: 75%; font-size: 2.4rem; transform: rotate(-12deg); }
+.fruto-9 { top: 91%; left: 40%; font-size: 2.7rem; transform: rotate(6deg); }
