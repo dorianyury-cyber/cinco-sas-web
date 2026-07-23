@@ -524,10 +524,18 @@ form.pqr-form button { margin-top: 20px; width: 100%; }
 }
 
 /* ---- Corporativo: palabras decorativas de fondo (Gálatas 5:22-23) ----
-   Capa puramente decorativa, detrás de las tarjetas (que tienen fondo
-   blanco sólido, así que quedan intactas) — se oculta en pantallas
-   angostas donde no hay espacio alrededor de las tarjetas para lucirla. */
+   Capa puramente decorativa, en DOS franjas fijas (en píxeles, no en % de
+   la altura de la sección — así nunca dependen de cuánto midan las
+   tarjetas): una franja arriba de las tarjetas (ancladas con `top`) y otra
+   abajo (ancladas con `bottom`), dentro de un padding extra que se le da a
+   la sección solo quando esta capa se muestra. El tamaño de letra de cada
+   palabra es más chico cuanto más larga es la palabra, para que ninguna
+   se salga del ancho disponible. Se oculta en pantallas angostas donde no
+   hay margen suficiente para lucirla sin recortarse. */
 .section-frutos { position: relative; overflow: hidden; }
+@media (min-width: 1301px) {
+  .section-frutos { padding-top: 150px; padding-bottom: 150px; }
+}
 .frutos-fondo {
   position: absolute;
   inset: 0;
@@ -555,17 +563,20 @@ form.pqr-form button { margin-top: 20px; width: 100%; }
 @media (prefers-color-scheme: dark) {
   .frutos-fondo .fruto { opacity: 0.45; filter: drop-shadow(0 1px 4px rgba(0, 0, 0, 0.5)); }
 }
-@media (max-width: 900px) {
+@media (max-width: 1300px) {
   .frutos-fondo { display: none; }
 }
 .section-frutos .container { position: relative; z-index: 1; }
 
-.fruto-1 { top: 4%;  left: 3%;  font-size: 3rem;   transform: rotate(-13deg); }
-.fruto-2 { top: 8%;  left: 66%; font-size: 2.2rem; transform: rotate(10deg); }
-.fruto-3 { top: 20%; left: 10%; font-size: 2.5rem; transform: rotate(7deg); }
-.fruto-4 { top: 30%; left: 70%; font-size: 2.8rem; transform: rotate(-9deg); }
-.fruto-5 { top: 45%; left: 3%;  font-size: 2.2rem; transform: rotate(-5deg); }
-.fruto-6 { top: 52%; left: 72%; font-size: 2.1rem; transform: rotate(15deg); }
-.fruto-7 { top: 65%; left: 7%;  font-size: 2.7rem; transform: rotate(11deg); }
-.fruto-8 { top: 76%; left: 68%; font-size: 2.2rem; transform: rotate(-12deg); }
-.fruto-9 { top: 88%; left: 44%; font-size: 2.4rem; transform: rotate(6deg); }
+/* Franja superior (antes de las tarjetas) */
+.fruto-1 { top: 22px;    left: 4%;  font-size: 2.6rem; transform: rotate(-12deg); }
+.fruto-2 { top: 42px;    left: 23%; font-size: 2.4rem; transform: rotate(9deg); }
+.fruto-3 { top: 16px;    left: 40%; font-size: 2.3rem; transform: rotate(-7deg); }
+.fruto-4 { top: 46px;    left: 57%; font-size: 1.6rem; transform: rotate(6deg); }
+.fruto-5 { top: 26px;    left: 78%; font-size: 1.5rem; transform: rotate(-8deg); }
+
+/* Franja inferior (después de las tarjetas) */
+.fruto-6 { bottom: 32px; left: 5%;  font-size: 2rem;   transform: rotate(8deg); }
+.fruto-7 { bottom: 18px; left: 22%; font-size: 1.4rem; transform: rotate(-6deg); }
+.fruto-8 { bottom: 38px; left: 51%; font-size: 1.7rem; transform: rotate(10deg); }
+.fruto-9 { bottom: 22px; left: 78%; font-size: 2.8rem; transform: rotate(-10deg); }
