@@ -522,3 +522,43 @@ form.pqr-form button { margin-top: 20px; width: 100%; }
   font-size: 12px;
   color: #6b7480;
 }
+
+/* ---- Corporativo: palabras decorativas de fondo (Gálatas 5:22-23) ----
+   Capa puramente decorativa, detrás de las tarjetas (que tienen fondo
+   blanco sólido, así que quedan intactas) — se oculta en pantallas
+   angostas donde no hay espacio alrededor de las tarjetas para lucirla. */
+.section-frutos { position: relative; overflow: hidden; }
+.frutos-fondo {
+  position: absolute;
+  inset: 0;
+  overflow: hidden;
+  pointer-events: none;
+  z-index: 0;
+}
+.frutos-fondo .fruto {
+  position: absolute;
+  font-family: "Poppins", sans-serif;
+  font-weight: 700;
+  letter-spacing: 0.03em;
+  text-transform: uppercase;
+  color: var(--cinco-amber);
+  opacity: 0.16;
+  white-space: nowrap;
+}
+@media (prefers-color-scheme: dark) {
+  .frutos-fondo .fruto { opacity: 0.12; }
+}
+@media (max-width: 900px) {
+  .frutos-fondo { display: none; }
+}
+.section-frutos .container { position: relative; z-index: 1; }
+
+.fruto-1 { top: 3%;  left: 4%;  font-size: 2.3rem; transform: rotate(-13deg); }
+.fruto-2 { top: 9%;  left: 80%; font-size: 1.6rem; transform: rotate(10deg); }
+.fruto-3 { top: 22%; left: 14%; font-size: 1.9rem; transform: rotate(7deg); }
+.fruto-4 { top: 33%; left: 84%; font-size: 2.1rem; transform: rotate(-9deg); }
+.fruto-5 { top: 46%; left: 3%;  font-size: 1.7rem; transform: rotate(-5deg); }
+.fruto-6 { top: 57%; left: 88%; font-size: 1.5rem; transform: rotate(15deg); }
+.fruto-7 { top: 69%; left: 7%;  font-size: 2rem;   transform: rotate(11deg); }
+.fruto-8 { top: 80%; left: 78%; font-size: 1.6rem; transform: rotate(-12deg); }
+.fruto-9 { top: 92%; left: 42%; font-size: 1.8rem; transform: rotate(6deg); }
