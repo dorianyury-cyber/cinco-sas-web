@@ -490,8 +490,8 @@ nav.main-nav a.active {
 
 /* ---- Misión/Visión con ícono y aparición escalonada (Corporativo) ---- */
 .mv-card { position: relative; overflow: hidden; }
-.mv-card-icono { display: block; margin-bottom: 8px; color: var(--cinco-amber-dark); }
-.mv-card-icono .icono-svg { width: 30px; height: 30px; }
+.mv-card-icono { display: block; margin-bottom: 10px; }
+.mv-card-icono img { width: 68px; height: 68px; border-radius: 50%; object-fit: cover; border: 3px solid var(--cinco-amber); box-shadow: var(--shadow); }
 .grid-cards-wide .mv-card:nth-child(2) { transition-delay: 0.15s; }
 
 /* ---- valores como cuadrícula de tarjetas con ícono (Corporativo) ---- */
@@ -509,8 +509,7 @@ nav.main-nav a.active {
   transition: transform 0.25s ease, box-shadow 0.25s ease, border-color 0.25s ease;
 }
 .valor-card:hover { transform: translateY(-5px); box-shadow: var(--shadow-lg); border-color: rgba(254, 178, 9, 0.4); }
-.valor-icono { color: var(--cinco-amber-dark); }
-.valor-icono .icono-svg { width: 28px; height: 28px; }
+.valor-icono img { width: 58px; height: 58px; border-radius: 50%; object-fit: cover; border: 3px solid var(--cinco-amber); box-shadow: var(--shadow); }
 .valor-nombre { font-size: 13.5px; font-weight: 600; color: var(--text); }
 
 /* Franja de cifras reutilizando .stats-card (Inicio) pero sin el margen
@@ -557,22 +556,8 @@ nav.main-nav a.active {
     inset 0 1px 0 rgba(255, 255, 255, 0.14),
     inset 0 -3px 8px rgba(0, 0, 0, 0.32);
 }
-.acordeon-trigger-icono { display: flex; flex-shrink: 0; color: var(--cinco-amber); }
-.acordeon-trigger-icono .icono-svg { width: 20px; height: 20px; }
-
-/* ---- íconos de línea (SVG, un solo color) en vez de emoji nativo:
-   se ven consistentes entre navegadores/sistemas y más sobrios/corporativos
-   que el emoji a color. Definidos como <symbol> ocultos y reutilizados con
-   <use> (ver el <svg class="svg-sprite"> justo después de <body>). ---- */
-.svg-sprite { display: none; }
-.icono-svg {
-  display: inline-block;
-  fill: none;
-  stroke: currentColor;
-  stroke-width: 1.7;
-  stroke-linecap: round;
-  stroke-linejoin: round;
-}
+.acordeon-trigger-icono { display: flex; flex-shrink: 0; }
+.acordeon-trigger-icono img { width: 36px; height: 36px; border-radius: 50%; object-fit: cover; border: 2px solid var(--cinco-amber); }
 .acordeon-trigger-label { flex: 1; font-weight: 700; font-size: 15px; }
 .acordeon-trigger-chevron { font-size: 13px; color: var(--cinco-amber); transition: transform 0.25s ease; flex-shrink: 0; }
 .acordeon-item.abierto .acordeon-trigger-chevron { transform: rotate(180deg); }
