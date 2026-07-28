@@ -1,16 +1,44 @@
 rules_version = '2';
 
-// Este sitio no tiene cuentas de usuario ni inicio de sesión: es un sitio
-// público informativo. La única colección ("pqr") solo la escribe la Cloud
+// El sitio público (Inicio, Servicios, PQR, etc.) no tiene cuentas de
+// usuario: la única colección que usa ("pqr") solo la escribe la Cloud
 // Function enviarPQR con el Admin SDK, que no pasa por estas reglas — por
-// eso aquí se niega TODO acceso directo desde el cliente (lectura y
-// escritura), sin excepciones. Esto es intencionalmente más estricto que
-// LBDC Neiva/Copropiedad Saludable, que sí necesitan reglas de lectura/
-// escritura para usuarios autenticados.
+// eso no tiene ninguna regla de acceso explícita abajo y queda denegada
+// por defecto.
+//
+// El módulo interno de Control de Contratos (web/control/*.html) sí tiene
+// login (Firebase Auth, cuentas creadas a mano para el equipo, todas con el
+// mismo nivel de acceso — sin roles por ahora), así que su colección
+// "contratos" permite lectura/escritura a cualquier usuario autenticado.
 service cloud.firestore {
   match /databases/{database}/documents {
-    match /{document=**} {
-      allow read, write: if false;
+    match /contratos/{contratoId} {
+      allow read, write: if request.auth != null;
+
+      match /items/{itemId} {
+        allow read, write: if request.auth != null;
+      }
+    }
+
+    // Listado Maestro de Documentos (web/control/documentos.html) — mismo
+    // criterio de acceso que "contratos". "contadores" guarda el siguiente
+    // consecutivo por área+tipo para generar los códigos sin choques.
+    match /documentos/{documentoId} {
+      allow read, write: if request.auth != null;
+
+      match /cambios/{cambioId} {
+        allow read, write: if request.auth != null;
+      }
+    }
+
+    match /contadores/{contadorId} {
+      allow read, write: if request.auth != null;
+    }
+
+    // Correspondencia (web/control/correspondencia.html) — mismo criterio;
+    // usa la misma colección "contadores" (doc "correspondencia_{año}").
+    match /correspondencia/{cartaId} {
+      allow read, write: if request.auth != null;
     }
   }
 }

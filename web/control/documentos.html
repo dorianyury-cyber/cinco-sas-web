@@ -1,0 +1,102 @@
+<!doctype html>
+<html lang="es">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<meta name="robots" content="noindex, nofollow">
+<title>Documentos — Control de Contratos — Cinco S.A.S.</title>
+<link rel="icon" href="../assets/img/favicon.png">
+<link rel="stylesheet" href="../assets/css/styles.css">
+</head>
+<body>
+  <header class="site-header">
+    <div class="container">
+      <a class="brand" href="../conecta.html">
+        <img src="../assets/img/logo.png" alt="Cinco S.A.S.">
+      </a>
+      <div class="control-userbar">
+        <span id="userEmail"></span>
+        <a href="contratos.html" class="control-userbar-link">Contratos</a>
+        <a href="correspondencia.html" class="control-userbar-link">Correspondencia</a>
+        <a href="cambiar-clave.html" class="control-userbar-link">Cambiar clave</a>
+        <button id="logoutBtn" class="btn-outline">Cerrar sesión</button>
+      </div>
+    </div>
+  </header>
+
+  <div class="page-banner">
+    <div class="container">
+      <span class="eyebrow">Uso interno</span>
+      <h1>Listado Maestro de Documentos</h1>
+      <p>Código, versión y control de cambios — general de la empresa.</p>
+    </div>
+  </div>
+
+  <section class="section">
+    <div class="container">
+      <details class="card control-nuevo">
+        <summary>+ Nuevo documento</summary>
+        <form class="pqr-form" id="nuevoDocumentoForm">
+          <label for="area">Área</label>
+          <select id="area" required></select>
+
+          <label for="tipo">Tipo de documento</label>
+          <select id="tipo" required></select>
+
+          <label for="nombre">Nombre del documento</label>
+          <input type="text" id="nombre" required maxlength="160">
+
+          <label for="enlace">Enlace OneDrive</label>
+          <input type="url" id="enlace" maxlength="500">
+
+          <label for="codigoAnterior">Código anterior (si es una recodificación, opcional)</label>
+          <input type="text" id="codigoAnterior" maxlength="60">
+
+          <button type="submit" class="btn" id="crearDocumentoBtn">Crear documento</button>
+          <div class="form-alert" id="crearDocumentoAlert"></div>
+        </form>
+      </details>
+
+      <div class="control-filtros">
+        <label>Área
+          <select id="filtroArea"><option value="">Todas</option></select>
+        </label>
+        <label>Estado
+          <select id="filtroEstado">
+            <option value="">Todos</option>
+            <option value="vigente">Vigente</option>
+            <option value="obsoleto">Obsoleto</option>
+          </select>
+        </label>
+      </div>
+
+      <div class="control-tabla-wrap">
+        <table class="control-tabla-documentos">
+          <colgroup>
+            <col class="w-110">
+            <col>
+            <col class="w-150">
+            <col class="w-120">
+            <col class="w-70">
+            <col class="w-100">
+          </colgroup>
+          <thead>
+            <tr>
+              <th>Código</th>
+              <th>Nombre</th>
+              <th>Área</th>
+              <th>Tipo</th>
+              <th>Ver.</th>
+              <th>Estado</th>
+            </tr>
+          </thead>
+          <tbody id="listaDocumentos"></tbody>
+        </table>
+      </div>
+      <p id="sinDocumentos" class="text-muted oculto">Todavía no hay documentos registrados.</p>
+    </div>
+  </section>
+
+  <script type="module" src="../js/control/documentos.js"></script>
+</body>
+</html>

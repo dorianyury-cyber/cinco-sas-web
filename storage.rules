@@ -1,0 +1,13 @@
+rules_version = '2';
+
+// Solo se usa para las imágenes que se insertan dentro de una carta de
+// Correspondencia (web/control/correspondencia.html) — mismo criterio de
+// acceso que Firestore: cualquier usuario autenticado del Control de
+// Contratos puede leer/escribir.
+service firebase.storage {
+  match /b/{bucket}/o {
+    match /correspondencia/{cartaId}/{archivo} {
+      allow read, write: if request.auth != null;
+    }
+  }
+}

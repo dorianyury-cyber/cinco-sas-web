@@ -1,0 +1,100 @@
+<!doctype html>
+<html lang="es">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<meta name="robots" content="noindex, nofollow">
+<title>Documento — Control de Contratos — Cinco S.A.S.</title>
+<link rel="icon" href="../assets/img/favicon.png">
+<link rel="stylesheet" href="../assets/css/styles.css">
+</head>
+<body>
+  <header class="site-header">
+    <div class="container">
+      <a class="brand" href="../conecta.html">
+        <img src="../assets/img/logo.png" alt="Cinco S.A.S.">
+      </a>
+      <div class="control-userbar">
+        <span id="userEmail"></span>
+        <a href="contratos.html" class="control-userbar-link">Contratos</a>
+        <a href="correspondencia.html" class="control-userbar-link">Correspondencia</a>
+        <a href="cambiar-clave.html" class="control-userbar-link">Cambiar clave</a>
+        <button id="logoutBtn" class="btn-outline">Cerrar sesión</button>
+      </div>
+    </div>
+  </header>
+
+  <div class="page-banner">
+    <div class="container">
+      <span class="eyebrow"><a href="documentos.html" class="control-volver">← Documentos</a></span>
+      <h1 id="documentoCodigo">Cargando…</h1>
+      <p id="documentoNombre"></p>
+    </div>
+  </div>
+
+  <section class="section">
+    <div class="container">
+      <div class="card control-cabecera">
+        <div>
+          <span class="pill" id="documentoArea"></span>
+          <span class="pill" id="documentoTipo"></span>
+          <span class="text-muted" id="documentoCodigoAnterior"></span>
+        </div>
+        <div class="control-cabecera-datos">
+          <span class="control-badge control-badge-lg" id="documentoVersion"></span>
+          <label>Estado:
+            <select id="documentoEstado">
+              <option value="vigente">Vigente</option>
+              <option value="obsoleto">Obsoleto</option>
+            </select>
+          </label>
+        </div>
+      </div>
+
+      <div class="card">
+        <form class="pqr-form control-form-sin-margen" id="datosForm">
+          <label for="nombre">Nombre del documento</label>
+          <input type="text" id="nombre" maxlength="160">
+
+          <label for="enlace">Enlace OneDrive</label>
+          <input type="url" id="enlace" maxlength="500">
+        </form>
+      </div>
+
+      <details class="card control-nuevo">
+        <summary>+ Registrar nueva versión</summary>
+        <form class="pqr-form" id="nuevaVersionForm">
+          <label for="motivo">Motivo del cambio</label>
+          <textarea id="motivo" rows="3" required maxlength="500"></textarea>
+
+          <label for="enlaceNuevaVersion">Enlace nuevo (opcional, si cambió de ubicación)</label>
+          <input type="url" id="enlaceNuevaVersion" maxlength="500">
+
+          <button type="submit" class="btn" id="nuevaVersionBtn">Registrar versión</button>
+          <div class="form-alert" id="nuevaVersionAlert"></div>
+        </form>
+      </details>
+
+      <div class="card">
+        <h3>Control de cambios</h3>
+        <div class="control-tabla-wrap">
+          <table class="control-tabla-cambios">
+            <colgroup>
+              <col class="w-60">
+              <col class="w-110">
+              <col>
+              <col class="w-220">
+            </colgroup>
+            <thead>
+              <tr><th>Ver.</th><th>Fecha</th><th>Motivo</th><th>Hecho por</th></tr>
+            </thead>
+            <tbody id="listaCambios"></tbody>
+          </table>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <script type="module" src="../js/control/documento-detalle.js"></script>
+</body>
+</html>

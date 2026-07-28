@@ -1,0 +1,61 @@
+<!doctype html>
+<html lang="es">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<meta name="robots" content="noindex, nofollow">
+<title>Contrato — Control de Contratos — Cinco S.A.S.</title>
+<link rel="icon" href="../assets/img/favicon.png">
+<link rel="stylesheet" href="../assets/css/styles.css">
+</head>
+<body>
+  <header class="site-header">
+    <div class="container">
+      <a class="brand" href="../conecta.html">
+        <img src="../assets/img/logo.png" alt="Cinco S.A.S.">
+      </a>
+      <div class="control-userbar">
+        <span id="userEmail"></span>
+        <a href="documentos.html" class="control-userbar-link">Documentos</a>
+        <a href="correspondencia.html" class="control-userbar-link">Correspondencia</a>
+        <a href="cambiar-clave.html" class="control-userbar-link">Cambiar clave</a>
+        <button id="logoutBtn" class="btn-outline">Cerrar sesión</button>
+      </div>
+    </div>
+  </header>
+
+  <div class="page-banner">
+    <div class="container">
+      <span class="eyebrow"><a href="contratos.html" class="control-volver">← Contratos</a></span>
+      <h1 id="contratoNombre">Cargando…</h1>
+      <p id="contratoCliente"></p>
+    </div>
+  </div>
+
+  <section class="section">
+    <div class="container">
+      <div class="card control-cabecera">
+        <div>
+          <span class="pill" id="contratoTipo"></span>
+          <span class="text-muted" id="contratoNumero"></span>
+        </div>
+        <div class="control-cabecera-datos">
+          <label>Inicio: <span id="contratoFechaInicio"></span></label>
+          <label>Estado:
+            <select id="contratoEstado">
+              <option value="activo">Activo</option>
+              <option value="cerrado">Cerrado</option>
+            </select>
+          </label>
+          <span class="control-badge control-badge-lg" id="avanceGeneral"></span>
+          <button id="borrarContratoBtn" class="control-btn-danger">Borrar contrato</button>
+        </div>
+      </div>
+
+      <div id="camposContainer"></div>
+    </div>
+  </section>
+
+  <script type="module" src="../js/control/contrato-detalle.js"></script>
+</body>
+</html>

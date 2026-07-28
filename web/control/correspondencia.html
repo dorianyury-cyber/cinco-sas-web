@@ -1,0 +1,99 @@
+<!doctype html>
+<html lang="es">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<meta name="robots" content="noindex, nofollow">
+<title>Correspondencia — Control de Contratos — Cinco S.A.S.</title>
+<link rel="icon" href="../assets/img/favicon.png">
+<link rel="stylesheet" href="../assets/css/styles.css">
+</head>
+<body>
+  <header class="site-header">
+    <div class="container">
+      <a class="brand" href="../conecta.html">
+        <img src="../assets/img/logo.png" alt="Cinco S.A.S.">
+      </a>
+      <div class="control-userbar">
+        <span id="userEmail"></span>
+        <a href="contratos.html" class="control-userbar-link">Contratos</a>
+        <a href="documentos.html" class="control-userbar-link">Documentos</a>
+        <a href="cambiar-clave.html" class="control-userbar-link">Cambiar clave</a>
+        <button id="logoutBtn" class="btn-outline">Cerrar sesión</button>
+      </div>
+    </div>
+  </header>
+
+  <div class="page-banner">
+    <div class="container">
+      <span class="eyebrow">Uso interno</span>
+      <h1>Correspondencia</h1>
+      <p>Genera cartas con el membrete actualizado — cada una con su propio radicado.</p>
+    </div>
+  </div>
+
+  <section class="section">
+    <div class="container">
+      <details class="card control-nuevo">
+        <summary>+ Nueva carta</summary>
+        <form class="pqr-form" id="nuevaCartaForm">
+          <label for="destinatario">Destinatario</label>
+          <textarea id="destinatario" rows="2" required maxlength="300" placeholder="Ej. Empresa / Nombre de contacto"></textarea>
+
+          <label for="ciudad">Ciudad</label>
+          <input type="text" id="ciudad" maxlength="60" value="Neiva">
+
+          <label for="asunto">Asunto</label>
+          <input type="text" id="asunto" required maxlength="200">
+
+          <label>Cuerpo de la carta</label>
+          <div id="bloquesEditor" class="control-bloques"></div>
+          <div class="control-bloques-botones">
+            <button type="button" class="control-btn-mini" id="agregarTextoBtn">+ Agregar texto</button>
+            <button type="button" class="control-btn-mini" id="agregarImagenBtn">+ Agregar imagen</button>
+            <input type="file" id="inputImagen" accept="image/*" multiple hidden>
+          </div>
+
+          <label for="firmaNombre">Nombre de quien firma</label>
+          <input type="text" id="firmaNombre" required maxlength="120">
+
+          <label for="firmaCargo">Cargo de quien firma</label>
+          <input type="text" id="firmaCargo" maxlength="120">
+
+          <button type="button" class="control-btn-secundario" id="vistaPreviaBtn">Vista previa (sin guardar)</button>
+          <button type="submit" class="btn" id="crearCartaBtn">Generar y descargar carta</button>
+          <div class="form-alert" id="crearCartaAlert"></div>
+        </form>
+      </details>
+
+      <div class="control-tabla-wrap">
+        <table class="control-tabla-documentos">
+          <colgroup>
+            <col class="w-130">
+            <col class="w-110">
+            <col>
+            <col>
+            <col class="w-260">
+          </colgroup>
+          <thead>
+            <tr>
+              <th>Radicado</th>
+              <th>Fecha</th>
+              <th>Destinatario</th>
+              <th>Asunto</th>
+              <th></th>
+            </tr>
+          </thead>
+          <tbody id="listaCorrespondencia"></tbody>
+        </table>
+      </div>
+      <p id="sinCartas" class="text-muted oculto">Todavía no hay cartas registradas.</p>
+      <input type="file" id="inputWordFinal" accept=".docx" hidden>
+    </div>
+  </section>
+
+  <script src="../js/vendor/jspdf.umd.min.js"></script>
+  <script src="../js/vendor/docx.iife.js"></script>
+  <script type="module" src="../js/control/correspondencia.js"></script>
+</body>
+</html>

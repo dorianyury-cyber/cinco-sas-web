@@ -1,0 +1,54 @@
+<!doctype html>
+<html lang="es">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<meta name="robots" content="noindex, nofollow">
+<title>Cambiar clave — Control de Contratos — Cinco S.A.S.</title>
+<link rel="icon" href="../assets/img/favicon.png">
+<link rel="stylesheet" href="../assets/css/styles.css">
+</head>
+<body>
+  <header class="site-header">
+    <div class="container">
+      <a class="brand" href="../conecta.html">
+        <img src="../assets/img/logo.png" alt="Cinco S.A.S.">
+      </a>
+      <div class="control-userbar">
+        <span id="userEmail"></span>
+        <button id="logoutBtn" class="btn-outline">Cerrar sesión</button>
+      </div>
+    </div>
+  </header>
+
+  <div class="page-banner">
+    <div class="container">
+      <span class="eyebrow"><a href="contratos.html" class="control-volver">← Contratos</a></span>
+      <h1>Cambiar mi clave</h1>
+      <p>Solo tú puedes cambiar tu propia clave, y necesitas la actual para confirmarlo.</p>
+    </div>
+  </div>
+
+  <section class="section">
+    <div class="container control-container-angosto">
+      <div class="card">
+        <form class="pqr-form" id="cambiarClaveForm">
+          <label for="claveActual">Clave actual</label>
+          <input type="password" id="claveActual" required autocomplete="current-password">
+
+          <label for="claveNueva">Clave nueva</label>
+          <input type="password" id="claveNueva" required minlength="6" autocomplete="new-password">
+
+          <label for="claveConfirmar">Repetir clave nueva</label>
+          <input type="password" id="claveConfirmar" required minlength="6" autocomplete="new-password">
+
+          <button type="submit" class="btn" id="cambiarClaveBtn">Guardar nueva clave</button>
+          <div class="form-alert" id="cambiarClaveAlert"></div>
+        </form>
+      </div>
+    </div>
+  </section>
+
+  <script type="module" src="../js/control/cambiar-clave.js"></script>
+</body>
+</html>

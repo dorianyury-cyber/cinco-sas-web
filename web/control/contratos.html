@@ -1,0 +1,70 @@
+<!doctype html>
+<html lang="es">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<meta name="robots" content="noindex, nofollow">
+<title>Contratos — Control de Contratos — Cinco S.A.S.</title>
+<link rel="icon" href="../assets/img/favicon.png">
+<link rel="stylesheet" href="../assets/css/styles.css">
+</head>
+<body>
+  <header class="site-header">
+    <div class="container">
+      <a class="brand" href="../conecta.html">
+        <img src="../assets/img/logo.png" alt="Cinco S.A.S.">
+      </a>
+      <div class="control-userbar">
+        <span id="userEmail"></span>
+        <a href="documentos.html" class="control-userbar-link">Documentos</a>
+        <a href="correspondencia.html" class="control-userbar-link">Correspondencia</a>
+        <a href="cambiar-clave.html" class="control-userbar-link">Cambiar clave</a>
+        <button id="logoutBtn" class="btn-outline">Cerrar sesión</button>
+      </div>
+    </div>
+  </header>
+
+  <div class="page-banner">
+    <div class="container">
+      <span class="eyebrow">Uso interno</span>
+      <h1>Contratos</h1>
+      <p>Servicio al Cliente, Talento Humano y Actividades, contrato por contrato.</p>
+    </div>
+  </div>
+
+  <section class="section">
+    <div class="container">
+      <details class="card control-nuevo">
+        <summary>+ Nuevo contrato</summary>
+        <form class="pqr-form" id="nuevoContratoForm">
+          <label for="nombre">Nombre / objeto del contrato</label>
+          <input type="text" id="nombre" required maxlength="160">
+
+          <label for="cliente">Cliente</label>
+          <input type="text" id="cliente" required maxlength="120">
+
+          <label for="tipo">Tipo de servicio</label>
+          <select id="tipo" required>
+            <option value="obra">Obra / Interventoría</option>
+            <option value="consultoria">Consultoría</option>
+          </select>
+
+          <label for="numero">Número de contrato (opcional)</label>
+          <input type="text" id="numero" maxlength="60">
+
+          <label for="fechaInicio">Fecha de inicio</label>
+          <input type="date" id="fechaInicio" required>
+
+          <button type="submit" class="btn" id="crearBtn">Crear contrato</button>
+          <div class="form-alert" id="crearAlert"></div>
+        </form>
+      </details>
+
+      <div id="listaContratos" class="grid-cards grid-cards-wide control-lista"></div>
+      <p id="sinContratos" class="text-muted oculto">Todavía no hay contratos registrados.</p>
+    </div>
+  </section>
+
+  <script type="module" src="../js/control/contratos.js"></script>
+</body>
+</html>
