@@ -56,3 +56,51 @@ document.querySelectorAll(".servicio-panel").forEach((panel) => {
     if (!yaActivo) panel.classList.add("activo");
   });
 });
+
+// Acordeón de Política/Objetivos/Alcance SGI-HSEQ (página Corporativo): un
+// clic en el encabezado despliega/colapsa esa sección, para no dejar todo
+// el texto de cumplimiento desplegado de una vez como un muro plano.
+document.querySelectorAll(".acordeon-trigger").forEach((btn) => {
+  btn.addEventListener("click", () => btn.closest(".acordeon-item")?.classList.toggle("abierto"));
+});
+
+// Cifras animadas (Corporativo): en vez de aparecer ya con el número final,
+// cuentan desde 0 hasta el valor real cuando la franja entra en pantalla.
+// Los años de experiencia toman su meta de aniosDeTrayectoria() en vez de
+// quedar fijos en el HTML (mismo criterio que .anios-cinco, para no volver
+// a quedar con un número desactualizado con el tiempo).
+document.querySelectorAll("[data-contador-anios]").forEach((el) => {
+  el.dataset.contador = aniosDeTrayectoria();
+});
+const elementosContador = document.querySelectorAll("[data-contador]");
+if (elementosContador.length) {
+  const animarContador = (el) => {
+    const destino = parseFloat(el.dataset.contador);
+    const sufijo = el.dataset.sufijo || "";
+    const duracion = 1200;
+    const inicio = performance.now();
+    function paso(ahora) {
+      const progreso = Math.min((ahora - inicio) / duracion, 1);
+      const suavizado = 1 - Math.pow(1 - progreso, 3);
+      el.textContent = Math.round(destino * suavizado) + sufijo;
+      if (progreso < 1) requestAnimationFrame(paso);
+    }
+    requestAnimationFrame(paso);
+  };
+  if ("IntersectionObserver" in window) {
+    const observadorContadores = new IntersectionObserver(
+      (entradas) => {
+        entradas.forEach((entrada) => {
+          if (entrada.isIntersecting) {
+            animarContador(entrada.target);
+            observadorContadores.unobserve(entrada.target);
+          }
+        });
+      },
+      { threshold: 0.4 }
+    );
+    elementosContador.forEach((el) => observadorContadores.observe(el));
+  } else {
+    elementosContador.forEach((el) => { el.textContent = el.dataset.contador + (el.dataset.sufijo || ""); });
+  }
+}
