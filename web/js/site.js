@@ -45,3 +45,14 @@ if ("IntersectionObserver" in window && elementosReveal.length) {
 } else {
   elementosReveal.forEach((el) => el.classList.add("in-view"));
 }
+
+// Acordeón de servicios (página Servicios): en computador el hover ya
+// expande la franja por CSS; el clic/toque sirve para el celular (donde no
+// hay cursor) y para "fijar" una franja abierta en pantallas táctiles.
+document.querySelectorAll(".servicio-panel").forEach((panel) => {
+  panel.addEventListener("click", () => {
+    const yaActivo = panel.classList.contains("activo");
+    document.querySelectorAll(".servicio-panel.activo").forEach((p) => p.classList.remove("activo"));
+    if (!yaActivo) panel.classList.add("activo");
+  });
+});
