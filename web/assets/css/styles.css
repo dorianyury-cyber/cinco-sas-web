@@ -597,6 +597,17 @@ ul.clean-list li::before {
   background: rgba(254, 178, 9, 0.14);
   border-radius: 18px;
 }
+/* Variante con foto real en vez de emoji (Conecta) — círculo con borde
+   ámbar, mismo lenguaje visual que Misión/Visión/Valores en Corporativo. */
+.app-card .icon.icon-foto { background: none; padding: 0; }
+.app-card .icon.icon-foto img {
+  width: 100%;
+  height: 100%;
+  border-radius: 50%;
+  object-fit: cover;
+  border: 3px solid var(--cinco-amber);
+  box-shadow: var(--shadow);
+}
 .app-card p { font-size: 13.5px; color: var(--text-muted); margin-bottom: 18px; }
 .app-card .note {
   font-size: 11.5px;
