@@ -340,6 +340,39 @@ nav.main-nav a.active {
   object-fit: cover;
 }
 .service-row-body .eyebrow { display: block; }
+
+/* Insignia "Línea 0X" con el mismo lenguaje visual de los botones de
+   acordeón del panel interno (degradado navy/ámbar, textura achurada,
+   relieve 3D) — reemplaza el texto plano en ámbar. */
+.linea-badge {
+  display: inline-flex;
+  align-items: center;
+  padding: 7px 14px;
+  margin-bottom: 14px;
+  border-radius: 8px;
+  font-size: 12px;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 1.2px;
+  color: var(--cinco-amber);
+  position: relative;
+  overflow: hidden;
+  background:
+    repeating-linear-gradient(135deg, rgba(254, 178, 9, 0.14) 0 8px, rgba(254, 178, 9, 0) 8px 16px),
+    linear-gradient(135deg, var(--cinco-navy) 0%, var(--cinco-navy-dark) 100%);
+  box-shadow:
+    0 6px 14px rgba(18, 22, 29, 0.28),
+    inset 0 1px 0 rgba(255, 255, 255, 0.10),
+    inset 0 -2px 5px rgba(0, 0, 0, 0.32);
+}
+.linea-badge::after {
+  content: "";
+  position: absolute;
+  left: 0; right: 0; bottom: 0;
+  height: 2px;
+  background: linear-gradient(90deg, var(--cinco-amber-dark), var(--cinco-amber), var(--cinco-amber-dark));
+}
+
 .service-row-body h3 { font-size: clamp(19px, 2.4vw, 24px); color: var(--cinco-navy); margin-bottom: 14px; }
 @media (prefers-color-scheme: dark) { .service-row-body h3 { color: #fff; } }
 .service-row-body p { color: var(--text-muted); font-size: 15px; }
