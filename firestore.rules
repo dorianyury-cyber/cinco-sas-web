@@ -9,9 +9,21 @@ rules_version = '2';
 // El módulo interno de Control de Contratos (web/control/*.html) tiene
 // login (Firebase Auth, cuentas creadas a mano para el equipo) y perfiles
 // en "empleados" (documento con id = email, porque todo el módulo ya
-// identifica al usuario por user.email, nunca por uid). Un admin ve/edita
-// todo; un empleado normal solo ve los contratos donde está en su "equipo",
-// y ahí solo puede tocar estado/avance, no reasignar equipo ni borrar.
+// identifica al usuario por user.email, nunca por uid). Cuatro roles:
+// - admin: control total (incluido borrar contratos y administrar
+//   empleados/roles — lo único que NO comparte con coadmin).
+// - coadmin: edita todo lo de los contratos (datos, checklist completo,
+//   equipo, documentos) igual que admin, pero no puede borrar contratos
+//   ni tocar la colección "empleados" (roles/altas/bajas).
+// - apoyo: dentro de "items" (el checklist) solo puede tocar las columnas
+//   listadas en su empleados/{email}.camposPermitidos — el resto del
+//   contrato (datos básicos, equipo) lo ve pero no lo edita.
+// - empleado: sin permiso de escritura en contratos/items/documentos.
+//   Ve lo que sus reglas de lectura permiten; qué columnas del checklist
+//   se le muestran (camposVisibles) y el ocultamiento de "Ver"/"+ Agregar
+//   documento" se resuelve en el cliente (contrato-detalle.js) — Firestore
+//   no permite redactar campos sueltos de un documento en la lectura, así
+//   que esa parte NO es una barrera de seguridad dura, solo de interfaz.
 service cloud.firestore {
   match /databases/{database}/documents {
 
@@ -21,37 +33,54 @@ service cloud.firestore {
     function esEmpleadoActivo() {
       return request.auth != null && empleadoDoc().estado == 'activo';
     }
-    function esAdmin() {
-      return esEmpleadoActivo() && empleadoDoc().rol == 'admin';
+    function tieneRol(rol) {
+      return esEmpleadoActivo() && empleadoDoc().rol == rol;
     }
+    function esAdmin() { return tieneRol('admin'); }
+    function esCoadmin() { return tieneRol('coadmin'); }
+    // "Gestor" = puede administrar contratos de punta a punta salvo
+    // borrarlos y tocar empleados (eso queda solo para esAdmin()).
+    function esGestor() { return esAdmin() || esCoadmin(); }
+    function esApoyo() { return tieneRol('apoyo'); }
     function enEquipo(datosContrato) {
       return esEmpleadoActivo() && request.auth.token.email in datosContrato.equipo;
     }
+    function camposPermitidosApoyo() {
+      return empleadoDoc().get('camposPermitidos', []);
+    }
 
     // Directorio de empleados: cualquier autenticado lo lee (para elegir a
-    // quién asignar a un contrato), solo un admin lo administra.
+    // quién asignar a un contrato), solo un admin lo administra —
+    // coadmin/apoyo/empleado no pueden cambiar roles ni de sí mismos ni
+    // de nadie más.
     match /empleados/{email} {
       allow read: if request.auth != null;
       allow write: if esAdmin();
     }
 
     match /contratos/{contratoId} {
-      allow read: if esAdmin() || enEquipo(resource.data);
-      allow create, delete: if esAdmin();
-      allow update: if esAdmin()
-        || (enEquipo(resource.data)
-            && request.resource.data.diff(resource.data).affectedKeys()
-                 .hasOnly(['estado', 'actualizadoEn', 'actualizadoPor']));
+      allow read: if esGestor() || enEquipo(resource.data);
+      allow create: if esGestor();
+      allow delete: if esAdmin();
+      allow update: if esGestor();
 
       match /items/{itemId} {
-        allow read, write: if esAdmin() || enEquipo(get(/databases/$(database)/documents/contratos/$(contratoId)).data);
+        allow read: if esGestor() || enEquipo(get(/databases/$(database)/documents/contratos/$(contratoId)).data);
+        allow write: if esGestor()
+          || (esApoyo()
+              && enEquipo(get(/databases/$(database)/documents/contratos/$(contratoId)).data)
+              && request.resource.data.diff(resource.data).affectedKeys()
+                   .hasOnly(camposPermitidosApoyo().concat(['actualizadoEn', 'actualizadoPor', 'historialEstado'])));
       }
 
       // Carpeta de documentos del contrato (referencias a "documentos" o
-      // "correspondencia", o filas manuales) — mismo nivel de acceso que
-      // el resto del contrato.
+      // "correspondencia", o filas manuales). Igual que el resto del
+      // contrato para leer; para crear/borrar filas, "empleado" queda
+      // fuera (no puede archivar documentos), apoyo sí puede.
       match /documentos/{docId} {
-        allow read, write: if esAdmin() || enEquipo(get(/databases/$(database)/documents/contratos/$(contratoId)).data);
+        allow read: if esGestor() || enEquipo(get(/databases/$(database)/documents/contratos/$(contratoId)).data);
+        allow write: if esGestor()
+          || (esApoyo() && enEquipo(get(/databases/$(database)/documents/contratos/$(contratoId)).data));
       }
     }
 

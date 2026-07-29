@@ -189,12 +189,19 @@ function celda(texto) {
   return td;
 }
 
+// Deep-link desde "Documentos del contrato" (contrato.html) — esa vista
+// solo puede enlazar a esta página en general (no hay contrato.html?id=
+// por carta), así que aquí se resalta y hace scroll a la fila pedida.
+const idDestacar = new URLSearchParams(window.location.search).get("id");
+let yaDestacado = false;
+
 function renderTabla(cartas) {
   tbody.innerHTML = "";
   sinCartas.classList.toggle("oculto", cartas.length > 0);
 
   cartas.forEach((c) => {
     const fila = document.createElement("tr");
+    fila.dataset.id = c.id;
     fila.appendChild(celda(c.radicado));
     fila.appendChild(celda(c.fecha || ""));
     fila.appendChild(celda(c.destinatario || ""));
@@ -268,6 +275,16 @@ function renderTabla(cartas) {
 
     tbody.appendChild(fila);
   });
+
+  if (idDestacar && !yaDestacado) {
+    const fila = tbody.querySelector(`tr[data-id="${idDestacar}"]`);
+    if (fila) {
+      yaDestacado = true;
+      fila.scrollIntoView({ behavior: "smooth", block: "center" });
+      fila.classList.add("control-fila-destacada");
+      setTimeout(() => fila.classList.remove("control-fila-destacada"), 3000);
+    }
+  }
 }
 
 inputWordFinal.addEventListener("change", async () => {

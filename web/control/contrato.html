@@ -35,7 +35,7 @@
 
   <section class="section">
     <div class="container">
-      <div class="card control-cabecera">
+      <div class="card control-cabecera" id="cabeceraVista">
         <div>
           <span class="control-badge control-badge-lg" id="contratoCodigo"></span>
           <span class="pill" id="contratoTipo"></span>
@@ -43,6 +43,9 @@
         </div>
         <div class="control-cabecera-datos">
           <label>Inicio: <span id="contratoFechaInicio"></span></label>
+          <label>Fin: <span id="contratoFechaFin"></span></label>
+          <label>Valor: <span id="contratoValor"></span></label>
+          <label class="oculto">Supervisor/Interventor: <span id="contratoSupervisor"></span></label>
           <label>Estado:
             <select id="contratoEstado">
               <option value="activo">Activo</option>
@@ -50,9 +53,48 @@
             </select>
           </label>
           <span class="control-badge control-badge-lg" id="avanceGeneral"></span>
+          <button id="editarContratoBtn" class="control-btn-mini oculto">Editar</button>
           <button id="borrarContratoBtn" class="control-btn-danger oculto">Borrar contrato</button>
         </div>
       </div>
+
+      <form class="card pqr-form control-edicion oculto" id="editarContratoForm">
+        <label for="editNombre">Nombre / objeto del contrato</label>
+        <input type="text" id="editNombre" required maxlength="300">
+
+        <label for="editCliente">Cliente</label>
+        <input type="text" id="editCliente" required maxlength="120">
+
+        <label for="editTipo">Tipo de servicio</label>
+        <select id="editTipo" required>
+          <option value="obra">Obra</option>
+          <option value="servicio">Servicio</option>
+        </select>
+
+        <label for="editNumero">Número de contrato (opcional)</label>
+        <input type="text" id="editNumero" maxlength="60">
+
+        <label for="editValorContrato">Valor del contrato</label>
+        <div class="control-input-unidad">
+          <span>$</span>
+          <input type="number" id="editValorContrato" min="0">
+        </div>
+
+        <label for="editFechaInicio">Fecha de inicio</label>
+        <input type="date" id="editFechaInicio" required>
+
+        <label for="editFechaFin">Fecha de finalización</label>
+        <input type="date" id="editFechaFin">
+
+        <label for="editSupervisor">Nombre Supervisor/Interventor (opcional)</label>
+        <input type="text" id="editSupervisor" maxlength="120">
+
+        <div class="control-edicion-botones">
+          <button type="submit" class="btn" id="guardarEdicionBtn">Guardar cambios</button>
+          <button type="button" class="control-btn-mini" id="cancelarEdicionBtn">Cancelar</button>
+        </div>
+        <div class="form-alert" id="editarContratoAlert"></div>
+      </form>
 
       <div id="camposContainer"></div>
 

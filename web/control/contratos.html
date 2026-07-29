@@ -35,11 +35,11 @@
 
   <section class="section">
     <div class="container">
-      <details class="card control-nuevo">
+      <details class="card control-nuevo" id="nuevoContratoDetails">
         <summary>+ Nuevo contrato</summary>
         <form class="pqr-form" id="nuevoContratoForm">
           <label for="nombre">Nombre / objeto del contrato</label>
-          <input type="text" id="nombre" required maxlength="160">
+          <input type="text" id="nombre" required maxlength="300">
 
           <label for="cliente">Cliente</label>
           <input type="text" id="cliente" required maxlength="120">
@@ -49,15 +49,27 @@
 
           <label for="tipo">Tipo de servicio</label>
           <select id="tipo" required>
-            <option value="obra">Obra / Interventoría</option>
-            <option value="consultoria">Consultoría</option>
+            <option value="obra">Obra</option>
+            <option value="servicio">Servicio</option>
           </select>
 
           <label for="numero">Número de contrato (opcional)</label>
           <input type="text" id="numero" maxlength="60">
 
+          <label for="valorContrato">Valor del contrato</label>
+          <div class="control-input-unidad">
+            <span>$</span>
+            <input type="number" id="valorContrato" min="0">
+          </div>
+
           <label for="fechaInicio">Fecha de inicio</label>
           <input type="date" id="fechaInicio" required>
+
+          <label for="fechaFin">Fecha de finalización</label>
+          <input type="date" id="fechaFin">
+
+          <label for="supervisor">Nombre Supervisor/Interventor (opcional)</label>
+          <input type="text" id="supervisor" maxlength="120">
 
           <button type="submit" class="btn" id="crearBtn">Crear contrato</button>
           <div class="form-alert" id="crearAlert"></div>

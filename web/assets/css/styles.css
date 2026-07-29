@@ -722,6 +722,17 @@ form.pqr-form textarea:focus {
   box-shadow: 0 0 0 3px rgba(254, 178, 9, 0.2);
 }
 form.pqr-form textarea { resize: vertical; }
+.control-input-unidad { position: relative; }
+.control-input-unidad span {
+  position: absolute;
+  left: 14px;
+  top: 50%;
+  transform: translateY(-50%);
+  color: var(--text-muted, #6b7280);
+  font-size: 14px;
+  pointer-events: none;
+}
+form.pqr-form .control-input-unidad input { padding-left: 30px; }
 .honeypot-field { position: absolute; left: -9999px; top: -9999px; }
 form.pqr-form button { margin-top: 20px; width: 100%; }
 .form-alert {
@@ -821,7 +832,6 @@ form.pqr-form button { margin-top: 20px; width: 100%; }
 
 /* ---- módulo interno: Control de Contratos (web/control/*) ---- */
 .text-muted { color: var(--text-muted); }
-.oculto { display: none; }
 .control-volver { color: inherit; }
 .control-container-angosto { max-width: 420px; }
 .control-form-sin-margen { margin-bottom: 0; }
@@ -871,6 +881,19 @@ a.control-contrato-card:hover { transform: translateY(-4px); box-shadow: var(--s
   gap: 16px;
 }
 .control-cabecera-datos { display: flex; align-items: center; gap: 20px; flex-wrap: wrap; font-size: 13px; color: var(--text-muted); }
+.control-edicion { margin-top: 20px; }
+.control-edicion-botones { display: flex; gap: 12px; margin-top: 20px; }
+form.pqr-form .control-edicion-botones button { width: auto; margin-top: 0; white-space: nowrap; }
+
+.control-rol-ayuda { margin: -4px 0 0; font-size: 12.5px; }
+.control-campos-permiso { margin-top: 14px; }
+.control-campos-permiso-lista { display: flex; gap: 16px; flex-wrap: wrap; margin-top: 6px; }
+.control-campos-permiso-lista label {
+  display: flex; align-items: center; gap: 6px;
+  font-weight: 400; font-size: 13.5px; margin: 0;
+}
+.control-campos-fila { display: flex; gap: 14px; flex-wrap: wrap; align-items: center; padding: 10px 0; border-top: 1px dashed var(--border); }
+.control-campos-resumen { font-size: 12.5px; color: var(--text-muted); }
 .control-cabecera-datos label { display: flex; align-items: center; gap: 6px; }
 .control-cabecera select {
   padding: 6px 10px;
@@ -973,6 +996,7 @@ a.control-contrato-card:hover { transform: translateY(-4px); box-shadow: var(--s
 
 .control-item-notas-celda { display: flex; gap: 6px; align-items: center; }
 .control-item-notas-celda input { flex: 1; min-width: 0; }
+.control-item-oculto { color: var(--text-muted); text-align: center; }
 .control-item-mas {
   flex-shrink: 0;
   width: 26px;
@@ -1098,6 +1122,7 @@ table.control-tabla-documentos td.control-tabla-acciones {
 tr.control-fila-doc { cursor: pointer; }
 tr.control-fila-doc:hover { background: rgba(254, 178, 9, 0.08); }
 tr.control-fila-doc td:first-child { font-weight: 700; color: var(--cinco-amber-dark); }
+tr.control-fila-destacada { background: rgba(254, 178, 9, 0.25); transition: background 0.4s ease; }
 
 /* ---- Equipo asignado (web/control/contrato.html) ---- */
 .control-equipo-lista { display: flex; flex-direction: column; gap: 8px; margin-bottom: 14px; }
@@ -1182,3 +1207,11 @@ tr.control-fila-doc td:first-child { font-weight: 700; color: var(--cinco-amber-
   .control-btn-secundario { border-color: #fff; color: #fff; }
   .control-btn-secundario:hover { background: rgba(255, 255, 255, 0.08); }
 }
+
+/* Utilidad "ocultar" — a propósito al final del archivo: con la misma
+   especificidad (una sola clase) que muchas reglas de componentes de
+   arriba (ej. .control-equipo-form { display: flex }), el desempate de
+   CSS lo gana quien aparezca último en el archivo. Si esta regla quedara
+   más arriba, un elemento con ambas clases (ej. "control-equipo-form
+   oculto") se mostraría igual pese a "oculto". */
+.oculto { display: none; }

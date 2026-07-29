@@ -43,10 +43,10 @@ export const ACTIVIDADES_OBRA = [
   { clave: "liquidacion_final", nombre: "Liquidación Final", fase: "cierre" }
 ];
 
-// Borrador inicial para Consultoría — no hay checklist real documentado
+// Borrador inicial para Servicio — no hay checklist real documentado
 // todavía, se arma por analogía con el de Obra. Ajustar con casos reales
 // en cuanto se tengan.
-export const ACTIVIDADES_CONSULTORIA = [
+export const ACTIVIDADES_SERVICIO = [
   { clave: "asignacion_recursos", nombre: "Asignación de Recursos", fase: "inicio" },
   { clave: "reunion_inicial", nombre: "Reunión Inicial", fase: "inicio" },
   { clave: "revision_doc_inicial", nombre: "Revisión Documentación Inicial", fase: "inicio" },
@@ -71,8 +71,22 @@ export const CAMPOS = [
   { clave: "actividades", nombre: "Actividades" }
 ];
 
+// Columnas editables de un ítem del checklist (fila en crearFilaItem, en
+// contrato-detalle.js) — es la unidad de permiso para los roles
+// "Apoyo" (camposPermitidos: cuáles puede editar) y "Empleado"
+// (camposVisibles: cuáles puede ver). "Verificado por"/"Fecha de
+// verificación" del panel de detalle no entran en este permiso: quedan
+// reservadas a Admin/Coadministrador siempre.
+export const COLUMNAS_ITEM = [
+  { clave: "estado", nombre: "Estado" },
+  { clave: "fecha", nombre: "Fecha" },
+  { clave: "responsable", nombre: "Responsable" },
+  { clave: "enlace", nombre: "Enlace" },
+  { clave: "notas", nombre: "Notas" }
+];
+
 export function plantillaActividades(tipo) {
-  return tipo === "consultoria" ? ACTIVIDADES_CONSULTORIA : ACTIVIDADES_OBRA;
+  return tipo === "servicio" ? ACTIVIDADES_SERVICIO : ACTIVIDADES_OBRA;
 }
 
 // Arma la lista plana de ítems a sembrar en contratos/{id}/items al crear

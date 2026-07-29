@@ -1,0 +1,72 @@
+// Normalización de texto para formularios de Control de Contratos.
+// El usuario puede escribir en cualquier combinación de mayúsculas/
+// minúsculas (incluido todo en mayúscula sostenida); al guardar se
+// homogeniza a formato "oración" (primera letra en mayúscula, resto en
+// minúscula) o a formato "nombre propio" (título), respetando:
+// - siglas de una lista fija (SAS, GGC, NIT...) que siempre quedan en
+//   mayúscula sin importar cómo se escribieron
+// - nombres propios/ciudades de uso frecuente en la operación (lista fija,
+//   ampliar aquí si aparecen casos nuevos)
+
+const SIGLAS = ["SAS", "LTDA", "IPS", "ESE", "EPS", "ESP", "ONG", "NIT", "GGC"];
+
+const PROPIOS = [
+  "Neiva", "Huila", "Colombia", "Pitalito", "Garzón", "Campoalegre",
+  "Rivera", "Palermo", "Aipe", "Baraya", "Gigante", "Tesalia", "Íquira",
+  "Yaguará", "Hobo", "Bogotá", "Medellín", "Cali", "Barranquilla"
+];
+
+const CONECTORES = new Set([
+  "de", "del", "la", "las", "los", "el", "y", "e", "en", "a", "al",
+  "para", "por", "con", "sin", "o", "u"
+]);
+
+const LETRA = "a-zA-Zá-úÁ-ÚñÑüÜ";
+const PATRON_PALABRA = new RegExp(`^([^${LETRA}]*)([${LETRA}]*)([^${LETRA}]*)$`);
+
+function dividirPalabra(palabra) {
+  const m = palabra.match(PATRON_PALABRA);
+  return m ? { pre: m[1], nucleo: m[2], post: m[3] } : { pre: "", nucleo: palabra, post: "" };
+}
+
+// Valor fijo (sigla o nombre propio) para un núcleo alfabético, o null si
+// debe tratarse como palabra común (minúscula salvo mayúscula inicial).
+function valorFijo(nucleo) {
+  const sigla = SIGLAS.find((s) => s.toLowerCase() === nucleo.toLowerCase());
+  if (sigla) return sigla;
+  return PROPIOS.find((p) => p.toLowerCase() === nucleo.toLowerCase()) || null;
+}
+
+export function capitalizarOracion(texto) {
+  const limpio = (texto || "").trim().replace(/\s+/g, " ");
+  if (!limpio) return "";
+  return limpio
+    .split(" ")
+    .map((palabra, i) => {
+      const { pre, nucleo, post } = dividirPalabra(palabra);
+      if (!nucleo) return palabra;
+      const fijo = valorFijo(nucleo);
+      if (fijo) return pre + fijo + post;
+      const base = nucleo.toLowerCase();
+      const cuerpo = i === 0 ? base.charAt(0).toUpperCase() + base.slice(1) : base;
+      return pre + cuerpo + post;
+    })
+    .join(" ");
+}
+
+export function capitalizarNombrePropio(texto) {
+  const limpio = (texto || "").trim().replace(/\s+/g, " ");
+  if (!limpio) return "";
+  return limpio
+    .split(" ")
+    .map((palabra, i) => {
+      const { pre, nucleo, post } = dividirPalabra(palabra);
+      if (!nucleo) return palabra;
+      const fijo = valorFijo(nucleo);
+      if (fijo) return pre + fijo + post;
+      const base = nucleo.toLowerCase();
+      const cuerpo = i > 0 && CONECTORES.has(base) ? base : base.charAt(0).toUpperCase() + base.slice(1);
+      return pre + cuerpo + post;
+    })
+    .join(" ");
+}

@@ -3,11 +3,14 @@ import {
   collection, doc, writeBatch, runTransaction, serverTimestamp,
   onSnapshot, query, orderBy
 } from "https://www.gstatic.com/firebasejs/10.7.1/firebase-firestore.js";
-import { auth, db, requireAuth } from "./firebase-control.js";
+import { auth, db, requireAuth, obtenerPerfil } from "./firebase-control.js";
 import { itemsIniciales } from "./plantillas.js";
 import { LINEAS_SERVICIO } from "./lineas-servicio.js";
+import { capitalizarOracion, capitalizarNombrePropio } from "./texto.js";
 
-const TIPO_LABEL = { obra: "Obra / Interventoría", consultoria: "Consultoría" };
+const TIPO_LABEL = { obra: "Obra", servicio: "Servicio" };
+
+const formatoMoneda = new Intl.NumberFormat("es-CO", { style: "currency", currency: "COP", maximumFractionDigits: 0 });
 
 const lista = document.getElementById("listaContratos");
 const sinContratos = document.getElementById("sinContratos");
@@ -22,6 +25,13 @@ LINEAS_SERVICIO.forEach((l) => {
   opt.textContent = `${l.clave} — ${l.nombre}`;
   selectLinea.appendChild(opt);
 });
+
+const nombreInput = document.getElementById("nombre");
+const clienteInput = document.getElementById("cliente");
+const supervisorInput = document.getElementById("supervisor");
+nombreInput.addEventListener("blur", () => { nombreInput.value = capitalizarOracion(nombreInput.value); });
+clienteInput.addEventListener("blur", () => { clienteInput.value = capitalizarNombrePropio(clienteInput.value); });
+supervisorInput.addEventListener("blur", () => { supervisorInput.value = capitalizarNombrePropio(supervisorInput.value); });
 
 function mostrarAlerta(texto, tipo) {
   alertBox.textContent = texto;
@@ -51,14 +61,23 @@ function renderContratos(snapshot) {
     card.appendChild(elemento("p", { text: c.cliente + (c.numero ? " · " + c.numero : "") }));
     card.appendChild(elemento("p", {
       class: "text-muted",
-      text: `Inicio: ${c.fechaInicio || "—"} · ${c.estado === "cerrado" ? "Cerrado" : "Activo"}`
+      text: `Inicio: ${c.fechaInicio || "—"}${c.fechaFin ? " · Fin: " + c.fechaFin : ""} · ${c.estado === "cerrado" ? "Cerrado" : "Activo"}`
     }));
+    if (c.valorContrato) {
+      card.appendChild(elemento("p", { class: "text-muted", text: formatoMoneda.format(c.valorContrato) }));
+    }
     lista.appendChild(card);
   });
 }
 
-requireAuth((user) => {
+requireAuth(async (user) => {
   document.getElementById("userEmail").textContent = user.email;
+
+  // Solo admin/coadmin crean contratos (las reglas de Firestore también lo
+  // exigen) — apoyo/empleado no ven el formulario, solo el listado.
+  const perfil = await obtenerPerfil(user.email);
+  const esGestor = perfil?.estado === "activo" && (perfil?.rol === "admin" || perfil?.rol === "coadmin");
+  if (!esGestor) document.getElementById("nuevoContratoDetails").classList.add("oculto");
 
   const q = query(collection(db, "contratos"), orderBy("creadoEn", "desc"));
   onSnapshot(q, renderContratos);
@@ -73,12 +92,15 @@ requireAuth((user) => {
     const lineaServicio = selectLinea.value;
     const anio = new Date().getFullYear();
     const datosBase = {
-      nombre: document.getElementById("nombre").value,
-      cliente: document.getElementById("cliente").value,
+      nombre: capitalizarOracion(nombreInput.value),
+      cliente: capitalizarNombrePropio(clienteInput.value),
       tipo,
       lineaServicio,
       numero: document.getElementById("numero").value,
+      valorContrato: Number(document.getElementById("valorContrato").value) || null,
       fechaInicio: document.getElementById("fechaInicio").value,
+      fechaFin: document.getElementById("fechaFin").value || null,
+      supervisor: capitalizarNombrePropio(supervisorInput.value),
       equipo: [],
       estado: "activo",
       creadoPor: user.email,

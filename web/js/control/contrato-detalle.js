@@ -4,11 +4,14 @@ import {
   query, orderBy, serverTimestamp, arrayUnion, arrayRemove
 } from "https://www.gstatic.com/firebasejs/10.7.1/firebase-firestore.js";
 import { auth, db, requireAuth, obtenerPerfil } from "./firebase-control.js";
-import { CAMPOS, FASES } from "./plantillas.js";
+import { CAMPOS, FASES, COLUMNAS_ITEM } from "./plantillas.js";
+import { capitalizarOracion, capitalizarNombrePropio } from "./texto.js";
 
 const TIPO_DOC_LABEL = { interno: "Interno", externo: "Externo" };
 
-const TIPO_LABEL = { obra: "Obra / Interventoría", consultoria: "Consultoría" };
+const TIPO_LABEL = { obra: "Obra", servicio: "Servicio" };
+
+const formatoMoneda = new Intl.NumberFormat("es-CO", { style: "currency", currency: "COP", maximumFractionDigits: 0 });
 const ESTADOS = [
   { valor: "pendiente", label: "Pendiente" },
   { valor: "en_proceso", label: "En proceso" },
@@ -52,16 +55,31 @@ function faseCompleta(todosLosItems, fase) {
   return relevantes.every((i) => i.estado === "completado");
 }
 
+// Placeholder para una columna que el rol "Empleado" no tiene en su lista
+// de camposVisibles — reemplaza al input/select en vez de solo deshabilitarlo,
+// para no mostrar ese dato en absoluto (aviso: esto es solo de interfaz, no
+// una barrera de seguridad — ver la nota en firestore.rules).
+function celdaOculta() {
+  return campo("span", { class: "control-item-oculto", text: "—" });
+}
+
 // Fila compacta de un ítem del checklist, más un panel de detalle opcional
 // (oculto por defecto) con historial de estados y verificación — se abre
 // con el botón "⋯" para no recargar visualmente la tabla del día a día.
 // Se construye con la API del DOM (sin innerHTML) para no exponer los
 // valores guardados por el usuario (notas, responsable...) a inyección de HTML.
-function crearFilaItem(item, user, onEstadoChange, contenedor, todosLosItems) {
+//
+// "permisos" decide qué puede tocar/ver cada rol en esta fila:
+// - esGestor (admin/coadmin): edita todo, incluida la verificación.
+// - apoyo: permisoColumna(clave).editable según empleados/{email}.camposPermitidos.
+// - empleado: nunca editable; permisoColumna(clave).visible según camposVisibles
+//   (las columnas no asignadas se reemplazan por celdaOculta()).
+function crearFilaItem(item, user, onEstadoChange, contenedor, todosLosItems, permisos) {
   const fila = campo("div", { class: "control-item" });
 
   fila.appendChild(campo("span", { class: "control-item-nombre", text: item.nombre }));
 
+  const pEstado = permisos.permisoColumna("estado");
   const selectEstado = document.createElement("select");
   selectEstado.className = "control-item-estado";
   ESTADOS.forEach((e) => {
@@ -69,30 +87,38 @@ function crearFilaItem(item, user, onEstadoChange, contenedor, todosLosItems) {
     if (e.valor === item.estado) opt.selected = true;
     selectEstado.appendChild(opt);
   });
-  fila.appendChild(selectEstado);
+  selectEstado.disabled = !pEstado.editable;
+  fila.appendChild(pEstado.visible ? selectEstado : celdaOculta());
 
+  const pFecha = permisos.permisoColumna("fecha");
   const fecha = document.createElement("input");
   fecha.type = "date";
   fecha.className = "control-item-fecha";
   fecha.value = item.fecha || "";
-  fila.appendChild(fecha);
+  fecha.disabled = !pFecha.editable;
+  fila.appendChild(pFecha.visible ? fecha : celdaOculta());
 
+  const pResponsable = permisos.permisoColumna("responsable");
   const responsable = document.createElement("input");
   responsable.type = "text";
   responsable.className = "control-item-responsable";
   responsable.placeholder = "Responsable";
   responsable.maxLength = 80;
   responsable.value = item.responsable || "";
-  fila.appendChild(responsable);
+  responsable.disabled = !pResponsable.editable;
+  fila.appendChild(pResponsable.visible ? responsable : celdaOculta());
 
+  const pEnlace = permisos.permisoColumna("enlace");
   const enlace = document.createElement("input");
   enlace.type = "url";
   enlace.className = "control-item-enlace";
   enlace.placeholder = "Enlace OneDrive";
   enlace.maxLength = 500;
   enlace.value = item.enlace || "";
-  fila.appendChild(enlace);
+  enlace.disabled = !pEnlace.editable;
+  fila.appendChild(pEnlace.visible ? enlace : celdaOculta());
 
+  const pNotas = permisos.permisoColumna("notas");
   const celdaNotas = campo("div", { class: "control-item-notas-celda" });
   const notas = document.createElement("input");
   notas.type = "text";
@@ -100,7 +126,8 @@ function crearFilaItem(item, user, onEstadoChange, contenedor, todosLosItems) {
   notas.placeholder = "Notas";
   notas.maxLength = 200;
   notas.value = item.notas || "";
-  celdaNotas.appendChild(notas);
+  notas.disabled = !pNotas.editable;
+  celdaNotas.appendChild(pNotas.visible ? notas : celdaOculta());
 
   const botonMas = document.createElement("button");
   botonMas.type = "button";
@@ -121,6 +148,7 @@ function crearFilaItem(item, user, onEstadoChange, contenedor, todosLosItems) {
   verificadoPor.placeholder = "Nombre de quien verifica";
   verificadoPor.maxLength = 80;
   verificadoPor.value = item.verificadoPor || "";
+  verificadoPor.disabled = !permisos.esGestor;
   labelVerifPor.appendChild(verificadoPor);
   filaVerif.appendChild(labelVerifPor);
 
@@ -128,6 +156,7 @@ function crearFilaItem(item, user, onEstadoChange, contenedor, todosLosItems) {
   const fechaVerificacion = document.createElement("input");
   fechaVerificacion.type = "date";
   fechaVerificacion.value = item.fechaVerificacion || "";
+  fechaVerificacion.disabled = !permisos.esGestor;
   labelVerifFecha.appendChild(fechaVerificacion);
   filaVerif.appendChild(labelVerifFecha);
   panel.appendChild(filaVerif);
@@ -215,10 +244,10 @@ function badgeAvance(items) {
 }
 
 // ---- Equipo asignado ----
-// Solo un admin ve el formulario para agregar/quitar (las reglas de
+// Solo admin/coadmin ven el formulario para agregar/quitar (las reglas de
 // Firestore también lo exigen); el resto del equipo ve la lista en
 // solo lectura.
-async function cargarEquipo(contratoRef, contrato, esAdmin) {
+async function cargarEquipo(contratoRef, contrato, puedeGestionar) {
   const lista = document.getElementById("equipoLista");
   const badge = document.getElementById("equipoBadge");
   const form = document.getElementById("agregarEquipoForm");
@@ -240,7 +269,7 @@ async function cargarEquipo(contratoRef, contrato, esAdmin) {
       const fila = campo("div", { class: "control-equipo-fila" });
       fila.appendChild(campo("span", { text: porEmail[email]?.nombre || email }));
       fila.appendChild(campo("span", { class: "text-muted", text: email }));
-      if (esAdmin) {
+      if (puedeGestionar) {
         const quitar = document.createElement("button");
         quitar.type = "button";
         quitar.className = "control-btn-mini";
@@ -269,7 +298,7 @@ async function cargarEquipo(contratoRef, contrato, esAdmin) {
       });
   }
 
-  if (esAdmin) {
+  if (puedeGestionar) {
     form.classList.remove("oculto");
     renderSelect();
     form.addEventListener("submit", async (e) => {
@@ -290,10 +319,13 @@ async function cargarEquipo(contratoRef, contrato, esAdmin) {
 // ---- Documentos del contrato ----
 // Combina lo que llega solo (desde Documentos/Correspondencia, cuando esa
 // carta o formato se creó eligiendo este contrato) con lo agregado a mano
-// para lo que no pasa por ninguno de los dos generadores todavía. Cualquiera
-// con acceso al contrato (admin o equipo) puede agregar filas manuales —
-// solo "Equipo asignado" es admin-only, según las reglas de Firestore.
-function cargarDocumentosContrato(contratoId) {
+// para lo que no pasa por ninguno de los dos generadores todavía. Admin,
+// coadmin y apoyo pueden ver y agregar filas manuales; "empleado" solo ve
+// la lista (ni "Ver" ni "+ Agregar documento manual" — aviso: al igual que
+// camposVisibles, ocultar "Ver" es solo de interfaz, no bloquea el dato en
+// Firestore; lo que sí es una barrera real es que la regla de Firestore le
+// niega crear filas en esta subcolección).
+function cargarDocumentosContrato(contratoId, esEmpleado) {
   const tbody = document.getElementById("listaDocumentosContrato");
   const sinDocs = document.getElementById("sinDocumentosContrato");
   const badge = document.getElementById("documentosBadge");
@@ -301,9 +333,11 @@ function cargarDocumentosContrato(contratoId) {
   const alertBox = document.getElementById("nuevoDocumentoManualAlert");
   const btn = document.getElementById("agregarDocumentoBtn");
 
+  if (esEmpleado) form.closest("details").classList.add("oculto");
+
   const enlaceDocumento = (d) => {
     if (d.origen === "documentos") return `documento.html?id=${d.refId}`;
-    if (d.origen === "correspondencia") return "correspondencia.html";
+    if (d.origen === "correspondencia") return `correspondencia.html?id=${d.refId}`;
     return d.enlace || "#";
   };
 
@@ -320,12 +354,14 @@ function cargarDocumentosContrato(contratoId) {
       fila.appendChild(campo("td", { text: TIPO_DOC_LABEL[d.tipo] || d.tipo }));
       fila.appendChild(campo("td", { text: d.creadoEn ? formatearFechaHora(d.creadoEn) : "" }));
       const tdVer = document.createElement("td");
-      const ver = document.createElement("a");
-      ver.href = enlaceDocumento(d);
-      ver.className = "control-btn-mini";
-      ver.textContent = "Ver";
-      if (d.origen === "manual") ver.target = "_blank";
-      tdVer.appendChild(ver);
+      if (!esEmpleado) {
+        const ver = document.createElement("a");
+        ver.href = enlaceDocumento(d);
+        ver.className = "control-btn-mini";
+        ver.textContent = "Ver";
+        if (d.origen === "manual") ver.target = "_blank";
+        tdVer.appendChild(ver);
+      }
       fila.appendChild(tdVer);
       tbody.appendChild(fila);
     });
@@ -368,18 +404,106 @@ requireAuth(async (user) => {
   }
   const contrato = contratoSnap.data();
   const perfil = await obtenerPerfil(user.email);
-  const esAdmin = perfil?.estado === "activo" && perfil?.rol === "admin";
+  const perfilActivo = perfil?.estado === "activo";
+  const esAdmin = perfilActivo && perfil?.rol === "admin";
+  const esCoadmin = perfilActivo && perfil?.rol === "coadmin";
+  // "Gestor" = admin o coadministrador: edita todo el contrato salvo
+  // borrarlo (esAdmin-only) y tocar empleados/roles (siempre esAdmin-only).
+  const esGestor = esAdmin || esCoadmin;
+  const esApoyo = perfilActivo && perfil?.rol === "apoyo";
+  const esEmpleado = perfilActivo && perfil?.rol === "empleado";
+  const camposPermitidos = new Set(esApoyo ? (perfil.camposPermitidos || []) : []);
+  const camposVisibles = new Set(esEmpleado ? (perfil.camposVisibles || []) : []);
 
-  document.getElementById("contratoCodigo").textContent = contrato.codigo || "";
-  document.getElementById("contratoNombre").textContent = contrato.nombre;
-  document.getElementById("contratoCliente").textContent = contrato.cliente;
-  document.getElementById("contratoTipo").textContent = TIPO_LABEL[contrato.tipo] || contrato.tipo;
-  document.getElementById("contratoNumero").textContent = contrato.numero ? `N.º ${contrato.numero}` : "";
-  document.getElementById("contratoFechaInicio").textContent = contrato.fechaInicio || "—";
-  document.getElementById("contratoEstado").value = contrato.estado || "activo";
-  document.getElementById("contratoEstado").addEventListener("change", (e) => {
+  // Qué puede tocar/ver cada rol en una columna del checklist (estado,
+  // fecha, responsable, enlace, notas) — ver COLUMNAS_ITEM en plantillas.js.
+  function permisoColumna(clave) {
+    if (esGestor) return { editable: true, visible: true };
+    if (esApoyo) return { editable: camposPermitidos.has(clave), visible: true };
+    if (esEmpleado) return { editable: false, visible: camposVisibles.has(clave) };
+    return { editable: false, visible: false };
+  }
+  const permisosItem = { esGestor, permisoColumna };
+
+  function pintarCabecera() {
+    document.getElementById("contratoCodigo").textContent = contrato.codigo || "";
+    document.getElementById("contratoNombre").textContent = contrato.nombre;
+    document.getElementById("contratoCliente").textContent = contrato.cliente;
+    document.getElementById("contratoTipo").textContent = TIPO_LABEL[contrato.tipo] || contrato.tipo;
+    document.getElementById("contratoNumero").textContent = contrato.numero ? `N.º ${contrato.numero}` : "";
+    document.getElementById("contratoFechaInicio").textContent = contrato.fechaInicio || "—";
+    document.getElementById("contratoFechaFin").textContent = contrato.fechaFin || "—";
+    document.getElementById("contratoValor").textContent = contrato.valorContrato ? formatoMoneda.format(contrato.valorContrato) : "—";
+    const supervisorEl = document.getElementById("contratoSupervisor");
+    supervisorEl.textContent = contrato.supervisor || "—";
+    supervisorEl.closest("label").classList.toggle("oculto", !contrato.supervisor);
+  }
+  pintarCabecera();
+  const selectContratoEstado = document.getElementById("contratoEstado");
+  selectContratoEstado.value = contrato.estado || "activo";
+  selectContratoEstado.disabled = !esGestor;
+  selectContratoEstado.addEventListener("change", (e) => {
     updateDoc(contratoRef, { estado: e.target.value, actualizadoEn: serverTimestamp() });
   });
+
+  // ---- Edición de los datos básicos del contrato (admin/coadmin) ----
+  const cabeceraVista = document.getElementById("cabeceraVista");
+  const editarBtn = document.getElementById("editarContratoBtn");
+  const editarForm = document.getElementById("editarContratoForm");
+  const editarAlert = document.getElementById("editarContratoAlert");
+  const guardarEdicionBtn = document.getElementById("guardarEdicionBtn");
+
+  if (esGestor) {
+    editarBtn.classList.remove("oculto");
+    editarBtn.addEventListener("click", () => {
+      document.getElementById("editNombre").value = contrato.nombre || "";
+      document.getElementById("editCliente").value = contrato.cliente || "";
+      document.getElementById("editTipo").value = contrato.tipo || "obra";
+      document.getElementById("editNumero").value = contrato.numero || "";
+      document.getElementById("editValorContrato").value = contrato.valorContrato || "";
+      document.getElementById("editFechaInicio").value = contrato.fechaInicio || "";
+      document.getElementById("editFechaFin").value = contrato.fechaFin || "";
+      document.getElementById("editSupervisor").value = contrato.supervisor || "";
+      editarAlert.className = "form-alert";
+      cabeceraVista.classList.add("oculto");
+      editarForm.classList.remove("oculto");
+    });
+
+    document.getElementById("cancelarEdicionBtn").addEventListener("click", () => {
+      editarForm.classList.add("oculto");
+      cabeceraVista.classList.remove("oculto");
+    });
+
+    editarForm.addEventListener("submit", async (e) => {
+      e.preventDefault();
+      guardarEdicionBtn.disabled = true;
+      guardarEdicionBtn.textContent = "Guardando...";
+      try {
+        const cambios = {
+          nombre: capitalizarOracion(document.getElementById("editNombre").value),
+          cliente: capitalizarNombrePropio(document.getElementById("editCliente").value),
+          tipo: document.getElementById("editTipo").value,
+          numero: document.getElementById("editNumero").value,
+          valorContrato: Number(document.getElementById("editValorContrato").value) || null,
+          fechaInicio: document.getElementById("editFechaInicio").value,
+          fechaFin: document.getElementById("editFechaFin").value || null,
+          supervisor: capitalizarNombrePropio(document.getElementById("editSupervisor").value),
+          actualizadoEn: serverTimestamp()
+        };
+        await updateDoc(contratoRef, cambios);
+        Object.assign(contrato, cambios);
+        pintarCabecera();
+        editarForm.classList.add("oculto");
+        cabeceraVista.classList.remove("oculto");
+      } catch (err) {
+        editarAlert.textContent = err.message || "No se pudo guardar los cambios.";
+        editarAlert.className = "form-alert show error";
+      } finally {
+        guardarEdicionBtn.disabled = false;
+        guardarEdicionBtn.textContent = "Guardar cambios";
+      }
+    });
+  }
 
   const itemsSnap = await getDocs(query(collection(db, "contratos", id, "items"), orderBy("orden")));
   const items = itemsSnap.docs.map((d) => ({ id: d.id, ref: d.ref, ...d.data() }));
@@ -391,13 +515,15 @@ requireAuth(async (user) => {
       `¿Seguro que quieres borrar el contrato "${contrato.nombre}"?\n\nEsta acción no se puede deshacer: se pierde todo el checklist (Servicio al Cliente, Talento Humano y Actividades) registrado en él.`
     );
     if (!confirmado) return;
+    const documentosSnap = await getDocs(collection(db, "contratos", id, "documentos"));
     await Promise.all(items.map((item) => deleteDoc(item.ref)));
+    await Promise.all(documentosSnap.docs.map((d) => deleteDoc(d.ref)));
     await deleteDoc(contratoRef);
     window.location.href = "contratos.html";
   });
 
-  await cargarEquipo(contratoRef, contrato, esAdmin);
-  cargarDocumentosContrato(id);
+  await cargarEquipo(contratoRef, contrato, esGestor);
+  cargarDocumentosContrato(id, esEmpleado);
 
   const badges = { general: document.getElementById("avanceGeneral") };
   const contenedor = document.getElementById("camposContainer");
@@ -442,14 +568,14 @@ requireAuth(async (user) => {
 
         const lista = campo("div", { class: "control-items" });
         lista.appendChild(encabezadoItems());
-        itemsFase.forEach((item) => crearFilaItem(item, user, recalcularAvances, lista, items));
+        itemsFase.forEach((item) => crearFilaItem(item, user, recalcularAvances, lista, items, permisosItem));
         detalleFase.appendChild(lista);
         detalle.appendChild(detalleFase);
       });
     } else {
       const lista = campo("div", { class: "control-items" });
       lista.appendChild(encabezadoItems());
-      itemsDelCampo.forEach((item) => crearFilaItem(item, user, recalcularAvances, lista, items));
+      itemsDelCampo.forEach((item) => crearFilaItem(item, user, recalcularAvances, lista, items, permisosItem));
       detalle.appendChild(lista);
     }
 

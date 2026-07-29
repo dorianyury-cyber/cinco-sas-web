@@ -49,8 +49,16 @@
           <label for="rol">Rol</label>
           <select id="rol" required>
             <option value="empleado">Empleado</option>
+            <option value="apoyo">Apoyo</option>
+            <option value="coadmin">Coadministrador</option>
             <option value="admin">Administrador</option>
           </select>
+          <p class="text-muted control-rol-ayuda" id="rolAyuda"></p>
+
+          <div id="camposPermisoContainer" class="control-campos-permiso oculto">
+            <label id="camposPermisoLabel"></label>
+            <div class="control-campos-permiso-lista" id="camposPermisoLista"></div>
+          </div>
 
           <button type="submit" class="btn" id="crearEmpleadoBtn">Crear empleado</button>
           <div class="form-alert" id="crearEmpleadoAlert"></div>
@@ -63,6 +71,7 @@
             <col>
             <col class="w-260">
             <col class="w-150">
+            <col class="w-260">
             <col class="w-120">
           </colgroup>
           <thead>
@@ -70,6 +79,7 @@
               <th>Nombre</th>
               <th>Correo</th>
               <th>Rol</th>
+              <th>Campos</th>
               <th>Estado</th>
             </tr>
           </thead>
