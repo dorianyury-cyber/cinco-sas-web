@@ -29,8 +29,10 @@ const LOGO_URL_TEXTO_OSCURO = "../assets/img/logo-texto-oscuro.png";
 // Código y versión de ESTE diseño de informe, tal como debería quedar
 // registrado en el Listado Maestro de Documentos (documentos.html, área
 // GG — Gestión Gerencial) — si el usuario todavía no lo ha dado de alta
-// ahí, este código queda "suelto" hasta que lo registre.
-const CODIGO_FORMATO = "GG-FOR-002";
+// ahí, este código queda "suelto" hasta que lo registre. GG-FOR-001 (no
+// -002): a la fecha no hay ningún documento GG-FOR creado todavía, así
+// que este sería el primero de esa área+tipo.
+const CODIGO_FORMATO = "GG-FOR-001";
 const VERSION_FORMATO = "1";
 
 const TIPO_LABEL = {
