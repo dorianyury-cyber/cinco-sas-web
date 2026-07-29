@@ -283,6 +283,22 @@ nav.main-nav a.active {
   margin-bottom: 22px;
 }
 
+/* ---- video institucional (Inicio) ---- */
+.video-frame {
+  max-width: 860px;
+  margin: 0 auto;
+  border-radius: var(--radius);
+  overflow: hidden;
+  box-shadow: var(--shadow-lg);
+}
+.video-frame video {
+  display: block;
+  width: 100%;
+  aspect-ratio: 16 / 9;
+  background: #000;
+  object-fit: contain;
+}
+
 /* ---- tarjetas de servicio (Inicio) ---- */
 .grid-cards {
   display: grid;
@@ -391,16 +407,6 @@ nav.main-nav a.active {
   width: 100%;
   height: 100%;
   object-fit: cover;
-}
-/* Provisional para líneas de servicio sin foto real todavía — mismo
-   degradado navy/ámbar de marca, a reemplazar por <img class="servicio-panel-img">
-   en cuanto haya una fotografía real disponible. */
-.servicio-panel-img-placeholder {
-  position: absolute;
-  inset: 0;
-  width: 100%;
-  height: 100%;
-  background: linear-gradient(135deg, var(--cinco-navy) 0%, var(--cinco-navy-dark) 65%, #8a5a12 100%);
 }
 .servicio-panel-overlay {
   position: absolute;
