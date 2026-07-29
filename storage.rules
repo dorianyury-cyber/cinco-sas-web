@@ -22,5 +22,11 @@ service firebase.storage {
     match /informes/{informeId}/{archivo} {
       allow read, write: if request.auth != null;
     }
+    // Imagen de firma de un empleado autorizado a presentar ofertas
+    // (web/control/empleados.html) — se sube una vez y se reusa en cada
+    // oferta que esa persona firme (web/control/ofertas.html).
+    match /empleados/{email}/{archivo} {
+      allow read, write: if request.auth != null;
+    }
   }
 }

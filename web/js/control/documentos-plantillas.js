@@ -18,6 +18,7 @@ export const TIPOS = [
   { clave: "REG", nombre: "Registro" },
   { clave: "ACT", nombre: "Acta" },
   { clave: "INF", nombre: "Informe" },
+  { clave: "OFE", nombre: "Oferta" },
   { clave: "MAN", nombre: "Manual" }
 ];
 

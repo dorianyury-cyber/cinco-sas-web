@@ -6,7 +6,14 @@ import {
 import { ref, uploadBytes, getDownloadURL } from "https://www.gstatic.com/firebasejs/10.7.1/firebase-storage.js";
 import { auth, db, storage, requireAuth } from "./firebase-control.js";
 import { generarInformePDF } from "./informes-pdf.js";
+import { registrarDocumentoSGC } from "./documentos-sgc.js";
 import { truncar } from "./texto.js";
+
+// Área/tipo fijos para que un informe quede en el Listado Maestro de
+// Documentos (SGC) sin pedir un campo más en el formulario — el checkbox
+// "parteSGI" es la única decisión que toma quien elabora el informe.
+const AREA_SGC_INFORMES = "SC";
+const TIPO_SGC_INFORMES = "INF";
 
 const TIPO_LABEL = {
   gestion: "Informe de gestión", mediciones: "Informe de mediciones",
@@ -277,6 +284,7 @@ function limpiarFormulario() {
   informeIdEnEdicion.value = "";
   guardarBtn.textContent = "Generar y descargar informe";
   cancelarEdicionBtn.classList.add("oculto");
+  document.getElementById("parteSGI").disabled = false;
 }
 
 cancelarEdicionBtn.addEventListener("click", limpiarFormulario);
@@ -365,14 +373,20 @@ function cargarEnFormulario(informe, paraEditar) {
     b.tipo === "tabla" ? { ...b, filas: filasParaEditar(b.filas || []) } : { ...b }
   ));
   renderBloques();
+  const parteSGI = document.getElementById("parteSGI");
   if (paraEditar) {
     informeIdEnEdicion.value = informe.id;
     guardarBtn.textContent = "Guardar cambios y descargar";
     cancelarEdicionBtn.classList.remove("oculto");
+    // Ya quedó registrado en el SGC al crearlo (si aplicaba) — no se vuelve
+    // a preguntar para no generar un segundo código para el mismo informe.
+    parteSGI.checked = false;
+    parteSGI.disabled = true;
   } else {
     informeIdEnEdicion.value = "";
     guardarBtn.textContent = "Generar y descargar informe";
     cancelarEdicionBtn.classList.add("oculto");
+    parteSGI.disabled = false;
     mostrarAlerta("Datos cargados desde " + informe.radicado + " — revisa qué cambiar antes de generar.", "ok");
   }
   document.getElementById("nuevoInformeDetails").open = true;
@@ -571,12 +585,32 @@ requireAuth(async (user) => {
         informeFinal = { id: idInforme, ...datosBase, radicado, creadoEn: new Date() };
       }
 
+      // Registro en el SGC: se hace en una segunda transacción aparte (no
+      // dentro de la de arriba) porque usa su propio contador por
+      // área+tipo — si falla, el informe ya quedó generado y no se pierde,
+      // solo se avisa para registrarlo manualmente en Documentos.
+      let codigoSgc = "";
+      let errorSgc = "";
+      if (!enEdicion && document.getElementById("parteSGI").checked) {
+        try {
+          codigoSgc = await registrarDocumentoSGC(db, {
+            area: AREA_SGC_INFORMES, tipo: TIPO_SGC_INFORMES,
+            nombre: datosBase.titulo, origen: "informes", refId: idInforme, user
+          });
+        } catch (err) {
+          errorSgc = err.message || "error desconocido";
+        }
+      }
+
       const pdf = await generarInformePDF(informeFinal);
       pdf.save(`${informeFinal.radicado}.pdf`);
 
       limpiarFormulario();
       form.closest("details").open = false;
-      mostrarAlerta(`Informe ${informeFinal.radicado} generado y descargado.`, "ok");
+      let mensaje = `Informe ${informeFinal.radicado} generado y descargado.`;
+      if (codigoSgc) mensaje += ` Registrado en el SGC como ${codigoSgc}.`;
+      if (errorSgc) mensaje += ` (No se pudo registrar en el SGC: ${errorSgc} — hazlo manualmente en Documentos.)`;
+      mostrarAlerta(mensaje, errorSgc ? "error" : "ok");
     } catch (err) {
       mostrarAlerta(err.message || "No se pudo generar el informe.", "error");
     } finally {

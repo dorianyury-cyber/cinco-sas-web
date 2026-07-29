@@ -1,0 +1,164 @@
+<!doctype html>
+<html lang="es">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<meta name="robots" content="noindex, nofollow">
+<title>Ofertas — Control de Contratos — Cinco S.A.S.</title>
+<link rel="icon" href="../assets/img/favicon.png">
+<link rel="stylesheet" href="../assets/css/styles.css">
+</head>
+<body>
+  <header class="site-header">
+    <div class="container">
+      <a class="brand" href="../conecta.html">
+        <img src="../assets/img/logo.png" alt="Cinco S.A.S.">
+      </a>
+      <div class="control-userbar">
+        <span id="userEmail"></span>
+        <a href="contratos.html" class="control-userbar-link">Contratos</a>
+        <a href="documentos.html" class="control-userbar-link">Documentos</a>
+        <a href="correspondencia.html" class="control-userbar-link">Correspondencia</a>
+        <a href="informes.html" class="control-userbar-link">Informes</a>
+        <a href="empleados.html" class="control-userbar-link">Empleados</a>
+        <a href="cambiar-clave.html" class="control-userbar-link">Cambiar clave</a>
+        <button id="logoutBtn" class="btn-outline">Cerrar sesión</button>
+      </div>
+    </div>
+  </header>
+
+  <div class="page-banner">
+    <div class="container">
+      <span class="eyebrow">Uso interno</span>
+      <h1>Ofertas</h1>
+      <p>Ofertas comerciales de diseño propio — portada, fortalezas de Cinco S.A.S., cotización con AIU/IVA como anexo, y firma del autorizado.</p>
+    </div>
+  </div>
+
+  <section class="section">
+    <div class="container">
+      <details class="card control-nuevo" id="nuevaOfertaDetails">
+        <summary>+ Nueva oferta</summary>
+        <form class="pqr-form" id="nuevaOfertaForm">
+          <input type="hidden" id="ofertaIdEnEdicion">
+
+          <label for="titulo">Título de la oferta</label>
+          <input type="text" id="titulo" required maxlength="200" placeholder="Ej. Oferta de Interventoría — Conjunto Prados del Norte">
+
+          <label for="lineaServicio">Línea de servicio</label>
+          <select id="lineaServicio" required></select>
+
+          <label for="tipo">Tipo</label>
+          <select id="tipo" required>
+            <option value="obra">Obra (con AIU)</option>
+            <option value="servicio">Servicio</option>
+          </select>
+
+          <label for="cliente">Cliente</label>
+          <input type="text" id="cliente" required maxlength="200" placeholder="Nombre del cliente o prospecto">
+
+          <label for="contratoRelacionado">Contrato relacionado (opcional — si ya es cliente, trae y archiva la oferta ahí también)</label>
+          <select id="contratoRelacionado"><option value="">Ninguno</option></select>
+
+          <label for="portada">Estilo de portada</label>
+          <select id="portada">
+            <option value="oscura">Oscura (pantalla)</option>
+            <option value="clara">Clara (ahorra tinta al imprimir)</option>
+          </select>
+
+          <label class="control-check-inline">
+            <input type="checkbox" id="parteSGI">
+            Hace parte del Sistema de Gestión Integrado (queda también en el Listado Maestro de Documentos)
+          </label>
+
+          <label>Presentación de la empresa (editable — fortalezas, experiencia, alcance del servicio)</label>
+          <div id="bloquesEditor" class="control-bloques"></div>
+          <div class="control-bloques-botones">
+            <button type="button" class="control-btn-mini" id="agregarTitulo1Btn">+ Título 1</button>
+            <button type="button" class="control-btn-mini" id="agregarTitulo2Btn">+ Título 2</button>
+            <button type="button" class="control-btn-mini" id="agregarTitulo3Btn">+ Título 3</button>
+            <button type="button" class="control-btn-mini" id="agregarParrafoBtn">+ Párrafo</button>
+            <button type="button" class="control-btn-mini" id="agregarTablaBtn">+ Tabla</button>
+            <button type="button" class="control-btn-mini" id="agregarImagenBtn">+ Gráfico / imagen</button>
+            <input type="file" id="inputImagen" accept="image/*" multiple hidden>
+          </div>
+
+          <label>Cotización (queda como Anexo 1, en página aparte, al generar el PDF)</label>
+          <div id="itemsEditor" class="control-items-editor"></div>
+          <div class="control-tabla-botones">
+            <button type="button" class="control-btn-mini" id="agregarItemBtn">+ Ítem</button>
+          </div>
+
+          <div id="aiuBox" class="control-aiu-box oculto">
+            <label for="administracion">Administración (%)</label>
+            <input type="number" id="administracion" min="0" max="100" step="0.1" value="10">
+            <label for="imprevistos">Imprevistos (%)</label>
+            <input type="number" id="imprevistos" min="0" max="100" step="0.1" value="5">
+            <label for="utilidad">Utilidad (%)</label>
+            <input type="number" id="utilidad" min="0" max="100" step="0.1" value="5">
+          </div>
+          <label for="iva">IVA (%) — <span id="ivaAyuda"></span></label>
+          <input type="number" id="iva" min="0" max="100" step="0.1" value="19">
+
+          <p class="text-muted control-informes-ayuda" id="totalesResumen"></p>
+
+          <label>Condiciones de la oferta</label>
+          <label class="control-check-inline">
+            <input type="checkbox" id="aplicaPoliza">
+            Aplica póliza de garantía
+          </label>
+          <textarea id="detallePoliza" rows="2" class="oculto" placeholder="Ej. Cumplimiento, calidad y responsabilidad civil extracontractual"></textarea>
+
+          <label for="porcentajeAnticipo">Anticipo (%)</label>
+          <input type="number" id="porcentajeAnticipo" min="0" max="100" step="1" placeholder="Ej. 50">
+
+          <label for="validezDias">Validez de la oferta (días)</label>
+          <input type="number" id="validezDias" min="1" step="1" placeholder="Ej. 30">
+
+          <label for="formaPago">Forma de pago</label>
+          <textarea id="formaPago" rows="2" placeholder="Ej. 50% anticipo, 50% contra entrega a satisfacción"></textarea>
+
+          <label for="otrasCondiciones">Otras condiciones (opcional)</label>
+          <textarea id="otrasCondiciones" rows="3" placeholder="Plazo de ejecución, lugar, garantías adicionales, etc."></textarea>
+
+          <label for="firmaEmail">Firma de quien presenta la oferta</label>
+          <select id="firmaEmail" required><option value="">Selecciona a quien firma...</option></select>
+          <p class="text-muted control-informes-ayuda">Solo aparecen empleados activos marcados como "Autorizado para presentar y firmar ofertas" en Empleados.</p>
+
+          <button type="submit" class="btn" id="guardarOfertaBtn">Generar y descargar oferta</button>
+          <button type="button" class="control-btn-mini oculto" id="cancelarEdicionOfertaBtn">Cancelar edición</button>
+          <div class="form-alert" id="crearOfertaAlert"></div>
+        </form>
+      </details>
+
+      <div class="control-tabla-wrap">
+        <table class="control-tabla-documentos">
+          <colgroup>
+            <col class="w-130">
+            <col>
+            <col class="w-190">
+            <col class="w-150">
+            <col class="w-110">
+            <col class="w-260">
+          </colgroup>
+          <thead>
+            <tr>
+              <th>Radicado</th>
+              <th>Título</th>
+              <th>Cliente</th>
+              <th>Línea</th>
+              <th>Fecha</th>
+              <th></th>
+            </tr>
+          </thead>
+          <tbody id="listaOfertas"></tbody>
+        </table>
+      </div>
+      <p id="sinOfertas" class="text-muted oculto">Todavía no hay ofertas registradas.</p>
+    </div>
+  </section>
+
+  <script src="../js/vendor/jspdf.umd.min.js"></script>
+  <script type="module" src="../js/control/ofertas.js"></script>
+</body>
+</html>

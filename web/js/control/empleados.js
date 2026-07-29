@@ -3,7 +3,8 @@ import {
   collection, doc, setDoc, getDoc, updateDoc, serverTimestamp,
   onSnapshot, query, orderBy
 } from "https://www.gstatic.com/firebasejs/10.7.1/firebase-firestore.js";
-import { auth, db, requireAuth, obtenerPerfil } from "./firebase-control.js";
+import { ref, uploadBytes, getDownloadURL } from "https://www.gstatic.com/firebasejs/10.7.1/firebase-storage.js";
+import { auth, db, storage, requireAuth, obtenerPerfil } from "./firebase-control.js";
 import { COLUMNAS_ITEM } from "./plantillas.js";
 
 const ROL_LABEL = { admin: "Administrador", coadmin: "Coadministrador", apoyo: "Apoyo", empleado: "Empleado" };
@@ -120,6 +121,62 @@ function celdaCampos(empleado, esAdmin) {
   return td;
 }
 
+// Checkbox de autorización (autoguardado, igual patrón que Rol/Estado) +
+// botón para subir/cambiar la imagen de la firma de esa persona — la
+// firma se sube UNA vez aquí y se reusa en cada oferta que esa persona
+// firme (Ofertas comerciales), en vez de subirla cada vez que se genera
+// un documento.
+function celdaOfertas(empleado, esAdmin) {
+  const td = celda("td");
+
+  const label = document.createElement("label");
+  label.className = "control-check-inline";
+  const check = document.createElement("input");
+  check.type = "checkbox";
+  check.checked = !!empleado.autorizadoOfertas;
+  check.disabled = !esAdmin;
+  check.addEventListener("change", () => {
+    updateDoc(doc(db, "empleados", empleado.id), { autorizadoOfertas: check.checked, actualizadoEn: serverTimestamp() });
+  });
+  label.appendChild(check);
+  label.appendChild(document.createTextNode("Autorizado"));
+  td.appendChild(label);
+
+  if (esAdmin) {
+    const btnFirma = document.createElement("button");
+    btnFirma.type = "button";
+    btnFirma.className = "control-btn-mini";
+    btnFirma.textContent = empleado.firmaUrl ? "Cambiar firma" : "Subir firma";
+    const inputFirma = document.createElement("input");
+    inputFirma.type = "file";
+    inputFirma.accept = "image/*";
+    inputFirma.hidden = true;
+    btnFirma.addEventListener("click", () => inputFirma.click());
+    inputFirma.addEventListener("change", async () => {
+      const archivo = inputFirma.files[0];
+      if (!archivo) return;
+      btnFirma.disabled = true;
+      btnFirma.textContent = "Subiendo...";
+      try {
+        const ext = archivo.name.includes(".") ? archivo.name.split(".").pop() : "png";
+        const archivoRef = ref(storage, `empleados/${empleado.id}/firma.${ext}`);
+        await uploadBytes(archivoRef, archivo);
+        const url = await getDownloadURL(archivoRef);
+        await updateDoc(doc(db, "empleados", empleado.id), { firmaUrl: url, actualizadoEn: serverTimestamp() });
+      } catch (err) {
+        window.alert(err.message || "No se pudo subir la firma.");
+      } finally {
+        btnFirma.disabled = false;
+        btnFirma.textContent = empleado.firmaUrl ? "Cambiar firma" : "Subir firma";
+        inputFirma.value = "";
+      }
+    });
+    td.append(btnFirma, inputFirma);
+  }
+
+  return td;
+}
+
 function renderTabla(empleados, esAdmin) {
   tbody.innerHTML = "";
   sinEmpleados.classList.toggle("oculto", empleados.length > 0);
@@ -128,6 +185,7 @@ function renderTabla(empleados, esAdmin) {
     const fila = document.createElement("tr");
     fila.appendChild(celda("td", e.nombre));
     fila.appendChild(celda("td", e.email));
+    fila.appendChild(celda("td", e.cargo || "—"));
 
     const tdRol = celda("td");
     const selectRol = document.createElement("select");
@@ -161,6 +219,8 @@ function renderTabla(empleados, esAdmin) {
     tdEstado.appendChild(selectEstado);
     fila.appendChild(tdEstado);
 
+    fila.appendChild(celdaOfertas(e, esAdmin));
+
     tbody.appendChild(fila);
   });
 }
@@ -189,6 +249,8 @@ requireAuth(async (user) => {
 
     const nombre = document.getElementById("nombre").value.trim();
     const email = document.getElementById("email").value.trim().toLowerCase();
+    const cargo = document.getElementById("cargo").value.trim();
+    const autorizadoOfertas = document.getElementById("autorizadoOfertas").checked;
     const rol = selectRolNuevo.value;
     const campo = campoDeRol(rol);
     const seleccionadas = [...camposLista.querySelectorAll(".campo-permiso-check:checked")].map((c) => c.value);
@@ -200,7 +262,7 @@ requireAuth(async (user) => {
         throw new Error("Ya existe un empleado registrado con ese correo.");
       }
       await setDoc(empleadoRef, {
-        nombre, email, rol, estado: "activo",
+        nombre, email, cargo, rol, estado: "activo", autorizadoOfertas,
         ...(campo ? { [campo]: seleccionadas } : {}),
         creadoPor: user.email, creadoEn: serverTimestamp(),
         actualizadoEn: serverTimestamp()
