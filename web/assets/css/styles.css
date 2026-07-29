@@ -299,6 +299,33 @@ nav.main-nav a.active {
   object-fit: contain;
 }
 
+/* ---- logos de clientes (Inicio): grid en escala de grises que se
+   colorea al pasar el mouse, para reforzar confianza sin competir con
+   la paleta navy/ámbar del resto del sitio. ---- */
+.clientes-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(130px, 1fr));
+  gap: 18px;
+}
+.cliente-logo {
+  background: var(--card-bg);
+  border: 1px solid var(--border);
+  border-radius: calc(var(--radius) - 4px);
+  padding: 16px;
+  height: 96px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+.cliente-logo img {
+  max-width: 100%;
+  max-height: 60px;
+  object-fit: contain;
+  filter: grayscale(1) opacity(0.7);
+  transition: filter 0.25s ease;
+}
+.cliente-logo:hover img { filter: grayscale(0) opacity(1); }
+
 /* ---- tarjetas de servicio (Inicio) ---- */
 .grid-cards {
   display: grid;
