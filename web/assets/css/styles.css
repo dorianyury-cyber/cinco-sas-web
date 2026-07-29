@@ -312,6 +312,18 @@ nav.main-nav a.active {
 @media (min-width: 900px) {
   .grid-cards-4 { grid-template-columns: repeat(4, 1fr); }
 }
+/* Variante flex (Servicios en Inicio: 7 tarjetas) — a diferencia de grid,
+   centra la última fila incompleta en vez de dejarla pegada a la
+   izquierda con un hueco asimétrico. */
+.grid-cards.grid-cards-flex-center {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: center;
+}
+.grid-cards.grid-cards-flex-center > .service-card {
+  flex: 1 1 240px;
+  max-width: 280px;
+}
 .service-card {
   background: var(--card-bg);
   border-radius: var(--radius);
