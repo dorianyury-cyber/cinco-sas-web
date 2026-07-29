@@ -19,6 +19,7 @@ export const TIPOS = [
   { clave: "ACT", nombre: "Acta" },
   { clave: "INF", nombre: "Informe" },
   { clave: "OFE", nombre: "Oferta" },
+  { clave: "COM", nombre: "Comunicación" },
   { clave: "MAN", nombre: "Manual" }
 ];
 

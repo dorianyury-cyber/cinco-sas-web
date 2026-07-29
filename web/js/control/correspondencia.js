@@ -7,6 +7,13 @@ import { auth, db, storage, requireAuth } from "./firebase-control.js";
 import { generarCartaPDF } from "./correspondencia-pdf.js";
 import { descargarCartaDocx } from "./correspondencia-docx.js";
 import { truncar } from "./texto.js";
+import { registrarDocumentoSGC } from "./documentos-sgc.js";
+
+// Área/tipo fijos para que una carta quede en el Listado Maestro de
+// Documentos (SGC) sin pedir un campo más en el formulario — mismo
+// criterio que informes.js/ofertas.js.
+const AREA_SGC_CORRESPONDENCIA = "SC";
+const TIPO_SGC_CORRESPONDENCIA = "COM";
 
 const selectContrato = document.getElementById("contratoRelacionado");
 
@@ -391,6 +398,22 @@ requireAuth(async (user) => {
         }
       });
 
+      // Registro en el SGC: transacción aparte (contador propio por
+      // área+tipo) — si falla, la carta ya quedó generada y no se pierde,
+      // solo se avisa para registrarla manualmente en Documentos.
+      let codigoSgc = "";
+      let errorSgc = "";
+      if (document.getElementById("parteSGI").checked) {
+        try {
+          codigoSgc = await registrarDocumentoSGC(db, {
+            area: AREA_SGC_CORRESPONDENCIA, tipo: TIPO_SGC_CORRESPONDENCIA,
+            nombre: datosBase.asunto, origen: "correspondencia", refId: cartaRef.id, user
+          });
+        } catch (err) {
+          errorSgc = err.message || "error desconocido";
+        }
+      }
+
       const pdf = await generarCartaPDF({ ...datosBase, bloques: bloquesFinal, radicado });
       pdf.save(`${radicado}.pdf`);
 
@@ -399,7 +422,10 @@ requireAuth(async (user) => {
       bloques = [{ tipo: "texto", texto: "" }];
       renderBloques();
       form.closest("details").open = false;
-      mostrarAlerta(`Carta ${radicado} generada y descargada.`, "ok");
+      let mensaje = `Carta ${radicado} generada y descargada.`;
+      if (codigoSgc) mensaje += ` Registrada en el SGC como ${codigoSgc}.`;
+      if (errorSgc) mensaje += ` (No se pudo registrar en el SGC: ${errorSgc} — hazlo manualmente en Documentos.)`;
+      mostrarAlerta(mensaje, errorSgc ? "error" : "ok");
     } catch (err) {
       mostrarAlerta(err.message || "No se pudo generar la carta.", "error");
     } finally {
