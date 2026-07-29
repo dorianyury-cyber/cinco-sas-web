@@ -886,6 +886,16 @@ a.control-contrato-card:hover { transform: translateY(-4px); box-shadow: var(--s
 form.pqr-form .control-edicion-botones button { width: auto; margin-top: 0; white-space: nowrap; }
 
 .control-rol-ayuda { margin: -4px 0 0; font-size: 12.5px; }
+.control-informes-ayuda { margin-top: -6px; font-size: 12.5px; }
+.control-meses-lista { display: flex; flex-wrap: wrap; gap: 8px; }
+.control-mes-pill {
+  font-size: 12.5px; font-weight: 600; padding: 6px 12px; border-radius: 999px;
+  border: 1px dashed var(--border); color: var(--text-muted); background: transparent;
+}
+.control-mes-pill.hecho { border-style: solid; border-color: var(--cinco-amber-dark); color: var(--cinco-navy); background: rgba(254, 178, 9, 0.12); }
+@media (prefers-color-scheme: dark) { .control-mes-pill.hecho { color: #fff; } }
+button.control-mes-pill.pendiente { cursor: pointer; }
+button.control-mes-pill.pendiente:hover { border-color: var(--cinco-amber-dark); color: var(--cinco-amber-dark); }
 .control-campos-permiso { margin-top: 14px; }
 .control-campos-permiso-lista { display: flex; gap: 16px; flex-wrap: wrap; margin-top: 6px; }
 .control-campos-permiso-lista label {
@@ -1185,9 +1195,38 @@ tr.control-fila-destacada { background: rgba(254, 178, 9, 0.25); transition: bac
   font-size: 13.5px;
   resize: vertical;
 }
-.control-bloque-imagen { max-width: 100%; max-height: 160px; border-radius: 6px; display: block; }
+.control-bloque-imagen { max-width: 100%; max-height: 160px; border-radius: 6px; display: block; margin-bottom: 8px; }
 .control-bloque-controles { display: flex; flex-direction: column; gap: 6px; flex-shrink: 0; }
-.control-bloques-botones { display: flex; gap: 10px; margin: 4px 0 20px; }
+.control-bloques-botones { display: flex; gap: 10px; margin: 4px 0 20px; flex-wrap: wrap; }
+form.pqr-form .control-bloques-botones button,
+form.pqr-form .control-tabla-botones button { width: auto; margin-top: 0; }
+.control-bloque-etiqueta { display: block; font-size: 11.5px; font-weight: 700; text-transform: uppercase; letter-spacing: 0.4px; color: var(--text-muted); margin-bottom: 4px; }
+.control-bloque-contenido input[type="text"] {
+  width: 100%;
+  padding: 10px 12px;
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  background: var(--card-bg);
+  color: var(--text);
+  font-family: inherit;
+  font-size: 13.5px;
+  margin-top: 6px;
+}
+
+.control-tabla-editor { display: flex; flex-direction: column; gap: 8px; }
+.control-tabla-grid { display: flex; flex-direction: column; gap: 4px; overflow-x: auto; }
+.control-tabla-fila { display: flex; gap: 4px; }
+.control-tabla-fila input {
+  flex: 1;
+  min-width: 90px;
+  padding: 6px 8px;
+  border: 1px solid var(--border);
+  border-radius: 6px;
+  background: var(--card-bg);
+  color: var(--text);
+  font-size: 12.5px;
+}
+.control-tabla-botones { display: flex; gap: 8px; flex-wrap: wrap; }
 
 .control-btn-secundario {
   display: inline-block;

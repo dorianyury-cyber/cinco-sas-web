@@ -1,0 +1,114 @@
+<!doctype html>
+<html lang="es">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<meta name="robots" content="noindex, nofollow">
+<title>Informes — Control de Contratos — Cinco S.A.S.</title>
+<link rel="icon" href="../assets/img/favicon.png">
+<link rel="stylesheet" href="../assets/css/styles.css">
+</head>
+<body>
+  <header class="site-header">
+    <div class="container">
+      <a class="brand" href="../conecta.html">
+        <img src="../assets/img/logo.png" alt="Cinco S.A.S.">
+      </a>
+      <div class="control-userbar">
+        <span id="userEmail"></span>
+        <a href="contratos.html" class="control-userbar-link">Contratos</a>
+        <a href="documentos.html" class="control-userbar-link">Documentos</a>
+        <a href="correspondencia.html" class="control-userbar-link">Correspondencia</a>
+        <a href="empleados.html" class="control-userbar-link">Empleados</a>
+        <a href="cambiar-clave.html" class="control-userbar-link">Cambiar clave</a>
+        <button id="logoutBtn" class="btn-outline">Cerrar sesión</button>
+      </div>
+    </div>
+  </header>
+
+  <div class="page-banner">
+    <div class="container">
+      <span class="eyebrow">Uso interno</span>
+      <h1>Informes</h1>
+      <p>Informes con diseño propio de Cinco S.A.S. — portada, índice, listas de gráficos/tablas y radicado, armados por bloques.</p>
+    </div>
+  </div>
+
+  <section class="section">
+    <div class="container">
+      <details class="card control-nuevo" id="nuevoInformeDetails">
+        <summary>+ Nuevo informe</summary>
+        <form class="pqr-form" id="nuevoInformeForm">
+          <input type="hidden" id="informeIdEnEdicion">
+
+          <label for="titulo">Título del informe</label>
+          <input type="text" id="titulo" required maxlength="200" placeholder="Ej. Informe de Gestión — Junio 2026">
+
+          <label for="tipoInforme">Tipo de informe</label>
+          <select id="tipoInforme">
+            <option value="gestion">Informe de gestión</option>
+            <option value="mediciones">Informe de mediciones</option>
+            <option value="consultoria">Informe de consultoría</option>
+            <option value="interventoria">Informe de interventoría</option>
+            <option value="otro">Otro</option>
+          </select>
+
+          <label for="mes">Mes (opcional)</label>
+          <input type="month" id="mes">
+
+          <label for="contratoRelacionado">Contrato relacionado (opcional — trae los datos del contrato/cliente y queda archivado también ahí)</label>
+          <select id="contratoRelacionado"><option value="">Ninguno</option></select>
+
+          <label>Cuerpo del informe</label>
+          <div id="bloquesEditor" class="control-bloques"></div>
+          <div class="control-bloques-botones">
+            <button type="button" class="control-btn-mini" id="agregarTitulo1Btn">+ Título 1</button>
+            <button type="button" class="control-btn-mini" id="agregarTitulo2Btn">+ Título 2</button>
+            <button type="button" class="control-btn-mini" id="agregarTitulo3Btn">+ Título 3</button>
+            <button type="button" class="control-btn-mini" id="agregarParrafoBtn">+ Párrafo</button>
+            <button type="button" class="control-btn-mini" id="agregarTablaBtn">+ Tabla</button>
+            <button type="button" class="control-btn-mini" id="agregarImagenBtn">+ Gráfico / imagen</button>
+            <input type="file" id="inputImagen" accept="image/*" multiple hidden>
+          </div>
+
+          <label for="firmaNombre">Nombre de quien elabora</label>
+          <input type="text" id="firmaNombre" maxlength="120">
+
+          <label for="firmaCargo">Cargo</label>
+          <input type="text" id="firmaCargo" maxlength="120">
+
+          <button type="submit" class="btn" id="guardarInformeBtn">Generar y descargar informe</button>
+          <button type="button" class="control-btn-mini oculto" id="cancelarEdicionInformeBtn">Cancelar edición</button>
+          <div class="form-alert" id="crearInformeAlert"></div>
+        </form>
+      </details>
+
+      <div class="control-tabla-wrap">
+        <table class="control-tabla-documentos">
+          <colgroup>
+            <col class="w-130">
+            <col>
+            <col class="w-180">
+            <col class="w-110">
+            <col class="w-260">
+          </colgroup>
+          <thead>
+            <tr>
+              <th>Radicado</th>
+              <th>Título</th>
+              <th>Contrato</th>
+              <th>Fecha</th>
+              <th></th>
+            </tr>
+          </thead>
+          <tbody id="listaInformes"></tbody>
+        </table>
+      </div>
+      <p id="sinInformes" class="text-muted oculto">Todavía no hay informes registrados.</p>
+    </div>
+  </section>
+
+  <script src="../js/vendor/jspdf.umd.min.js"></script>
+  <script type="module" src="../js/control/informes.js"></script>
+</body>
+</html>

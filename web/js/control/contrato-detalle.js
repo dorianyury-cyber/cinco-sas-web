@@ -1,9 +1,10 @@
 import { signOut } from "https://www.gstatic.com/firebasejs/10.7.1/firebase-auth.js";
 import {
-  doc, getDoc, updateDoc, deleteDoc, addDoc, collection, getDocs, onSnapshot,
+  doc, getDoc, updateDoc, deleteDoc, setDoc, collection, getDocs, onSnapshot,
   query, orderBy, serverTimestamp, arrayUnion, arrayRemove
 } from "https://www.gstatic.com/firebasejs/10.7.1/firebase-firestore.js";
-import { auth, db, requireAuth, obtenerPerfil } from "./firebase-control.js";
+import { ref, uploadBytes, getDownloadURL } from "https://www.gstatic.com/firebasejs/10.7.1/firebase-storage.js";
+import { auth, db, storage, requireAuth, obtenerPerfil } from "./firebase-control.js";
 import { CAMPOS, FASES, COLUMNAS_ITEM } from "./plantillas.js";
 import { capitalizarOracion, capitalizarNombrePropio } from "./texto.js";
 
@@ -316,6 +317,62 @@ async function cargarEquipo(contratoRef, contrato, puedeGestionar) {
   render();
 }
 
+// Lista de meses "YYYY-MM" entre fechaInicio y fechaFin (o hasta hoy si el
+// contrato no tiene fecha de fin), para el checklist de Informes mensuales.
+function rangoMeses(fechaInicio, fechaFin) {
+  if (!fechaInicio) return [];
+  const [anioIni, mesIni] = fechaInicio.split("-").map(Number);
+  const limite = fechaFin || new Date().toISOString().slice(0, 10);
+  const [anioFin, mesFin] = limite.split("-").map(Number);
+  const meses = [];
+  let anio = anioIni;
+  let mes = mesIni;
+  while (anio < anioFin || (anio === anioFin && mes <= mesFin)) {
+    meses.push(`${anio}-${String(mes).padStart(2, "0")}`);
+    mes += 1;
+    if (mes > 12) { mes = 1; anio += 1; }
+  }
+  return meses;
+}
+
+const FORMATO_MES = new Intl.DateTimeFormat("es-CO", { month: "short", year: "numeric" });
+function nombreMes(mesISO) {
+  const [anio, mes] = mesISO.split("-").map(Number);
+  return FORMATO_MES.format(new Date(anio, mes - 1, 1));
+}
+
+// ---- Informes mensuales ----
+// Checklist visual (no una lista aparte en Firestore): se apoya en los
+// mismos documentos manuales de abajo que tengan "mes" diligenciado —
+// ver "Mes del informe" en el formulario de documento manual.
+function renderInformesMensuales(contrato, documentosConMes) {
+  const contenedor = document.getElementById("informesMensualesLista");
+  const badge = document.getElementById("informesBadge");
+  const meses = rangoMeses(contrato.fechaInicio, contrato.fechaFin);
+  const mesesHechos = new Set(documentosConMes.map((d) => d.mes));
+
+  contenedor.innerHTML = "";
+  badge.textContent = `${mesesHechos.size}/${meses.length}`;
+  meses.forEach((mesISO) => {
+    const hecho = mesesHechos.has(mesISO);
+    const pill = document.createElement(hecho ? "span" : "button");
+    if (!hecho) pill.type = "button";
+    pill.className = `control-mes-pill ${hecho ? "hecho" : "pendiente"}`;
+    pill.textContent = `${nombreMes(mesISO)}${hecho ? " ✓" : ""}`;
+    if (!hecho) {
+      pill.title = "Agregar el informe de este mes";
+      pill.addEventListener("click", () => {
+        const detalleManual = document.getElementById("docMes").closest("details");
+        detalleManual.open = true;
+        document.getElementById("docMes").value = mesISO;
+        document.getElementById("docNombre").focus();
+        detalleManual.scrollIntoView({ behavior: "smooth", block: "center" });
+      });
+    }
+    contenedor.appendChild(pill);
+  });
+}
+
 // ---- Documentos del contrato ----
 // Combina lo que llega solo (desde Documentos/Correspondencia, cuando esa
 // carta o formato se creó eligiendo este contrato) con lo agregado a mano
@@ -325,7 +382,7 @@ async function cargarEquipo(contratoRef, contrato, puedeGestionar) {
 // camposVisibles, ocultar "Ver" es solo de interfaz, no bloquea el dato en
 // Firestore; lo que sí es una barrera real es que la regla de Firestore le
 // niega crear filas en esta subcolección).
-function cargarDocumentosContrato(contratoId, esEmpleado) {
+function cargarDocumentosContrato(contratoId, contrato, esEmpleado) {
   const tbody = document.getElementById("listaDocumentosContrato");
   const sinDocs = document.getElementById("sinDocumentosContrato");
   const badge = document.getElementById("documentosBadge");
@@ -346,6 +403,7 @@ function cargarDocumentosContrato(contratoId, esEmpleado) {
     badge.textContent = String(snapshot.size);
     tbody.innerHTML = "";
     sinDocs.classList.toggle("oculto", !snapshot.empty);
+    renderInformesMensuales(contrato, snapshot.docs.map((d) => d.data()).filter((d) => d.mes));
     snapshot.forEach((docSnap) => {
       const d = docSnap.data();
       const fila = document.createElement("tr");
@@ -367,15 +425,37 @@ function cargarDocumentosContrato(contratoId, esEmpleado) {
     });
   });
 
+  const inputArchivoPdf = document.getElementById("docArchivoPdf");
+
   form.addEventListener("submit", async (e) => {
     e.preventDefault();
-    btn.disabled = true;
     alertBox.className = "form-alert";
+
+    const enlaceEscrito = document.getElementById("docEnlace").value;
+    const archivo = inputArchivoPdf.files[0];
+    if (!enlaceEscrito && !archivo) {
+      alertBox.textContent = "Escribe un enlace o sube el PDF.";
+      alertBox.className = "form-alert show error";
+      return;
+    }
+
+    btn.disabled = true;
     try {
-      await addDoc(collection(db, "contratos", contratoId, "documentos"), {
+      const mes = document.getElementById("docMes").value;
+      const docRef = doc(collection(db, "contratos", contratoId, "documentos"));
+
+      let enlace = enlaceEscrito;
+      if (archivo) {
+        const archivoRef = ref(storage, `contratos/${contratoId}/documentos/${docRef.id}.pdf`);
+        await uploadBytes(archivoRef, archivo);
+        enlace = await getDownloadURL(archivoRef);
+      }
+
+      await setDoc(docRef, {
         nombre: document.getElementById("docNombre").value,
         tipo: document.getElementById("docTipo").value,
-        enlace: document.getElementById("docEnlace").value,
+        enlace,
+        ...(mes ? { mes } : {}),
         origen: "manual",
         creadoPor: auth.currentUser.email,
         creadoEn: serverTimestamp()
@@ -523,7 +603,7 @@ requireAuth(async (user) => {
   });
 
   await cargarEquipo(contratoRef, contrato, esGestor);
-  cargarDocumentosContrato(id, esEmpleado);
+  cargarDocumentosContrato(id, contrato, esEmpleado);
 
   const badges = { general: document.getElementById("avanceGeneral") };
   const contenedor = document.getElementById("camposContainer");

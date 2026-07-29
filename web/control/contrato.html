@@ -18,6 +18,7 @@
         <span id="userEmail"></span>
         <a href="documentos.html" class="control-userbar-link">Documentos</a>
         <a href="correspondencia.html" class="control-userbar-link">Correspondencia</a>
+        <a href="informes.html" class="control-userbar-link">Informes</a>
         <a href="empleados.html" class="control-userbar-link">Empleados</a>
         <a href="cambiar-clave.html" class="control-userbar-link">Cambiar clave</a>
         <button id="logoutBtn" class="btn-outline">Cerrar sesión</button>
@@ -109,6 +110,12 @@
       </details>
 
       <details class="card control-campo" open>
+        <summary><span>Informes mensuales</span><span class="control-badge" id="informesBadge"></span></summary>
+        <p class="text-muted control-informes-ayuda">Informes con formato propio del cliente (Word, con sus tablas/gráficos) — se suben como documento manual abajo, marcando el mes. Aquí solo se ve de un vistazo qué mes falta.</p>
+        <div id="informesMensualesLista" class="control-meses-lista"></div>
+      </details>
+
+      <details class="card control-campo" open>
         <summary><span>Documentos del contrato</span><span class="control-badge" id="documentosBadge"></span></summary>
         <div class="control-tabla-wrap">
           <table class="control-tabla-documentos">
@@ -145,8 +152,14 @@
               <option value="externo">Externo</option>
             </select>
 
-            <label for="docEnlace">Enlace</label>
-            <input type="url" id="docEnlace" required maxlength="500">
+            <label for="docEnlace">Enlace (ej. a la carpeta en OneDrive)</label>
+            <input type="url" id="docEnlace" maxlength="500">
+
+            <label for="docArchivoPdf">O sube aquí el PDF final (el que se le envía al cliente)</label>
+            <input type="file" id="docArchivoPdf" accept="application/pdf">
+
+            <label for="docMes">Mes del informe (solo si es un informe mensual)</label>
+            <input type="month" id="docMes">
 
             <button type="submit" class="btn" id="agregarDocumentoBtn">Agregar</button>
             <div class="form-alert" id="nuevoDocumentoManualAlert"></div>

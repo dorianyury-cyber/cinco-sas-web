@@ -1,12 +1,25 @@
 rules_version = '2';
 
-// Solo se usa para las imágenes que se insertan dentro de una carta de
-// Correspondencia (web/control/correspondencia.html) — mismo criterio de
-// acceso que Firestore: cualquier usuario autenticado del Control de
-// Contratos puede leer/escribir.
+// Mismo criterio en ambas rutas: cualquier usuario autenticado del Control
+// de Contratos puede leer/escribir (el filtro fino de quién puede archivar
+// qué contrato ya lo hacen las reglas de Firestore sobre
+// contratos/{id}/documentos, no Storage).
 service firebase.storage {
   match /b/{bucket}/o {
+    // Imágenes que se insertan dentro de una carta de Correspondencia
+    // (web/control/correspondencia.html).
     match /correspondencia/{cartaId}/{archivo} {
+      allow read, write: if request.auth != null;
+    }
+    // PDF final de un documento manual archivado en un contrato (ej. el
+    // informe mensual que se le envía al cliente) — "Documentos del
+    // contrato" en contrato.html.
+    match /contratos/{contratoId}/documentos/{archivo} {
+      allow read, write: if request.auth != null;
+    }
+    // Gráficos/imágenes insertados en un Informe de diseño propio
+    // (web/control/informes.html).
+    match /informes/{informeId}/{archivo} {
       allow read, write: if request.auth != null;
     }
   }
