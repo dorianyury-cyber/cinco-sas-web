@@ -623,6 +623,36 @@ requireAuth(async (user) => {
 
   badges.actividades_fases = {};
 
+  // Botón para agregar un ítem suelto al checklist de un contrato ya
+  // creado — la plantilla (plantillas.js) solo se aplica al crear el
+  // contrato, así que si cambia después (o hace falta algo puntual para
+  // este contrato), no había forma de sumarlo sin tocar la base de datos
+  // a mano. Solo Admin/Coadministrador, igual que el resto de cambios
+  // estructurales del checklist.
+  function botonAgregarItem(campoClave, faseClave) {
+    const btn = campo("button", { type: "button", class: "control-btn-mini" });
+    btn.textContent = "+ Agregar ítem";
+    btn.addEventListener("click", async () => {
+      const nombre = window.prompt("Nombre del nuevo ítem del checklist:");
+      if (!nombre || !nombre.trim()) return;
+      btn.disabled = true;
+      try {
+        const ordenMax = Math.max(0, ...items.map((i) => i.orden || 0));
+        const itemRef = doc(collection(db, "contratos", id, "items"));
+        await setDoc(itemRef, {
+          clave: `manual_${Date.now()}`, nombre: nombre.trim(), fase: faseClave, campo: campoClave,
+          orden: ordenMax + 1, estado: "pendiente", responsable: "", fecha: null, enlace: "", notas: "",
+          actualizadoEn: serverTimestamp(), actualizadoPor: user.email
+        });
+        window.location.reload();
+      } catch (err) {
+        window.alert(err.message || "No se pudo agregar el ítem.");
+        btn.disabled = false;
+      }
+    });
+    return btn;
+  }
+
   CAMPOS.forEach((c) => {
     const detalle = campo("details", { class: "card control-campo" });
     const resumen = document.createElement("summary");
@@ -650,6 +680,7 @@ requireAuth(async (user) => {
         lista.appendChild(encabezadoItems());
         itemsFase.forEach((item) => crearFilaItem(item, user, recalcularAvances, lista, items, permisosItem));
         detalleFase.appendChild(lista);
+        if (esGestor) detalleFase.appendChild(botonAgregarItem("actividades", f.clave));
         detalle.appendChild(detalleFase);
       });
     } else {
@@ -657,6 +688,7 @@ requireAuth(async (user) => {
       lista.appendChild(encabezadoItems());
       itemsDelCampo.forEach((item) => crearFilaItem(item, user, recalcularAvances, lista, items, permisosItem));
       detalle.appendChild(lista);
+      if (esGestor) detalle.appendChild(botonAgregarItem(c.clave, null));
     }
 
     contenedor.appendChild(detalle);
