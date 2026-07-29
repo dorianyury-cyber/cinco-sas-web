@@ -28,19 +28,30 @@ export const ACTIVIDADES_OBRA = [
   { clave: "induccion_personal", nombre: "Inducción de Personal", fase: "inicio" },
   { clave: "obtencion_informacion", nombre: "Obtención de Información", fase: "inicio" },
   { clave: "rediseno_proyecto", nombre: "Rediseño del Proyecto", fase: "inicio" },
-  { clave: "correspondencia_cruzada", nombre: "Correspondencia Cruzada", fase: "inicio" },
+  // "Correspondencia Cruzada" no es un evento de una sola vez al inicio —
+  // ocurre durante todo el contrato, así que se repite como un ítem
+  // independiente en cada fase (cada fase es su propio grupo con su propio
+  // contador, no hay forma de que un solo ítem "aparezca en las tres").
+  { clave: "correspondencia_cruzada_inicio", nombre: "Correspondencia Cruzada", fase: "inicio" },
   { clave: "reunion_inicial", nombre: "Reunión Inicial", fase: "inicio" },
   { clave: "revision_doc_inicial", nombre: "Revisión Documentación Inicial", fase: "inicio" },
   { clave: "replanteo_obra", nombre: "Replanteo de Obra", fase: "ejecucion" },
   { clave: "socializacion_obra", nombre: "Socialización de Obra", fase: "ejecucion" },
   { clave: "documentacion_periodica", nombre: "Documentación Periódica", fase: "ejecucion" },
+  // Antes solo había un ítem de informes, en Cierre — en la práctica también
+  // se entregan informes periódicos durante la ejecución (igual que ya
+  // distingue el checklist de Servicio: "Elaboración de Estudios/Informes
+  // Técnicos" en Ejecución vs. "Informe Final" en Cierre).
+  { clave: "informes_periodicos", nombre: "Informes Periódicos de Avance", fase: "ejecucion" },
   { clave: "revision_materiales", nombre: "Revisión de Materiales", fase: "ejecucion" },
   { clave: "realizacion_inventarios", nombre: "Realización de Inventarios", fase: "ejecucion" },
   { clave: "reuniones_avance", nombre: "Reuniones de Avance de Obra", fase: "ejecucion" },
   { clave: "visita_obra", nombre: "Visita de Obra", fase: "ejecucion" },
+  { clave: "correspondencia_cruzada_ejecucion", nombre: "Correspondencia Cruzada", fase: "ejecucion" },
   { clave: "realizacion_informes", nombre: "Realización de Informes", fase: "cierre" },
   { clave: "recibo_satisfaccion", nombre: "Recibo a Satisfacción", fase: "cierre" },
-  { clave: "liquidacion_final", nombre: "Liquidación Final", fase: "cierre" }
+  { clave: "liquidacion_final", nombre: "Liquidación Final", fase: "cierre" },
+  { clave: "correspondencia_cruzada_cierre", nombre: "Correspondencia Cruzada", fase: "cierre" }
 ];
 
 // Borrador inicial para Servicio — no hay checklist real documentado
@@ -50,13 +61,15 @@ export const ACTIVIDADES_SERVICIO = [
   { clave: "asignacion_recursos", nombre: "Asignación de Recursos", fase: "inicio" },
   { clave: "reunion_inicial", nombre: "Reunión Inicial", fase: "inicio" },
   { clave: "revision_doc_inicial", nombre: "Revisión Documentación Inicial", fase: "inicio" },
-  { clave: "correspondencia_cruzada", nombre: "Correspondencia Cruzada", fase: "inicio" },
+  { clave: "correspondencia_cruzada_inicio", nombre: "Correspondencia Cruzada", fase: "inicio" },
   { clave: "recopilacion_analisis", nombre: "Recopilación y Análisis de Información", fase: "ejecucion" },
   { clave: "elaboracion_estudios", nombre: "Elaboración de Estudios/Informes Técnicos", fase: "ejecucion" },
   { clave: "mesas_trabajo", nombre: "Mesas de Trabajo y Seguimiento", fase: "ejecucion" },
+  { clave: "correspondencia_cruzada_ejecucion", nombre: "Correspondencia Cruzada", fase: "ejecucion" },
   { clave: "informe_final", nombre: "Informe Final", fase: "cierre" },
   { clave: "recibo_satisfaccion", nombre: "Recibo a Satisfacción", fase: "cierre" },
-  { clave: "liquidacion_final", nombre: "Liquidación Final", fase: "cierre" }
+  { clave: "liquidacion_final", nombre: "Liquidación Final", fase: "cierre" },
+  { clave: "correspondencia_cruzada_cierre", nombre: "Correspondencia Cruzada", fase: "cierre" }
 ];
 
 export const FASES = [
