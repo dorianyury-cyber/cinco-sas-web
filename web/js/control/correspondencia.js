@@ -1,11 +1,13 @@
 import { signOut } from "https://www.gstatic.com/firebasejs/10.7.1/firebase-auth.js";
 import {
-  collection, doc, deleteDoc, runTransaction, serverTimestamp, onSnapshot, query, orderBy, updateDoc
+  collection, doc, deleteDoc, getDocs, runTransaction, serverTimestamp, onSnapshot, query, orderBy, updateDoc
 } from "https://www.gstatic.com/firebasejs/10.7.1/firebase-firestore.js";
 import { ref, uploadBytes, getDownloadURL } from "https://www.gstatic.com/firebasejs/10.7.1/firebase-storage.js";
 import { auth, db, storage, requireAuth } from "./firebase-control.js";
 import { generarCartaPDF } from "./correspondencia-pdf.js";
 import { descargarCartaDocx } from "./correspondencia-docx.js";
+
+const selectContrato = document.getElementById("contratoRelacionado");
 
 const tbody = document.getElementById("listaCorrespondencia");
 const sinCartas = document.getElementById("sinCartas");
@@ -290,13 +292,25 @@ inputWordFinal.addEventListener("change", async () => {
   }
 });
 
-requireAuth((user) => {
+requireAuth(async (user) => {
   usuarioActual = user;
   document.getElementById("userEmail").textContent = user.email;
 
   const q = query(collection(db, "correspondencia"), orderBy("creadoEn", "desc"));
   onSnapshot(q, (snapshot) => {
     renderTabla(snapshot.docs.map((d) => ({ id: d.id, ...d.data() })));
+  });
+
+  // orderBy("creadoEn") y no "codigo": los contratos de antes de esta
+  // función no tienen "codigo" y quedarían fuera si se ordenara por ese
+  // campo. Las reglas de Firestore ya filtran qué contratos ve cada quien.
+  const contratosSnap = await getDocs(query(collection(db, "contratos"), orderBy("creadoEn", "desc")));
+  contratosSnap.forEach((docSnap) => {
+    const c = docSnap.data();
+    const opt = document.createElement("option");
+    opt.value = docSnap.id;
+    opt.textContent = `${c.codigo || "(sin código)"} — ${c.nombre}`;
+    selectContrato.appendChild(opt);
   });
 
   form.addEventListener("submit", async (e) => {
@@ -334,6 +348,7 @@ requireAuth((user) => {
       }
 
       const contadorRef = doc(db, "contadores", `correspondencia_${anio}`);
+      const contratoId = selectContrato.value;
       let radicado;
 
       await runTransaction(db, async (tx) => {
@@ -347,6 +362,15 @@ requireAuth((user) => {
           creadoPor: user.email, creadoEn: serverTimestamp(),
           actualizadoEn: serverTimestamp(), actualizadoPor: user.email
         });
+
+        if (contratoId) {
+          const refEnContrato = doc(collection(db, "contratos", contratoId, "documentos"));
+          tx.set(refEnContrato, {
+            codigo: radicado, nombre: datosBase.asunto, tipo: "externo",
+            origen: "correspondencia", refId: cartaRef.id,
+            creadoPor: user.email, creadoEn: serverTimestamp()
+          });
+        }
       });
 
       const pdf = await generarCartaPDF({ ...datosBase, bloques: bloquesFinal, radicado });

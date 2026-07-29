@@ -1,10 +1,12 @@
 import { signOut } from "https://www.gstatic.com/firebasejs/10.7.1/firebase-auth.js";
 import {
-  collection, doc, runTransaction, serverTimestamp,
+  collection, doc, getDocs, runTransaction, serverTimestamp,
   onSnapshot, query, orderBy
 } from "https://www.gstatic.com/firebasejs/10.7.1/firebase-firestore.js";
 import { auth, db, requireAuth } from "./firebase-control.js";
 import { AREAS, TIPOS, nombreArea, nombreTipo } from "./documentos-plantillas.js";
+
+const selectContrato = document.getElementById("contratoRelacionado");
 
 const ESTADO_LABEL = { vigente: "Vigente", obsoleto: "Obsoleto" };
 
@@ -71,13 +73,27 @@ function renderTabla() {
 filtroArea.addEventListener("change", renderTabla);
 filtroEstado.addEventListener("change", renderTabla);
 
-requireAuth((user) => {
+requireAuth(async (user) => {
   document.getElementById("userEmail").textContent = user.email;
 
   const q = query(collection(db, "documentos"), orderBy("codigo"));
   onSnapshot(q, (snapshot) => {
     documentos = snapshot.docs.map((d) => ({ id: d.id, ...d.data() }));
     renderTabla();
+  });
+
+  // Solo aparecen los contratos a los que este usuario tiene acceso — las
+  // reglas de Firestore ya filtran el resultado por lectura, no hace falta
+  // repetir esa lógica aquí. orderBy("creadoEn") en vez de "codigo" porque
+  // los contratos creados antes de esta función no tienen "codigo" y
+  // Firestore los excluiría del resultado si se ordenara por ese campo.
+  const contratosSnap = await getDocs(query(collection(db, "contratos"), orderBy("creadoEn", "desc")));
+  contratosSnap.forEach((docSnap) => {
+    const c = docSnap.data();
+    const opt = document.createElement("option");
+    opt.value = docSnap.id;
+    opt.textContent = `${c.codigo || "(sin código)"} — ${c.nombre}`;
+    selectContrato.appendChild(opt);
   });
 
   form.addEventListener("submit", async (e) => {
@@ -91,6 +107,7 @@ requireAuth((user) => {
     const nombre = document.getElementById("nombre").value;
     const enlace = document.getElementById("enlace").value;
     const codigoAnterior = document.getElementById("codigoAnterior").value;
+    const contratoId = selectContrato.value;
 
     try {
       const contadorRef = doc(db, "contadores", `${area}_${tipo}`);
@@ -116,6 +133,14 @@ requireAuth((user) => {
           hechoPor: user.email,
           en: serverTimestamp()
         });
+
+        if (contratoId) {
+          const refEnContrato = doc(collection(db, "contratos", contratoId, "documentos"));
+          tx.set(refEnContrato, {
+            codigo, nombre, tipo: "interno", origen: "documentos", refId: documentoRef.id,
+            creadoPor: user.email, creadoEn: serverTimestamp()
+          });
+        }
       });
 
       form.reset();

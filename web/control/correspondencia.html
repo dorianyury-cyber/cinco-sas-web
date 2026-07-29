@@ -18,6 +18,7 @@
         <span id="userEmail"></span>
         <a href="contratos.html" class="control-userbar-link">Contratos</a>
         <a href="documentos.html" class="control-userbar-link">Documentos</a>
+        <a href="empleados.html" class="control-userbar-link">Empleados</a>
         <a href="cambiar-clave.html" class="control-userbar-link">Cambiar clave</a>
         <button id="logoutBtn" class="btn-outline">Cerrar sesión</button>
       </div>
@@ -59,6 +60,9 @@
 
           <label for="firmaCargo">Cargo de quien firma</label>
           <input type="text" id="firmaCargo" maxlength="120">
+
+          <label for="contratoRelacionado">Contrato relacionado (opcional — queda archivada también ahí)</label>
+          <select id="contratoRelacionado"><option value="">Ninguno</option></select>
 
           <button type="button" class="control-btn-secundario" id="vistaPreviaBtn">Vista previa (sin guardar)</button>
           <button type="submit" class="btn" id="crearCartaBtn">Generar y descargar carta</button>

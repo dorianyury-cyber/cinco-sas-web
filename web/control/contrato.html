@@ -18,6 +18,7 @@
         <span id="userEmail"></span>
         <a href="documentos.html" class="control-userbar-link">Documentos</a>
         <a href="correspondencia.html" class="control-userbar-link">Correspondencia</a>
+        <a href="empleados.html" class="control-userbar-link">Empleados</a>
         <a href="cambiar-clave.html" class="control-userbar-link">Cambiar clave</a>
         <button id="logoutBtn" class="btn-outline">Cerrar sesión</button>
       </div>
@@ -36,6 +37,7 @@
     <div class="container">
       <div class="card control-cabecera">
         <div>
+          <span class="control-badge control-badge-lg" id="contratoCodigo"></span>
           <span class="pill" id="contratoTipo"></span>
           <span class="text-muted" id="contratoNumero"></span>
         </div>
@@ -48,11 +50,67 @@
             </select>
           </label>
           <span class="control-badge control-badge-lg" id="avanceGeneral"></span>
-          <button id="borrarContratoBtn" class="control-btn-danger">Borrar contrato</button>
+          <button id="borrarContratoBtn" class="control-btn-danger oculto">Borrar contrato</button>
         </div>
       </div>
 
       <div id="camposContainer"></div>
+
+      <details class="card control-campo" open>
+        <summary><span>Equipo asignado</span><span class="control-badge" id="equipoBadge"></span></summary>
+        <div id="equipoLista" class="control-equipo-lista"></div>
+        <form id="agregarEquipoForm" class="control-equipo-form oculto">
+          <select id="equipoSelect"></select>
+          <button type="submit" class="control-btn-mini">+ Agregar al equipo</button>
+        </form>
+        <div class="form-alert" id="equipoAlert"></div>
+      </details>
+
+      <details class="card control-campo" open>
+        <summary><span>Documentos del contrato</span><span class="control-badge" id="documentosBadge"></span></summary>
+        <div class="control-tabla-wrap">
+          <table class="control-tabla-documentos">
+            <colgroup>
+              <col class="w-120">
+              <col>
+              <col class="w-90">
+              <col class="w-110">
+              <col class="w-90">
+            </colgroup>
+            <thead>
+              <tr>
+                <th>Código</th>
+                <th>Nombre</th>
+                <th>Tipo</th>
+                <th>Fecha</th>
+                <th></th>
+              </tr>
+            </thead>
+            <tbody id="listaDocumentosContrato"></tbody>
+          </table>
+        </div>
+        <p id="sinDocumentosContrato" class="text-muted oculto">Todavía no hay documentos archivados en este contrato.</p>
+
+        <details class="control-nuevo">
+          <summary>+ Agregar documento manual</summary>
+          <form class="pqr-form" id="nuevoDocumentoManualForm">
+            <label for="docNombre">Nombre</label>
+            <input type="text" id="docNombre" required maxlength="160">
+
+            <label for="docTipo">Tipo</label>
+            <select id="docTipo" required>
+              <option value="interno">Interno</option>
+              <option value="externo">Externo</option>
+            </select>
+
+            <label for="docEnlace">Enlace</label>
+            <input type="url" id="docEnlace" required maxlength="500">
+
+            <button type="submit" class="btn" id="agregarDocumentoBtn">Agregar</button>
+            <div class="form-alert" id="nuevoDocumentoManualAlert"></div>
+          </form>
+        </details>
+      </details>
     </div>
   </section>
 

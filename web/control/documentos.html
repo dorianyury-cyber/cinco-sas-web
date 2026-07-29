@@ -18,6 +18,7 @@
         <span id="userEmail"></span>
         <a href="contratos.html" class="control-userbar-link">Contratos</a>
         <a href="correspondencia.html" class="control-userbar-link">Correspondencia</a>
+        <a href="empleados.html" class="control-userbar-link">Empleados</a>
         <a href="cambiar-clave.html" class="control-userbar-link">Cambiar clave</a>
         <button id="logoutBtn" class="btn-outline">Cerrar sesión</button>
       </div>
@@ -51,6 +52,9 @@
 
           <label for="codigoAnterior">Código anterior (si es una recodificación, opcional)</label>
           <input type="text" id="codigoAnterior" maxlength="60">
+
+          <label for="contratoRelacionado">Contrato relacionado (opcional — queda archivado también ahí)</label>
+          <select id="contratoRelacionado"><option value="">Ninguno</option></select>
 
           <button type="submit" class="btn" id="crearDocumentoBtn">Crear documento</button>
           <div class="form-alert" id="crearDocumentoAlert"></div>

@@ -1,10 +1,11 @@
 import { signOut } from "https://www.gstatic.com/firebasejs/10.7.1/firebase-auth.js";
 import {
-  collection, addDoc, doc, writeBatch, serverTimestamp,
+  collection, doc, writeBatch, runTransaction, serverTimestamp,
   onSnapshot, query, orderBy
 } from "https://www.gstatic.com/firebasejs/10.7.1/firebase-firestore.js";
 import { auth, db, requireAuth } from "./firebase-control.js";
 import { itemsIniciales } from "./plantillas.js";
+import { LINEAS_SERVICIO } from "./lineas-servicio.js";
 
 const TIPO_LABEL = { obra: "Obra / Interventoría", consultoria: "Consultoría" };
 
@@ -13,6 +14,14 @@ const sinContratos = document.getElementById("sinContratos");
 const form = document.getElementById("nuevoContratoForm");
 const alertBox = document.getElementById("crearAlert");
 const crearBtn = document.getElementById("crearBtn");
+
+const selectLinea = document.getElementById("lineaServicio");
+LINEAS_SERVICIO.forEach((l) => {
+  const opt = document.createElement("option");
+  opt.value = l.clave;
+  opt.textContent = `${l.clave} — ${l.nombre}`;
+  selectLinea.appendChild(opt);
+});
 
 function mostrarAlerta(texto, tipo) {
   alertBox.textContent = texto;
@@ -36,6 +45,7 @@ function renderContratos(snapshot) {
     const card = document.createElement("a");
     card.className = "card control-contrato-card";
     card.href = `contrato.html?id=${docSnap.id}`;
+    if (c.codigo) card.appendChild(elemento("span", { class: "control-badge", text: c.codigo }));
     card.appendChild(elemento("span", { class: "pill", text: TIPO_LABEL[c.tipo] || c.tipo }));
     card.appendChild(elemento("h3", { text: c.nombre }));
     card.appendChild(elemento("p", { text: c.cliente + (c.numero ? " · " + c.numero : "") }));
@@ -60,12 +70,16 @@ requireAuth((user) => {
     alertBox.className = "form-alert";
 
     const tipo = document.getElementById("tipo").value;
-    const datos = {
+    const lineaServicio = selectLinea.value;
+    const anio = new Date().getFullYear();
+    const datosBase = {
       nombre: document.getElementById("nombre").value,
       cliente: document.getElementById("cliente").value,
       tipo,
+      lineaServicio,
       numero: document.getElementById("numero").value,
       fechaInicio: document.getElementById("fechaInicio").value,
+      equipo: [],
       estado: "activo",
       creadoPor: user.email,
       creadoEn: serverTimestamp(),
@@ -73,7 +87,17 @@ requireAuth((user) => {
     };
 
     try {
-      const contratoRef = await addDoc(collection(db, "contratos"), datos);
+      const contadorRef = doc(db, "contadores", `contrato_${lineaServicio}_${anio}`);
+      const contratoRef = doc(collection(db, "contratos"));
+
+      await runTransaction(db, async (tx) => {
+        const contadorSnap = await tx.get(contadorRef);
+        const siguiente = contadorSnap.exists() ? contadorSnap.data().siguiente : 1;
+        const codigo = `${lineaServicio}-${anio}-${String(siguiente).padStart(3, "0")}`;
+
+        tx.set(contadorRef, { siguiente: siguiente + 1 });
+        tx.set(contratoRef, { ...datosBase, codigo });
+      });
 
       const batch = writeBatch(db);
       itemsIniciales(tipo).forEach((item) => {

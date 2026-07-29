@@ -1099,6 +1099,30 @@ tr.control-fila-doc { cursor: pointer; }
 tr.control-fila-doc:hover { background: rgba(254, 178, 9, 0.08); }
 tr.control-fila-doc td:first-child { font-weight: 700; color: var(--cinco-amber-dark); }
 
+/* ---- Equipo asignado (web/control/contrato.html) ---- */
+.control-equipo-lista { display: flex; flex-direction: column; gap: 8px; margin-bottom: 14px; }
+.control-equipo-fila {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 8px 12px;
+  border: 1px solid var(--border);
+  border-radius: 10px;
+  font-size: 13px;
+}
+.control-equipo-fila span:first-child { font-weight: 600; }
+.control-equipo-fila span:nth-child(2) { flex: 1; }
+.control-equipo-form { display: flex; gap: 10px; align-items: center; flex-wrap: wrap; }
+.control-equipo-form select {
+  padding: 7px 10px;
+  border-radius: 8px;
+  border: 1px solid var(--border);
+  background: var(--card-bg);
+  color: var(--text);
+  font-size: 13px;
+  min-width: 220px;
+}
+
 .control-btn-mini {
   padding: 5px 12px;
   border-radius: 999px;

@@ -1,9 +1,12 @@
 import { signOut } from "https://www.gstatic.com/firebasejs/10.7.1/firebase-auth.js";
 import {
-  doc, getDoc, updateDoc, deleteDoc, collection, getDocs, query, orderBy, serverTimestamp
+  doc, getDoc, updateDoc, deleteDoc, addDoc, collection, getDocs, onSnapshot,
+  query, orderBy, serverTimestamp, arrayUnion, arrayRemove
 } from "https://www.gstatic.com/firebasejs/10.7.1/firebase-firestore.js";
-import { auth, db, requireAuth } from "./firebase-control.js";
+import { auth, db, requireAuth, obtenerPerfil } from "./firebase-control.js";
 import { CAMPOS, FASES } from "./plantillas.js";
+
+const TIPO_DOC_LABEL = { interno: "Interno", externo: "Externo" };
 
 const TIPO_LABEL = { obra: "Obra / Interventoría", consultoria: "Consultoría" };
 const ESTADOS = [
@@ -211,6 +214,149 @@ function badgeAvance(items) {
   return `${completos}/${relevantes.length}`;
 }
 
+// ---- Equipo asignado ----
+// Solo un admin ve el formulario para agregar/quitar (las reglas de
+// Firestore también lo exigen); el resto del equipo ve la lista en
+// solo lectura.
+async function cargarEquipo(contratoRef, contrato, esAdmin) {
+  const lista = document.getElementById("equipoLista");
+  const badge = document.getElementById("equipoBadge");
+  const form = document.getElementById("agregarEquipoForm");
+  const select = document.getElementById("equipoSelect");
+  const alertBox = document.getElementById("equipoAlert");
+
+  const empleadosSnap = await getDocs(query(collection(db, "empleados"), orderBy("nombre")));
+  const empleados = empleadosSnap.docs.map((d) => d.data());
+  const porEmail = Object.fromEntries(empleados.map((e) => [e.email, e]));
+
+  function render() {
+    const equipo = contrato.equipo || [];
+    badge.textContent = String(equipo.length);
+    lista.innerHTML = "";
+    if (!equipo.length) {
+      lista.appendChild(campo("p", { class: "text-muted", text: "Todavía no hay nadie asignado." }));
+    }
+    equipo.forEach((email) => {
+      const fila = campo("div", { class: "control-equipo-fila" });
+      fila.appendChild(campo("span", { text: porEmail[email]?.nombre || email }));
+      fila.appendChild(campo("span", { class: "text-muted", text: email }));
+      if (esAdmin) {
+        const quitar = document.createElement("button");
+        quitar.type = "button";
+        quitar.className = "control-btn-mini";
+        quitar.textContent = "Quitar";
+        quitar.addEventListener("click", async () => {
+          await updateDoc(contratoRef, { equipo: arrayRemove(email), actualizadoEn: serverTimestamp() });
+          contrato.equipo = (contrato.equipo || []).filter((e) => e !== email);
+          renderSelect();
+          render();
+        });
+        fila.appendChild(quitar);
+      }
+      lista.appendChild(fila);
+    });
+  }
+
+  function renderSelect() {
+    const equipo = contrato.equipo || [];
+    select.innerHTML = "";
+    empleados
+      .filter((e) => e.estado === "activo" && !equipo.includes(e.email))
+      .forEach((e) => {
+        const opt = campo("option", { text: `${e.nombre} — ${e.email}` });
+        opt.value = e.email;
+        select.appendChild(opt);
+      });
+  }
+
+  if (esAdmin) {
+    form.classList.remove("oculto");
+    renderSelect();
+    form.addEventListener("submit", async (e) => {
+      e.preventDefault();
+      if (!select.value) return;
+      await updateDoc(contratoRef, { equipo: arrayUnion(select.value), actualizadoEn: serverTimestamp() });
+      contrato.equipo = [...(contrato.equipo || []), select.value];
+      renderSelect();
+      render();
+      alertBox.textContent = "Agregado al equipo.";
+      alertBox.className = "form-alert show ok";
+    });
+  }
+
+  render();
+}
+
+// ---- Documentos del contrato ----
+// Combina lo que llega solo (desde Documentos/Correspondencia, cuando esa
+// carta o formato se creó eligiendo este contrato) con lo agregado a mano
+// para lo que no pasa por ninguno de los dos generadores todavía. Cualquiera
+// con acceso al contrato (admin o equipo) puede agregar filas manuales —
+// solo "Equipo asignado" es admin-only, según las reglas de Firestore.
+function cargarDocumentosContrato(contratoId) {
+  const tbody = document.getElementById("listaDocumentosContrato");
+  const sinDocs = document.getElementById("sinDocumentosContrato");
+  const badge = document.getElementById("documentosBadge");
+  const form = document.getElementById("nuevoDocumentoManualForm");
+  const alertBox = document.getElementById("nuevoDocumentoManualAlert");
+  const btn = document.getElementById("agregarDocumentoBtn");
+
+  const enlaceDocumento = (d) => {
+    if (d.origen === "documentos") return `documento.html?id=${d.refId}`;
+    if (d.origen === "correspondencia") return "correspondencia.html";
+    return d.enlace || "#";
+  };
+
+  const q = query(collection(db, "contratos", contratoId, "documentos"), orderBy("creadoEn", "desc"));
+  onSnapshot(q, (snapshot) => {
+    badge.textContent = String(snapshot.size);
+    tbody.innerHTML = "";
+    sinDocs.classList.toggle("oculto", !snapshot.empty);
+    snapshot.forEach((docSnap) => {
+      const d = docSnap.data();
+      const fila = document.createElement("tr");
+      fila.appendChild(campo("td", { text: d.codigo || "—" }));
+      fila.appendChild(campo("td", { text: d.nombre || "" }));
+      fila.appendChild(campo("td", { text: TIPO_DOC_LABEL[d.tipo] || d.tipo }));
+      fila.appendChild(campo("td", { text: d.creadoEn ? formatearFechaHora(d.creadoEn) : "" }));
+      const tdVer = document.createElement("td");
+      const ver = document.createElement("a");
+      ver.href = enlaceDocumento(d);
+      ver.className = "control-btn-mini";
+      ver.textContent = "Ver";
+      if (d.origen === "manual") ver.target = "_blank";
+      tdVer.appendChild(ver);
+      fila.appendChild(tdVer);
+      tbody.appendChild(fila);
+    });
+  });
+
+  form.addEventListener("submit", async (e) => {
+    e.preventDefault();
+    btn.disabled = true;
+    alertBox.className = "form-alert";
+    try {
+      await addDoc(collection(db, "contratos", contratoId, "documentos"), {
+        nombre: document.getElementById("docNombre").value,
+        tipo: document.getElementById("docTipo").value,
+        enlace: document.getElementById("docEnlace").value,
+        origen: "manual",
+        creadoPor: auth.currentUser.email,
+        creadoEn: serverTimestamp()
+      });
+      form.reset();
+      form.closest("details").open = false;
+      alertBox.textContent = "Documento agregado.";
+      alertBox.className = "form-alert show ok";
+    } catch (err) {
+      alertBox.textContent = err.message || "No se pudo agregar el documento.";
+      alertBox.className = "form-alert show error";
+    } finally {
+      btn.disabled = false;
+    }
+  });
+}
+
 requireAuth(async (user) => {
   document.getElementById("userEmail").textContent = user.email;
 
@@ -221,7 +367,10 @@ requireAuth(async (user) => {
     return;
   }
   const contrato = contratoSnap.data();
+  const perfil = await obtenerPerfil(user.email);
+  const esAdmin = perfil?.estado === "activo" && perfil?.rol === "admin";
 
+  document.getElementById("contratoCodigo").textContent = contrato.codigo || "";
   document.getElementById("contratoNombre").textContent = contrato.nombre;
   document.getElementById("contratoCliente").textContent = contrato.cliente;
   document.getElementById("contratoTipo").textContent = TIPO_LABEL[contrato.tipo] || contrato.tipo;
@@ -235,7 +384,9 @@ requireAuth(async (user) => {
   const itemsSnap = await getDocs(query(collection(db, "contratos", id, "items"), orderBy("orden")));
   const items = itemsSnap.docs.map((d) => ({ id: d.id, ref: d.ref, ...d.data() }));
 
-  document.getElementById("borrarContratoBtn").addEventListener("click", async () => {
+  const borrarBtn = document.getElementById("borrarContratoBtn");
+  if (esAdmin) borrarBtn.classList.remove("oculto");
+  borrarBtn.addEventListener("click", async () => {
     const confirmado = window.confirm(
       `¿Seguro que quieres borrar el contrato "${contrato.nombre}"?\n\nEsta acción no se puede deshacer: se pierde todo el checklist (Servicio al Cliente, Talento Humano y Actividades) registrado en él.`
     );
@@ -244,6 +395,9 @@ requireAuth(async (user) => {
     await deleteDoc(contratoRef);
     window.location.href = "contratos.html";
   });
+
+  await cargarEquipo(contratoRef, contrato, esAdmin);
+  cargarDocumentosContrato(id);
 
   const badges = { general: document.getElementById("avanceGeneral") };
   const contenedor = document.getElementById("camposContainer");

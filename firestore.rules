@@ -6,23 +6,61 @@ rules_version = '2';
 // eso no tiene ninguna regla de acceso explícita abajo y queda denegada
 // por defecto.
 //
-// El módulo interno de Control de Contratos (web/control/*.html) sí tiene
-// login (Firebase Auth, cuentas creadas a mano para el equipo, todas con el
-// mismo nivel de acceso — sin roles por ahora), así que su colección
-// "contratos" permite lectura/escritura a cualquier usuario autenticado.
+// El módulo interno de Control de Contratos (web/control/*.html) tiene
+// login (Firebase Auth, cuentas creadas a mano para el equipo) y perfiles
+// en "empleados" (documento con id = email, porque todo el módulo ya
+// identifica al usuario por user.email, nunca por uid). Un admin ve/edita
+// todo; un empleado normal solo ve los contratos donde está en su "equipo",
+// y ahí solo puede tocar estado/avance, no reasignar equipo ni borrar.
 service cloud.firestore {
   match /databases/{database}/documents {
+
+    function empleadoDoc() {
+      return get(/databases/$(database)/documents/empleados/$(request.auth.token.email)).data;
+    }
+    function esEmpleadoActivo() {
+      return request.auth != null && empleadoDoc().estado == 'activo';
+    }
+    function esAdmin() {
+      return esEmpleadoActivo() && empleadoDoc().rol == 'admin';
+    }
+    function enEquipo(datosContrato) {
+      return esEmpleadoActivo() && request.auth.token.email in datosContrato.equipo;
+    }
+
+    // Directorio de empleados: cualquier autenticado lo lee (para elegir a
+    // quién asignar a un contrato), solo un admin lo administra.
+    match /empleados/{email} {
+      allow read: if request.auth != null;
+      allow write: if esAdmin();
+    }
+
     match /contratos/{contratoId} {
-      allow read, write: if request.auth != null;
+      allow read: if esAdmin() || enEquipo(resource.data);
+      allow create, delete: if esAdmin();
+      allow update: if esAdmin()
+        || (enEquipo(resource.data)
+            && request.resource.data.diff(resource.data).affectedKeys()
+                 .hasOnly(['estado', 'actualizadoEn', 'actualizadoPor']));
 
       match /items/{itemId} {
-        allow read, write: if request.auth != null;
+        allow read, write: if esAdmin() || enEquipo(get(/databases/$(database)/documents/contratos/$(contratoId)).data);
+      }
+
+      // Carpeta de documentos del contrato (referencias a "documentos" o
+      // "correspondencia", o filas manuales) — mismo nivel de acceso que
+      // el resto del contrato.
+      match /documentos/{docId} {
+        allow read, write: if esAdmin() || enEquipo(get(/databases/$(database)/documents/contratos/$(contratoId)).data);
       }
     }
 
-    // Listado Maestro de Documentos (web/control/documentos.html) — mismo
-    // criterio de acceso que "contratos". "contadores" guarda el siguiente
-    // consecutivo por área+tipo para generar los códigos sin choques.
+    // Listado Maestro de Documentos (web/control/documentos.html) — catálogo
+    // de toda la empresa, no de un contrato puntual, así que se mantiene
+    // abierto a cualquier autenticado (igual que Correspondencia debajo).
+    // "contadores" guarda el siguiente consecutivo por área+tipo (y ahora
+    // también por línea de servicio+año, para el código de contrato) para
+    // generar los códigos sin choques.
     match /documentos/{documentoId} {
       allow read, write: if request.auth != null;
 
