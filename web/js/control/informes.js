@@ -6,6 +6,7 @@ import {
 import { ref, uploadBytes, getDownloadURL } from "https://www.gstatic.com/firebasejs/10.7.1/firebase-storage.js";
 import { auth, db, storage, requireAuth } from "./firebase-control.js";
 import { generarInformePDF } from "./informes-pdf.js";
+import { truncar } from "./texto.js";
 
 const TIPO_LABEL = {
   gestion: "Informe de gestión", mediciones: "Informe de mediciones",
@@ -30,6 +31,18 @@ function mostrarAlerta(texto, tipo) {
 
 function hoyISO() {
   return new Date().toISOString().slice(0, 10);
+}
+
+// Firestore no permite arrays anidados (un array dentro de otro array) —
+// bloque.filas en el editor es una cuadrícula string[][] (lo más simple
+// para la UI de la tabla), así que antes de guardar cada fila se envuelve
+// en un objeto {celdas: [...]}, y al volver a cargar un informe guardado
+// (Editar/Duplicar) se desenvuelve otra vez a string[][].
+function filasParaGuardar(filas) {
+  return filas.map((fila) => ({ celdas: fila }));
+}
+function filasParaEditar(filas) {
+  return filas.map((fila) => (Array.isArray(fila) ? fila : fila.celdas || []));
 }
 
 // ---- editor de bloques: título1/título2/título3/párrafo/tabla/imagen,
@@ -268,6 +281,67 @@ function limpiarFormulario() {
 
 cancelarEdicionBtn.addEventListener("click", limpiarFormulario);
 
+// ---- Importar bloques desde JSON ----
+// Para reaprovechar un informe ya elaborado en Word (o cualquier otro
+// origen): un JSON con { titulo, tipoInforme, mes, firmaNombre,
+// firmaCargo, bloques } precarga el formulario en blanco, igual que
+// "Duplicar" pero sin partir de un informe que ya esté guardado en el
+// sistema. El contrato relacionado se deja para que el usuario lo elija
+// él mismo (así trae los datos reales del contrato de Firestore).
+document.getElementById("importarJsonBtn").addEventListener("click", () => {
+  const textoJson = document.getElementById("importarJsonTexto").value.trim();
+  if (!textoJson) return;
+  let datos;
+  try {
+    datos = JSON.parse(textoJson);
+  } catch (err) {
+    mostrarAlerta("Ese texto no es un JSON válido.", "error");
+    return;
+  }
+  if (!Array.isArray(datos.bloques)) {
+    mostrarAlerta('El JSON debe tener un arreglo "bloques".', "error");
+    return;
+  }
+
+  // Este JSON puede venir escrito a mano o armado por otra herramienta,
+  // así que puede llegar incompleto — se valida ANTES de tocar el
+  // formulario (para no dejarlo a medio cargar) y con un mensaje que diga
+  // cuál bloque falló, en vez de dejar que renderBloques() reviente más
+  // adelante al toparse con una tabla sin filas.
+  const TIPOS_VALIDOS = ["titulo1", "titulo2", "titulo3", "parrafo", "tabla", "imagen"];
+  for (let i = 0; i < datos.bloques.length; i++) {
+    const b = datos.bloques[i];
+    if (!TIPOS_VALIDOS.includes(b.tipo)) {
+      mostrarAlerta(`El bloque #${i + 1} tiene un "tipo" no reconocido ("${b.tipo}"). Corrígelo antes de importar.`, "error");
+      return;
+    }
+    if (b.tipo === "imagen") {
+      mostrarAlerta(`El bloque #${i + 1} es de tipo "imagen" — este importador no trae fotos, solo agrégalas manualmente después de importar el resto.`, "error");
+      return;
+    }
+    if (b.tipo === "tabla") {
+      const filasValidas = Array.isArray(b.filas) && b.filas.length > 0 &&
+        b.filas.every((fila) => Array.isArray(fila) && fila.length > 0);
+      if (!filasValidas) {
+        mostrarAlerta(`El bloque #${i + 1} es una tabla pero no trae "filas" completas (debe tener al menos una fila y una columna). Corrígelo antes de importar.`, "error");
+        return;
+      }
+    }
+  }
+
+  if (datos.titulo) document.getElementById("titulo").value = datos.titulo;
+  if (datos.tipoInforme) document.getElementById("tipoInforme").value = datos.tipoInforme;
+  if (datos.portada) document.getElementById("portada").value = datos.portada;
+  if (datos.mes) document.getElementById("mes").value = datos.mes;
+  if (datos.firmaNombre) document.getElementById("firmaNombre").value = datos.firmaNombre;
+  if (datos.firmaCargo) document.getElementById("firmaCargo").value = datos.firmaCargo;
+  bloques = datos.bloques.map((b) => (b.tipo === "tabla" ? { ...b } : { ...b, texto: b.texto || "" }));
+  renderBloques();
+  document.getElementById("importarJsonTexto").value = "";
+  document.getElementById("importarJsonTexto").closest("details").open = false;
+  mostrarAlerta(`Se cargaron ${bloques.length} bloques — falta elegir el "Contrato relacionado" y revisar antes de generar.`, "ok");
+});
+
 // ---- listado ----
 function celda(texto) {
   const td = document.createElement("td");
@@ -275,18 +349,32 @@ function celda(texto) {
   return td;
 }
 
-function cargarEnFormulario(informe) {
+// paraEditar=true: guarda sobre el mismo informe (mismo radicado).
+// paraEditar=false ("Duplicar"): parte de sus datos/bloques ya digitados
+// pero al guardar genera un radicado nuevo — para el informe del próximo
+// mes del mismo contrato, o uno similar para otro cliente/contrato.
+function cargarEnFormulario(informe, paraEditar) {
   document.getElementById("titulo").value = informe.titulo || "";
   document.getElementById("tipoInforme").value = informe.tipoInforme || "gestion";
+  document.getElementById("portada").value = informe.portada || "oscura";
   document.getElementById("mes").value = informe.mes || "";
   selectContrato.value = informe.contratoId || "";
   document.getElementById("firmaNombre").value = informe.firmaNombre || "";
   document.getElementById("firmaCargo").value = informe.firmaCargo || "";
-  bloques = (informe.bloques || []).map((b) => ({ ...b }));
+  bloques = (informe.bloques || []).map((b) => (
+    b.tipo === "tabla" ? { ...b, filas: filasParaEditar(b.filas || []) } : { ...b }
+  ));
   renderBloques();
-  informeIdEnEdicion.value = informe.id;
-  guardarBtn.textContent = "Guardar cambios y descargar";
-  cancelarEdicionBtn.classList.remove("oculto");
+  if (paraEditar) {
+    informeIdEnEdicion.value = informe.id;
+    guardarBtn.textContent = "Guardar cambios y descargar";
+    cancelarEdicionBtn.classList.remove("oculto");
+  } else {
+    informeIdEnEdicion.value = "";
+    guardarBtn.textContent = "Generar y descargar informe";
+    cancelarEdicionBtn.classList.add("oculto");
+    mostrarAlerta("Datos cargados desde " + informe.radicado + " — revisa qué cambiar antes de generar.", "ok");
+  }
   document.getElementById("nuevoInformeDetails").open = true;
   document.getElementById("nuevoInformeDetails").scrollIntoView({ behavior: "smooth" });
 }
@@ -323,7 +411,14 @@ function renderTabla(informes) {
     btnEditar.type = "button";
     btnEditar.className = "control-btn-mini";
     btnEditar.textContent = "Editar";
-    btnEditar.addEventListener("click", () => cargarEnFormulario(inf));
+    btnEditar.addEventListener("click", () => cargarEnFormulario(inf, true));
+
+    const btnDuplicar = document.createElement("button");
+    btnDuplicar.type = "button";
+    btnDuplicar.className = "control-btn-mini";
+    btnDuplicar.textContent = "Duplicar";
+    btnDuplicar.title = "Partir de este informe para uno nuevo (otro mes u otro contrato), con radicado propio";
+    btnDuplicar.addEventListener("click", () => cargarEnFormulario(inf, false));
 
     const btnBorrar = document.createElement("button");
     btnBorrar.type = "button";
@@ -343,7 +438,7 @@ function renderTabla(informes) {
       }
     });
 
-    tdAccion.append(btnPdf, btnEditar, btnBorrar);
+    tdAccion.append(btnPdf, btnEditar, btnDuplicar, btnBorrar);
     fila.appendChild(tdAccion);
     tbody.appendChild(fila);
   });
@@ -367,7 +462,7 @@ requireAuth(async (user) => {
     contratosPorId[docSnap.id] = c;
     const opt = document.createElement("option");
     opt.value = docSnap.id;
-    opt.textContent = `${c.codigo || "(sin código)"} — ${c.nombre}`;
+    opt.textContent = `${c.codigo || "(sin código)"} — ${truncar(c.nombre)}`;
     selectContrato.appendChild(opt);
   });
 
@@ -394,6 +489,8 @@ requireAuth(async (user) => {
           bloquesFinal.push({ tipo: "imagen", url, pieDeFoto: bloque.pieDeFoto || "" });
         } else if (bloque.tipo === "imagen") {
           bloquesFinal.push({ tipo: "imagen", url: bloque.url, pieDeFoto: bloque.pieDeFoto || "" });
+        } else if (bloque.tipo === "tabla") {
+          bloquesFinal.push({ ...bloque, filas: filasParaGuardar(bloque.filas) });
         } else {
           bloquesFinal.push(bloque);
         }
@@ -404,6 +501,7 @@ requireAuth(async (user) => {
       const datosBase = {
         titulo: document.getElementById("titulo").value,
         tipoInforme: document.getElementById("tipoInforme").value,
+        portada: document.getElementById("portada").value || "oscura",
         mes: document.getElementById("mes").value || null,
         firmaNombre: document.getElementById("firmaNombre").value,
         firmaCargo: document.getElementById("firmaCargo").value,

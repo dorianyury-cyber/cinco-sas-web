@@ -705,7 +705,8 @@ form.pqr-form label {
   margin: 14px 0 6px;
 }
 form.pqr-form input,
-form.pqr-form textarea {
+form.pqr-form textarea,
+form.pqr-form select {
   width: 100%;
   padding: 12px 14px;
   border: 1px solid var(--border);
@@ -715,8 +716,10 @@ form.pqr-form textarea {
   font-size: 14px;
   font-family: inherit;
 }
+form.pqr-form select { max-width: 100%; text-overflow: ellipsis; }
 form.pqr-form input:focus,
-form.pqr-form textarea:focus {
+form.pqr-form textarea:focus,
+form.pqr-form select:focus {
   outline: none;
   border-color: var(--cinco-amber-dark);
   box-shadow: 0 0 0 3px rgba(254, 178, 9, 0.2);

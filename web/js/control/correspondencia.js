@@ -6,6 +6,7 @@ import { ref, uploadBytes, getDownloadURL } from "https://www.gstatic.com/fireba
 import { auth, db, storage, requireAuth } from "./firebase-control.js";
 import { generarCartaPDF } from "./correspondencia-pdf.js";
 import { descargarCartaDocx } from "./correspondencia-docx.js";
+import { truncar } from "./texto.js";
 
 const selectContrato = document.getElementById("contratoRelacionado");
 
@@ -326,7 +327,7 @@ requireAuth(async (user) => {
     const c = docSnap.data();
     const opt = document.createElement("option");
     opt.value = docSnap.id;
-    opt.textContent = `${c.codigo || "(sin código)"} — ${c.nombre}`;
+    opt.textContent = `${c.codigo || "(sin código)"} — ${truncar(c.nombre)}`;
     selectContrato.appendChild(opt);
   });
 

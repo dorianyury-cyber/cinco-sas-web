@@ -54,6 +54,17 @@ export function capitalizarOracion(texto) {
     .join(" ");
 }
 
+// Para etiquetas de <option> (ej. "código — objeto del contrato"): el
+// objeto de un contrato puede ser una frase legal larguísima, y el menú
+// desplegable nativo del navegador no la envuelve ni la trunca — solo el
+// <select> cerrado respeta el ancho vía CSS, pero la lista abierta no. Se
+// recorta el texto de raíz para que la lista abierta tampoco se desborde.
+export function truncar(texto, maximo = 90) {
+  const limpio = (texto || "").trim();
+  if (limpio.length <= maximo) return limpio;
+  return limpio.slice(0, maximo - 1).trim() + "…";
+}
+
 export function capitalizarNombrePropio(texto) {
   const limpio = (texto || "").trim().replace(/\s+/g, " ");
   if (!limpio) return "";

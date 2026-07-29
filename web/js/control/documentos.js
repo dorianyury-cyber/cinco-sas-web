@@ -5,6 +5,7 @@ import {
 } from "https://www.gstatic.com/firebasejs/10.7.1/firebase-firestore.js";
 import { auth, db, requireAuth } from "./firebase-control.js";
 import { AREAS, TIPOS, nombreArea, nombreTipo } from "./documentos-plantillas.js";
+import { truncar } from "./texto.js";
 
 const selectContrato = document.getElementById("contratoRelacionado");
 
@@ -92,7 +93,7 @@ requireAuth(async (user) => {
     const c = docSnap.data();
     const opt = document.createElement("option");
     opt.value = docSnap.id;
-    opt.textContent = `${c.codigo || "(sin código)"} — ${c.nombre}`;
+    opt.textContent = `${c.codigo || "(sin código)"} — ${truncar(c.nombre)}`;
     selectContrato.appendChild(opt);
   });
 

@@ -17,9 +17,14 @@
 const NAVY = [31, 39, 50];
 const NAVY_HEX = "#1f2732";
 const AMBER = [254, 178, 9];
+const AMBER_DARK = [217, 148, 0];
 const TEXT_MUTED = [92, 101, 112];
 const GRIS_CLARO = [245, 246, 248];
 const LOGO_URL = "../assets/img/logo.png";
+// El logo.png normal trae el texto "CINCO S.A.S." y el círculo en BLANCO
+// (pensado para fondo navy) — sobre la portada clara quedaría invisible,
+// así que ahí se usa esta variante con el texto en negro.
+const LOGO_URL_TEXTO_OSCURO = "../assets/img/logo-texto-oscuro.png";
 
 // Código y versión de ESTE diseño de informe, tal como debería quedar
 // registrado en el Listado Maestro de Documentos (documentos.html, área
@@ -62,7 +67,10 @@ function formatearFecha(fechaISO) {
 // criterio que el resto de la suite (ver calcularAnchosColumna en pdf.js
 // de LBDC Neiva).
 function calcularAnchosColumna(doc, filas, anchoUtil) {
-  const numCols = filas[0].length;
+  // No todas las filas tienen necesariamente el mismo número de celdas
+  // (ej. tablas importadas de Word con celdas combinadas) — se usa el
+  // máximo, no solo filas[0].length, para no perder columnas.
+  const numCols = Math.max(...filas.map((f) => f.length));
   const anchoMin = 18;
   const anchoMax = anchoUtil * 0.55;
   const anchosCrudos = [];
@@ -90,8 +98,12 @@ export async function generarInformePDF(informe) {
   const anchoUtil = anchoPagina - margenX * 2;
   const lineHeight = 5.2;
 
+  const portadaClara = informe.portada === "clara";
+
   let logo = null;
-  try { logo = await cargarImagenComoDataURL(LOGO_URL, NAVY_HEX); } catch (e) { /* se genera igual sin logo */ }
+  try {
+    logo = await cargarImagenComoDataURL(portadaClara ? LOGO_URL_TEXTO_OSCURO : LOGO_URL, portadaClara ? "#ffffff" : NAVY_HEX);
+  } catch (e) { /* se genera igual sin logo */ }
 
   // ---- cuerpo: se dibuja primero, arrancando "en blanco" en la página 1
   // (luego se le insertan portada+índice+listas adelante) ----
@@ -183,7 +195,12 @@ export async function generarInformePDF(informe) {
   }
 
   function dibujarTabla(bloque) {
-    const filas = bloque.filas && bloque.filas.length ? bloque.filas : [[""]];
+    // Guardado en Firestore, cada fila es {celdas:[...]} (Firestore no
+    // admite arrays anidados) — pero por si acaso llega ya como array
+    // plano (ej. una vista previa antes de guardar), se acepta cualquiera
+    // de las dos formas.
+    const filasCrudas = bloque.filas && bloque.filas.length ? bloque.filas : [[""]];
+    const filas = filasCrudas.map((f) => (Array.isArray(f) ? f : f.celdas || []));
     const numero = tablasEntradas.length + 1;
     const tituloTexto = `Tabla ${numero}. ${bloque.titulo || ""}`.trim();
 
@@ -202,23 +219,26 @@ export async function generarInformePDF(informe) {
 
     filas.forEach((fila, fi) => {
       doc.setFont("helvetica", fi === 0 ? "bold" : "normal");
-      const lineasPorCelda = fila.map((texto, ci) => doc.splitTextToSize(String(texto || ""), anchos[ci] - padding * 2));
+      // Siempre se recorre anchos.length (no fila.length): una fila con
+      // menos celdas que el máximo de la tabla (celdas combinadas en el
+      // Word de origen) rellena con vacío en vez de desalinear columnas.
+      const lineasPorCelda = anchos.map((ancho, ci) => doc.splitTextToSize(String(fila[ci] || ""), ancho - padding * 2));
       const alturaFila = Math.max(...lineasPorCelda.map((l) => l.length)) * 4.2 + padding * 2;
 
       saltoSiNoCabe(alturaFila);
       let x = margenX;
       if (fi === 0) doc.setFillColor(...GRIS_CLARO);
-      fila.forEach((_, ci) => {
-        if (fi === 0) doc.rect(x, y, anchos[ci], alturaFila, "F");
+      anchos.forEach((ancho, ci) => {
+        if (fi === 0) doc.rect(x, y, ancho, alturaFila, "F");
         doc.setDrawColor(210, 214, 219);
-        doc.rect(x, y, anchos[ci], alturaFila);
-        x += anchos[ci];
+        doc.rect(x, y, ancho, alturaFila);
+        x += ancho;
       });
       x = margenX;
       doc.setTextColor(20, 22, 26);
-      fila.forEach((_, ci) => {
+      anchos.forEach((ancho, ci) => {
         doc.text(lineasPorCelda[ci], x + padding, y + padding + 3.2);
-        x += anchos[ci];
+        x += ancho;
       });
       y += alturaFila;
     });
@@ -247,9 +267,34 @@ export async function generarInformePDF(informe) {
   for (let i = 0; i < offset; i++) doc.insertPage(1);
 
   // ---- portada ----
+  // Dos variantes con el mismo layout: "oscura" (fondo navy a página
+  // completa, pensada para verse en pantalla) y "clara" (fondo blanco,
+  // solo dos filetes de acento arriba/abajo — pensada para imprimir sin
+  // gastar tanta tinta). El logo ya se cargó compuesto sobre el fondo
+  // correcto (portadaClara arriba, antes de dibujar el cuerpo).
+  const colorTitulo = portadaClara ? NAVY : [255, 255, 255];
+  const colorTipo = portadaClara ? AMBER_DARK : AMBER;
+  const colorEtiqueta = portadaClara ? NAVY : [255, 255, 255];
+  const colorValor = portadaClara ? TEXT_MUTED : [220, 224, 229];
+  const colorRadicado = portadaClara ? NAVY : [255, 255, 255];
+  const colorPie = portadaClara ? TEXT_MUTED : [199, 204, 211];
+
   doc.setPage(1);
-  doc.setFillColor(...NAVY);
-  doc.rect(0, 0, anchoPagina, altoPagina, "F");
+  if (portadaClara) {
+    doc.setFillColor(255, 255, 255);
+    doc.rect(0, 0, anchoPagina, altoPagina, "F");
+    doc.setFillColor(...NAVY);
+    doc.rect(0, 15, anchoPagina, 1.2, "F");
+    doc.setFillColor(...AMBER);
+    doc.rect(0, 16.2, anchoPagina, 1.2, "F");
+    doc.setFillColor(...AMBER);
+    doc.rect(0, altoPagina - 40, anchoPagina, 1.2, "F");
+    doc.setFillColor(...NAVY);
+    doc.rect(0, altoPagina - 38.8, anchoPagina, 1.2, "F");
+  } else {
+    doc.setFillColor(...NAVY);
+    doc.rect(0, 0, anchoPagina, altoPagina, "F");
+  }
   if (logo) {
     const altoLogo = 32;
     const anchoLogo = altoLogo * (logo.ancho / logo.alto);
@@ -257,24 +302,29 @@ export async function generarInformePDF(informe) {
   }
   doc.setFont("helvetica", "bold");
   doc.setFontSize(20);
-  doc.setTextColor(255, 255, 255);
+  doc.setTextColor(...colorTitulo);
   const tituloLineas = doc.splitTextToSize(informe.titulo || "", anchoUtil);
   doc.text(tituloLineas, anchoPagina / 2, 115, { align: "center" });
   doc.setFont("helvetica", "normal");
   doc.setFontSize(12);
-  doc.setTextColor(...AMBER);
+  doc.setTextColor(...colorTipo);
   doc.text(TIPO_LABEL[informe.tipoInforme] || "Informe", anchoPagina / 2, 115 + tituloLineas.length * 8 + 4, { align: "center" });
 
   let yPortada = 165;
   doc.setFontSize(10.5);
-  doc.setTextColor(220, 224, 229);
+  doc.setTextColor(...colorValor);
+  const xValor = anchoPagina / 2 - 10;
+  const anchoValor = anchoPagina - margenX - xValor;
   const filaPortada = (etiqueta, valor) => {
     if (!valor) return;
     doc.setFont("helvetica", "bold");
+    doc.setTextColor(...colorEtiqueta);
     doc.text(etiqueta, anchoPagina / 2 - 45, yPortada);
     doc.setFont("helvetica", "normal");
-    doc.text(String(valor), anchoPagina / 2 - 10, yPortada);
-    yPortada += 7;
+    doc.setTextColor(...colorValor);
+    const lineas = doc.splitTextToSize(String(valor), anchoValor);
+    doc.text(lineas, xValor, yPortada);
+    yPortada += lineas.length * 5.2 + 2;
   };
   filaPortada("Contrato:", informe.contratoCodigo ? `${informe.contratoCodigo}${informe.contratoNumero ? " · N.º " + informe.contratoNumero : ""}` : null);
   filaPortada("Objeto:", informe.contratoNombre);
@@ -285,11 +335,11 @@ export async function generarInformePDF(informe) {
 
   doc.setFont("helvetica", "bold");
   doc.setFontSize(11);
-  doc.setTextColor(255, 255, 255);
+  doc.setTextColor(...colorRadicado);
   doc.text(`Radicado: ${informe.radicado || ""}`, anchoPagina / 2, altoPagina - 30, { align: "center" });
   doc.setFont("helvetica", "normal");
   doc.setFontSize(9);
-  doc.setTextColor(199, 204, 211);
+  doc.setTextColor(...colorPie);
   doc.text(`Cinco S.A.S. · ${formatearFecha(informe.mes ? informe.mes + "-01" : null) !== "—" ? formatearFecha(informe.mes + "-01") : new Date().toLocaleDateString("es-CO", { day: "numeric", month: "long", year: "numeric" })}`, anchoPagina / 2, altoPagina - 24, { align: "center" });
 
   // ---- índice y listas: helper compartido para dibujar una lista de

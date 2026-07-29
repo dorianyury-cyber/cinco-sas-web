@@ -41,6 +41,13 @@
         <form class="pqr-form" id="nuevoInformeForm">
           <input type="hidden" id="informeIdEnEdicion">
 
+          <details class="control-nuevo">
+            <summary>Importar bloques desde JSON (contenido ya elaborado)</summary>
+            <p class="text-muted control-informes-ayuda">Pega aquí el JSON con título/bloques ya armados (por ejemplo, extraído de un informe anterior en Word) — reemplaza el título, tipo, mes y el cuerpo del formulario, pero tienes que elegir tú el "Contrato relacionado" antes de generar.</p>
+            <textarea id="importarJsonTexto" rows="6" placeholder='{"titulo": "...", "bloques": [...]}'></textarea>
+            <button type="button" class="control-btn-mini" id="importarJsonBtn">Cargar en el formulario</button>
+          </details>
+
           <label for="titulo">Título del informe</label>
           <input type="text" id="titulo" required maxlength="200" placeholder="Ej. Informe de Gestión — Junio 2026">
 
@@ -51,6 +58,12 @@
             <option value="consultoria">Informe de consultoría</option>
             <option value="interventoria">Informe de interventoría</option>
             <option value="otro">Otro</option>
+          </select>
+
+          <label for="portada">Estilo de portada</label>
+          <select id="portada">
+            <option value="oscura">Oscura (pantalla)</option>
+            <option value="clara">Clara (ahorra tinta al imprimir)</option>
           </select>
 
           <label for="mes">Mes (opcional)</label>
