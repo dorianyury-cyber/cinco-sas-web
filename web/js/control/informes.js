@@ -438,7 +438,27 @@ function renderTabla(informes) {
       }
     });
 
-    tdAccion.append(btnPdf, btnEditar, btnDuplicar, btnBorrar);
+    const btnPortada = document.createElement("button");
+    btnPortada.type = "button";
+    btnPortada.className = "control-btn-mini";
+    const esClara = inf.portada === "clara";
+    btnPortada.textContent = esClara ? "Portada oscura" : "Portada clara";
+    btnPortada.title = "Cambia el estilo de portada de este informe y descarga el PDF con el nuevo estilo";
+    btnPortada.addEventListener("click", async () => {
+      btnPortada.disabled = true;
+      try {
+        const nuevaPortada = esClara ? "oscura" : "clara";
+        await updateDoc(doc(db, "informes", inf.id), { portada: nuevaPortada });
+        const pdf = await generarInformePDF({ ...inf, portada: nuevaPortada });
+        pdf.save(`${inf.radicado}.pdf`);
+      } catch (err) {
+        mostrarAlerta(err.message || "No se pudo cambiar la portada.", "error");
+      } finally {
+        btnPortada.disabled = false;
+      }
+    });
+
+    tdAccion.append(btnPdf, btnEditar, btnDuplicar, btnPortada, btnBorrar);
     fila.appendChild(tdAccion);
     tbody.appendChild(fila);
   });
