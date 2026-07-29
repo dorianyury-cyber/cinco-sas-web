@@ -378,10 +378,13 @@ function cargarEnFormulario(informe, paraEditar) {
     informeIdEnEdicion.value = informe.id;
     guardarBtn.textContent = "Guardar cambios y descargar";
     cancelarEdicionBtn.classList.remove("oculto");
-    // Ya quedó registrado en el SGC al crearlo (si aplicaba) — no se vuelve
-    // a preguntar para no generar un segundo código para el mismo informe.
+    // Solo se bloquea si este informe puntual ya tiene un código del SGC
+    // guardado (se registró antes) — no por el simple hecho de estar
+    // editando. Los informes de antes de que existiera esta casilla (o que
+    // no se marcaron al crearlos) nunca quedaron registrados, así que aquí
+    // se debe poder marcar y registrar por primera vez.
     parteSGI.checked = false;
-    parteSGI.disabled = true;
+    parteSGI.disabled = !!informe.codigoSgc;
   } else {
     informeIdEnEdicion.value = "";
     guardarBtn.textContent = "Generar y descargar informe";
@@ -591,12 +594,17 @@ requireAuth(async (user) => {
       // solo se avisa para registrarlo manualmente en Documentos.
       let codigoSgc = "";
       let errorSgc = "";
-      if (!enEdicion && document.getElementById("parteSGI").checked) {
+      if (document.getElementById("parteSGI").checked) {
         try {
           codigoSgc = await registrarDocumentoSGC(db, {
             area: AREA_SGC_INFORMES, tipo: TIPO_SGC_INFORMES,
             nombre: datosBase.titulo, origen: "informes", refId: idInforme, user
           });
+          // Se guarda en el propio informe para que, si se vuelve a editar
+          // más adelante, ya no se ofrezca marcarlo de nuevo (evita generar
+          // un segundo código para el mismo documento).
+          await updateDoc(doc(db, "informes", idInforme), { codigoSgc });
+          informeFinal.codigoSgc = codigoSgc;
         } catch (err) {
           errorSgc = err.message || "error desconocido";
         }

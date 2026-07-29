@@ -464,10 +464,13 @@ function cargarEnFormulario(oferta, paraEditar) {
     ofertaIdEnEdicion.value = oferta.id;
     guardarBtn.textContent = "Guardar cambios y descargar";
     cancelarEdicionBtn.classList.remove("oculto");
-    // Ya quedó registrada en el SGC al crearla (si aplicaba) — no se
-    // vuelve a preguntar para no generar un segundo código.
+    // Solo se bloquea si esta oferta puntual ya tiene un código del SGC
+    // guardado (se registró antes) — no por el simple hecho de estar
+    // editando. Las ofertas de antes de que existiera esta casilla (o que
+    // no se marcaron al crearse) nunca quedaron registradas, así que aquí
+    // se debe poder marcar y registrar por primera vez.
     parteSGI.checked = false;
-    parteSGI.disabled = true;
+    parteSGI.disabled = !!oferta.codigoSgc;
   } else {
     ofertaIdEnEdicion.value = "";
     guardarBtn.textContent = "Generar y descargar oferta";
@@ -697,12 +700,17 @@ requireAuth(async (user) => {
       // solo se avisa para registrarla manualmente en Documentos.
       let codigoSgc = "";
       let errorSgc = "";
-      if (!enEdicion && document.getElementById("parteSGI").checked) {
+      if (document.getElementById("parteSGI").checked) {
         try {
           codigoSgc = await registrarDocumentoSGC(db, {
             area: AREA_SGC_OFERTAS, tipo: TIPO_SGC_OFERTAS,
             nombre: datosBase.titulo, origen: "ofertas", refId: idOferta, user
           });
+          // Se guarda en la propia oferta para que, si se vuelve a editar
+          // más adelante, ya no se ofrezca marcarla de nuevo (evita generar
+          // un segundo código para el mismo documento).
+          await updateDoc(doc(db, "ofertas", idOferta), { codigoSgc });
+          ofertaFinal.codigoSgc = codigoSgc;
         } catch (err) {
           errorSgc = err.message || "error desconocido";
         }
