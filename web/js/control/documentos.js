@@ -63,8 +63,11 @@ function renderTabla() {
     fila.appendChild(celda("td", nombreArea(d.area)));
     fila.appendChild(celda("td", nombreTipo(d.tipo)));
     fila.appendChild(celda("td", "v" + d.versionActual));
-    const tdEstado = celda("td", ESTADO_LABEL[d.estado] || d.estado);
-    if (d.estado === "obsoleto") tdEstado.className = "text-muted";
+    const tdEstado = document.createElement("td");
+    const pillEstado = document.createElement("span");
+    pillEstado.className = `control-estado-pill control-estado-${d.estado === "obsoleto" ? "obsoleto" : "vigente"}`;
+    pillEstado.textContent = ESTADO_LABEL[d.estado] || d.estado;
+    tdEstado.appendChild(pillEstado);
     fila.appendChild(tdEstado);
     fila.addEventListener("click", () => { window.location.href = `documento.html?id=${d.id}`; });
     tbody.appendChild(fila);
