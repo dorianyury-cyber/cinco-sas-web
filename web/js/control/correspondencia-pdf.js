@@ -14,9 +14,10 @@ const GRIS_CLARO = [245, 246, 248];
 const LOGO_URL = "../assets/img/logo.png";
 
 // Código y versión del formato en blanco (la plantilla), tal como quedó
-// registrado en el Listado Maestro de Documentos (documentos.html) — si
-// ahí se registra una nueva versión del diseño, actualizar también acá.
-const CODIGO_FORMATO = "SC-FOR-001";
+// registrado en el Listado Maestro de Documentos (documentos.html, área
+// AC — Actividades, ver la nota en correspondencia.js) — si ahí se
+// registra una nueva versión del diseño, actualizar también acá.
+const CODIGO_FORMATO = "AC-FOR-001";
 const VERSION_FORMATO = "1";
 
 // Se dibuja en un <canvas> antes de pasarlo a jsPDF, aplanando la

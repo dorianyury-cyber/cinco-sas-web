@@ -11,8 +11,11 @@ import { truncar } from "./texto.js";
 
 // Área/tipo fijos para que un informe quede en el Listado Maestro de
 // Documentos (SGC) sin pedir un campo más en el formulario — el checkbox
-// "parteSGI" es la única decisión que toma quien elabora el informe.
-const AREA_SGC_INFORMES = "SC";
+// "parteSGI" es la única decisión que toma quien elabora el informe. Área
+// AC (Actividades), no SC: el checklist real de contratos (plantillas.js,
+// ACTIVIDADES_OBRA/SERVICIO) incluye textualmente "Realización de
+// Informes"/"Informe Final" como parte de Actividades.
+const AREA_SGC_INFORMES = "AC";
 const TIPO_SGC_INFORMES = "INF";
 
 const TIPO_LABEL = {

@@ -11,8 +11,11 @@ import { registrarDocumentoSGC } from "./documentos-sgc.js";
 
 // Área/tipo fijos para que una carta quede en el Listado Maestro de
 // Documentos (SGC) sin pedir un campo más en el formulario — mismo
-// criterio que informes.js/ofertas.js.
-const AREA_SGC_CORRESPONDENCIA = "SC";
+// criterio que informes.js/ofertas.js. Área AC (Actividades), no SC: el
+// checklist real de contratos (plantillas.js, ACTIVIDADES_OBRA/SERVICIO)
+// incluye textualmente "Correspondencia Cruzada" como parte de
+// Actividades, no de Servicio al Cliente.
+const AREA_SGC_CORRESPONDENCIA = "AC";
 const TIPO_SGC_CORRESPONDENCIA = "COM";
 
 const selectContrato = document.getElementById("contratoRelacionado");
