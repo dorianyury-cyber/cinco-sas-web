@@ -132,7 +132,12 @@ export async function generarOfertaPDF(oferta) {
 
   function dibujarTitulo(nivel, texto) {
     if (nivel === 1) {
-      if (y > margenSuperior + 0.5) { doc.addPage(); y = margenSuperior; }
+      // A diferencia de informes-pdf.js (capítulos largos, sí conviene
+      // arrancar página nueva), una oferta tiene secciones cortas — forzar
+      // salto de página en cada título 1 dejaba páginas casi en blanco.
+      // Solo salta si de verdad no cabe, igual que los otros niveles.
+      saltoSiNoCabe(lineHeight * 3);
+      y += 4;
       doc.setFont("helvetica", "bold");
       doc.setFontSize(15);
       doc.setTextColor(...NAVY);
@@ -294,7 +299,7 @@ export async function generarOfertaPDF(oferta) {
   if (oferta.firmaUrl) {
     try {
       const firma = await cargarImagenComoDataURL(oferta.firmaUrl);
-      const altoFirma = 18;
+      const altoFirma = 26;
       const anchoFirma = altoFirma * (firma.ancho / firma.alto);
       doc.addImage(firma.dataUrl, "PNG", margenX, y, anchoFirma, altoFirma);
       y += altoFirma + 2;
@@ -323,10 +328,11 @@ export async function generarOfertaPDF(oferta) {
   y += 10;
 
   const items = oferta.items || [];
-  const filasTabla = [["Ítem", "Cantidad", "Valor unitario", "Valor total"]];
+  const filasTabla = [["Descripción", "Unidad", "Cantidad", "Valor unitario", "Valor total"]];
   items.forEach((it) => {
     filasTabla.push([
       it.descripcion || "",
+      it.unidad || "—",
       formatoCantidad.format(Number(it.cantidad) || 0),
       formatoMoneda.format(Number(it.valorUnitario) || 0),
       formatoMoneda.format((Number(it.cantidad) || 0) * (Number(it.valorUnitario) || 0))

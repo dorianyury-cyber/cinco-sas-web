@@ -1333,6 +1333,7 @@ form.pqr-form .control-tabla-botones button { width: auto; margin-top: 0; }
   font-size: 12.5px;
 }
 .control-items-fila input[type="text"] { flex: 3; min-width: 140px; }
+.control-items-fila input.control-items-unidad { flex: 0.7; min-width: 80px; }
 .control-items-fila input[type="number"] { flex: 1; min-width: 70px; }
 .control-items-fila .control-items-total {
   flex: 1.4;

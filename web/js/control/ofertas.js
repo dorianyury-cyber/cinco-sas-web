@@ -320,7 +320,7 @@ inputImagen.addEventListener("change", async () => {
 let items = [];
 
 function nuevoItem() {
-  return { descripcion: "", cantidad: 1, valorUnitario: 0 };
+  return { descripcion: "", unidad: "", cantidad: 1, valorUnitario: 0 };
 }
 
 // AIU/IVA: si es "obra", Administración/Imprevistos/Utilidad se calculan
@@ -374,6 +374,15 @@ function renderItemsEditor() {
     descInput.value = item.descripcion;
     descInput.addEventListener("input", () => { item.descripcion = descInput.value; });
     fila.appendChild(descInput);
+
+    const unidadInput = document.createElement("input");
+    unidadInput.type = "text";
+    unidadInput.maxLength = 20;
+    unidadInput.placeholder = "Unidad (m, kg, global...)";
+    unidadInput.className = "control-items-unidad";
+    unidadInput.value = item.unidad || "";
+    unidadInput.addEventListener("input", () => { item.unidad = unidadInput.value; });
+    fila.appendChild(unidadInput);
 
     const cantInput = document.createElement("input");
     cantInput.type = "number";
@@ -659,7 +668,7 @@ requireAuth(async (user) => {
         contratoNumero: contrato?.numero || null,
         portada: document.getElementById("portada").value || "oscura",
         bloques: bloquesFinal,
-        items: items.map((it) => ({ descripcion: it.descripcion, cantidad: Number(it.cantidad) || 0, valorUnitario: Number(it.valorUnitario) || 0 })),
+        items: items.map((it) => ({ descripcion: it.descripcion, unidad: it.unidad || "", cantidad: Number(it.cantidad) || 0, valorUnitario: Number(it.valorUnitario) || 0 })),
         aiu: leerAiu(),
         iva: parseFloat(ivaInput.value) || 0,
         condiciones: {
