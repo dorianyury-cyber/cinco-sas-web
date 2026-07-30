@@ -239,9 +239,19 @@ function encabezadoItems() {
 
 function badgeAvance(items) {
   const relevantes = items.filter((i) => i.estado !== "no_aplica");
-  if (!relevantes.length) return "—";
+  if (!relevantes.length) return { texto: "—", completo: false };
   const completos = relevantes.filter((i) => i.estado === "completado").length;
-  return `${completos}/${relevantes.length}`;
+  return { texto: `${completos}/${relevantes.length}`, completo: completos === relevantes.length };
+}
+
+// Aplica el texto "x/y" a un badge y lo pone en verde (.completo) cuando
+// llegó a su meta — mismo helper para el avance general, por campo y por
+// fase, para no repetir el toggle de clase en cada sitio.
+function aplicarBadgeAvance(el, items) {
+  if (!el) return;
+  const { texto, completo } = badgeAvance(items);
+  el.textContent = texto;
+  el.classList.toggle("completo", completo);
 }
 
 // ---- Equipo asignado ----
@@ -353,6 +363,7 @@ function renderInformesMensuales(contrato, documentosConMes) {
 
   contenedor.innerHTML = "";
   badge.textContent = `${mesesHechos.size}/${meses.length}`;
+  badge.classList.toggle("completo", meses.length > 0 && mesesHechos.size === meses.length);
   meses.forEach((mesISO) => {
     const hecho = mesesHechos.has(mesISO);
     const pill = document.createElement(hecho ? "span" : "button");
@@ -615,14 +626,16 @@ requireAuth(async (user) => {
   const contenedor = document.getElementById("camposContainer");
 
   function recalcularAvances() {
-    badges.general.textContent = "Avance general: " + badgeAvance(items);
+    const general = badgeAvance(items);
+    badges.general.textContent = "Avance general: " + general.texto;
+    badges.general.classList.toggle("completo", general.completo);
     CAMPOS.forEach((c) => {
-      if (badges[c.clave]) badges[c.clave].textContent = badgeAvance(items.filter((i) => i.campo === c.clave));
+      aplicarBadgeAvance(badges[c.clave], items.filter((i) => i.campo === c.clave));
     });
     if (badges.actividades_fases) {
       FASES.forEach((f) => {
         const el = badges.actividades_fases[f.clave];
-        if (el) el.textContent = badgeAvance(items.filter((i) => i.campo === "actividades" && i.fase === f.clave));
+        aplicarBadgeAvance(el, items.filter((i) => i.campo === "actividades" && i.fase === f.clave));
       });
     }
   }
