@@ -664,11 +664,63 @@ ul.clean-list li::before {
   box-shadow: var(--shadow);
 }
 .app-card p { font-size: 13.5px; color: var(--text-muted); margin-bottom: 18px; }
+.app-card-link { margin: 12px 0 0; }
 .app-card .note {
   font-size: 11.5px;
   color: var(--text-muted);
   margin-top: 10px;
 }
+/* Variante de .icon con un número en vez de emoji (pasos de un proceso) */
+.icon-num { font-weight: 800; color: var(--cinco-navy); }
+@media (prefers-color-scheme: dark) { .icon-num { color: #fff; } }
+
+/* ---- landing de aplicativo (Copropiedad Saludable): intro con imagen a
+   un lado, mismo lenguaje visual (tarjetas/tokens) que el resto del sitio ---- */
+.app-hero { display: flex; align-items: center; gap: 40px; flex-wrap: wrap; }
+.app-hero-texto { flex: 1 1 360px; }
+.app-hero-texto p { color: var(--text-muted); font-size: 15px; margin: 14px 0 22px; }
+.app-hero-badges { display: flex; gap: 10px; flex-wrap: wrap; margin-bottom: 24px; }
+.app-hero-badge {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  background: var(--card-bg);
+  border: 1px solid var(--border);
+  border-radius: 999px;
+  padding: 8px 16px;
+  font-size: 13px;
+  font-weight: 600;
+  box-shadow: var(--shadow);
+}
+.app-hero-img { flex: 1 1 300px; max-width: 380px; margin: 0 auto; }
+.app-hero-img img { border-radius: var(--radius); box-shadow: var(--shadow-lg); }
+/* Variante: un .stat-item como "columna" de un .app-hero (cifra + texto) */
+.app-hero > .stat-item { flex: 1 1 220px; padding: 0; }
+/* Espaciado consistente cuando uno de estos bloques va justo bajo un
+   .eyebrow dentro de una tarjeta (secciones "Lo que la hace diferente") */
+.card > .eyebrow + .grid-cards,
+.card > .eyebrow + .stats-card,
+.card > .eyebrow + .app-hero { margin-top: 18px; }
+/* Nota aclaratoria pequeña, centrada, bajo un panel ilustrativo */
+.nota-centrada { text-align: center; color: var(--text-muted); font-size: 13px; margin-top: 10px; }
+
+/* Cita/testimonio destacado sobre fondo navy (mismo degradé que .cta-band) */
+.testimonio {
+  background: linear-gradient(120deg, var(--cinco-navy) 0%, var(--cinco-navy-soft) 100%);
+  color: #fff;
+  border-radius: var(--radius);
+  padding: 30px 34px;
+  margin-top: 20px;
+}
+.testimonio p:first-child { font-size: 17px; font-style: italic; margin: 0 0 10px; }
+.testimonio p:last-child { color: var(--cinco-amber); font-size: 13px; font-weight: 600; margin: 0; }
+
+/* Enlace de regreso, sobre el banner navy de una página interna */
+.breadcrumb-back { display: block; font-size: 13px; font-weight: 600; color: var(--cinco-amber); margin-bottom: 14px; }
+.breadcrumb-back:hover { text-decoration: underline; }
+
+/* Cuando una franja CTA lleva dos botones en vez de uno */
+.cta-band-actions { display: flex; gap: 12px; flex-wrap: wrap; }
 
 /* ---- página de contacto: layout partido formulario / info ---- */
 .contact-split {
