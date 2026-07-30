@@ -8,7 +8,7 @@ import { auth, db, storage, requireAuth, obtenerPerfil } from "./firebase-contro
 import { CAMPOS, FASES, COLUMNAS_ITEM } from "./plantillas.js";
 import { capitalizarOracion, capitalizarNombrePropio } from "./texto.js";
 
-const TIPO_DOC_LABEL = { interno: "Interno", externo: "Externo" };
+const TIPO_DOC_LABEL = { contrato: "Contrato", interno: "Interno", externo: "Externo" };
 
 const TIPO_LABEL = { obra: "Obra", servicio: "Servicio" };
 

@@ -1,9 +1,10 @@
 import { signOut } from "https://www.gstatic.com/firebasejs/10.7.1/firebase-auth.js";
 import {
-  collection, doc, writeBatch, runTransaction, serverTimestamp,
+  collection, doc, setDoc, writeBatch, runTransaction, serverTimestamp,
   onSnapshot, query, orderBy
 } from "https://www.gstatic.com/firebasejs/10.7.1/firebase-firestore.js";
-import { auth, db, requireAuth, obtenerPerfil } from "./firebase-control.js";
+import { ref, uploadBytes, getDownloadURL } from "https://www.gstatic.com/firebasejs/10.7.1/firebase-storage.js";
+import { auth, db, storage, requireAuth, obtenerPerfil } from "./firebase-control.js";
 import { itemsIniciales } from "./plantillas.js";
 import { LINEAS_SERVICIO } from "./lineas-servicio.js";
 import { capitalizarOracion, capitalizarNombrePropio } from "./texto.js";
@@ -128,9 +129,38 @@ requireAuth(async (user) => {
       });
       await batch.commit();
 
+      // El contrato ya quedó creado en firme arriba; si esto falla no se
+      // debe reportar como que la creación del contrato falló (llevaría a
+      // reintentar y duplicar el contrato) — se avisa aparte.
+      let avisoDocumento = "";
+      const enlaceEscrito = document.getElementById("docContratoEnlace").value;
+      const archivoContrato = document.getElementById("docContratoArchivo").files[0];
+      if (enlaceEscrito || archivoContrato) {
+        try {
+          const docRef = doc(collection(db, "contratos", contratoRef.id, "documentos"));
+          let enlace = enlaceEscrito;
+          if (archivoContrato) {
+            const extension = archivoContrato.name.split(".").pop().toLowerCase();
+            const archivoRef = ref(storage, `contratos/${contratoRef.id}/documentos/${docRef.id}.${extension}`);
+            await uploadBytes(archivoRef, archivoContrato);
+            enlace = await getDownloadURL(archivoRef);
+          }
+          await setDoc(docRef, {
+            nombre: "Documento del contrato",
+            tipo: "contrato",
+            enlace,
+            origen: "manual",
+            creadoPor: user.email,
+            creadoEn: serverTimestamp()
+          });
+        } catch (errDoc) {
+          avisoDocumento = " El contrato se creó, pero el documento no se pudo adjuntar — agrégalo luego desde su ficha.";
+        }
+      }
+
       form.reset();
       form.closest("details").open = false;
-      mostrarAlerta("Contrato creado.", "ok");
+      mostrarAlerta("Contrato creado." + avisoDocumento, avisoDocumento ? "error" : "ok");
     } catch (err) {
       mostrarAlerta(err.message || "No se pudo crear el contrato.", "error");
     } finally {

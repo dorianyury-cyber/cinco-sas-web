@@ -73,6 +73,12 @@
           <label for="supervisor">Nombre Supervisor/Interventor (opcional)</label>
           <input type="text" id="supervisor" maxlength="120">
 
+          <label for="docContratoEnlace">Documento del contrato (opcional) — enlace, ej. a la carpeta en OneDrive</label>
+          <input type="url" id="docContratoEnlace" maxlength="500">
+
+          <label for="docContratoArchivo">O sube aquí el archivo (el contrato firmado, PDF o Word)</label>
+          <input type="file" id="docContratoArchivo" accept="application/pdf,.doc,.docx">
+
           <button type="submit" class="btn" id="crearBtn">Crear contrato</button>
           <div class="form-alert" id="crearAlert"></div>
         </form>
