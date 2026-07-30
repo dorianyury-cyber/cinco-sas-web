@@ -367,6 +367,14 @@ function renderItemsEditor() {
     const fila = document.createElement("div");
     fila.className = "control-items-fila";
 
+    // Número de ítem: automático según la posición en la lista, no un
+    // campo editable — si se quita o reordena un ítem, se recalcula solo
+    // al volver a pintar la lista (no queda un consecutivo "congelado").
+    const numSpan = document.createElement("span");
+    numSpan.className = "control-items-num";
+    numSpan.textContent = String(i + 1);
+    fila.appendChild(numSpan);
+
     const descInput = document.createElement("input");
     descInput.type = "text";
     descInput.maxLength = 300;

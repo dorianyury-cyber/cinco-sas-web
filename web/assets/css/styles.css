@@ -1324,6 +1324,13 @@ form.pqr-form .control-tabla-botones button { width: auto; margin-top: 0; }
 
 .control-items-editor { display: flex; flex-direction: column; gap: 6px; margin-bottom: 8px; }
 .control-items-fila { display: flex; gap: 6px; align-items: center; }
+.control-items-num {
+  flex: 0 0 22px;
+  text-align: center;
+  font-weight: 700;
+  color: var(--text-muted);
+  font-size: 12.5px;
+}
 .control-items-fila input {
   padding: 6px 8px;
   border: 1px solid var(--border);

@@ -328,9 +328,10 @@ export async function generarOfertaPDF(oferta) {
   y += 10;
 
   const items = oferta.items || [];
-  const filasTabla = [["Descripción", "Unidad", "Cantidad", "Valor unitario", "Valor total"]];
-  items.forEach((it) => {
+  const filasTabla = [["No.", "Descripción", "Unidad", "Cantidad", "Valor unitario", "Valor total"]];
+  items.forEach((it, i) => {
     filasTabla.push([
+      String(i + 1),
       it.descripcion || "",
       it.unidad || "—",
       formatoCantidad.format(Number(it.cantidad) || 0),
