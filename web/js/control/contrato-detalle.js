@@ -393,15 +393,40 @@ function renderInformesMensuales(contrato, documentosConMes) {
 // camposVisibles, ocultar "Ver" es solo de interfaz, no bloquea el dato en
 // Firestore; lo que sí es una barrera real es que la regla de Firestore le
 // niega crear filas en esta subcolección).
-function cargarDocumentosContrato(contratoId, contrato, esEmpleado, puedeArchivar) {
+function cargarDocumentosContrato(contratoId, contrato, esEmpleado, puedeArchivar, esGestor) {
   const tbody = document.getElementById("listaDocumentosContrato");
   const sinDocs = document.getElementById("sinDocumentosContrato");
   const badge = document.getElementById("documentosBadge");
   const form = document.getElementById("nuevoDocumentoManualForm");
   const alertBox = document.getElementById("nuevoDocumentoManualAlert");
   const btn = document.getElementById("agregarDocumentoBtn");
+  const idEnEdicionInput = document.getElementById("docIdEnEdicion");
+  const cancelarEdicionBtn = document.getElementById("cancelarEdicionDocumentoBtn");
 
   if (esEmpleado) form.closest("details").classList.add("oculto");
+
+  function salirDeEdicion() {
+    idEnEdicionInput.value = "";
+    form.reset();
+    btn.textContent = "Agregar";
+    cancelarEdicionBtn.classList.add("oculto");
+  }
+  cancelarEdicionBtn.addEventListener("click", salirDeEdicion);
+
+  // Solo admin/coadmin cambian un documento ya archivado (pedido explícito
+  // del usuario) — apoyo puede archivar/borrar pero no editar lo ya subido.
+  function editarDocumento(docId, d) {
+    idEnEdicionInput.value = docId;
+    document.getElementById("docNombre").value = d.nombre || "";
+    document.getElementById("docTipo").value = d.tipo || "interno";
+    document.getElementById("docEnlace").value = d.origen === "manual" ? (d.enlace || "") : "";
+    document.getElementById("docMes").value = d.mes || "";
+    btn.textContent = "Guardar cambios";
+    cancelarEdicionBtn.classList.remove("oculto");
+    const detalle = form.closest("details");
+    detalle.open = true;
+    detalle.scrollIntoView({ behavior: "smooth" });
+  }
 
   const enlaceDocumento = (d) => {
     if (d.origen === "documentos") return `documento.html?id=${d.refId}`;
@@ -439,10 +464,17 @@ function cargarDocumentosContrato(contratoId, contrato, esEmpleado, puedeArchiva
         tdAccion.appendChild(ver);
       }
       // Solo los documentos manuales (subidos a mano, con enlace o archivo
-      // desde este mismo formulario) se pueden borrar aquí — un error al
-      // subirlos (documento equivocado) se corrige borrando y volviendo a
-      // agregar. Los que vienen de Informes/Correspondencia se gestionan
-      // desde su propio módulo, no como una fila suelta de esta lista.
+      // desde este mismo formulario) se pueden editar/borrar aquí. Los que
+      // vienen de Informes/Correspondencia se gestionan desde su propio
+      // módulo, no como una fila suelta de esta lista.
+      if (esGestor && d.origen === "manual") {
+        const editar = document.createElement("button");
+        editar.type = "button";
+        editar.className = "control-btn-mini";
+        editar.textContent = "Editar";
+        editar.addEventListener("click", () => editarDocumento(docSnap.id, d));
+        tdAccion.appendChild(editar);
+      }
       if (puedeArchivar && d.origen === "manual") {
         const borrar = document.createElement("button");
         borrar.type = "button";
@@ -472,10 +504,11 @@ function cargarDocumentosContrato(contratoId, contrato, esEmpleado, puedeArchiva
     e.preventDefault();
     alertBox.className = "form-alert";
 
+    const idEnEdicion = idEnEdicionInput.value;
     const enlaceEscrito = document.getElementById("docEnlace").value;
     const archivo = inputArchivoPdf.files[0];
     if (!enlaceEscrito && !archivo) {
-      alertBox.textContent = "Escribe un enlace o sube el PDF.";
+      alertBox.textContent = "Escribe un enlace o sube el archivo.";
       alertBox.className = "form-alert show error";
       return;
     }
@@ -483,30 +516,45 @@ function cargarDocumentosContrato(contratoId, contrato, esEmpleado, puedeArchiva
     btn.disabled = true;
     try {
       const mes = document.getElementById("docMes").value;
-      const docRef = doc(collection(db, "contratos", contratoId, "documentos"));
+      const docRef = idEnEdicion
+        ? doc(db, "contratos", contratoId, "documentos", idEnEdicion)
+        : doc(collection(db, "contratos", contratoId, "documentos"));
 
       let enlace = enlaceEscrito;
       if (archivo) {
-        const archivoRef = ref(storage, `contratos/${contratoId}/documentos/${docRef.id}.pdf`);
+        const extension = archivo.name.split(".").pop().toLowerCase();
+        const archivoRef = ref(storage, `contratos/${contratoId}/documentos/${docRef.id}.${extension}`);
         await uploadBytes(archivoRef, archivo);
         enlace = await getDownloadURL(archivoRef);
       }
 
-      await setDoc(docRef, {
+      const datos = {
         nombre: document.getElementById("docNombre").value,
         tipo: document.getElementById("docTipo").value,
         enlace,
-        ...(mes ? { mes } : {}),
-        origen: "manual",
-        creadoPor: auth.currentUser.email,
-        creadoEn: serverTimestamp()
-      });
-      form.reset();
+        ...(mes ? { mes } : {})
+      };
+
+      if (idEnEdicion) {
+        await updateDoc(docRef, {
+          ...datos,
+          actualizadoPor: auth.currentUser.email,
+          actualizadoEn: serverTimestamp()
+        });
+      } else {
+        await setDoc(docRef, {
+          ...datos,
+          origen: "manual",
+          creadoPor: auth.currentUser.email,
+          creadoEn: serverTimestamp()
+        });
+      }
+      salirDeEdicion();
       form.closest("details").open = false;
-      alertBox.textContent = "Documento agregado.";
+      alertBox.textContent = idEnEdicion ? "Documento actualizado." : "Documento agregado.";
       alertBox.className = "form-alert show ok";
     } catch (err) {
-      alertBox.textContent = err.message || "No se pudo agregar el documento.";
+      alertBox.textContent = err.message || "No se pudo guardar el documento.";
       alertBox.className = "form-alert show error";
     } finally {
       btn.disabled = false;
@@ -648,7 +696,7 @@ requireAuth(async (user) => {
   // contratos/{id}/documentos: gestor siempre, apoyo solo si está en el
   // equipo de este contrato puntual.
   const puedeArchivar = esGestor || (esApoyo && (contrato.equipo || []).includes(user.email));
-  cargarDocumentosContrato(id, contrato, esEmpleado, puedeArchivar);
+  cargarDocumentosContrato(id, contrato, esEmpleado, puedeArchivar, esGestor);
 
   const badges = { general: document.getElementById("avanceGeneral") };
   const contenedor = document.getElementById("camposContainer");
