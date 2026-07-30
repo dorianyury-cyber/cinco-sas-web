@@ -69,6 +69,20 @@ function filasParaEditar(filas) {
 // con su propia copia", ya establecido entre informes.js/correspondencia.js). ----
 let bloques = [];
 
+// Años de trayectoria desde la fundación (29 de diciembre de 2009) — mismo
+// cálculo que aniosDeTrayectoria() en site.js, copiado aquí (no exportado
+// como módulo compartido) para que el texto de partida no quede con un
+// número fijo desactualizado, como ya pasó antes en la franja de cifras.
+function aniosDeTrayectoria() {
+  const FUNDACION = new Date(2009, 11, 29);
+  const hoy = new Date();
+  let anios = hoy.getFullYear() - FUNDACION.getFullYear();
+  const aunNoCumpleAnios = hoy.getMonth() < FUNDACION.getMonth() ||
+    (hoy.getMonth() === FUNDACION.getMonth() && hoy.getDate() < FUNDACION.getDate());
+  if (aunNoCumpleAnios) anios -= 1;
+  return anios;
+}
+
 // Texto de partida para que la oferta no arranque en blanco — cubre "mostrar
 // las bondades de Cinco sin descalificar a nadie": experiencia, equipo,
 // enfoque en calidad, sin nombrar competencia. Totalmente editable por
@@ -76,11 +90,13 @@ let bloques = [];
 function bloquesPorDefecto() {
   return [
     { tipo: "titulo1", texto: "1. Quiénes somos" },
-    { tipo: "parrafo", texto: "Cinco S.A.S. es una empresa con más de 16 años de experiencia en construcción, ingeniería y consultoría, con un equipo multidisciplinario de profesionales dedicados a entregar soluciones técnicas confiables, puntuales y respaldadas por un enfoque riguroso de calidad en cada etapa del servicio." },
+    { tipo: "parrafo", texto: `Cinco S.A.S. es una empresa con más de ${aniosDeTrayectoria()} años de experiencia en construcción, ingeniería y consultoría, con un equipo multidisciplinario de profesionales dedicados a entregar soluciones técnicas confiables, puntuales y respaldadas por un enfoque riguroso de calidad en cada etapa del servicio.` },
     { tipo: "titulo1", texto: "2. Por qué elegir a Cinco S.A.S." },
     { tipo: "parrafo", texto: "Nuestra trayectoria nos permite acompañar a nuestros clientes con seriedad y respaldo técnico real, no solo con una propuesta económica. Contamos con procesos documentados, personal calificado en cada línea de servicio, y un compromiso directo de la gerencia con la calidad y los tiempos de entrega de cada proyecto." },
     { tipo: "titulo1", texto: "3. Alcance del servicio ofertado" },
-    { tipo: "parrafo", texto: "Describe aquí el alcance específico de esta oferta: actividades incluidas, entregables, cronograma estimado y cualquier condición técnica particular." }
+    { tipo: "parrafo", texto: "Describe aquí el alcance específico de esta oferta: actividades incluidas, entregables, cronograma estimado y cualquier condición técnica particular." },
+    { tipo: "titulo1", texto: "4. Valor de la oferta" },
+    { tipo: "parrafo", texto: "El detalle de cantidades, precios unitarios y el valor total de esta oferta se presenta en el Anexo 1 — Cotización detallada, al final de este documento." }
   ];
 }
 
