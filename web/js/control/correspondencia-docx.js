@@ -5,6 +5,8 @@
 // Depende de la librería docx autoalojada en web/js/vendor/docx.iife.js
 // (script clásico, no módulo, por eso queda en window.docx).
 
+import { parsearHtmlARuns } from "./texto-rico.js";
+
 const NAVY_HEX = "1F2732";
 const MUTED_HEX = "5C6570";
 const LOGO_URL = "../assets/img/logo.png";
@@ -14,6 +16,37 @@ const LOGO_URL = "../assets/img/logo.png";
 // cambia la versión.
 const CODIGO_FORMATO = "AC-FOR-001";
 const VERSION_FORMATO = "1";
+// [r,g,b] (como los usa jsPDF/canvas) a hex sin "#" (como lo pide docx).
+function rgbAHexDocx(rgb) {
+  if (!rgb) return undefined;
+  return rgb.map((n) => n.toString(16).padStart(2, "0")).join("").toUpperCase();
+}
+
+// Convierte el HTML de un párrafo (ver web/js/control/texto-rico.js) a
+// TextRun de docx con negrilla/cursiva/color — a diferencia de
+// correspondencia-pdf.js no hace falta partir en palabras para ajustar
+// línea a mano: Word ya envuelve el texto solo. Recibe TextRun como
+// parámetro porque viene de window.docx, desestructurado dentro de
+// generarCartaDocxBlob (no hay import de módulo real de esa librería).
+function runsParaDocx(TextRun, html, tamano) {
+  const runs = parsearHtmlARuns(html);
+  const resultado = [];
+  runs.forEach((run) => {
+    if (run.salto) {
+      if (resultado.length) resultado[resultado.length - 1].break = (resultado[resultado.length - 1].break || 0) + 1;
+      return;
+    }
+    resultado.push({
+      text: run.texto,
+      size: tamano,
+      ...(run.negrita ? { bold: true } : {}),
+      ...(run.cursiva ? { italics: true } : {}),
+      ...(run.color ? { color: rgbAHexDocx(run.color) } : {})
+    });
+  });
+  return resultado.map((opciones) => new TextRun(opciones));
+}
+
 const PX_POR_MM = 96 / 25.4;
 const MARGEN_MM = 20;
 const ANCHO_UTIL_MM = 215.9 - MARGEN_MM * 2; // carta (Letter) menos márgenes
@@ -179,18 +212,8 @@ export async function generarCartaDocxBlob(datos) {
       }
       continue;
     }
-    // Un solo Enter pasa a la siguiente línea (como en Word); una línea en
-    // blanco entre medio (doble Enter) arma un párrafo nuevo aparte.
-    (bloque.texto || "").split(/\n{2,}/).forEach((parrafo) => {
-      const lineas = parrafo.split("\n");
-      const runs = lineas.map((linea, i) => {
-        const opciones = { text: linea, size: 21 };
-        if (i < lineas.length - 1) opciones.break = 1;
-        return new TextRun(opciones);
-      });
-      cuerpo.push(new Paragraph({ children: runs }));
-      cuerpo.push(new Paragraph({ text: "" }));
-    });
+    cuerpo.push(new Paragraph({ children: runsParaDocx(TextRun, bloque.texto, 21) }));
+    cuerpo.push(new Paragraph({ text: "" }));
   }
 
   // ---- cierre y firma ----

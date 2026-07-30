@@ -4,11 +4,12 @@ import {
   serverTimestamp, onSnapshot, query, orderBy
 } from "https://www.gstatic.com/firebasejs/10.7.1/firebase-firestore.js";
 import { ref, uploadBytes, getDownloadURL } from "https://www.gstatic.com/firebasejs/10.7.1/firebase-storage.js";
-import { auth, db, storage, requireAuth } from "./firebase-control.js";
+import { auth, db, storage, requireAuth, obtenerPerfil } from "./firebase-control.js";
 import { generarOfertaPDF } from "./ofertas-pdf.js";
 import { registrarDocumentoSGC } from "./documentos-sgc.js";
 import { truncar } from "./texto.js";
 import { LINEAS_SERVICIO } from "./lineas-servicio.js";
+import { crearCampoTextoRico } from "./texto-rico.js";
 
 // Área/tipo fijos para que una oferta quede en el Listado Maestro de
 // Documentos (SGC) sin pedir un campo más en el formulario — mismo
@@ -23,8 +24,17 @@ const sinOfertas = document.getElementById("sinOfertas");
 const form = document.getElementById("nuevaOfertaForm");
 const alertBox = document.getElementById("crearOfertaAlert");
 const guardarBtn = document.getElementById("guardarOfertaBtn");
+const visualizarBtn = document.getElementById("visualizarOfertaBtn");
+const descargarBtn = document.getElementById("descargarOfertaBtn");
 const cancelarEdicionBtn = document.getElementById("cancelarEdicionOfertaBtn");
 const ofertaIdEnEdicion = document.getElementById("ofertaIdEnEdicion");
+
+// Igual criterio que informes.js: última oferta guardada con el contenido
+// actual — "Descargar" la usa sin volver a guardar.
+let ofertaGuardadaActual = null;
+function actualizarDescargarBtn() {
+  descargarBtn.disabled = !ofertaGuardadaActual;
+}
 const selectContrato = document.getElementById("contratoRelacionado");
 const selectLinea = document.getElementById("lineaServicio");
 const selectTipo = document.getElementById("tipo");
@@ -171,11 +181,9 @@ const TIPOS_INSERTABLES = [
   { tipo: "imagen", etiqueta: "Gráfico / imagen" }
 ];
 
-// Índice del hueco cuyo menú está desplegado (null = todos colapsados) y,
-// mientras se espera el selector de archivo, en qué hueco insertar la(s)
+// Mientras se espera el selector de archivo, en qué hueco insertar la(s)
 // imagen(es) elegidas — el input de archivo es uno solo, compartido con
 // el botón "+ Gráfico / imagen" de la barra de abajo.
-let indiceMenuAbierto = null;
 let indiceInsertarImagen = null;
 
 function crearBloquePorTipo(tipo) {
@@ -190,40 +198,23 @@ function insertarBloqueEn(indice, tipo) {
     return;
   }
   bloques.splice(indice, 0, crearBloquePorTipo(tipo));
-  indiceMenuAbierto = null;
   renderBloques();
 }
 
+// Botones de insertar SIEMPRE visibles (no un "+" que hay que abrir) — se
+// pidió explícitamente poder agregar un título/párrafo/tabla/gráfico junto
+// a cualquier campo, sin tener que bajar hasta el final de la lista.
 function renderHueco(indice) {
   const hueco = document.createElement("div");
   hueco.className = "control-bloque-gap";
-  if (indiceMenuAbierto === indice) {
-    const menu = document.createElement("div");
-    menu.className = "control-bloque-gap-menu";
-    TIPOS_INSERTABLES.forEach(({ tipo, etiqueta }) => {
-      const btn = document.createElement("button");
-      btn.type = "button";
-      btn.className = "control-btn-mini";
-      btn.textContent = etiqueta;
-      btn.addEventListener("click", () => insertarBloqueEn(indice, tipo));
-      menu.appendChild(btn);
-    });
-    const cerrar = document.createElement("button");
-    cerrar.type = "button";
-    cerrar.className = "control-btn-mini";
-    cerrar.textContent = "✕";
-    cerrar.title = "Cancelar";
-    cerrar.addEventListener("click", () => { indiceMenuAbierto = null; renderBloques(); });
-    menu.appendChild(cerrar);
-    hueco.appendChild(menu);
-  } else {
-    const toggle = document.createElement("button");
-    toggle.type = "button";
-    toggle.className = "control-bloque-gap-toggle";
-    toggle.textContent = "+ Insertar aquí";
-    toggle.addEventListener("click", () => { indiceMenuAbierto = indice; renderBloques(); });
-    hueco.appendChild(toggle);
-  }
+  TIPOS_INSERTABLES.forEach(({ tipo, etiqueta }) => {
+    const btn = document.createElement("button");
+    btn.type = "button";
+    btn.className = "control-btn-mini";
+    btn.textContent = etiqueta;
+    btn.addEventListener("click", () => insertarBloqueEn(indice, tipo));
+    hueco.appendChild(btn);
+  });
   return hueco;
 }
 
@@ -250,12 +241,11 @@ function renderBloques() {
       input.addEventListener("input", () => { bloque.texto = input.value; });
       contenido.appendChild(input);
     } else if (bloque.tipo === "parrafo") {
-      const textarea = document.createElement("textarea");
-      textarea.rows = 4;
-      textarea.placeholder = "Escribe un párrafo...";
-      textarea.value = bloque.texto;
-      textarea.addEventListener("input", () => { bloque.texto = textarea.value; });
-      contenido.appendChild(textarea);
+      contenido.appendChild(crearCampoTextoRico({
+        valor: bloque.texto,
+        placeholder: "Escribe un párrafo...",
+        onInput: (html) => { bloque.texto = html; }
+      }));
     } else if (bloque.tipo === "tabla") {
       contenido.appendChild(renderTablaEditor(bloque));
     } else {
@@ -384,7 +374,6 @@ inputImagen.addEventListener("change", async () => {
   // imágenes quedan ahí en vez de siempre al final de la lista.
   let destino = indiceInsertarImagen ?? bloques.length;
   indiceInsertarImagen = null;
-  indiceMenuAbierto = null;
   for (const archivo of archivos) {
     try {
       const { blob, previewUrl } = await redimensionarImagen(archivo);
@@ -529,10 +518,12 @@ function limpiarFormulario() {
   items = [nuevoItem()];
   renderItemsEditor();
   ofertaIdEnEdicion.value = "";
-  guardarBtn.textContent = "Generar y descargar oferta";
+  guardarBtn.textContent = "Guardar";
   cancelarEdicionBtn.classList.add("oculto");
   detallePolizaTextarea.classList.add("oculto");
   document.getElementById("parteSGI").disabled = false;
+  ofertaGuardadaActual = null;
+  actualizarDescargarBtn();
   actualizarResumen();
 }
 
@@ -583,7 +574,7 @@ function cargarEnFormulario(oferta, paraEditar) {
   const parteSGI = document.getElementById("parteSGI");
   if (paraEditar) {
     ofertaIdEnEdicion.value = oferta.id;
-    guardarBtn.textContent = "Guardar cambios y descargar";
+    guardarBtn.textContent = "Guardar cambios";
     cancelarEdicionBtn.classList.remove("oculto");
     // Solo se bloquea si esta oferta puntual ya tiene un código del SGC
     // guardado (se registró antes) — no por el simple hecho de estar
@@ -592,18 +583,21 @@ function cargarEnFormulario(oferta, paraEditar) {
     // se debe poder marcar y registrar por primera vez.
     parteSGI.checked = false;
     parteSGI.disabled = !!oferta.codigoSgc;
+    ofertaGuardadaActual = oferta;
   } else {
     ofertaIdEnEdicion.value = "";
-    guardarBtn.textContent = "Generar y descargar oferta";
+    guardarBtn.textContent = "Guardar";
     cancelarEdicionBtn.classList.add("oculto");
     parteSGI.disabled = false;
+    ofertaGuardadaActual = null;
     mostrarAlerta("Datos cargados desde " + oferta.radicado + " — revisa qué cambiar antes de generar.", "ok");
   }
+  actualizarDescargarBtn();
   document.getElementById("nuevaOfertaDetails").open = true;
   document.getElementById("nuevaOfertaDetails").scrollIntoView({ behavior: "smooth" });
 }
 
-function renderTabla(ofertas) {
+function renderTabla(ofertas, esGestor) {
   tbody.innerHTML = "";
   sinOfertas.classList.toggle("oculto", ofertas.length > 0);
 
@@ -632,38 +626,43 @@ function renderTabla(ofertas) {
       }
     });
 
-    const btnEditar = document.createElement("button");
-    btnEditar.type = "button";
-    btnEditar.className = "control-btn-mini";
-    btnEditar.textContent = "Editar";
-    btnEditar.addEventListener("click", () => cargarEnFormulario(of, true));
+    tdAccion.append(btnPdf);
 
-    const btnDuplicar = document.createElement("button");
-    btnDuplicar.type = "button";
-    btnDuplicar.className = "control-btn-mini";
-    btnDuplicar.textContent = "Duplicar";
-    btnDuplicar.title = "Partir de esta oferta para una nueva (otro cliente u otra cotización), con radicado propio";
-    btnDuplicar.addEventListener("click", () => cargarEnFormulario(of, false));
+    if (esGestor) {
+      const btnEditar = document.createElement("button");
+      btnEditar.type = "button";
+      btnEditar.className = "control-btn-mini";
+      btnEditar.textContent = "Editar";
+      btnEditar.addEventListener("click", () => cargarEnFormulario(of, true));
 
-    const btnBorrar = document.createElement("button");
-    btnBorrar.type = "button";
-    btnBorrar.className = "control-btn-danger";
-    btnBorrar.textContent = "Borrar";
-    btnBorrar.addEventListener("click", async () => {
-      const confirmado = window.confirm(
-        `¿Seguro que quieres borrar la oferta ${of.radicado} (${of.titulo})?\n\nEsta acción no se puede deshacer. El radicado no se vuelve a usar para otra oferta.`
-      );
-      if (!confirmado) return;
-      btnBorrar.disabled = true;
-      try {
-        await deleteDoc(doc(db, "ofertas", of.id));
-      } catch (err) {
-        mostrarAlerta(err.message || "No se pudo borrar la oferta.", "error");
-        btnBorrar.disabled = false;
-      }
-    });
+      const btnDuplicar = document.createElement("button");
+      btnDuplicar.type = "button";
+      btnDuplicar.className = "control-btn-mini";
+      btnDuplicar.textContent = "Duplicar";
+      btnDuplicar.title = "Partir de esta oferta para una nueva (otro cliente u otra cotización), con radicado propio";
+      btnDuplicar.addEventListener("click", () => cargarEnFormulario(of, false));
 
-    tdAccion.append(btnPdf, btnEditar, btnDuplicar, btnBorrar);
+      const btnBorrar = document.createElement("button");
+      btnBorrar.type = "button";
+      btnBorrar.className = "control-btn-danger";
+      btnBorrar.textContent = "Borrar";
+      btnBorrar.addEventListener("click", async () => {
+        const confirmado = window.confirm(
+          `¿Seguro que quieres borrar la oferta ${of.radicado} (${of.titulo})?\n\nEsta acción no se puede deshacer. El radicado no se vuelve a usar para otra oferta.`
+        );
+        if (!confirmado) return;
+        btnBorrar.disabled = true;
+        try {
+          await deleteDoc(doc(db, "ofertas", of.id));
+        } catch (err) {
+          mostrarAlerta(err.message || "No se pudo borrar la oferta.", "error");
+          btnBorrar.disabled = false;
+        }
+      });
+
+      tdAccion.append(btnEditar, btnDuplicar, btnBorrar);
+    }
+
     fila.appendChild(tdAccion);
     tbody.appendChild(fila);
   });
@@ -672,9 +671,18 @@ function renderTabla(ofertas) {
 requireAuth(async (user) => {
   document.getElementById("userEmail").textContent = user.email;
 
+  // Solo admin/coadmin generan/editan ofertas (las reglas de Firestore
+  // también lo exigen) — antes cualquier autenticado podía.
+  const perfil = await obtenerPerfil(user.email);
+  const esGestor = perfil?.estado === "activo" && (perfil?.rol === "admin" || perfil?.rol === "coadmin");
+  if (!esGestor) {
+    document.getElementById("nuevaOfertaDetails").classList.add("oculto");
+    document.getElementById("soloGestorAviso")?.classList.remove("oculto");
+  }
+
   const q = query(collection(db, "ofertas"), orderBy("creadoEn", "desc"));
   onSnapshot(q, (snapshot) => {
-    renderTabla(snapshot.docs.map((d) => ({ id: d.id, ...d.data() })));
+    renderTabla(snapshot.docs.map((d) => ({ id: d.id, ...d.data() })), esGestor);
   });
 
   // Contratos: para el select "Contrato relacionado", igual patrón que
@@ -721,7 +729,7 @@ requireAuth(async (user) => {
     e.preventDefault();
     guardarBtn.disabled = true;
     const enEdicion = !!ofertaIdEnEdicion.value;
-    guardarBtn.textContent = enEdicion ? "Guardando..." : "Generando...";
+    guardarBtn.textContent = "Guardando...";
     alertBox.className = "form-alert";
 
     try {
@@ -837,20 +845,92 @@ requireAuth(async (user) => {
         }
       }
 
-      const pdf = await generarOfertaPDF(ofertaFinal);
-      pdf.save(`${ofertaFinal.radicado}.pdf`);
+      // Se queda en modo edición sobre esta misma oferta (no limpia el
+      // formulario ni lo cierra) — así "Descargar" y "Visualizar" quedan
+      // disponibles de una vez. "Cancelar edición" sigue disponible.
+      ofertaIdEnEdicion.value = idOferta;
+      guardarBtn.textContent = "Guardar cambios";
+      cancelarEdicionBtn.classList.remove("oculto");
+      document.getElementById("parteSGI").disabled = !!codigoSgc;
+      ofertaGuardadaActual = ofertaFinal;
+      actualizarDescargarBtn();
 
-      limpiarFormulario();
-      form.closest("details").open = false;
-      let mensaje = `Oferta ${ofertaFinal.radicado} generada y descargada.`;
+      let mensaje = `Oferta ${ofertaFinal.radicado} guardada.`;
       if (codigoSgc) mensaje += ` Registrada en el SGC como ${codigoSgc}.`;
       if (errorSgc) mensaje += ` (No se pudo registrar en el SGC: ${errorSgc} — hazlo manualmente en Documentos.)`;
       mostrarAlerta(mensaje, errorSgc ? "error" : "ok");
     } catch (err) {
-      mostrarAlerta(err.message || "No se pudo generar la oferta.", "error");
+      mostrarAlerta(err.message || "No se pudo guardar la oferta.", "error");
     } finally {
       guardarBtn.disabled = false;
-      guardarBtn.textContent = ofertaIdEnEdicion.value ? "Guardar cambios y descargar" : "Generar y descargar oferta";
+      guardarBtn.textContent = ofertaIdEnEdicion.value ? "Guardar cambios" : "Guardar";
+    }
+  });
+
+  // ---- Visualizar: genera el PDF con lo que hay ahora mismo en el
+  // formulario, en una pestaña nueva — no sube imágenes ni guarda nada ni
+  // gasta un radicado.
+  visualizarBtn.addEventListener("click", async () => {
+    visualizarBtn.disabled = true;
+    visualizarBtn.textContent = "Generando vista previa...";
+    try {
+      const empleadoFirma = empleadosPorEmail[selectFirma.value];
+      const contratoId = selectContrato.value;
+      const contrato = contratoId ? contratosPorId[contratoId] : null;
+      const bloquesPreview = bloques.map((b) => {
+        if (b.tipo === "imagen") return { tipo: "imagen", url: b.url || URL.createObjectURL(b.blob), pieDeFoto: b.pieDeFoto || "" };
+        if (b.tipo === "tabla") return { ...b, filas: filasParaGuardar(b.filas) };
+        return b;
+      });
+      const datosPreview = {
+        titulo: document.getElementById("titulo").value,
+        lineaServicio: selectLinea.value,
+        tipo: selectTipo.value,
+        cliente: document.getElementById("cliente").value,
+        contratoCodigo: contrato?.codigo || null,
+        contratoNumero: contrato?.numero || null,
+        portada: document.getElementById("portada").value || "oscura",
+        bloques: bloquesPreview,
+        items: items.map((it) => ({ descripcion: it.descripcion, unidad: it.unidad || "", cantidad: Number(it.cantidad) || 0, valorUnitario: Number(it.valorUnitario) || 0 })),
+        aiu: leerAiu(),
+        iva: parseFloat(ivaInput.value) || 0,
+        condiciones: {
+          aplicaPoliza: aplicaPolizaCheck.checked,
+          detallePoliza: detallePolizaTextarea.value,
+          porcentajeAnticipo: parseFloat(document.getElementById("porcentajeAnticipo").value) || 0,
+          validezDias: parseInt(document.getElementById("validezDias").value, 10) || 0,
+          formaPago: document.getElementById("formaPago").value,
+          otras: document.getElementById("otrasCondiciones").value
+        },
+        firmaNombre: empleadoFirma?.nombre || "",
+        firmaCargo: empleadoFirma?.cargo || "",
+        firmaUrl: empleadoFirma?.firmaUrl || null,
+        radicado: "VISTA PREVIA — sin guardar"
+      };
+      const pdf = await generarOfertaPDF(datosPreview);
+      window.open(pdf.output("bloburl"), "_blank");
+    } catch (err) {
+      mostrarAlerta(err.message || "No se pudo generar la vista previa.", "error");
+    } finally {
+      visualizarBtn.disabled = false;
+      visualizarBtn.textContent = "Visualizar";
+    }
+  });
+
+  // ---- Descargar: genera el PDF de la última oferta GUARDADA y la
+  // descarga — no vuelve a guardar nada.
+  descargarBtn.addEventListener("click", async () => {
+    if (!ofertaGuardadaActual) return;
+    descargarBtn.disabled = true;
+    descargarBtn.textContent = "Generando...";
+    try {
+      const pdf = await generarOfertaPDF(ofertaGuardadaActual);
+      pdf.save(`${ofertaGuardadaActual.radicado}.pdf`);
+    } catch (err) {
+      mostrarAlerta(err.message || "No se pudo descargar la oferta.", "error");
+    } finally {
+      descargarBtn.disabled = false;
+      descargarBtn.textContent = "Descargar";
     }
   });
 });

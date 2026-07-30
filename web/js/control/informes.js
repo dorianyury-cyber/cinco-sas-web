@@ -4,10 +4,11 @@ import {
   serverTimestamp, onSnapshot, query, orderBy
 } from "https://www.gstatic.com/firebasejs/10.7.1/firebase-firestore.js";
 import { ref, uploadBytes, getDownloadURL } from "https://www.gstatic.com/firebasejs/10.7.1/firebase-storage.js";
-import { auth, db, storage, requireAuth } from "./firebase-control.js";
+import { auth, db, storage, requireAuth, obtenerPerfil } from "./firebase-control.js";
 import { generarInformePDF } from "./informes-pdf.js";
 import { registrarDocumentoSGC } from "./documentos-sgc.js";
 import { truncar } from "./texto.js";
+import { crearCampoTextoRico } from "./texto-rico.js";
 
 // Área/tipo fijos para que un informe quede en el Listado Maestro de
 // Documentos (SGC) sin pedir un campo más en el formulario — el checkbox
@@ -28,8 +29,19 @@ const sinInformes = document.getElementById("sinInformes");
 const form = document.getElementById("nuevoInformeForm");
 const alertBox = document.getElementById("crearInformeAlert");
 const guardarBtn = document.getElementById("guardarInformeBtn");
+const visualizarBtn = document.getElementById("visualizarInformeBtn");
+const descargarBtn = document.getElementById("descargarInformeBtn");
 const cancelarEdicionBtn = document.getElementById("cancelarEdicionInformeBtn");
 const informeIdEnEdicion = document.getElementById("informeIdEnEdicion");
+
+// Último informe guardado con el contenido actual del formulario —
+// "Descargar" lo usa para generar el PDF sin volver a guardar. Se limpia
+// al empezar uno nuevo/duplicar, y se fija al guardar o al entrar a
+// "Editar" (ese informe ya está guardado, se puede descargar de una vez).
+let informeGuardadoActual = null;
+function actualizarDescargarBtn() {
+  descargarBtn.disabled = !informeGuardadoActual;
+}
 const selectContrato = document.getElementById("contratoRelacionado");
 const bloquesEditor = document.getElementById("bloquesEditor");
 const inputImagen = document.getElementById("inputImagen");
@@ -119,11 +131,9 @@ const TIPOS_INSERTABLES = [
   { tipo: "imagen", etiqueta: "Gráfico / imagen" }
 ];
 
-// Índice del hueco cuyo menú está desplegado (null = todos colapsados) y,
-// mientras se espera el selector de archivo, en qué hueco insertar la(s)
+// Mientras se espera el selector de archivo, en qué hueco insertar la(s)
 // imagen(es) elegidas — el input de archivo es uno solo, compartido con
 // el botón "+ Gráfico / imagen" de la barra de abajo.
-let indiceMenuAbierto = null;
 let indiceInsertarImagen = null;
 
 function crearBloquePorTipo(tipo) {
@@ -138,40 +148,23 @@ function insertarBloqueEn(indice, tipo) {
     return;
   }
   bloques.splice(indice, 0, crearBloquePorTipo(tipo));
-  indiceMenuAbierto = null;
   renderBloques();
 }
 
+// Botones de insertar SIEMPRE visibles (no un "+" que hay que abrir) — se
+// pidió explícitamente poder agregar un título/párrafo/tabla/gráfico junto
+// a cualquier campo, sin tener que bajar hasta el final de la lista.
 function renderHueco(indice) {
   const hueco = document.createElement("div");
   hueco.className = "control-bloque-gap";
-  if (indiceMenuAbierto === indice) {
-    const menu = document.createElement("div");
-    menu.className = "control-bloque-gap-menu";
-    TIPOS_INSERTABLES.forEach(({ tipo, etiqueta }) => {
-      const btn = document.createElement("button");
-      btn.type = "button";
-      btn.className = "control-btn-mini";
-      btn.textContent = etiqueta;
-      btn.addEventListener("click", () => insertarBloqueEn(indice, tipo));
-      menu.appendChild(btn);
-    });
-    const cerrar = document.createElement("button");
-    cerrar.type = "button";
-    cerrar.className = "control-btn-mini";
-    cerrar.textContent = "✕";
-    cerrar.title = "Cancelar";
-    cerrar.addEventListener("click", () => { indiceMenuAbierto = null; renderBloques(); });
-    menu.appendChild(cerrar);
-    hueco.appendChild(menu);
-  } else {
-    const toggle = document.createElement("button");
-    toggle.type = "button";
-    toggle.className = "control-bloque-gap-toggle";
-    toggle.textContent = "+ Insertar aquí";
-    toggle.addEventListener("click", () => { indiceMenuAbierto = indice; renderBloques(); });
-    hueco.appendChild(toggle);
-  }
+  TIPOS_INSERTABLES.forEach(({ tipo, etiqueta }) => {
+    const btn = document.createElement("button");
+    btn.type = "button";
+    btn.className = "control-btn-mini";
+    btn.textContent = etiqueta;
+    btn.addEventListener("click", () => insertarBloqueEn(indice, tipo));
+    hueco.appendChild(btn);
+  });
   return hueco;
 }
 
@@ -198,12 +191,11 @@ function renderBloques() {
       input.addEventListener("input", () => { bloque.texto = input.value; });
       contenido.appendChild(input);
     } else if (bloque.tipo === "parrafo") {
-      const textarea = document.createElement("textarea");
-      textarea.rows = 4;
-      textarea.placeholder = "Escribe un párrafo...";
-      textarea.value = bloque.texto;
-      textarea.addEventListener("input", () => { bloque.texto = textarea.value; });
-      contenido.appendChild(textarea);
+      contenido.appendChild(crearCampoTextoRico({
+        valor: bloque.texto,
+        placeholder: "Escribe un párrafo...",
+        onInput: (html) => { bloque.texto = html; }
+      }));
     } else if (bloque.tipo === "tabla") {
       contenido.appendChild(renderTablaEditor(bloque));
     } else {
@@ -336,7 +328,6 @@ inputImagen.addEventListener("change", async () => {
   // imágenes quedan ahí en vez de siempre al final de la lista.
   let destino = indiceInsertarImagen ?? bloques.length;
   indiceInsertarImagen = null;
-  indiceMenuAbierto = null;
   for (const archivo of archivos) {
     try {
       const { blob, previewUrl } = await redimensionarImagen(archivo);
@@ -361,9 +352,11 @@ function limpiarFormulario() {
   bloques = [];
   renderBloques();
   informeIdEnEdicion.value = "";
-  guardarBtn.textContent = "Generar y descargar informe";
+  guardarBtn.textContent = "Guardar";
   cancelarEdicionBtn.classList.add("oculto");
   document.getElementById("parteSGI").disabled = false;
+  informeGuardadoActual = null;
+  actualizarDescargarBtn();
 }
 
 cancelarEdicionBtn.addEventListener("click", limpiarFormulario);
@@ -455,7 +448,7 @@ function cargarEnFormulario(informe, paraEditar) {
   const parteSGI = document.getElementById("parteSGI");
   if (paraEditar) {
     informeIdEnEdicion.value = informe.id;
-    guardarBtn.textContent = "Guardar cambios y descargar";
+    guardarBtn.textContent = "Guardar cambios";
     cancelarEdicionBtn.classList.remove("oculto");
     // Solo se bloquea si este informe puntual ya tiene un código del SGC
     // guardado (se registró antes) — no por el simple hecho de estar
@@ -464,18 +457,23 @@ function cargarEnFormulario(informe, paraEditar) {
     // se debe poder marcar y registrar por primera vez.
     parteSGI.checked = false;
     parteSGI.disabled = !!informe.codigoSgc;
+    // Ya está guardado tal como está — se puede descargar de una vez, sin
+    // esperar a que se guarde de nuevo.
+    informeGuardadoActual = informe;
   } else {
     informeIdEnEdicion.value = "";
-    guardarBtn.textContent = "Generar y descargar informe";
+    guardarBtn.textContent = "Guardar";
     cancelarEdicionBtn.classList.add("oculto");
     parteSGI.disabled = false;
+    informeGuardadoActual = null;
     mostrarAlerta("Datos cargados desde " + informe.radicado + " — revisa qué cambiar antes de generar.", "ok");
   }
+  actualizarDescargarBtn();
   document.getElementById("nuevoInformeDetails").open = true;
   document.getElementById("nuevoInformeDetails").scrollIntoView({ behavior: "smooth" });
 }
 
-function renderTabla(informes) {
+function renderTabla(informes, esGestor) {
   tbody.innerHTML = "";
   sinInformes.classList.toggle("oculto", informes.length > 0);
 
@@ -503,58 +501,63 @@ function renderTabla(informes) {
       }
     });
 
-    const btnEditar = document.createElement("button");
-    btnEditar.type = "button";
-    btnEditar.className = "control-btn-mini";
-    btnEditar.textContent = "Editar";
-    btnEditar.addEventListener("click", () => cargarEnFormulario(inf, true));
+    tdAccion.append(btnPdf);
 
-    const btnDuplicar = document.createElement("button");
-    btnDuplicar.type = "button";
-    btnDuplicar.className = "control-btn-mini";
-    btnDuplicar.textContent = "Duplicar";
-    btnDuplicar.title = "Partir de este informe para uno nuevo (otro mes u otro contrato), con radicado propio";
-    btnDuplicar.addEventListener("click", () => cargarEnFormulario(inf, false));
+    if (esGestor) {
+      const btnEditar = document.createElement("button");
+      btnEditar.type = "button";
+      btnEditar.className = "control-btn-mini";
+      btnEditar.textContent = "Editar";
+      btnEditar.addEventListener("click", () => cargarEnFormulario(inf, true));
 
-    const btnBorrar = document.createElement("button");
-    btnBorrar.type = "button";
-    btnBorrar.className = "control-btn-danger";
-    btnBorrar.textContent = "Borrar";
-    btnBorrar.addEventListener("click", async () => {
-      const confirmado = window.confirm(
-        `¿Seguro que quieres borrar el informe ${inf.radicado} (${inf.titulo})?\n\nEsta acción no se puede deshacer. El radicado no se vuelve a usar para otro informe.`
-      );
-      if (!confirmado) return;
-      btnBorrar.disabled = true;
-      try {
-        await deleteDoc(doc(db, "informes", inf.id));
-      } catch (err) {
-        mostrarAlerta(err.message || "No se pudo borrar el informe.", "error");
-        btnBorrar.disabled = false;
-      }
-    });
+      const btnDuplicar = document.createElement("button");
+      btnDuplicar.type = "button";
+      btnDuplicar.className = "control-btn-mini";
+      btnDuplicar.textContent = "Duplicar";
+      btnDuplicar.title = "Partir de este informe para uno nuevo (otro mes u otro contrato), con radicado propio";
+      btnDuplicar.addEventListener("click", () => cargarEnFormulario(inf, false));
 
-    const btnPortada = document.createElement("button");
-    btnPortada.type = "button";
-    btnPortada.className = "control-btn-mini";
-    const esClara = inf.portada === "clara";
-    btnPortada.textContent = esClara ? "Portada oscura" : "Portada clara";
-    btnPortada.title = "Cambia el estilo de portada de este informe y descarga el PDF con el nuevo estilo";
-    btnPortada.addEventListener("click", async () => {
-      btnPortada.disabled = true;
-      try {
-        const nuevaPortada = esClara ? "oscura" : "clara";
-        await updateDoc(doc(db, "informes", inf.id), { portada: nuevaPortada });
-        const pdf = await generarInformePDF({ ...inf, portada: nuevaPortada });
-        pdf.save(`${inf.radicado}.pdf`);
-      } catch (err) {
-        mostrarAlerta(err.message || "No se pudo cambiar la portada.", "error");
-      } finally {
-        btnPortada.disabled = false;
-      }
-    });
+      const btnPortada = document.createElement("button");
+      btnPortada.type = "button";
+      btnPortada.className = "control-btn-mini";
+      const esClara = inf.portada === "clara";
+      btnPortada.textContent = esClara ? "Portada oscura" : "Portada clara";
+      btnPortada.title = "Cambia el estilo de portada de este informe y descarga el PDF con el nuevo estilo";
+      btnPortada.addEventListener("click", async () => {
+        btnPortada.disabled = true;
+        try {
+          const nuevaPortada = esClara ? "oscura" : "clara";
+          await updateDoc(doc(db, "informes", inf.id), { portada: nuevaPortada });
+          const pdf = await generarInformePDF({ ...inf, portada: nuevaPortada });
+          pdf.save(`${inf.radicado}.pdf`);
+        } catch (err) {
+          mostrarAlerta(err.message || "No se pudo cambiar la portada.", "error");
+        } finally {
+          btnPortada.disabled = false;
+        }
+      });
 
-    tdAccion.append(btnPdf, btnEditar, btnDuplicar, btnPortada, btnBorrar);
+      const btnBorrar = document.createElement("button");
+      btnBorrar.type = "button";
+      btnBorrar.className = "control-btn-danger";
+      btnBorrar.textContent = "Borrar";
+      btnBorrar.addEventListener("click", async () => {
+        const confirmado = window.confirm(
+          `¿Seguro que quieres borrar el informe ${inf.radicado} (${inf.titulo})?\n\nEsta acción no se puede deshacer. El radicado no se vuelve a usar para otro informe.`
+        );
+        if (!confirmado) return;
+        btnBorrar.disabled = true;
+        try {
+          await deleteDoc(doc(db, "informes", inf.id));
+        } catch (err) {
+          mostrarAlerta(err.message || "No se pudo borrar el informe.", "error");
+          btnBorrar.disabled = false;
+        }
+      });
+
+      tdAccion.append(btnEditar, btnDuplicar, btnPortada, btnBorrar);
+    }
+
     fila.appendChild(tdAccion);
     tbody.appendChild(fila);
   });
@@ -563,9 +566,19 @@ function renderTabla(informes) {
 requireAuth(async (user) => {
   document.getElementById("userEmail").textContent = user.email;
 
+  // Solo admin/coadmin generan/editan informes (las reglas de Firestore
+  // también lo exigen) — antes cualquier autenticado podía, y se estaba
+  // volviendo un catálogo sin control real de quién publica qué.
+  const perfil = await obtenerPerfil(user.email);
+  const esGestor = perfil?.estado === "activo" && (perfil?.rol === "admin" || perfil?.rol === "coadmin");
+  if (!esGestor) {
+    document.getElementById("nuevoInformeDetails").classList.add("oculto");
+    document.getElementById("soloGestorAviso")?.classList.remove("oculto");
+  }
+
   const q = query(collection(db, "informes"), orderBy("creadoEn", "desc"));
   onSnapshot(q, (snapshot) => {
-    renderTabla(snapshot.docs.map((d) => ({ id: d.id, ...d.data() })));
+    renderTabla(snapshot.docs.map((d) => ({ id: d.id, ...d.data() })), esGestor);
   });
 
   // orderBy("creadoEn") y no "codigo": los contratos de antes de esa
@@ -588,7 +601,7 @@ requireAuth(async (user) => {
     e.preventDefault();
     guardarBtn.disabled = true;
     const enEdicion = !!informeIdEnEdicion.value;
-    guardarBtn.textContent = enEdicion ? "Guardando..." : "Generando...";
+    guardarBtn.textContent = "Guardando...";
     alertBox.className = "form-alert";
 
     try {
@@ -689,20 +702,81 @@ requireAuth(async (user) => {
         }
       }
 
-      const pdf = await generarInformePDF(informeFinal);
-      pdf.save(`${informeFinal.radicado}.pdf`);
+      // Se queda en modo edición sobre este mismo informe (no limpia el
+      // formulario ni lo cierra) — así "Descargar" y "Visualizar" quedan
+      // disponibles de una vez, sin tener que volver a buscarlo en la
+      // tabla. "Cancelar edición" sigue disponible para empezar de cero.
+      informeIdEnEdicion.value = idInforme;
+      guardarBtn.textContent = "Guardar cambios";
+      cancelarEdicionBtn.classList.remove("oculto");
+      document.getElementById("parteSGI").disabled = !!codigoSgc;
+      informeGuardadoActual = informeFinal;
+      actualizarDescargarBtn();
 
-      limpiarFormulario();
-      form.closest("details").open = false;
-      let mensaje = `Informe ${informeFinal.radicado} generado y descargado.`;
+      let mensaje = `Informe ${informeFinal.radicado} guardado.`;
       if (codigoSgc) mensaje += ` Registrado en el SGC como ${codigoSgc}.`;
       if (errorSgc) mensaje += ` (No se pudo registrar en el SGC: ${errorSgc} — hazlo manualmente en Documentos.)`;
       mostrarAlerta(mensaje, errorSgc ? "error" : "ok");
     } catch (err) {
-      mostrarAlerta(err.message || "No se pudo generar el informe.", "error");
+      mostrarAlerta(err.message || "No se pudo guardar el informe.", "error");
     } finally {
       guardarBtn.disabled = false;
-      guardarBtn.textContent = informeIdEnEdicion.value ? "Guardar cambios y descargar" : "Generar y descargar informe";
+      guardarBtn.textContent = informeIdEnEdicion.value ? "Guardar cambios" : "Guardar";
+    }
+  });
+
+  // ---- Visualizar: genera el PDF con lo que hay ahora mismo en el
+  // formulario, en una pestaña nueva — no sube imágenes a Storage ni
+  // guarda nada ni gasta un radicado, solo para revisar antes de guardar.
+  visualizarBtn.addEventListener("click", async () => {
+    visualizarBtn.disabled = true;
+    visualizarBtn.textContent = "Generando vista previa...";
+    try {
+      const contratoId = selectContrato.value;
+      const contrato = contratoId ? contratosPorId[contratoId] : null;
+      const bloquesPreview = bloques.map((b) => {
+        if (b.tipo === "imagen") return { tipo: "imagen", url: b.url || URL.createObjectURL(b.blob), pieDeFoto: b.pieDeFoto || "" };
+        if (b.tipo === "tabla") return { ...b, filas: filasParaGuardar(b.filas) };
+        return b;
+      });
+      const datosPreview = {
+        titulo: document.getElementById("titulo").value,
+        tipoInforme: document.getElementById("tipoInforme").value,
+        portada: document.getElementById("portada").value || "oscura",
+        mes: document.getElementById("mes").value || null,
+        firmaNombre: document.getElementById("firmaNombre").value,
+        firmaCargo: document.getElementById("firmaCargo").value,
+        bloques: bloquesPreview,
+        contratoCodigo: contrato?.codigo || null,
+        contratoNombre: contrato?.nombre || null,
+        contratoCliente: contrato?.cliente || null,
+        contratoNumero: contrato?.numero || null,
+        radicado: "VISTA PREVIA — sin guardar"
+      };
+      const pdf = await generarInformePDF(datosPreview);
+      window.open(pdf.output("bloburl"), "_blank");
+    } catch (err) {
+      mostrarAlerta(err.message || "No se pudo generar la vista previa.", "error");
+    } finally {
+      visualizarBtn.disabled = false;
+      visualizarBtn.textContent = "Visualizar";
+    }
+  });
+
+  // ---- Descargar: genera el PDF del último informe GUARDADO y lo
+  // descarga — no vuelve a guardar nada (para eso está "Guardar").
+  descargarBtn.addEventListener("click", async () => {
+    if (!informeGuardadoActual) return;
+    descargarBtn.disabled = true;
+    descargarBtn.textContent = "Generando...";
+    try {
+      const pdf = await generarInformePDF(informeGuardadoActual);
+      pdf.save(`${informeGuardadoActual.radicado}.pdf`);
+    } catch (err) {
+      mostrarAlerta(err.message || "No se pudo descargar el informe.", "error");
+    } finally {
+      descargarBtn.disabled = false;
+      descargarBtn.textContent = "Descargar";
     }
   });
 });

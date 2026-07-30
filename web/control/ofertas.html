@@ -37,6 +37,8 @@
 
   <section class="section">
     <div class="container">
+      <p id="soloGestorAviso" class="text-muted oculto">Solo un administrador o coadministrador puede crear, editar o borrar ofertas. Puedes ver el listado y descargar el PDF, pero no modificarlas.</p>
+
       <details class="card control-nuevo" id="nuevaOfertaDetails">
         <summary>+ Nueva oferta</summary>
         <form class="pqr-form" id="nuevaOfertaForm">
@@ -125,7 +127,11 @@
           <select id="firmaEmail" required><option value="">Selecciona a quien firma...</option></select>
           <p class="text-muted control-informes-ayuda">Solo aparecen empleados activos marcados como "Autorizado para presentar y firmar ofertas" en Empleados.</p>
 
-          <button type="submit" class="btn" id="guardarOfertaBtn">Generar y descargar oferta</button>
+          <div class="control-3botones">
+            <button type="button" class="control-btn-mini" id="visualizarOfertaBtn">Visualizar</button>
+            <button type="submit" class="btn" id="guardarOfertaBtn">Guardar</button>
+            <button type="button" class="btn" id="descargarOfertaBtn" disabled>Descargar</button>
+          </div>
           <button type="button" class="control-btn-mini oculto" id="cancelarEdicionOfertaBtn">Cancelar edición</button>
           <div class="form-alert" id="crearOfertaAlert"></div>
         </form>

@@ -3,11 +3,12 @@ import {
   collection, doc, deleteDoc, getDocs, runTransaction, serverTimestamp, onSnapshot, query, orderBy, updateDoc
 } from "https://www.gstatic.com/firebasejs/10.7.1/firebase-firestore.js";
 import { ref, uploadBytes, getDownloadURL } from "https://www.gstatic.com/firebasejs/10.7.1/firebase-storage.js";
-import { auth, db, storage, requireAuth } from "./firebase-control.js";
+import { auth, db, storage, requireAuth, obtenerPerfil } from "./firebase-control.js";
 import { generarCartaPDF } from "./correspondencia-pdf.js";
 import { descargarCartaDocx } from "./correspondencia-docx.js";
 import { truncar } from "./texto.js";
 import { registrarDocumentoSGC } from "./documentos-sgc.js";
+import { crearCampoTextoRico } from "./texto-rico.js";
 
 // Área/tipo fijos para que una carta quede en el Listado Maestro de
 // Documentos (SGC) sin pedir un campo más en el formulario — mismo
@@ -25,11 +26,23 @@ const sinCartas = document.getElementById("sinCartas");
 const form = document.getElementById("nuevaCartaForm");
 const alertBox = document.getElementById("crearCartaAlert");
 const crearBtn = document.getElementById("crearCartaBtn");
+const descargarBtn = document.getElementById("descargarCartaBtn");
+const nuevaCartaBtn = document.getElementById("nuevaCartaBtn");
 const bloquesEditor = document.getElementById("bloquesEditor");
 const inputImagen = document.getElementById("inputImagen");
 const inputWordFinal = document.getElementById("inputWordFinal");
 let usuarioActual = null;
 let cartaIdParaSubirWord = null;
+
+// Igual criterio que informes.js/ofertas.js — última carta guardada con
+// el contenido actual; "Descargar" la usa sin volver a guardar. Como acá
+// no hay modo "editar" (una carta ya generada no se vuelve a tocar), tras
+// guardar se bloquea "Guardar" hasta que se pida explícitamente "+ Nueva
+// carta" — evita generar un radicado nuevo sin querer con un segundo clic.
+let cartaGuardadaActual = null;
+function actualizarDescargarBtn() {
+  descargarBtn.disabled = !cartaGuardadaActual;
+}
 
 function mostrarAlerta(texto, tipo) {
   alertBox.textContent = texto;
@@ -88,7 +101,6 @@ function quitarBloque(indice) {
 // imagen justo ahí, en vez de siempre al final y reordenar con flechas —
 // mismo patrón que informes.js/ofertas.js, adaptado a los 2 tipos de
 // bloque que maneja una carta (texto/imagen, sin títulos ni tablas).
-let indiceMenuAbierto = null;
 let indiceInsertarImagen = null;
 
 function insertarBloqueEn(indice, tipo) {
@@ -98,40 +110,23 @@ function insertarBloqueEn(indice, tipo) {
     return;
   }
   bloques.splice(indice, 0, { tipo: "texto", texto: "" });
-  indiceMenuAbierto = null;
   renderBloques();
 }
 
+// Botones de insertar SIEMPRE visibles (no un "+" que hay que abrir) — se
+// pidió explícitamente poder agregar un párrafo/gráfico junto a cualquier
+// campo, sin tener que bajar hasta el final de la lista.
 function renderHueco(indice) {
   const hueco = document.createElement("div");
   hueco.className = "control-bloque-gap";
-  if (indiceMenuAbierto === indice) {
-    const menu = document.createElement("div");
-    menu.className = "control-bloque-gap-menu";
-    [{ tipo: "texto", etiqueta: "Párrafo" }, { tipo: "imagen", etiqueta: "Gráfico / imagen" }].forEach(({ tipo, etiqueta }) => {
-      const btn = document.createElement("button");
-      btn.type = "button";
-      btn.className = "control-btn-mini";
-      btn.textContent = etiqueta;
-      btn.addEventListener("click", () => insertarBloqueEn(indice, tipo));
-      menu.appendChild(btn);
-    });
-    const cerrar = document.createElement("button");
-    cerrar.type = "button";
-    cerrar.className = "control-btn-mini";
-    cerrar.textContent = "✕";
-    cerrar.title = "Cancelar";
-    cerrar.addEventListener("click", () => { indiceMenuAbierto = null; renderBloques(); });
-    menu.appendChild(cerrar);
-    hueco.appendChild(menu);
-  } else {
-    const toggle = document.createElement("button");
-    toggle.type = "button";
-    toggle.className = "control-bloque-gap-toggle";
-    toggle.textContent = "+ Insertar aquí";
-    toggle.addEventListener("click", () => { indiceMenuAbierto = indice; renderBloques(); });
-    hueco.appendChild(toggle);
-  }
+  [{ tipo: "texto", etiqueta: "Párrafo" }, { tipo: "imagen", etiqueta: "Gráfico / imagen" }].forEach(({ tipo, etiqueta }) => {
+    const btn = document.createElement("button");
+    btn.type = "button";
+    btn.className = "control-btn-mini";
+    btn.textContent = etiqueta;
+    btn.addEventListener("click", () => insertarBloqueEn(indice, tipo));
+    hueco.appendChild(btn);
+  });
   return hueco;
 }
 
@@ -145,12 +140,11 @@ function renderBloques() {
     const contenido = document.createElement("div");
     contenido.className = "control-bloque-contenido";
     if (bloque.tipo === "texto") {
-      const textarea = document.createElement("textarea");
-      textarea.rows = 4;
-      textarea.placeholder = "Escribe un párrafo...";
-      textarea.value = bloque.texto;
-      textarea.addEventListener("input", () => { bloque.texto = textarea.value; });
-      contenido.appendChild(textarea);
+      contenido.appendChild(crearCampoTextoRico({
+        valor: bloque.texto,
+        placeholder: "Escribe un párrafo...",
+        onInput: (html) => { bloque.texto = html; }
+      }));
     } else {
       const img = document.createElement("img");
       img.src = bloque.previewUrl;
@@ -201,7 +195,6 @@ inputImagen.addEventListener("change", async () => {
   // imágenes quedan ahí en vez de siempre al final de la lista.
   let destino = indiceInsertarImagen ?? bloques.length;
   indiceInsertarImagen = null;
-  indiceMenuAbierto = null;
   for (const archivo of archivos) {
     try {
       const { blob, previewUrl } = await redimensionarImagen(archivo);
@@ -248,7 +241,7 @@ document.getElementById("vistaPreviaBtn").addEventListener("click", async () => 
     window.open(pdf.output("bloburl"), "_blank");
   } finally {
     btn.disabled = false;
-    btn.textContent = "Vista previa (sin guardar)";
+    btn.textContent = "Visualizar";
   }
 });
 
@@ -265,7 +258,7 @@ function celda(texto) {
 const idDestacar = new URLSearchParams(window.location.search).get("id");
 let yaDestacado = false;
 
-function renderTabla(cartas) {
+function renderTabla(cartas, esGestor) {
   tbody.innerHTML = "";
   sinCartas.classList.toggle("oculto", cartas.length > 0);
 
@@ -312,35 +305,40 @@ function renderTabla(cartas) {
       }
     });
 
-    const btnSubirWord = document.createElement("button");
-    btnSubirWord.type = "button";
-    btnSubirWord.className = "control-btn-mini";
-    btnSubirWord.textContent = "Cargar Word editado";
-    btnSubirWord.title = "Sube el .docx ya ajustado a mano (ej. imagen centrada) para que quede como la versión oficial de esta carta";
-    btnSubirWord.addEventListener("click", () => {
-      cartaIdParaSubirWord = c.id;
-      inputWordFinal.click();
-    });
+    tdAccion.append(btnPdf, btnWord);
 
-    const btnBorrar = document.createElement("button");
-    btnBorrar.type = "button";
-    btnBorrar.className = "control-btn-danger";
-    btnBorrar.textContent = "Borrar";
-    btnBorrar.addEventListener("click", async () => {
-      const confirmado = window.confirm(
-        `¿Seguro que quieres borrar la carta ${c.radicado} (${c.asunto || "sin asunto"})?\n\nEsta acción no se puede deshacer. El radicado no se vuelve a usar para otra carta.`
-      );
-      if (!confirmado) return;
-      btnBorrar.disabled = true;
-      try {
-        await deleteDoc(doc(db, "correspondencia", c.id));
-      } catch (err) {
-        mostrarAlerta(err.message || "No se pudo borrar la carta.", "error");
-        btnBorrar.disabled = false;
-      }
-    });
+    if (esGestor) {
+      const btnSubirWord = document.createElement("button");
+      btnSubirWord.type = "button";
+      btnSubirWord.className = "control-btn-mini";
+      btnSubirWord.textContent = "Cargar Word editado";
+      btnSubirWord.title = "Sube el .docx ya ajustado a mano (ej. imagen centrada) para que quede como la versión oficial de esta carta";
+      btnSubirWord.addEventListener("click", () => {
+        cartaIdParaSubirWord = c.id;
+        inputWordFinal.click();
+      });
 
-    tdAccion.append(btnPdf, btnWord, btnSubirWord, btnBorrar);
+      const btnBorrar = document.createElement("button");
+      btnBorrar.type = "button";
+      btnBorrar.className = "control-btn-danger";
+      btnBorrar.textContent = "Borrar";
+      btnBorrar.addEventListener("click", async () => {
+        const confirmado = window.confirm(
+          `¿Seguro que quieres borrar la carta ${c.radicado} (${c.asunto || "sin asunto"})?\n\nEsta acción no se puede deshacer. El radicado no se vuelve a usar para otra carta.`
+        );
+        if (!confirmado) return;
+        btnBorrar.disabled = true;
+        try {
+          await deleteDoc(doc(db, "correspondencia", c.id));
+        } catch (err) {
+          mostrarAlerta(err.message || "No se pudo borrar la carta.", "error");
+          btnBorrar.disabled = false;
+        }
+      });
+
+      tdAccion.append(btnSubirWord, btnBorrar);
+    }
+
     fila.appendChild(tdAccion);
 
     tbody.appendChild(fila);
@@ -383,9 +381,18 @@ requireAuth(async (user) => {
   usuarioActual = user;
   document.getElementById("userEmail").textContent = user.email;
 
+  // Solo admin/coadmin crean/borran cartas (las reglas de Firestore
+  // también lo exigen) — antes cualquier autenticado podía.
+  const perfil = await obtenerPerfil(user.email);
+  const esGestor = perfil?.estado === "activo" && (perfil?.rol === "admin" || perfil?.rol === "coadmin");
+  if (!esGestor) {
+    document.getElementById("nuevaCartaDetails").classList.add("oculto");
+    document.getElementById("soloGestorAviso")?.classList.remove("oculto");
+  }
+
   const q = query(collection(db, "correspondencia"), orderBy("creadoEn", "desc"));
   onSnapshot(q, (snapshot) => {
-    renderTabla(snapshot.docs.map((d) => ({ id: d.id, ...d.data() })));
+    renderTabla(snapshot.docs.map((d) => ({ id: d.id, ...d.data() })), esGestor);
   });
 
   // orderBy("creadoEn") y no "codigo": los contratos de antes de esta
@@ -403,7 +410,7 @@ requireAuth(async (user) => {
   form.addEventListener("submit", async (e) => {
     e.preventDefault();
     crearBtn.disabled = true;
-    crearBtn.textContent = "Generando...";
+    crearBtn.textContent = "Guardando...";
     alertBox.className = "form-alert";
 
     const anio = new Date().getFullYear();
@@ -476,24 +483,56 @@ requireAuth(async (user) => {
         }
       }
 
-      const pdf = await generarCartaPDF({ ...datosBase, bloques: bloquesFinal, radicado });
-      pdf.save(`${radicado}.pdf`);
+      // No se limpia el formulario ni se cierra — se queda tal cual para
+      // que "Descargar" (y "Visualizar") reflejen justo lo que se guardó.
+      // "Guardar" queda bloqueado (evita generar un radicado nuevo con un
+      // segundo clic) hasta que se pida "+ Nueva carta".
+      cartaGuardadaActual = { ...datosBase, bloques: bloquesFinal, radicado };
+      actualizarDescargarBtn();
+      nuevaCartaBtn.classList.remove("oculto");
+      crearBtn.textContent = "Guardada";
 
-      form.reset();
-      document.getElementById("ciudad").value = "Neiva";
-      bloques = [{ tipo: "texto", texto: "" }];
-      renderBloques();
-      form.closest("details").open = false;
-      let mensaje = `Carta ${radicado} generada y descargada.`;
+      let mensaje = `Carta ${radicado} guardada.`;
       if (codigoSgc) mensaje += ` Registrada en el SGC como ${codigoSgc}.`;
       if (errorSgc) mensaje += ` (No se pudo registrar en el SGC: ${errorSgc} — hazlo manualmente en Documentos.)`;
       mostrarAlerta(mensaje, errorSgc ? "error" : "ok");
+      return;
     } catch (err) {
-      mostrarAlerta(err.message || "No se pudo generar la carta.", "error");
-    } finally {
+      mostrarAlerta(err.message || "No se pudo guardar la carta.", "error");
       crearBtn.disabled = false;
-      crearBtn.textContent = "Generar y descargar carta";
+      crearBtn.textContent = "Guardar";
     }
+  });
+
+  // ---- Descargar: genera el PDF de la última carta GUARDADA — no vuelve
+  // a guardar nada.
+  descargarBtn.addEventListener("click", async () => {
+    if (!cartaGuardadaActual) return;
+    descargarBtn.disabled = true;
+    descargarBtn.textContent = "Generando...";
+    try {
+      const pdf = await generarCartaPDF(cartaGuardadaActual);
+      pdf.save(`${cartaGuardadaActual.radicado}.pdf`);
+    } catch (err) {
+      mostrarAlerta(err.message || "No se pudo descargar la carta.", "error");
+    } finally {
+      descargarBtn.disabled = false;
+      descargarBtn.textContent = "Descargar";
+    }
+  });
+
+  // ---- Nueva carta: limpia el formulario para empezar otra desde cero.
+  nuevaCartaBtn.addEventListener("click", () => {
+    form.reset();
+    document.getElementById("ciudad").value = "Neiva";
+    bloques = [{ tipo: "texto", texto: "" }];
+    renderBloques();
+    cartaGuardadaActual = null;
+    actualizarDescargarBtn();
+    nuevaCartaBtn.classList.add("oculto");
+    crearBtn.disabled = false;
+    crearBtn.textContent = "Guardar";
+    alertBox.className = "form-alert";
   });
 });
 

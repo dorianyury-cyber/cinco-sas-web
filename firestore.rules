@@ -123,22 +123,29 @@ service cloud.firestore {
       allow read, write: if request.auth != null;
     }
 
-    // Correspondencia (web/control/correspondencia.html) — mismo criterio;
-    // usa la misma colección "contadores" (doc "correspondencia_{año}").
+    // Correspondencia (web/control/correspondencia.html) — usa "contadores"
+    // (doc "correspondencia_{año}"). Lectura abierta; crear/editar/borrar
+    // requiere esGestor() (antes estaba abierto a cualquiera).
     match /correspondencia/{cartaId} {
-      allow read, write: if request.auth != null;
+      allow read: if request.auth != null;
+      allow write: if esGestor();
     }
 
-    // Informes de diseño propio (web/control/informes.html) — mismo
-    // criterio; usa "contadores" (doc "informe_{año}").
+    // Informes de diseño propio (web/control/informes.html) — usa
+    // "contadores" (doc "informe_{año}"). Lectura abierta a cualquier
+    // autenticado; crear/editar/borrar requiere esGestor() (antes estaba
+    // abierto a cualquiera, sin control real de quién publica qué).
     match /informes/{informeId} {
-      allow read, write: if request.auth != null;
+      allow read: if request.auth != null;
+      allow write: if esGestor();
     }
 
-    // Ofertas comerciales (web/control/ofertas.html) — mismo criterio;
-    // usa "contadores" (doc "oferta_{año}").
+    // Ofertas comerciales (web/control/ofertas.html) — usa "contadores"
+    // (doc "oferta_{año}"). Lectura abierta; crear/editar/borrar requiere
+    // esGestor() (antes estaba abierto a cualquiera).
     match /ofertas/{ofertaId} {
-      allow read, write: if request.auth != null;
+      allow read: if request.auth != null;
+      allow write: if esGestor();
     }
   }
 }

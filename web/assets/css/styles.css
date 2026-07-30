@@ -1295,34 +1295,47 @@ tr.control-fila-destacada { background: rgba(254, 178, 9, 0.25); transition: bac
 .control-bloque-controles { display: flex; flex-direction: column; gap: 6px; flex-shrink: 0; }
 .control-bloques-botones { display: flex; gap: 10px; margin: 4px 0 20px; flex-wrap: wrap; }
 form.pqr-form .control-bloques-botones button,
-form.pqr-form .control-tabla-botones button { width: auto; margin-top: 0; }
+form.pqr-form .control-tabla-botones button,
+form.pqr-form .control-bloque-gap button { width: auto; margin-top: 0; }
+/* Visualizar / Guardar / Descargar — misma franja de 3 acciones en
+   Informes, Ofertas y Correspondencia. */
+.control-3botones { display: flex; gap: 10px; margin-top: 20px; }
+form.pqr-form .control-3botones button { width: auto; flex: 1; margin-top: 0; }
+form.pqr-form .control-3botones button:disabled { opacity: 0.5; cursor: not-allowed; }
 .control-bloque-etiqueta { display: block; font-size: 11.5px; font-weight: 700; text-transform: uppercase; letter-spacing: 0.4px; color: var(--text-muted); margin-bottom: 4px; }
-/* Hueco entre bloques (y antes del primero): permite insertar un bloque
-   nuevo ahí mismo, no solo al final de la lista. */
-.control-bloque-gap { display: flex; justify-content: center; margin: -3px 0; }
-.control-bloque-gap-toggle {
-  font-size: 11px;
-  padding: 1px 12px;
-  border-radius: 999px;
-  border: 1px dashed var(--border);
-  background: var(--bg);
-  color: var(--text-muted);
-  cursor: pointer;
-  opacity: 0.55;
-  transition: opacity 0.15s ease, border-color 0.15s ease, color 0.15s ease;
+/* Campo de párrafo con formato (negrilla/cursiva/color) — ver
+   web/js/control/texto-rico.js. Mismo lenguaje visual que el resto de los
+   campos del editor de bloques, con la mini barra pegada arriba. */
+.control-rich-toolbar { display: flex; gap: 4px; margin-bottom: 6px; }
+.control-rich-btn, .control-rich-color {
+  width: 26px; height: 26px; border-radius: 6px;
+  border: 1px solid var(--border); background: var(--card-bg);
+  cursor: pointer; padding: 0;
 }
-.control-bloque-gap-toggle:hover { opacity: 1; border-color: var(--cinco-amber); color: var(--cinco-amber-dark); }
-.control-bloque-gap-menu {
+.control-rich-btn { font-size: 13px; color: var(--text); display: inline-flex; align-items: center; justify-content: center; }
+.control-rich-btn:hover, .control-rich-color:hover { border-color: var(--cinco-amber); }
+.control-rich-color { padding: 2px; }
+.control-rich-editable {
+  width: 100%; min-height: 70px; padding: 10px 12px;
+  border: 1px solid var(--border); border-radius: 8px; font-size: 13.5px;
+  background: var(--bg); color: var(--text); font-family: inherit; overflow-y: auto;
+}
+.control-rich-editable:focus { outline: none; border-color: var(--cinco-amber); box-shadow: 0 0 0 3px rgba(254, 178, 9, 0.18); }
+.control-rich-editable:empty:before { content: attr(data-placeholder); color: var(--text-muted); }
+/* Hueco entre bloques (y antes del primero): botones siempre visibles
+   para insertar un bloque nuevo ahí mismo, no solo al final de la lista
+   (pedido explícito: no obligar a bajar hasta el final para agregar un
+   título/párrafo/tabla/gráfico junto a un campo puntual). */
+.control-bloque-gap {
   display: flex;
   gap: 6px;
   flex-wrap: wrap;
   justify-content: center;
   align-items: center;
-  padding: 8px;
-  background: rgba(254, 178, 9, 0.07);
-  border: 1px dashed rgba(254, 178, 9, 0.4);
+  padding: 6px;
+  background: rgba(254, 178, 9, 0.06);
+  border: 1px dashed rgba(254, 178, 9, 0.35);
   border-radius: 10px;
-  width: 100%;
 }
 .control-bloque-contenido input[type="text"] {
   width: 100%;

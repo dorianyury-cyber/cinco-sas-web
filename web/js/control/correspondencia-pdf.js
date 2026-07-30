@@ -6,6 +6,8 @@
 // clásico, no módulo, por eso queda en window.jspdf) — así no hace falta
 // abrir el CSP del sitio a un CDN externo.
 
+import { parsearHtmlARuns } from "./texto-rico.js";
+
 const NAVY = [31, 39, 50];
 const NAVY_HEX = "#1f2732";
 const AMBER = [254, 178, 9];
@@ -156,22 +158,59 @@ export async function generarCartaPDF(datos) {
       continue;
     }
 
-    doc.setFont("helvetica", "normal");
+    // Dibuja el párrafo con negrilla/cursiva/color por tramo, tal como se
+    // escribió en el campo de texto rico (ver web/js/control/texto-rico.js)
+    // — mismo criterio que informes-pdf.js/ofertas-pdf.js.
     doc.setFontSize(10.5);
-    doc.setTextColor(20, 22, 26);
-    // Un solo Enter pasa a la siguiente línea (como en Word); una línea en
-    // blanco entre medio (doble Enter) deja además un espacio extra de
-    // separación de párrafo.
-    const parrafos = (bloque.texto || "").split(/\n{2,}/);
-    parrafos.forEach((parrafo) => {
-      parrafo.split("\n").forEach((lineaOriginal) => {
-        const lineas = doc.splitTextToSize(lineaOriginal, anchoUtil);
-        if (y + lineas.length * 5.5 > altoPagina - 45) { doc.addPage(); y = 20; }
-        doc.text(lineas, margenX, y);
-        y += lineas.length * 5.5;
+    const runsParrafo = parsearHtmlARuns(bloque.texto);
+    if (runsParrafo.length) {
+      const COLOR_PARRAFO = [20, 22, 26];
+      const estiloFuente = (negrita, cursiva) => {
+        if (negrita && cursiva) return "bolditalic";
+        if (negrita) return "bold";
+        if (cursiva) return "italic";
+        return "normal";
+      };
+      const medirToken = (token) => {
+        doc.setFont("helvetica", estiloFuente(token.negrita, token.cursiva));
+        return doc.getTextWidth(token.texto);
+      };
+      const tokens = [];
+      runsParrafo.forEach((run) => {
+        if (run.salto) { tokens.push({ salto: true }); return; }
+        run.texto.split(/(\s+)/).filter((p) => p !== "").forEach((palabra) => {
+          tokens.push({ texto: palabra, negrita: run.negrita, cursiva: run.cursiva, color: run.color });
+        });
       });
+
+      let linea = [];
+      let anchoLinea = 0;
+      const trazarLinea = () => {
+        if (!linea.length) { y += 5.5; return; }
+        if (y + 5.5 > altoPagina - 45) { doc.addPage(); y = 20; }
+        let x = margenX;
+        linea.forEach((token) => {
+          doc.setFont("helvetica", estiloFuente(token.negrita, token.cursiva));
+          doc.setTextColor(...(token.color || COLOR_PARRAFO));
+          doc.text(token.texto, x, y);
+          x += medirToken(token);
+        });
+        y += 5.5;
+        linea = [];
+        anchoLinea = 0;
+      };
+      tokens.forEach((token) => {
+        if (token.salto) { trazarLinea(); y += 5.5 * 0.3; return; }
+        const ancho = medirToken(token);
+        const esEspacio = /^\s+$/.test(token.texto);
+        if (esEspacio && !linea.length) return;
+        if (!esEspacio && anchoLinea + ancho > anchoUtil && linea.length) trazarLinea();
+        linea.push(token);
+        anchoLinea += ancho;
+      });
+      trazarLinea();
       y += 5;
-    });
+    }
   }
 
   // ---- cierre y firma ----

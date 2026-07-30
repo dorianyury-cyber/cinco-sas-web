@@ -37,7 +37,9 @@
 
   <section class="section">
     <div class="container">
-      <details class="card control-nuevo">
+      <p id="soloGestorAviso" class="text-muted oculto">Solo un administrador o coadministrador puede crear o borrar cartas de correspondencia. Puedes ver el listado y descargar el PDF/Word, pero no crear nuevas.</p>
+
+      <details class="card control-nuevo" id="nuevaCartaDetails">
         <summary>+ Nueva carta</summary>
         <form class="pqr-form" id="nuevaCartaForm">
           <label for="destinatario">Destinatario</label>
@@ -71,8 +73,12 @@
           <label for="contratoRelacionado">Contrato relacionado (opcional — queda archivada también ahí)</label>
           <select id="contratoRelacionado"><option value="">Ninguno</option></select>
 
-          <button type="button" class="control-btn-secundario" id="vistaPreviaBtn">Vista previa (sin guardar)</button>
-          <button type="submit" class="btn" id="crearCartaBtn">Generar y descargar carta</button>
+          <div class="control-3botones">
+            <button type="button" class="control-btn-mini" id="vistaPreviaBtn">Visualizar</button>
+            <button type="submit" class="btn" id="crearCartaBtn">Guardar</button>
+            <button type="button" class="btn" id="descargarCartaBtn" disabled>Descargar</button>
+          </div>
+          <button type="button" class="control-btn-mini oculto" id="nuevaCartaBtn">+ Nueva carta</button>
           <div class="form-alert" id="crearCartaAlert"></div>
         </form>
       </details>
