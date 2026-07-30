@@ -393,7 +393,7 @@ function renderInformesMensuales(contrato, documentosConMes) {
 // camposVisibles, ocultar "Ver" es solo de interfaz, no bloquea el dato en
 // Firestore; lo que sí es una barrera real es que la regla de Firestore le
 // niega crear filas en esta subcolección).
-function cargarDocumentosContrato(contratoId, contrato, esEmpleado) {
+function cargarDocumentosContrato(contratoId, contrato, esEmpleado, puedeArchivar) {
   const tbody = document.getElementById("listaDocumentosContrato");
   const sinDocs = document.getElementById("sinDocumentosContrato");
   const badge = document.getElementById("documentosBadge");
@@ -428,16 +428,40 @@ function cargarDocumentosContrato(contratoId, contrato, esEmpleado) {
       fila.appendChild(campo("td", { text: d.nombre || "" }));
       fila.appendChild(campo("td", { text: TIPO_DOC_LABEL[d.tipo] || d.tipo }));
       fila.appendChild(campo("td", { text: d.creadoEn ? formatearFechaHora(d.creadoEn) : "" }));
-      const tdVer = document.createElement("td");
+      const tdAccion = document.createElement("td");
+      tdAccion.className = "control-tabla-acciones";
       if (!esEmpleado) {
         const ver = document.createElement("a");
         ver.href = enlaceDocumento(d);
         ver.className = "control-btn-mini";
         ver.textContent = "Ver";
         if (d.origen === "manual") ver.target = "_blank";
-        tdVer.appendChild(ver);
+        tdAccion.appendChild(ver);
       }
-      fila.appendChild(tdVer);
+      // Solo los documentos manuales (subidos a mano, con enlace o archivo
+      // desde este mismo formulario) se pueden borrar aquí — un error al
+      // subirlos (documento equivocado) se corrige borrando y volviendo a
+      // agregar. Los que vienen de Informes/Correspondencia se gestionan
+      // desde su propio módulo, no como una fila suelta de esta lista.
+      if (puedeArchivar && d.origen === "manual") {
+        const borrar = document.createElement("button");
+        borrar.type = "button";
+        borrar.className = "control-btn-danger";
+        borrar.textContent = "Borrar";
+        borrar.addEventListener("click", async () => {
+          const confirmado = window.confirm(`¿Seguro que quieres borrar "${d.nombre}" de los documentos del contrato?\n\nEsta acción no se puede deshacer.`);
+          if (!confirmado) return;
+          borrar.disabled = true;
+          try {
+            await deleteDoc(docSnap.ref);
+          } catch (err) {
+            window.alert(err.message || "No se pudo borrar el documento.");
+            borrar.disabled = false;
+          }
+        });
+        tdAccion.appendChild(borrar);
+      }
+      fila.appendChild(tdAccion);
       tbody.appendChild(fila);
     });
   });
@@ -620,7 +644,11 @@ requireAuth(async (user) => {
   });
 
   await cargarEquipo(contratoRef, contrato, esGestor);
-  cargarDocumentosContrato(id, contrato, esEmpleado);
+  // Mismo permiso que exige la regla de Firestore para escribir en
+  // contratos/{id}/documentos: gestor siempre, apoyo solo si está en el
+  // equipo de este contrato puntual.
+  const puedeArchivar = esGestor || (esApoyo && (contrato.equipo || []).includes(user.email));
+  cargarDocumentosContrato(id, contrato, esEmpleado, puedeArchivar);
 
   const badges = { general: document.getElementById("avanceGeneral") };
   const contenedor = document.getElementById("camposContainer");
