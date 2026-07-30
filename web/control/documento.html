@@ -51,8 +51,16 @@
               <option value="obsoleto">Obsoleto</option>
             </select>
           </label>
+          <label>Socializado:
+            <select id="documentoSocializado">
+              <option value="no">No</option>
+              <option value="si">Sí</option>
+            </select>
+          </label>
         </div>
       </div>
+
+      <p id="soloGestorAviso" class="text-muted oculto">Solo un administrador (o un empleado autorizado desde Empleados) puede editar este documento. Puedes verlo, pero no modificarlo.</p>
 
       <div class="card">
         <form class="pqr-form control-form-sin-margen" id="datosForm">
@@ -60,9 +68,27 @@
           <input type="text" id="nombre" maxlength="160">
 
           <label for="enlace">Enlace OneDrive</label>
-          <input type="url" id="enlace" maxlength="500">
+          <div class="control-enlace-fila">
+            <input type="url" id="enlace" maxlength="500">
+            <a href="#" target="_blank" rel="noopener noreferrer" class="control-btn-mini" id="abrirEnlaceBtn">Abrir</a>
+          </div>
         </form>
       </div>
+
+      <details class="card control-nuevo" id="recodificarDetails">
+        <summary>Cambiar área/tipo (recodificar)</summary>
+        <p class="text-muted control-informes-ayuda">Cambiar el área o el tipo genera un código nuevo y guarda el actual como "código anterior" — solo tiene sentido mientras el documento no se haya socializado (una vez comunicado, el código debe quedar estable).</p>
+        <form class="pqr-form" id="recodificarForm">
+          <label for="nuevaArea">Área</label>
+          <select id="nuevaArea" required></select>
+
+          <label for="nuevoTipo">Tipo de documento</label>
+          <select id="nuevoTipo" required></select>
+
+          <button type="submit" class="btn" id="recodificarBtn">Generar nuevo código</button>
+          <div class="form-alert" id="recodificarAlert"></div>
+        </form>
+      </details>
 
       <details class="card control-nuevo">
         <summary>+ Registrar nueva versión</summary>

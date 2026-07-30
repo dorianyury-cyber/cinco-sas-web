@@ -777,6 +777,8 @@ form.pqr-form select:focus {
   box-shadow: 0 0 0 3px rgba(254, 178, 9, 0.2);
 }
 form.pqr-form textarea { resize: vertical; }
+.control-enlace-fila { display: flex; gap: 8px; align-items: center; }
+.control-enlace-fila input { flex: 1; min-width: 0; }
 .control-input-unidad { position: relative; }
 .control-input-unidad span {
   position: absolute;

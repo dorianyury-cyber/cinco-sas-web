@@ -177,6 +177,25 @@ function celdaOfertas(empleado, esAdmin) {
   return td;
 }
 
+// Checkbox de autorización para el Listado Maestro de Documentos —
+// autoguardado, mismo patrón que celdaOfertas pero sin la parte de firma.
+function celdaDocumentos(empleado, esAdmin) {
+  const td = celda("td");
+  const label = document.createElement("label");
+  label.className = "control-check-inline";
+  const check = document.createElement("input");
+  check.type = "checkbox";
+  check.checked = !!empleado.gestionaDocumentos;
+  check.disabled = !esAdmin;
+  check.addEventListener("change", () => {
+    updateDoc(doc(db, "empleados", empleado.id), { gestionaDocumentos: check.checked, actualizadoEn: serverTimestamp() });
+  });
+  label.appendChild(check);
+  label.appendChild(document.createTextNode("Autorizado"));
+  td.appendChild(label);
+  return td;
+}
+
 function renderTabla(empleados, esAdmin) {
   tbody.innerHTML = "";
   sinEmpleados.classList.toggle("oculto", empleados.length > 0);
@@ -220,6 +239,7 @@ function renderTabla(empleados, esAdmin) {
     fila.appendChild(tdEstado);
 
     fila.appendChild(celdaOfertas(e, esAdmin));
+    fila.appendChild(celdaDocumentos(e, esAdmin));
 
     tbody.appendChild(fila);
   });
@@ -251,6 +271,7 @@ requireAuth(async (user) => {
     const email = document.getElementById("email").value.trim().toLowerCase();
     const cargo = document.getElementById("cargo").value.trim();
     const autorizadoOfertas = document.getElementById("autorizadoOfertas").checked;
+    const gestionaDocumentos = document.getElementById("gestionaDocumentos").checked;
     const rol = selectRolNuevo.value;
     const campo = campoDeRol(rol);
     const seleccionadas = [...camposLista.querySelectorAll(".campo-permiso-check:checked")].map((c) => c.value);
@@ -262,7 +283,7 @@ requireAuth(async (user) => {
         throw new Error("Ya existe un empleado registrado con ese correo.");
       }
       await setDoc(empleadoRef, {
-        nombre, email, cargo, rol, estado: "activo", autorizadoOfertas,
+        nombre, email, cargo, rol, estado: "activo", autorizadoOfertas, gestionaDocumentos,
         ...(campo ? { [campo]: seleccionadas } : {}),
         creadoPor: user.email, creadoEn: serverTimestamp(),
         actualizadoEn: serverTimestamp()

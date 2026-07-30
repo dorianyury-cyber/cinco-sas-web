@@ -1,13 +1,10 @@
 import { signOut } from "https://www.gstatic.com/firebasejs/10.7.1/firebase-auth.js";
 import {
-  collection, doc, getDocs, runTransaction, serverTimestamp,
+  collection, doc, getDoc, runTransaction, serverTimestamp,
   onSnapshot, query, orderBy
 } from "https://www.gstatic.com/firebasejs/10.7.1/firebase-firestore.js";
-import { auth, db, requireAuth } from "./firebase-control.js";
+import { auth, db, requireAuth, obtenerPerfil } from "./firebase-control.js";
 import { AREAS, TIPOS, nombreArea, nombreTipo } from "./documentos-plantillas.js";
-import { truncar } from "./texto.js";
-
-const selectContrato = document.getElementById("contratoRelacionado");
 
 const ESTADO_LABEL = { vigente: "Vigente", obsoleto: "Obsoleto" };
 
@@ -16,8 +13,12 @@ const sinDocumentos = document.getElementById("sinDocumentos");
 const form = document.getElementById("nuevoDocumentoForm");
 const alertBox = document.getElementById("crearDocumentoAlert");
 const crearBtn = document.getElementById("crearDocumentoBtn");
+const vistaPreviaBtn = document.getElementById("vistaPreviaBtn");
+const vistaPreviaBox = document.getElementById("vistaPreviaBox");
 const filtroArea = document.getElementById("filtroArea");
+const filtroTipo = document.getElementById("filtroTipo");
 const filtroEstado = document.getElementById("filtroEstado");
+const filtroSocializado = document.getElementById("filtroSocializado");
 
 function mostrarAlerta(texto, tipo) {
   alertBox.textContent = texto;
@@ -36,6 +37,43 @@ function llenarSelect(select, opciones) {
 llenarSelect(document.getElementById("area"), AREAS);
 llenarSelect(document.getElementById("tipo"), TIPOS);
 llenarSelect(filtroArea, AREAS);
+llenarSelect(filtroTipo, TIPOS);
+
+// Vista previa: lee el consecutivo actual del contador área+tipo SIN
+// incrementarlo, para que el administrador vea el código que se le
+// asignaría y revise nombre/área/tipo antes de gastar un consecutivo real
+// (crear y borrar no libera el número, así que conviene revisar antes).
+vistaPreviaBtn.addEventListener("click", async () => {
+  const area = document.getElementById("area").value;
+  const tipo = document.getElementById("tipo").value;
+  const nombre = document.getElementById("nombre").value.trim();
+  if (!nombre) {
+    vistaPreviaBox.textContent = "Escribe el nombre del documento primero.";
+    vistaPreviaBox.className = "form-alert show error";
+    return;
+  }
+  vistaPreviaBtn.disabled = true;
+  try {
+    const contadorSnap = await getDoc(doc(db, "contadores", `${area}_${tipo}`));
+    const siguiente = contadorSnap.exists() ? contadorSnap.data().siguiente : 1;
+    const codigoProbable = `${area}-${tipo}-${String(siguiente).padStart(3, "0")}`;
+    vistaPreviaBox.innerHTML = "";
+    const resumen = document.createElement("div");
+    resumen.innerHTML =
+      `<strong>Código probable:</strong> ${codigoProbable}<br>` +
+      `<strong>Nombre:</strong> ${nombre}<br>` +
+      `<strong>Área:</strong> ${area} — ${nombreArea(area)}<br>` +
+      `<strong>Tipo:</strong> ${tipo} — ${nombreTipo(tipo)}<br>` +
+      `<span class="text-muted">El código real se asigna al crear — puede variar si alguien más crea uno del mismo área+tipo primero.</span>`;
+    vistaPreviaBox.appendChild(resumen);
+    vistaPreviaBox.className = "form-alert show ok";
+  } catch (err) {
+    vistaPreviaBox.textContent = err.message || "No se pudo calcular la vista previa.";
+    vistaPreviaBox.className = "form-alert show error";
+  } finally {
+    vistaPreviaBtn.disabled = false;
+  }
+});
 
 let documentos = [];
 
@@ -47,9 +85,14 @@ function celda(tag, texto) {
 
 function renderTabla() {
   const area = filtroArea.value;
+  const tipo = filtroTipo.value;
   const estado = filtroEstado.value;
-  const filtrados = documentos.filter(
-    (d) => (!area || d.area === area) && (!estado || d.estado === estado)
+  const socializado = filtroSocializado.value;
+  const filtrados = documentos.filter((d) =>
+    (!area || d.area === area) &&
+    (!tipo || d.tipo === tipo) &&
+    (!estado || d.estado === estado) &&
+    (!socializado || (socializado === "si" ? !!d.socializado : !d.socializado))
   );
 
   tbody.innerHTML = "";
@@ -69,35 +112,36 @@ function renderTabla() {
     pillEstado.textContent = ESTADO_LABEL[d.estado] || d.estado;
     tdEstado.appendChild(pillEstado);
     fila.appendChild(tdEstado);
+    const tdSocializado = document.createElement("td");
+    const pillSocializado = document.createElement("span");
+    pillSocializado.className = `control-estado-pill control-estado-${d.socializado ? "vigente" : "obsoleto"}`;
+    pillSocializado.textContent = d.socializado ? "Sí" : "No";
+    tdSocializado.appendChild(pillSocializado);
+    fila.appendChild(tdSocializado);
     fila.addEventListener("click", () => { window.location.href = `documento.html?id=${d.id}`; });
     tbody.appendChild(fila);
   });
 }
 
 filtroArea.addEventListener("change", renderTabla);
+filtroTipo.addEventListener("change", renderTabla);
 filtroEstado.addEventListener("change", renderTabla);
+filtroSocializado.addEventListener("change", renderTabla);
 
 requireAuth(async (user) => {
   document.getElementById("userEmail").textContent = user.email;
+
+  const perfil = await obtenerPerfil(user.email);
+  const puedeGestionar = perfil?.estado === "activo" && (perfil?.rol === "admin" || perfil?.gestionaDocumentos === true);
+  if (!puedeGestionar) {
+    document.getElementById("nuevoDocumentoDetails").classList.add("oculto");
+    document.getElementById("soloGestorAviso").classList.remove("oculto");
+  }
 
   const q = query(collection(db, "documentos"), orderBy("codigo"));
   onSnapshot(q, (snapshot) => {
     documentos = snapshot.docs.map((d) => ({ id: d.id, ...d.data() }));
     renderTabla();
-  });
-
-  // Solo aparecen los contratos a los que este usuario tiene acceso — las
-  // reglas de Firestore ya filtran el resultado por lectura, no hace falta
-  // repetir esa lógica aquí. orderBy("creadoEn") en vez de "codigo" porque
-  // los contratos creados antes de esta función no tienen "codigo" y
-  // Firestore los excluiría del resultado si se ordenara por ese campo.
-  const contratosSnap = await getDocs(query(collection(db, "contratos"), orderBy("creadoEn", "desc")));
-  contratosSnap.forEach((docSnap) => {
-    const c = docSnap.data();
-    const opt = document.createElement("option");
-    opt.value = docSnap.id;
-    opt.textContent = `${c.codigo || "(sin código)"} — ${truncar(c.nombre)}`;
-    selectContrato.appendChild(opt);
   });
 
   form.addEventListener("submit", async (e) => {
@@ -111,7 +155,6 @@ requireAuth(async (user) => {
     const nombre = document.getElementById("nombre").value;
     const enlace = document.getElementById("enlace").value;
     const codigoAnterior = document.getElementById("codigoAnterior").value;
-    const contratoId = selectContrato.value;
 
     try {
       const contadorRef = doc(db, "contadores", `${area}_${tipo}`);
@@ -126,7 +169,7 @@ requireAuth(async (user) => {
         tx.set(contadorRef, { siguiente: siguiente + 1 });
         tx.set(documentoRef, {
           codigo, area, tipo, consecutivo: siguiente, nombre, enlace,
-          versionActual: 1, estado: "vigente", codigoAnterior: codigoAnterior || "",
+          versionActual: 1, estado: "vigente", socializado: false, codigoAnterior: codigoAnterior || "",
           creadoPor: user.email, creadoEn: serverTimestamp(),
           actualizadoEn: serverTimestamp(), actualizadoPor: user.email
         });
@@ -137,18 +180,11 @@ requireAuth(async (user) => {
           hechoPor: user.email,
           en: serverTimestamp()
         });
-
-        if (contratoId) {
-          const refEnContrato = doc(collection(db, "contratos", contratoId, "documentos"));
-          tx.set(refEnContrato, {
-            codigo, nombre, tipo: "interno", origen: "documentos", refId: documentoRef.id,
-            creadoPor: user.email, creadoEn: serverTimestamp()
-          });
-        }
       });
 
       form.reset();
       form.closest("details").open = false;
+      vistaPreviaBox.className = "form-alert";
       mostrarAlerta("Documento creado.", "ok");
     } catch (err) {
       mostrarAlerta(err.message || "No se pudo crear el documento.", "error");

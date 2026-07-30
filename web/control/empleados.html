@@ -70,6 +70,11 @@
             Autorizado para presentar y firmar ofertas comerciales
           </label>
 
+          <label class="control-check-inline">
+            <input type="checkbox" id="gestionaDocumentos">
+            Gestiona el Listado Maestro de Documentos (crear/editar formatos y su código)
+          </label>
+
           <button type="submit" class="btn" id="crearEmpleadoBtn">Crear empleado</button>
           <div class="form-alert" id="crearEmpleadoAlert"></div>
         </form>
@@ -85,6 +90,7 @@
             <col class="w-220">
             <col class="w-110">
             <col class="w-190">
+            <col class="w-130">
           </colgroup>
           <thead>
             <tr>
@@ -95,6 +101,7 @@
               <th>Campos</th>
               <th>Estado</th>
               <th>Ofertas</th>
+              <th>Documentos</th>
             </tr>
           </thead>
           <tbody id="listaEmpleados"></tbody>

@@ -37,7 +37,9 @@
 
   <section class="section">
     <div class="container">
-      <details class="card control-nuevo">
+      <p id="soloGestorAviso" class="text-muted oculto">Solo un administrador (o un empleado autorizado desde Empleados) puede crear o editar documentos del Listado Maestro. Puedes ver el catálogo, pero no modificarlo.</p>
+
+      <details class="card control-nuevo" id="nuevoDocumentoDetails">
         <summary>+ Nuevo documento</summary>
         <form class="pqr-form" id="nuevoDocumentoForm">
           <label for="area">Área</label>
@@ -55,9 +57,8 @@
           <label for="codigoAnterior">Código anterior (si es una recodificación, opcional)</label>
           <input type="text" id="codigoAnterior" maxlength="60">
 
-          <label for="contratoRelacionado">Contrato relacionado (opcional — queda archivado también ahí)</label>
-          <select id="contratoRelacionado"><option value="">Ninguno</option></select>
-
+          <div class="form-alert" id="vistaPreviaBox"></div>
+          <button type="button" class="control-btn-mini" id="vistaPreviaBtn">Vista previa</button>
           <button type="submit" class="btn" id="crearDocumentoBtn">Crear documento</button>
           <div class="form-alert" id="crearDocumentoAlert"></div>
         </form>
@@ -67,11 +68,21 @@
         <label>Área
           <select id="filtroArea"><option value="">Todas</option></select>
         </label>
+        <label>Tipo
+          <select id="filtroTipo"><option value="">Todos</option></select>
+        </label>
         <label>Estado
           <select id="filtroEstado">
             <option value="">Todos</option>
             <option value="vigente">Vigente</option>
             <option value="obsoleto">Obsoleto</option>
+          </select>
+        </label>
+        <label>Socializado
+          <select id="filtroSocializado">
+            <option value="">Todos</option>
+            <option value="si">Sí</option>
+            <option value="no">No</option>
           </select>
         </label>
       </div>
@@ -85,6 +96,7 @@
             <col class="w-120">
             <col class="w-70">
             <col class="w-100">
+            <col class="w-110">
           </colgroup>
           <thead>
             <tr>
@@ -94,6 +106,7 @@
               <th>Tipo</th>
               <th>Ver.</th>
               <th>Estado</th>
+              <th>Socializado</th>
             </tr>
           </thead>
           <tbody id="listaDocumentos"></tbody>

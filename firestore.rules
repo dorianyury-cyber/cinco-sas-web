@@ -48,6 +48,13 @@ service cloud.firestore {
     function camposPermitidosApoyo() {
       return empleadoDoc().get('camposPermitidos', []);
     }
+    // Permiso aparte del rol de contratos: quién puede dar de alta o
+    // corregir el Listado Maestro de Documentos — admin siempre, o un
+    // empleado puntual al que el admin se lo otorgue desde Empleados
+    // (empleados/{email}.gestionaDocumentos).
+    function gestionaDocumentos() {
+      return esAdmin() || (esEmpleadoActivo() && empleadoDoc().get('gestionaDocumentos', false) == true);
+    }
 
     // Directorio de empleados: cualquier autenticado lo lee (para elegir a
     // quién asignar a un contrato), solo un admin lo administra —
@@ -85,16 +92,30 @@ service cloud.firestore {
     }
 
     // Listado Maestro de Documentos (web/control/documentos.html) — catálogo
-    // de toda la empresa, no de un contrato puntual, así que se mantiene
-    // abierto a cualquier autenticado (igual que Correspondencia debajo).
+    // de toda la empresa, no de un contrato puntual. La lectura queda
+    // abierta a cualquier autenticado (igual que Correspondencia debajo,
+    // otros módulos necesitan poder consultarlo), pero crear/editar/borrar
+    // un documento del catálogo (o su control de cambios) requiere
+    // gestionaDocumentos() — antes estaba abierto a cualquiera y se
+    // estaban colando errores de nombre/área/tipo al crear.
     // "contadores" guarda el siguiente consecutivo por área+tipo (y ahora
     // también por línea de servicio+año, para el código de contrato) para
     // generar los códigos sin choques.
     match /documentos/{documentoId} {
-      allow read, write: if request.auth != null;
+      allow read: if request.auth != null;
+      // Alta manual desde "+ Nuevo documento" (sin "origen"): requiere el
+      // permiso. Alta automática desde Informes/Ofertas/Correspondencia al
+      // marcar "parteSGI" (trae "origen" propio): sigue abierta a
+      // cualquier autenticado, igual que antes — si no, se rompería ese
+      // flujo para cualquiera que no tenga gestionaDocumentos().
+      allow create: if gestionaDocumentos()
+        || (request.auth != null && request.resource.data.origen in ['informes', 'ofertas', 'correspondencia']);
+      allow update, delete: if gestionaDocumentos();
 
       match /cambios/{cambioId} {
-        allow read, write: if request.auth != null;
+        allow read: if request.auth != null;
+        allow create: if request.auth != null;
+        allow update, delete: if gestionaDocumentos();
       }
     }
 
