@@ -407,7 +407,13 @@ function cargarDocumentosContrato(contratoId, contrato, esEmpleado) {
     snapshot.forEach((docSnap) => {
       const d = docSnap.data();
       const fila = document.createElement("tr");
-      fila.appendChild(campo("td", { text: d.codigo || "—" }));
+      // El documento del contrato es de origen externo (lo redacta el
+      // cliente, no Cinco) — no le damos un consecutivo del SGC como a
+      // Informes/Ofertas/Correspondencia (eso implicaría que Cinco lo
+      // versiona, lo cual sería un hallazgo en una auditoría de calidad).
+      // Sí queda trazable con el código del contrato mismo.
+      const codigoMostrado = d.codigo || (d.tipo === "contrato" ? contrato.codigo : "—");
+      fila.appendChild(campo("td", { text: codigoMostrado || "—" }));
       fila.appendChild(campo("td", { text: d.nombre || "" }));
       fila.appendChild(campo("td", { text: TIPO_DOC_LABEL[d.tipo] || d.tipo }));
       fila.appendChild(campo("td", { text: d.creadoEn ? formatearFechaHora(d.creadoEn) : "" }));
