@@ -8,7 +8,7 @@
 // - nombres propios/ciudades de uso frecuente en la operación (lista fija,
 //   ampliar aquí si aparecen casos nuevos)
 
-const SIGLAS = ["SAS", "LTDA", "IPS", "ESE", "EPS", "ESP", "ONG", "NIT", "GGC"];
+const SIGLAS = ["SAS", "LTDA", "IPS", "ESE", "EPS", "ESP", "ONG", "NIT", "GGC", "AGPE"];
 
 const PROPIOS = [
   "Neiva", "Huila", "Colombia", "Pitalito", "Garzón", "Campoalegre",
@@ -37,12 +37,27 @@ function valorFijo(nucleo) {
   return PROPIOS.find((p) => p.toLowerCase() === nucleo.toLowerCase()) || null;
 }
 
+// Reconoce una sigla escrita con un punto entre cada letra (ej. "S.A.S.",
+// "s.a.s", "E.S.P."), un patrón muy común en razones sociales que
+// dividirPalabra() no captura por sí solo (esa función solo separa
+// puntuación al inicio/final de la palabra, no intercalada letra a letra).
+const PATRON_SIGLA_PUNTEADA = /^[a-zA-Zá-úÁ-Ú](\.[a-zA-Zá-úÁ-Ú])+\.?$/;
+
+function siglaPunteada(palabra) {
+  if (!PATRON_SIGLA_PUNTEADA.test(palabra)) return null;
+  const letras = palabra.replace(/\./g, "");
+  const sigla = SIGLAS.find((s) => s.toLowerCase() === letras.toLowerCase());
+  return sigla ? sigla.split("").join(".") + "." : null;
+}
+
 export function capitalizarOracion(texto) {
   const limpio = (texto || "").trim().replace(/\s+/g, " ");
   if (!limpio) return "";
   return limpio
     .split(" ")
     .map((palabra, i) => {
+      const sigla = siglaPunteada(palabra);
+      if (sigla) return sigla;
       const { pre, nucleo, post } = dividirPalabra(palabra);
       if (!nucleo) return palabra;
       const fijo = valorFijo(nucleo);
@@ -71,6 +86,8 @@ export function capitalizarNombrePropio(texto) {
   return limpio
     .split(" ")
     .map((palabra, i) => {
+      const sigla = siglaPunteada(palabra);
+      if (sigla) return sigla;
       const { pre, nucleo, post } = dividirPalabra(palabra);
       if (!nucleo) return palabra;
       const fijo = valorFijo(nucleo);

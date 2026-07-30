@@ -9,9 +9,10 @@ const NAVY_HEX = "1F2732";
 const MUTED_HEX = "5C6570";
 const LOGO_URL = "../assets/img/logo.png";
 // Código y versión del formato en blanco, tal como quedó registrado en el
-// Listado Maestro de Documentos (documentos.html) — mismo criterio que en
-// correspondencia-pdf.js, actualizar los dos si cambia la versión.
-const CODIGO_FORMATO = "SC-FOR-001";
+// Listado Maestro de Documentos (documentos.html, área AC — Actividades) —
+// mismo criterio que en correspondencia-pdf.js, actualizar los dos si
+// cambia la versión.
+const CODIGO_FORMATO = "AC-FOR-001";
 const VERSION_FORMATO = "1";
 const PX_POR_MM = 96 / 25.4;
 const MARGEN_MM = 20;
