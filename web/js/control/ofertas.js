@@ -83,19 +83,31 @@ function aniosDeTrayectoria() {
   return anios;
 }
 
-// Texto de partida para que la oferta no arranque en blanco — cubre "mostrar
-// las bondades de Cinco sin descalificar a nadie": experiencia, equipo,
-// enfoque en calidad, sin nombrar competencia. Totalmente editable por
-// oferta; el usuario ajusta el alcance específico de lo que está cotizando.
+// "y" antes del último elemento en vez de una coma más, para que la lista
+// de líneas de servicio se lea como prosa y no como un catálogo pegado.
+function listarConY(items) {
+  if (items.length <= 1) return items.join("");
+  return items.slice(0, -1).join(", ") + " y " + items[items.length - 1];
+}
+
+// Texto de partida para que la oferta no arranque en blanco ni se quede
+// corta — cubre "mostrar las bondades de Cinco sin descalificar a nadie":
+// experiencia, alcance de líneas de servicio, invitación a conocer más en
+// el sitio web, y enfoque en calidad, sin nombrar competencia. Totalmente
+// editable por oferta; el usuario ajusta el alcance específico de lo que
+// está cotizando.
 function bloquesPorDefecto() {
   return [
     { tipo: "titulo1", texto: "1. Quiénes somos" },
-    { tipo: "parrafo", texto: `Cinco S.A.S. es una empresa con más de ${aniosDeTrayectoria()} años de experiencia en construcción, ingeniería y consultoría, con un equipo multidisciplinario de profesionales dedicados a entregar soluciones técnicas confiables, puntuales y respaldadas por un enfoque riguroso de calidad en cada etapa del servicio.` },
-    { tipo: "titulo1", texto: "2. Por qué elegir a Cinco S.A.S." },
+    { tipo: "parrafo", texto: `Cinco S.A.S. es una empresa con más de ${aniosDeTrayectoria()} años de experiencia en construcción, ingeniería y consultoría para el sector eléctrico, con más de 30 proyectos de construcción, más de 20 interventorías y más de 30 proyectos de diseño ejecutados para entidades públicas y privadas. Contamos con un equipo multidisciplinario de profesionales dedicados a entregar soluciones técnicas confiables, puntuales y respaldadas por un enfoque riguroso de calidad en cada etapa del servicio.` },
+    { tipo: "titulo1", texto: "2. Nuestras líneas de servicio" },
+    { tipo: "parrafo", texto: `Atendemos el ciclo completo de un proyecto eléctrico desde un solo aliado, con ${LINEAS_SERVICIO.length} líneas de servicio especializadas: ${listarConY(LINEAS_SERVICIO.map((l) => l.nombre.toLowerCase()))}.` },
+    { tipo: "titulo1", texto: "3. Por qué elegir a Cinco S.A.S." },
     { tipo: "parrafo", texto: "Nuestra trayectoria nos permite acompañar a nuestros clientes con seriedad y respaldo técnico real, no solo con una propuesta económica. Contamos con procesos documentados, personal calificado en cada línea de servicio, y un compromiso directo de la gerencia con la calidad y los tiempos de entrega de cada proyecto." },
-    { tipo: "titulo1", texto: "3. Alcance del servicio ofertado" },
+    { tipo: "parrafo", texto: "Conoce más sobre nuestra trayectoria, los proyectos que hemos ejecutado y los clientes que ya confían en nosotros en cinco-sas.web.app." },
+    { tipo: "titulo1", texto: "4. Alcance del servicio ofertado" },
     { tipo: "parrafo", texto: "Describe aquí el alcance específico de esta oferta: actividades incluidas, entregables, cronograma estimado y cualquier condición técnica particular." },
-    { tipo: "titulo1", texto: "4. Valor de la oferta" },
+    { tipo: "titulo1", texto: "5. Valor de la oferta" },
     { tipo: "parrafo", texto: "El detalle de cantidades, precios unitarios y el valor total de esta oferta se presenta en el Anexo 1 — Cotización detallada, al final de este documento." }
   ];
 }
