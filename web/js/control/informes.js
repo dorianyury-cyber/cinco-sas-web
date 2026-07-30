@@ -107,8 +107,77 @@ function quitarBloque(indice) {
 
 const TITULO_LABEL = { titulo1: "Título 1", titulo2: "Título 2", titulo3: "Título 3" };
 
+// Tipos de bloque que se pueden insertar desde un "hueco" entre bloques
+// (o antes del primero) — mismas 6 opciones que la barra de abajo, para
+// no obligar a agregar siempre al final y reordenar a mano.
+const TIPOS_INSERTABLES = [
+  { tipo: "titulo1", etiqueta: "Título 1" },
+  { tipo: "titulo2", etiqueta: "Título 2" },
+  { tipo: "titulo3", etiqueta: "Título 3" },
+  { tipo: "parrafo", etiqueta: "Párrafo" },
+  { tipo: "tabla", etiqueta: "Tabla" },
+  { tipo: "imagen", etiqueta: "Gráfico / imagen" }
+];
+
+// Índice del hueco cuyo menú está desplegado (null = todos colapsados) y,
+// mientras se espera el selector de archivo, en qué hueco insertar la(s)
+// imagen(es) elegidas — el input de archivo es uno solo, compartido con
+// el botón "+ Gráfico / imagen" de la barra de abajo.
+let indiceMenuAbierto = null;
+let indiceInsertarImagen = null;
+
+function crearBloquePorTipo(tipo) {
+  if (tipo === "tabla") return nuevaTabla();
+  return { tipo, texto: "" };
+}
+
+function insertarBloqueEn(indice, tipo) {
+  if (tipo === "imagen") {
+    indiceInsertarImagen = indice;
+    inputImagen.click();
+    return;
+  }
+  bloques.splice(indice, 0, crearBloquePorTipo(tipo));
+  indiceMenuAbierto = null;
+  renderBloques();
+}
+
+function renderHueco(indice) {
+  const hueco = document.createElement("div");
+  hueco.className = "control-bloque-gap";
+  if (indiceMenuAbierto === indice) {
+    const menu = document.createElement("div");
+    menu.className = "control-bloque-gap-menu";
+    TIPOS_INSERTABLES.forEach(({ tipo, etiqueta }) => {
+      const btn = document.createElement("button");
+      btn.type = "button";
+      btn.className = "control-btn-mini";
+      btn.textContent = etiqueta;
+      btn.addEventListener("click", () => insertarBloqueEn(indice, tipo));
+      menu.appendChild(btn);
+    });
+    const cerrar = document.createElement("button");
+    cerrar.type = "button";
+    cerrar.className = "control-btn-mini";
+    cerrar.textContent = "✕";
+    cerrar.title = "Cancelar";
+    cerrar.addEventListener("click", () => { indiceMenuAbierto = null; renderBloques(); });
+    menu.appendChild(cerrar);
+    hueco.appendChild(menu);
+  } else {
+    const toggle = document.createElement("button");
+    toggle.type = "button";
+    toggle.className = "control-bloque-gap-toggle";
+    toggle.textContent = "+ Insertar aquí";
+    toggle.addEventListener("click", () => { indiceMenuAbierto = indice; renderBloques(); });
+    hueco.appendChild(toggle);
+  }
+  return hueco;
+}
+
 function renderBloques() {
   bloquesEditor.innerHTML = "";
+  bloquesEditor.appendChild(renderHueco(0));
   bloques.forEach((bloque, i) => {
     const fila = document.createElement("div");
     fila.className = "control-bloque";
@@ -175,6 +244,7 @@ function renderBloques() {
     fila.appendChild(controles);
 
     bloquesEditor.appendChild(fila);
+    bloquesEditor.appendChild(renderHueco(i + 1));
   });
 }
 
@@ -262,10 +332,16 @@ document.getElementById("agregarImagenBtn").addEventListener("click", () => inpu
 inputImagen.addEventListener("change", async () => {
   const archivos = [...inputImagen.files];
   const fallidos = [];
+  // Si se abrió el selector desde un hueco ("+ Insertar aquí"), las
+  // imágenes quedan ahí en vez de siempre al final de la lista.
+  let destino = indiceInsertarImagen ?? bloques.length;
+  indiceInsertarImagen = null;
+  indiceMenuAbierto = null;
   for (const archivo of archivos) {
     try {
       const { blob, previewUrl } = await redimensionarImagen(archivo);
-      bloques.push({ tipo: "imagen", blob, previewUrl, pieDeFoto: "" });
+      bloques.splice(destino, 0, { tipo: "imagen", blob, previewUrl, pieDeFoto: "" });
+      destino++;
     } catch (err) {
       fallidos.push(archivo.name);
     }

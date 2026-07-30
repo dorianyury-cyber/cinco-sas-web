@@ -1295,6 +1295,33 @@ tr.control-fila-destacada { background: rgba(254, 178, 9, 0.25); transition: bac
 form.pqr-form .control-bloques-botones button,
 form.pqr-form .control-tabla-botones button { width: auto; margin-top: 0; }
 .control-bloque-etiqueta { display: block; font-size: 11.5px; font-weight: 700; text-transform: uppercase; letter-spacing: 0.4px; color: var(--text-muted); margin-bottom: 4px; }
+/* Hueco entre bloques (y antes del primero): permite insertar un bloque
+   nuevo ahí mismo, no solo al final de la lista. */
+.control-bloque-gap { display: flex; justify-content: center; margin: -3px 0; }
+.control-bloque-gap-toggle {
+  font-size: 11px;
+  padding: 1px 12px;
+  border-radius: 999px;
+  border: 1px dashed var(--border);
+  background: var(--bg);
+  color: var(--text-muted);
+  cursor: pointer;
+  opacity: 0.55;
+  transition: opacity 0.15s ease, border-color 0.15s ease, color 0.15s ease;
+}
+.control-bloque-gap-toggle:hover { opacity: 1; border-color: var(--cinco-amber); color: var(--cinco-amber-dark); }
+.control-bloque-gap-menu {
+  display: flex;
+  gap: 6px;
+  flex-wrap: wrap;
+  justify-content: center;
+  align-items: center;
+  padding: 8px;
+  background: rgba(254, 178, 9, 0.07);
+  border: 1px dashed rgba(254, 178, 9, 0.4);
+  border-radius: 10px;
+  width: 100%;
+}
 .control-bloque-contenido input[type="text"] {
   width: 100%;
   padding: 10px 12px;
