@@ -84,8 +84,60 @@ function quitarBloque(indice) {
   renderBloques();
 }
 
+// Hueco entre bloques (o antes del primero) para insertar un párrafo o una
+// imagen justo ahí, en vez de siempre al final y reordenar con flechas —
+// mismo patrón que informes.js/ofertas.js, adaptado a los 2 tipos de
+// bloque que maneja una carta (texto/imagen, sin títulos ni tablas).
+let indiceMenuAbierto = null;
+let indiceInsertarImagen = null;
+
+function insertarBloqueEn(indice, tipo) {
+  if (tipo === "imagen") {
+    indiceInsertarImagen = indice;
+    inputImagen.click();
+    return;
+  }
+  bloques.splice(indice, 0, { tipo: "texto", texto: "" });
+  indiceMenuAbierto = null;
+  renderBloques();
+}
+
+function renderHueco(indice) {
+  const hueco = document.createElement("div");
+  hueco.className = "control-bloque-gap";
+  if (indiceMenuAbierto === indice) {
+    const menu = document.createElement("div");
+    menu.className = "control-bloque-gap-menu";
+    [{ tipo: "texto", etiqueta: "Párrafo" }, { tipo: "imagen", etiqueta: "Gráfico / imagen" }].forEach(({ tipo, etiqueta }) => {
+      const btn = document.createElement("button");
+      btn.type = "button";
+      btn.className = "control-btn-mini";
+      btn.textContent = etiqueta;
+      btn.addEventListener("click", () => insertarBloqueEn(indice, tipo));
+      menu.appendChild(btn);
+    });
+    const cerrar = document.createElement("button");
+    cerrar.type = "button";
+    cerrar.className = "control-btn-mini";
+    cerrar.textContent = "✕";
+    cerrar.title = "Cancelar";
+    cerrar.addEventListener("click", () => { indiceMenuAbierto = null; renderBloques(); });
+    menu.appendChild(cerrar);
+    hueco.appendChild(menu);
+  } else {
+    const toggle = document.createElement("button");
+    toggle.type = "button";
+    toggle.className = "control-bloque-gap-toggle";
+    toggle.textContent = "+ Insertar aquí";
+    toggle.addEventListener("click", () => { indiceMenuAbierto = indice; renderBloques(); });
+    hueco.appendChild(toggle);
+  }
+  return hueco;
+}
+
 function renderBloques() {
   bloquesEditor.innerHTML = "";
+  bloquesEditor.appendChild(renderHueco(0));
   bloques.forEach((bloque, i) => {
     const fila = document.createElement("div");
     fila.className = "control-bloque";
@@ -130,6 +182,7 @@ function renderBloques() {
     fila.appendChild(controles);
 
     bloquesEditor.appendChild(fila);
+    bloquesEditor.appendChild(renderHueco(i + 1));
   });
 }
 renderBloques();
@@ -144,10 +197,16 @@ document.getElementById("agregarImagenBtn").addEventListener("click", () => inpu
 inputImagen.addEventListener("change", async () => {
   const archivos = [...inputImagen.files];
   const fallidos = [];
+  // Si se abrió el selector desde un hueco ("+ Insertar aquí"), las
+  // imágenes quedan ahí en vez de siempre al final de la lista.
+  let destino = indiceInsertarImagen ?? bloques.length;
+  indiceInsertarImagen = null;
+  indiceMenuAbierto = null;
   for (const archivo of archivos) {
     try {
       const { blob, previewUrl } = await redimensionarImagen(archivo);
-      bloques.push({ tipo: "imagen", blob, previewUrl });
+      bloques.splice(destino, 0, { tipo: "imagen", blob, previewUrl });
+      destino++;
     } catch (err) {
       // Una imagen que el navegador no puede leer (ej. .HEIC de iPhone) no
       // debe bloquear las demás — se avisa cuál falló y se sigue con el resto.
