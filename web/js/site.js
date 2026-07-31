@@ -60,15 +60,17 @@ document.querySelectorAll(".servicio-panel").forEach((panel) => {
 // Galería "Nuestra historia en imágenes" con lightbox (página Corporativo):
 // clic en una foto abre la versión grande, con flechas/teclado para navegar
 // entre todas sin cerrar.
-const historiaItems = document.querySelectorAll(".historia-item");
+const historiaItems = Array.from(document.querySelectorAll(".historia-item"));
 const historiaLightbox = document.getElementById("historia-lightbox");
+const historiaFiltros = document.querySelectorAll(".historia-filtro");
 if (historiaItems.length && historiaLightbox) {
   const imgGrande = historiaLightbox.querySelector("img");
+  let itemsVisibles = historiaItems;
   let indiceActual = 0;
 
   const mostrar = (indice) => {
-    indiceActual = (indice + historiaItems.length) % historiaItems.length;
-    imgGrande.src = historiaItems[indiceActual].dataset.full;
+    indiceActual = (indice + itemsVisibles.length) % itemsVisibles.length;
+    imgGrande.src = itemsVisibles[indiceActual].dataset.full;
   };
   const abrir = (indice) => {
     mostrar(indice);
@@ -79,9 +81,27 @@ if (historiaItems.length && historiaLightbox) {
     imgGrande.src = "";
   };
 
-  historiaItems.forEach((item, indice) => {
-    item.addEventListener("click", () => abrir(indice));
+  historiaItems.forEach((item) => {
+    item.addEventListener("click", () => {
+      const indice = itemsVisibles.indexOf(item);
+      if (indice !== -1) abrir(indice);
+    });
   });
+
+  // Filtro por línea de servicio: oculta las fotos que no correspondan a
+  // la línea elegida y recalcula el set sobre el que navega el lightbox.
+  historiaFiltros.forEach((boton) => {
+    boton.addEventListener("click", () => {
+      const linea = boton.dataset.filtro;
+      historiaFiltros.forEach((b) => b.classList.remove("activo"));
+      boton.classList.add("activo");
+      historiaItems.forEach((item) => {
+        item.hidden = linea !== "todas" && item.dataset.linea !== linea;
+      });
+      itemsVisibles = historiaItems.filter((item) => !item.hidden);
+    });
+  });
+
   historiaLightbox.querySelector(".historia-lightbox-cerrar").addEventListener("click", cerrar);
   historiaLightbox.querySelector(".historia-lightbox-anterior").addEventListener("click", () => mostrar(indiceActual - 1));
   historiaLightbox.querySelector(".historia-lightbox-siguiente").addEventListener("click", () => mostrar(indiceActual + 1));
