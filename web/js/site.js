@@ -57,6 +57,45 @@ document.querySelectorAll(".servicio-panel").forEach((panel) => {
   });
 });
 
+// Galería "Nuestra historia en imágenes" con lightbox (página Corporativo):
+// clic en una foto abre la versión grande, con flechas/teclado para navegar
+// entre todas sin cerrar.
+const historiaItems = document.querySelectorAll(".historia-item");
+const historiaLightbox = document.getElementById("historia-lightbox");
+if (historiaItems.length && historiaLightbox) {
+  const imgGrande = historiaLightbox.querySelector("img");
+  let indiceActual = 0;
+
+  const mostrar = (indice) => {
+    indiceActual = (indice + historiaItems.length) % historiaItems.length;
+    imgGrande.src = historiaItems[indiceActual].dataset.full;
+  };
+  const abrir = (indice) => {
+    mostrar(indice);
+    historiaLightbox.classList.add("abierta");
+  };
+  const cerrar = () => {
+    historiaLightbox.classList.remove("abierta");
+    imgGrande.src = "";
+  };
+
+  historiaItems.forEach((item, indice) => {
+    item.addEventListener("click", () => abrir(indice));
+  });
+  historiaLightbox.querySelector(".historia-lightbox-cerrar").addEventListener("click", cerrar);
+  historiaLightbox.querySelector(".historia-lightbox-anterior").addEventListener("click", () => mostrar(indiceActual - 1));
+  historiaLightbox.querySelector(".historia-lightbox-siguiente").addEventListener("click", () => mostrar(indiceActual + 1));
+  historiaLightbox.addEventListener("click", (evento) => {
+    if (evento.target === historiaLightbox) cerrar();
+  });
+  document.addEventListener("keydown", (evento) => {
+    if (!historiaLightbox.classList.contains("abierta")) return;
+    if (evento.key === "Escape") cerrar();
+    if (evento.key === "ArrowLeft") mostrar(indiceActual - 1);
+    if (evento.key === "ArrowRight") mostrar(indiceActual + 1);
+  });
+}
+
 // Acordeón de Política/Objetivos/Alcance SGI-HSEQ (página Corporativo): un
 // clic en el encabezado despliega/colapsa esa sección, para no dejar todo
 // el texto de cumplimiento desplegado de una vez como un muro plano.

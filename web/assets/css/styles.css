@@ -567,6 +567,59 @@ nav.main-nav a.active {
 .valor-icono img { width: 58px; height: 58px; border-radius: 50%; object-fit: cover; border: 3px solid var(--cinco-amber); box-shadow: var(--shadow); }
 .valor-nombre { font-size: 13.5px; font-weight: 600; color: var(--text); }
 
+/* ---- galería "Nuestra historia en imágenes" (Corporativo) ---- */
+/* masonry sin JS: columns intenta 4, pero nunca más angosto que 220px por
+   columna, así que en pantallas chicas baja sola a 2-3-1 columnas. */
+.stats-card-standalone + .section-header { margin-top: 48px; }
+.historia-galeria { columns: 4 220px; column-gap: 14px; margin-top: 8px; }
+.historia-galeria + .cta-band { margin: 40px 0 12px; }
+.historia-item {
+  display: block; width: 100%; margin: 0 0 14px; break-inside: avoid;
+  border: none; background: none; padding: 0; cursor: pointer;
+  border-radius: var(--radius); overflow: hidden; position: relative;
+  box-shadow: var(--shadow);
+}
+.historia-item img { display: block; width: 100%; height: auto; transition: transform 0.35s ease; }
+.historia-item:hover img { transform: scale(1.06); }
+.historia-item::after {
+  content: "\26A1"; position: absolute; top: 10px; right: 10px;
+  width: 30px; height: 30px; border-radius: 50%;
+  background: rgba(18, 22, 29, 0.55); color: var(--cinco-amber);
+  display: flex; align-items: center; justify-content: center;
+  font-size: 14px; opacity: 0; transition: opacity 0.25s ease;
+}
+.historia-item:hover::after { opacity: 1; }
+
+.historia-lightbox {
+  position: fixed; inset: 0; z-index: 999;
+  background: rgba(10, 12, 15, 0.92);
+  display: flex; align-items: center; justify-content: center;
+  opacity: 0; pointer-events: none; transition: opacity 0.25s ease;
+}
+.historia-lightbox.abierta { opacity: 1; pointer-events: auto; }
+.historia-lightbox img {
+  max-width: 88vw; max-height: 82vh; border-radius: 10px; box-shadow: var(--shadow-lg);
+}
+.historia-lightbox-cerrar,
+.historia-lightbox-anterior,
+.historia-lightbox-siguiente {
+  position: absolute; border: none; background: rgba(255, 255, 255, 0.12);
+  color: #fff; cursor: pointer; border-radius: 50%;
+  display: flex; align-items: center; justify-content: center;
+  font-size: 20px; transition: background 0.2s ease;
+}
+.historia-lightbox-cerrar:hover,
+.historia-lightbox-anterior:hover,
+.historia-lightbox-siguiente:hover { background: rgba(255, 255, 255, 0.25); }
+.historia-lightbox-cerrar { top: 20px; right: 24px; width: 42px; height: 42px; }
+.historia-lightbox-anterior,
+.historia-lightbox-siguiente { top: 50%; transform: translateY(-50%); width: 50px; height: 50px; }
+.historia-lightbox-anterior { left: 16px; }
+.historia-lightbox-siguiente { right: 16px; }
+@media (max-width: 640px) {
+  .historia-lightbox-anterior, .historia-lightbox-siguiente { width: 40px; height: 40px; font-size: 16px; }
+}
+
 /* Franja de cifras reutilizando .stats-card (Inicio) pero sin el margen
    negativo pensado para flotar sobre el hero — aquí va en flujo normal. */
 .stats-card.stats-card-standalone { margin: 4px 0 8px; }
