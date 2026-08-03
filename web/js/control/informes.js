@@ -6,6 +6,7 @@ import {
 import { ref, uploadBytes, getDownloadURL } from "https://www.gstatic.com/firebasejs/10.7.1/firebase-storage.js";
 import { auth, db, storage, requireAuth, obtenerPerfil } from "./firebase-control.js";
 import { generarInformePDF } from "./informes-pdf.js";
+import { descargarInformeDocx } from "./informes-docx.js";
 import { registrarDocumentoSGC } from "./documentos-sgc.js";
 import { truncar } from "./texto.js";
 import { crearCampoTextoRico } from "./texto-rico.js";
@@ -21,7 +22,17 @@ const TIPO_SGC_INFORMES = "INF";
 
 const TIPO_LABEL = {
   gestion: "Informe de gestión", mediciones: "Informe de mediciones",
-  consultoria: "Informe de consultoría", interventoria: "Informe de interventoría", otro: "Otro"
+  consultoria: "Informe de consultoría", interventoria: "Informe de interventoría",
+  obra: "Informe de obra", capacitacion: "Informe de capacitación", otro: "Otro"
+};
+
+// Cada tipo de informe tiene su propio prefijo de radicado y su propio
+// contador (contadores/informe_{PREFIJO}_{año}) — antes todos compartían
+// "IG" y un único contador, mezclando mediciones/consultoría/etc. bajo el
+// mismo código. "otro" se deja bajo IG por ser el catch-all histórico.
+const PREFIJO_TIPO = {
+  gestion: "IG", mediciones: "IM", consultoria: "IC",
+  interventoria: "II", obra: "IO", capacitacion: "ICAP", otro: "IG"
 };
 
 const tbody = document.getElementById("listaInformes");
@@ -72,8 +83,40 @@ function filasParaEditar(filas) {
 // bloque porque un informe necesita índice (los títulos) y tablas. ----
 let bloques = [];
 
+// ---- deshacer: pila de snapshots de "bloques" tomados justo antes de
+// cada acción que agrega/quita/mueve un bloque (o fila/columna de tabla).
+// No cubre cada tecla escrita en un texto (sería spam de snapshots que no
+// aporta — un texto mal escrito se corrige retipeando), solo los cambios
+// estructurales que son fáciles de disparar por error y difíciles de
+// notar/revertir a mano (p. ej. "Quitar" el bloque equivocado). ----
+let historialBloques = [];
+const MAX_HISTORIAL_BLOQUES = 20;
+const deshacerBtn = document.getElementById("deshacerBloqueBtn");
+
+function clonarBloques(lista) {
+  return lista.map((b) => (b.tipo === "tabla" ? { ...b, filas: b.filas.map((fila) => [...fila]) } : { ...b }));
+}
+
+function guardarHistorialBloques() {
+  historialBloques.push(clonarBloques(bloques));
+  if (historialBloques.length > MAX_HISTORIAL_BLOQUES) historialBloques.shift();
+  deshacerBtn.disabled = false;
+}
+
+function reiniciarHistorialBloques() {
+  historialBloques = [];
+  deshacerBtn.disabled = true;
+}
+
+deshacerBtn.addEventListener("click", () => {
+  if (!historialBloques.length) return;
+  bloques = historialBloques.pop();
+  renderBloques();
+  deshacerBtn.disabled = historialBloques.length === 0;
+});
+
 function nuevaTabla() {
-  return { tipo: "tabla", titulo: "", filas: [["", ""], ["", ""]] };
+  return { tipo: "tabla", titulo: "", nota: "", filas: [["", ""], ["", ""]] };
 }
 
 function redimensionarImagen(file) {
@@ -108,11 +151,13 @@ function redimensionarImagen(file) {
 function moverBloque(indice, direccion) {
   const destino = indice + direccion;
   if (destino < 0 || destino >= bloques.length) return;
+  guardarHistorialBloques();
   [bloques[indice], bloques[destino]] = [bloques[destino], bloques[indice]];
   renderBloques();
 }
 
 function quitarBloque(indice) {
+  guardarHistorialBloques();
   bloques.splice(indice, 1);
   renderBloques();
 }
@@ -147,6 +192,7 @@ function insertarBloqueEn(indice, tipo) {
     inputImagen.click();
     return;
   }
+  guardarHistorialBloques();
   bloques.splice(indice, 0, crearBloquePorTipo(tipo));
   renderBloques();
 }
@@ -161,7 +207,8 @@ function renderHueco(indice) {
     const btn = document.createElement("button");
     btn.type = "button";
     btn.className = "control-btn-mini";
-    btn.textContent = etiqueta;
+    btn.textContent = "+ " + etiqueta;
+    btn.title = "Insertar aquí";
     btn.addEventListener("click", () => insertarBloqueEn(indice, tipo));
     hueco.appendChild(btn);
   });
@@ -199,6 +246,13 @@ function renderBloques() {
     } else if (bloque.tipo === "tabla") {
       contenido.appendChild(renderTablaEditor(bloque));
     } else {
+      const nombre = document.createElement("input");
+      nombre.type = "text";
+      nombre.maxLength = 200;
+      nombre.placeholder = "Nombre de la gráfica (aparece arriba, centrado, y en la Lista de gráficos)";
+      nombre.value = bloque.nombre || "";
+      nombre.addEventListener("input", () => { bloque.nombre = nombre.value; });
+      contenido.appendChild(nombre);
       const img = document.createElement("img");
       img.src = bloque.previewUrl;
       img.className = "control-bloque-imagen";
@@ -206,7 +260,7 @@ function renderBloques() {
       const pie = document.createElement("input");
       pie.type = "text";
       pie.maxLength = 200;
-      pie.placeholder = "Pie de foto (aparece en la Lista de gráficos)";
+      pie.placeholder = "Pie de página (aparece abajo, alineado a la derecha)";
       pie.value = bloque.pieDeFoto || "";
       pie.addEventListener("input", () => { bloque.pieDeFoto = pie.value; });
       contenido.appendChild(pie);
@@ -251,7 +305,7 @@ function renderTablaEditor(bloque) {
   const tituloInput = document.createElement("input");
   tituloInput.type = "text";
   tituloInput.maxLength = 200;
-  tituloInput.placeholder = "Título de la tabla (aparece en la Lista de tablas)";
+  tituloInput.placeholder = "Título de la tabla (aparece arriba, centrado, y en la Lista de tablas)";
   tituloInput.value = bloque.titulo || "";
   tituloInput.addEventListener("input", () => { bloque.titulo = tituloInput.value; });
   cont.appendChild(tituloInput);
@@ -281,6 +335,7 @@ function renderTablaEditor(bloque) {
   agregarFila.className = "control-btn-mini";
   agregarFila.textContent = "+ Fila";
   agregarFila.addEventListener("click", () => {
+    guardarHistorialBloques();
     bloque.filas.push(bloque.filas[0].map(() => ""));
     renderBloques();
   });
@@ -290,13 +345,14 @@ function renderTablaEditor(bloque) {
   quitarFila.textContent = "- Fila";
   quitarFila.disabled = bloque.filas.length <= 1;
   quitarFila.addEventListener("click", () => {
-    if (bloque.filas.length > 1) { bloque.filas.pop(); renderBloques(); }
+    if (bloque.filas.length > 1) { guardarHistorialBloques(); bloque.filas.pop(); renderBloques(); }
   });
   const agregarCol = document.createElement("button");
   agregarCol.type = "button";
   agregarCol.className = "control-btn-mini";
   agregarCol.textContent = "+ Columna";
   agregarCol.addEventListener("click", () => {
+    guardarHistorialBloques();
     bloque.filas.forEach((fila) => fila.push(""));
     renderBloques();
   });
@@ -306,19 +362,27 @@ function renderTablaEditor(bloque) {
   quitarCol.textContent = "- Columna";
   quitarCol.disabled = bloque.filas[0].length <= 1;
   quitarCol.addEventListener("click", () => {
-    if (bloque.filas[0].length > 1) { bloque.filas.forEach((fila) => fila.pop()); renderBloques(); }
+    if (bloque.filas[0].length > 1) { guardarHistorialBloques(); bloque.filas.forEach((fila) => fila.pop()); renderBloques(); }
   });
   botones.append(agregarFila, quitarFila, agregarCol, quitarCol);
   cont.appendChild(botones);
 
+  const notaInput = document.createElement("input");
+  notaInput.type = "text";
+  notaInput.maxLength = 200;
+  notaInput.placeholder = "Nota / pie de tabla (aparece abajo, alineada a la derecha)";
+  notaInput.value = bloque.nota || "";
+  notaInput.addEventListener("input", () => { bloque.nota = notaInput.value; });
+  cont.appendChild(notaInput);
+
   return cont;
 }
 
-document.getElementById("agregarTitulo1Btn").addEventListener("click", () => { bloques.push({ tipo: "titulo1", texto: "" }); renderBloques(); });
-document.getElementById("agregarTitulo2Btn").addEventListener("click", () => { bloques.push({ tipo: "titulo2", texto: "" }); renderBloques(); });
-document.getElementById("agregarTitulo3Btn").addEventListener("click", () => { bloques.push({ tipo: "titulo3", texto: "" }); renderBloques(); });
-document.getElementById("agregarParrafoBtn").addEventListener("click", () => { bloques.push({ tipo: "parrafo", texto: "" }); renderBloques(); });
-document.getElementById("agregarTablaBtn").addEventListener("click", () => { bloques.push(nuevaTabla()); renderBloques(); });
+document.getElementById("agregarTitulo1Btn").addEventListener("click", () => { guardarHistorialBloques(); bloques.push({ tipo: "titulo1", texto: "" }); renderBloques(); });
+document.getElementById("agregarTitulo2Btn").addEventListener("click", () => { guardarHistorialBloques(); bloques.push({ tipo: "titulo2", texto: "" }); renderBloques(); });
+document.getElementById("agregarTitulo3Btn").addEventListener("click", () => { guardarHistorialBloques(); bloques.push({ tipo: "titulo3", texto: "" }); renderBloques(); });
+document.getElementById("agregarParrafoBtn").addEventListener("click", () => { guardarHistorialBloques(); bloques.push({ tipo: "parrafo", texto: "" }); renderBloques(); });
+document.getElementById("agregarTablaBtn").addEventListener("click", () => { guardarHistorialBloques(); bloques.push(nuevaTabla()); renderBloques(); });
 document.getElementById("agregarImagenBtn").addEventListener("click", () => inputImagen.click());
 
 inputImagen.addEventListener("change", async () => {
@@ -328,10 +392,11 @@ inputImagen.addEventListener("change", async () => {
   // imágenes quedan ahí en vez de siempre al final de la lista.
   let destino = indiceInsertarImagen ?? bloques.length;
   indiceInsertarImagen = null;
+  if (archivos.length) guardarHistorialBloques();
   for (const archivo of archivos) {
     try {
       const { blob, previewUrl } = await redimensionarImagen(archivo);
-      bloques.splice(destino, 0, { tipo: "imagen", blob, previewUrl, pieDeFoto: "" });
+      bloques.splice(destino, 0, { tipo: "imagen", blob, previewUrl, nombre: "", pieDeFoto: "" });
       destino++;
     } catch (err) {
       fallidos.push(archivo.name);
@@ -350,6 +415,7 @@ inputImagen.addEventListener("change", async () => {
 function limpiarFormulario() {
   form.reset();
   bloques = [];
+  reiniciarHistorialBloques();
   renderBloques();
   informeIdEnEdicion.value = "";
   guardarBtn.textContent = "Guardar";
@@ -416,6 +482,7 @@ document.getElementById("importarJsonBtn").addEventListener("click", () => {
   if (datos.firmaNombre) document.getElementById("firmaNombre").value = datos.firmaNombre;
   if (datos.firmaCargo) document.getElementById("firmaCargo").value = datos.firmaCargo;
   bloques = datos.bloques.map((b) => (b.tipo === "tabla" ? { ...b } : { ...b, texto: b.texto || "" }));
+  reiniciarHistorialBloques();
   renderBloques();
   document.getElementById("importarJsonTexto").value = "";
   document.getElementById("importarJsonTexto").closest("details").open = false;
@@ -444,6 +511,7 @@ function cargarEnFormulario(informe, paraEditar) {
   bloques = (informe.bloques || []).map((b) => (
     b.tipo === "tabla" ? { ...b, filas: filasParaEditar(b.filas || []) } : { ...b }
   ));
+  reiniciarHistorialBloques();
   renderBloques();
   const parteSGI = document.getElementById("parteSGI");
   if (paraEditar) {
@@ -501,7 +569,20 @@ function renderTabla(informes, esGestor) {
       }
     });
 
-    tdAccion.append(btnPdf);
+    const btnWord = document.createElement("button");
+    btnWord.type = "button";
+    btnWord.className = "control-btn-mini";
+    btnWord.textContent = "Word";
+    btnWord.addEventListener("click", async () => {
+      btnWord.disabled = true;
+      try {
+        await descargarInformeDocx(inf);
+      } finally {
+        btnWord.disabled = false;
+      }
+    });
+
+    tdAccion.append(btnPdf, btnWord);
 
     if (esGestor) {
       const btnEditar = document.createElement("button");
@@ -615,9 +696,9 @@ requireAuth(async (user) => {
           const archivoRef = ref(storage, `informes/${idInforme}/${n}.jpg`);
           await uploadBytes(archivoRef, bloque.blob);
           const url = await getDownloadURL(archivoRef);
-          bloquesFinal.push({ tipo: "imagen", url, pieDeFoto: bloque.pieDeFoto || "" });
+          bloquesFinal.push({ tipo: "imagen", url, nombre: bloque.nombre || "", pieDeFoto: bloque.pieDeFoto || "" });
         } else if (bloque.tipo === "imagen") {
-          bloquesFinal.push({ tipo: "imagen", url: bloque.url, pieDeFoto: bloque.pieDeFoto || "" });
+          bloquesFinal.push({ tipo: "imagen", url: bloque.url, nombre: bloque.nombre || "", pieDeFoto: bloque.pieDeFoto || "" });
         } else if (bloque.tipo === "tabla") {
           bloquesFinal.push({ ...bloque, filas: filasParaGuardar(bloque.filas) });
         } else {
@@ -655,13 +736,27 @@ requireAuth(async (user) => {
         informeFinal = { id: idInforme, ...snap.data() };
       } else {
         const informeRef = doc(db, "informes", idInforme);
-        const contadorRef = doc(db, "contadores", `informe_${new Date().getFullYear()}`);
+        const anio = new Date().getFullYear();
+        const prefijo = PREFIJO_TIPO[datosBase.tipoInforme] || "IG";
+        const contadorRef = doc(db, "contadores", `informe_${prefijo}_${anio}`);
         let radicado;
         await runTransaction(db, async (tx) => {
           const contadorSnap = await tx.get(contadorRef);
-          const siguiente = contadorSnap.exists() ? contadorSnap.data().siguiente : 1;
-          const anio = new Date().getFullYear();
-          radicado = `IG-${anio}-${String(siguiente).padStart(3, "0")}`;
+          let siguiente;
+          if (contadorSnap.exists()) {
+            siguiente = contadorSnap.data().siguiente;
+          } else if (prefijo === "IG") {
+            // Migración: hasta ahora todos los informes (incluyendo los
+            // mal codificados como IG por ser mediciones/etc.) compartían
+            // este contador único. Se continúa desde ahí para no repetir
+            // radicados IG ya usados.
+            const legacyRef = doc(db, "contadores", `informe_${anio}`);
+            const legacySnap = await tx.get(legacyRef);
+            siguiente = legacySnap.exists() ? legacySnap.data().siguiente : 1;
+          } else {
+            siguiente = 1;
+          }
+          radicado = `${prefijo}-${anio}-${String(siguiente).padStart(3, "0")}`;
           tx.set(contadorRef, { siguiente: siguiente + 1 });
           tx.set(informeRef, {
             ...datosBase, radicado, anio, consecutivo: siguiente,
@@ -735,7 +830,7 @@ requireAuth(async (user) => {
       const contratoId = selectContrato.value;
       const contrato = contratoId ? contratosPorId[contratoId] : null;
       const bloquesPreview = bloques.map((b) => {
-        if (b.tipo === "imagen") return { tipo: "imagen", url: b.url || URL.createObjectURL(b.blob), pieDeFoto: b.pieDeFoto || "" };
+        if (b.tipo === "imagen") return { tipo: "imagen", url: b.url || URL.createObjectURL(b.blob), nombre: b.nombre || "", pieDeFoto: b.pieDeFoto || "" };
         if (b.tipo === "tabla") return { ...b, filas: filasParaGuardar(b.filas) };
         return b;
       });

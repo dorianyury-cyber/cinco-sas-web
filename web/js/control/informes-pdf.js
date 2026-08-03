@@ -39,7 +39,8 @@ const VERSION_FORMATO = "1";
 
 const TIPO_LABEL = {
   gestion: "Informe de gestión", mediciones: "Informe de mediciones",
-  consultoria: "Informe de consultoría", interventoria: "Informe de interventoría", otro: "Informe"
+  consultoria: "Informe de consultoría", interventoria: "Informe de interventoría",
+  obra: "Informe de obra", capacitacion: "Informe de capacitación", otro: "Informe"
 };
 
 function cargarImagenComoDataURL(url, colorFondo = "#ffffff") {
@@ -212,6 +213,20 @@ export async function generarInformePDF(informe) {
   async function dibujarImagen(bloque) {
     try {
       const img = await cargarImagenComoDataURL(bloque.url);
+
+      // Nombre arriba, centrado (mismo criterio que el título de una
+      // tabla) — la Lista de gráficos del índice usa este mismo texto.
+      const numero = graficosEntradas.length + 1;
+      const nombre = `Figura ${numero}. ${bloque.nombre || ""}`.trim();
+      saltoSiNoCabe(lineHeight * 2);
+      doc.setFont("helvetica", "bold");
+      doc.setFontSize(9.5);
+      doc.setTextColor(...NAVY);
+      const lineasNombre = doc.splitTextToSize(nombre, anchoUtil);
+      doc.text(lineasNombre, anchoPagina / 2, y, { align: "center" });
+      y += lineasNombre.length * lineHeight;
+      graficosEntradas.push({ texto: bloque.nombre || `Figura ${numero}`, pagina: doc.internal.getNumberOfPages() });
+
       let ancho = anchoUtil * 0.85;
       let alto = ancho * (img.alto / img.ancho);
       const altoMaximo = 100;
@@ -220,15 +235,17 @@ export async function generarInformePDF(informe) {
       const x = margenX + (anchoUtil - ancho) / 2;
       doc.addImage(img.dataUrl, "PNG", x, y, ancho, alto);
       y += alto + 3;
-      const numero = graficosEntradas.length + 1;
-      const pie = `Figura ${numero}. ${bloque.pieDeFoto || ""}`.trim();
-      doc.setFont("helvetica", "italic");
-      doc.setFontSize(9);
-      doc.setTextColor(...TEXT_MUTED);
-      const lineasPie = doc.splitTextToSize(pie, anchoUtil);
-      doc.text(lineasPie, anchoPagina / 2, y, { align: "center" });
-      y += lineasPie.length * 4.5 + 5;
-      graficosEntradas.push({ texto: bloque.pieDeFoto || `Figura ${numero}`, pagina: doc.internal.getNumberOfPages() });
+
+      // Pie de página de la gráfica, abajo a la derecha.
+      if (bloque.pieDeFoto) {
+        doc.setFont("helvetica", "italic");
+        doc.setFontSize(9);
+        doc.setTextColor(...TEXT_MUTED);
+        const lineasPie = doc.splitTextToSize(bloque.pieDeFoto, anchoUtil);
+        doc.text(lineasPie, anchoPagina - margenX, y, { align: "right" });
+        y += lineasPie.length * 4.5;
+      }
+      y += 6;
     } catch (e) {
       saltoSiNoCabe(14);
       doc.setDrawColor(214, 69, 69);
@@ -255,8 +272,9 @@ export async function generarInformePDF(informe) {
     doc.setFont("helvetica", "bold");
     doc.setFontSize(9.5);
     doc.setTextColor(...NAVY);
-    doc.text(tituloTexto, margenX, y);
-    y += lineHeight;
+    const lineasTitulo = doc.splitTextToSize(tituloTexto, anchoUtil);
+    doc.text(lineasTitulo, anchoPagina / 2, y, { align: "center" });
+    y += lineasTitulo.length * lineHeight;
     tablasEntradas.push({ texto: bloque.titulo || `Tabla ${numero}`, pagina: doc.internal.getNumberOfPages() });
 
     const padding = 2.2;
@@ -289,6 +307,18 @@ export async function generarInformePDF(informe) {
       });
       y += alturaFila;
     });
+
+    // Nota/pie de la tabla, abajo a la derecha.
+    if (bloque.nota) {
+      y += 2;
+      doc.setFont("helvetica", "italic");
+      doc.setFontSize(9);
+      doc.setTextColor(...TEXT_MUTED);
+      const lineasNota = doc.splitTextToSize(bloque.nota, anchoUtil);
+      saltoSiNoCabe(lineasNota.length * 4.5);
+      doc.text(lineasNota, anchoPagina - margenX, y, { align: "right" });
+      y += lineasNota.length * 4.5;
+    }
     y += 6;
   }
 

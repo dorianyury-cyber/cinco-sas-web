@@ -1335,6 +1335,8 @@ tr.control-fila-destacada { background: rgba(254, 178, 9, 0.25); transition: bac
 @media (prefers-color-scheme: dark) { .control-btn-mini { color: #fff; } }
 
 /* ---- editor de bloques (texto/imagen) de una carta ---- */
+.control-bloques-header { display: flex; align-items: center; justify-content: space-between; gap: 10px; flex-wrap: wrap; }
+form.pqr-form .control-bloques-header button { width: auto; margin-top: 0; }
 .control-bloques { display: flex; flex-direction: column; gap: 10px; margin-bottom: 4px; }
 .control-bloque {
   display: flex;

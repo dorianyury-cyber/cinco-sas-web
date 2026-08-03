@@ -37,7 +37,7 @@
 
   <section class="section">
     <div class="container">
-      <p id="soloGestorAviso" class="text-muted oculto">Solo un administrador o coadministrador puede crear, editar o borrar informes. Puedes ver el listado y descargar el PDF, pero no modificarlos.</p>
+      <p id="soloGestorAviso" class="text-muted oculto">Solo un administrador o coadministrador puede crear, editar o borrar informes. Puedes ver el listado y descargar el PDF/Word, pero no modificarlos.</p>
 
       <details class="card control-nuevo" id="nuevoInformeDetails">
         <summary>+ Nuevo informe</summary>
@@ -60,6 +60,8 @@
             <option value="mediciones">Informe de mediciones</option>
             <option value="consultoria">Informe de consultoría</option>
             <option value="interventoria">Informe de interventoría</option>
+            <option value="obra">Informe de obra</option>
+            <option value="capacitacion">Informe de capacitación</option>
             <option value="otro">Otro</option>
           </select>
 
@@ -80,7 +82,10 @@
           <label for="contratoRelacionado">Contrato relacionado (opcional — trae los datos del contrato/cliente y queda archivado también ahí)</label>
           <select id="contratoRelacionado"><option value="">Ninguno</option></select>
 
-          <label>Cuerpo del informe</label>
+          <div class="control-bloques-header">
+            <label>Cuerpo del informe</label>
+            <button type="button" class="control-btn-mini" id="deshacerBloqueBtn" disabled>↩ Deshacer última acción</button>
+          </div>
           <div id="bloquesEditor" class="control-bloques"></div>
           <div class="control-bloques-botones">
             <button type="button" class="control-btn-mini" id="agregarTitulo1Btn">+ Título 1</button>
@@ -134,6 +139,7 @@
   </section>
 
   <script src="../js/vendor/jspdf.umd.min.js"></script>
+  <script src="../js/vendor/docx.iife.js"></script>
   <script type="module" src="../js/control/informes.js"></script>
 </body>
 </html>
