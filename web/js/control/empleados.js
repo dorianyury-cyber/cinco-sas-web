@@ -196,6 +196,28 @@ function celdaDocumentos(empleado, esAdmin) {
   return td;
 }
 
+// Checkbox que marca a esta persona como aprobadora obligatoria de todo
+// contrato nuevo (Administradora, Gerente...) — autoguardado, mismo patrón
+// que celdaDocumentos. Ver "Aprobación del contrato" en contrato-detalle.js:
+// cada contrato debe quedar aprobado por TODOS los empleados activos que
+// tengan esto marcado.
+function celdaAprobacion(empleado, esAdmin) {
+  const td = celda("td");
+  const label = document.createElement("label");
+  label.className = "control-check-inline";
+  const check = document.createElement("input");
+  check.type = "checkbox";
+  check.checked = !!empleado.aprobadorContratos;
+  check.disabled = !esAdmin;
+  check.addEventListener("change", () => {
+    updateDoc(doc(db, "empleados", empleado.id), { aprobadorContratos: check.checked, actualizadoEn: serverTimestamp() });
+  });
+  label.appendChild(check);
+  label.appendChild(document.createTextNode("Requerido"));
+  td.appendChild(label);
+  return td;
+}
+
 function renderTabla(empleados, esAdmin) {
   tbody.innerHTML = "";
   sinEmpleados.classList.toggle("oculto", empleados.length > 0);
@@ -240,6 +262,7 @@ function renderTabla(empleados, esAdmin) {
 
     fila.appendChild(celdaOfertas(e, esAdmin));
     fila.appendChild(celdaDocumentos(e, esAdmin));
+    fila.appendChild(celdaAprobacion(e, esAdmin));
 
     tbody.appendChild(fila);
   });
@@ -272,6 +295,7 @@ requireAuth(async (user) => {
     const cargo = document.getElementById("cargo").value.trim();
     const autorizadoOfertas = document.getElementById("autorizadoOfertas").checked;
     const gestionaDocumentos = document.getElementById("gestionaDocumentos").checked;
+    const aprobadorContratos = document.getElementById("aprobadorContratos").checked;
     const rol = selectRolNuevo.value;
     const campo = campoDeRol(rol);
     const seleccionadas = [...camposLista.querySelectorAll(".campo-permiso-check:checked")].map((c) => c.value);
@@ -283,7 +307,7 @@ requireAuth(async (user) => {
         throw new Error("Ya existe un empleado registrado con ese correo.");
       }
       await setDoc(empleadoRef, {
-        nombre, email, cargo, rol, estado: "activo", autorizadoOfertas, gestionaDocumentos,
+        nombre, email, cargo, rol, estado: "activo", autorizadoOfertas, gestionaDocumentos, aprobadorContratos,
         ...(campo ? { [campo]: seleccionadas } : {}),
         creadoPor: user.email, creadoEn: serverTimestamp(),
         actualizadoEn: serverTimestamp()

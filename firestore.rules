@@ -55,6 +55,22 @@ service cloud.firestore {
     function gestionaDocumentos() {
       return esAdmin() || (esEmpleadoActivo() && empleadoDoc().get('gestionaDocumentos', false) == true);
     }
+    // Permiso aparte del rol de contratos: quién debe leer y aprobar TODO
+    // contrato nuevo (Administradora, Gerente...), otorgado desde Empleados
+    // (empleados/{email}.aprobadorContratos) — sin importar si esa persona
+    // está o no en el "equipo" de ese contrato puntual, por eso necesita
+    // poder leer cualquier contrato (ver "allow read" abajo).
+    function esAprobadorContratos() {
+      return esEmpleadoActivo() && empleadoDoc().get('aprobadorContratos', false) == true;
+    }
+    // Un aprobador sin rol de gestor solo puede tocar SU PROPIA entrada
+    // dentro de contratos/{id}.aprobaciones (mapa por email) — no puede
+    // marcar la aprobación de otro ni tocar ningún otro campo del contrato.
+    function soloTocaSuPropiaAprobacion() {
+      let antes = resource.data.get('aprobaciones', {});
+      let despues = request.resource.data.get('aprobaciones', {});
+      return despues.diff(antes).affectedKeys().hasOnly([request.auth.token.email]);
+    }
 
     // Directorio de empleados: cualquier autenticado lo lee (para elegir a
     // quién asignar a un contrato), solo un admin lo administra —
@@ -66,13 +82,23 @@ service cloud.firestore {
     }
 
     match /contratos/{contratoId} {
-      allow read: if esGestor() || enEquipo(resource.data);
+      allow read: if esGestor() || enEquipo(resource.data) || esAprobadorContratos();
       allow create: if esGestor();
       allow delete: if esAdmin();
-      allow update: if esGestor();
+      // Un aprobador (Administradora, Gerente...) sin rol de gestor puede
+      // marcar/quitar SU aprobación aunque no pueda editar el resto del
+      // contrato — ver esAprobadorContratos() y soloTocaSuPropiaAprobacion().
+      allow update: if esGestor()
+        || (esAprobadorContratos()
+            && request.resource.data.diff(resource.data).affectedKeys().hasOnly(['aprobaciones', 'actualizadoEn'])
+            && soloTocaSuPropiaAprobacion());
 
       match /items/{itemId} {
-        allow read: if esGestor() || enEquipo(get(/databases/$(database)/documents/contratos/$(contratoId)).data);
+        // esAprobadorContratos() incluido en la lectura porque
+        // contrato-detalle.js carga el checklist para cualquiera que abra la
+        // ficha del contrato, incluidos los aprobadores que no están en el
+        // equipo ni son gestores.
+        allow read: if esGestor() || enEquipo(get(/databases/$(database)/documents/contratos/$(contratoId)).data) || esAprobadorContratos();
         allow write: if esGestor()
           || (esApoyo()
               && enEquipo(get(/databases/$(database)/documents/contratos/$(contratoId)).data)
@@ -85,7 +111,11 @@ service cloud.firestore {
       // contrato para leer; para crear/borrar filas, "empleado" queda
       // fuera (no puede archivar documentos), apoyo sí puede.
       match /documentos/{docId} {
-        allow read: if esGestor() || enEquipo(get(/databases/$(database)/documents/contratos/$(contratoId)).data);
+        // Mismo motivo que en items/{itemId}: contrato-detalle.js carga esta
+        // subcolección para cualquiera que abra la ficha, incluidos los
+        // aprobadores que necesitan leer (y no solo aprobar a ciegas) el
+        // documento real del contrato archivado aquí.
+        allow read: if esGestor() || enEquipo(get(/databases/$(database)/documents/contratos/$(contratoId)).data) || esAprobadorContratos();
         allow write: if esGestor()
           || (esApoyo() && enEquipo(get(/databases/$(database)/documents/contratos/$(contratoId)).data));
       }

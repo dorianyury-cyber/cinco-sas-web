@@ -1,7 +1,7 @@
 import { signOut } from "https://www.gstatic.com/firebasejs/10.7.1/firebase-auth.js";
 import {
   collection, doc, setDoc, writeBatch, runTransaction, serverTimestamp,
-  onSnapshot, query, orderBy
+  onSnapshot, query, orderBy, getDocs
 } from "https://www.gstatic.com/firebasejs/10.7.1/firebase-firestore.js";
 import { ref, uploadBytes, getDownloadURL } from "https://www.gstatic.com/firebasejs/10.7.1/firebase-storage.js";
 import { auth, db, storage, requireAuth, obtenerPerfil } from "./firebase-control.js";
@@ -48,7 +48,12 @@ function elemento(tag, opts = {}) {
 
 // Se construye con la API del DOM (no innerHTML) porque nombre/cliente/
 // número los escribe el usuario al crear el contrato.
-function renderContratos(snapshot) {
+//
+// totalAprobadores > 0: hay gente marcada en Empleados como aprobadora
+// obligatoria de contratos — se agrega un badge de un vistazo (sin tener
+// que entrar a cada ficha) para que quien aprueba encuentre rápido los
+// contratos que todavía le faltan.
+function renderContratos(snapshot, totalAprobadores) {
   lista.innerHTML = "";
   sinContratos.classList.toggle("oculto", !snapshot.empty);
   snapshot.forEach((docSnap) => {
@@ -58,6 +63,13 @@ function renderContratos(snapshot) {
     card.href = `contrato.html?id=${docSnap.id}`;
     if (c.codigo) card.appendChild(elemento("span", { class: "control-badge", text: c.codigo }));
     card.appendChild(elemento("span", { class: "pill", text: TIPO_LABEL[c.tipo] || c.tipo }));
+    if (totalAprobadores > 0) {
+      const aprobados = Object.keys(c.aprobaciones || {}).length;
+      card.appendChild(elemento("span", {
+        class: `control-badge${aprobados >= totalAprobadores ? " completo" : ""}`,
+        text: aprobados >= totalAprobadores ? "✅ Aprobado" : `⏳ Aprobación ${aprobados}/${totalAprobadores}`
+      }));
+    }
     card.appendChild(elemento("h3", { text: c.nombre }));
     card.appendChild(elemento("p", { text: c.cliente + (c.numero ? " · " + c.numero : "") }));
     card.appendChild(elemento("p", {
@@ -80,8 +92,13 @@ requireAuth(async (user) => {
   const esGestor = perfil?.estado === "activo" && (perfil?.rol === "admin" || perfil?.rol === "coadmin");
   if (!esGestor) document.getElementById("nuevoContratoDetails").classList.add("oculto");
 
+  const empleadosSnap = await getDocs(collection(db, "empleados"));
+  const totalAprobadores = empleadosSnap.docs
+    .map((d) => d.data())
+    .filter((e) => e.estado === "activo" && e.aprobadorContratos === true).length;
+
   const q = query(collection(db, "contratos"), orderBy("creadoEn", "desc"));
-  onSnapshot(q, renderContratos);
+  onSnapshot(q, (snapshot) => renderContratos(snapshot, totalAprobadores));
 
   form.addEventListener("submit", async (e) => {
     e.preventDefault();

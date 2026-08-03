@@ -75,6 +75,11 @@
             Gestiona el Listado Maestro de Documentos (crear/editar formatos y su código)
           </label>
 
+          <label class="control-check-inline">
+            <input type="checkbox" id="aprobadorContratos">
+            Debe leer y aprobar cada contrato nuevo (ej. Administradora, Gerente)
+          </label>
+
           <button type="submit" class="btn" id="crearEmpleadoBtn">Crear empleado</button>
           <div class="form-alert" id="crearEmpleadoAlert"></div>
         </form>
@@ -91,6 +96,7 @@
             <col class="w-110">
             <col class="w-190">
             <col class="w-130">
+            <col class="w-130">
           </colgroup>
           <thead>
             <tr>
@@ -102,6 +108,7 @@
               <th>Estado</th>
               <th>Ofertas</th>
               <th>Documentos</th>
+              <th>Aprueba contratos</th>
             </tr>
           </thead>
           <tbody id="listaEmpleados"></tbody>

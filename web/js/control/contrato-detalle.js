@@ -1,7 +1,7 @@
 import { signOut } from "https://www.gstatic.com/firebasejs/10.7.1/firebase-auth.js";
 import {
   doc, getDoc, updateDoc, deleteDoc, setDoc, collection, getDocs, onSnapshot,
-  query, orderBy, serverTimestamp, arrayUnion, arrayRemove
+  query, orderBy, serverTimestamp, arrayUnion, arrayRemove, deleteField
 } from "https://www.gstatic.com/firebasejs/10.7.1/firebase-firestore.js";
 import { ref, uploadBytes, getDownloadURL } from "https://www.gstatic.com/firebasejs/10.7.1/firebase-storage.js";
 import { auth, db, storage, requireAuth, obtenerPerfil } from "./firebase-control.js";
@@ -258,15 +258,13 @@ function aplicarBadgeAvance(el, items) {
 // Solo admin/coadmin ven el formulario para agregar/quitar (las reglas de
 // Firestore también lo exigen); el resto del equipo ve la lista en
 // solo lectura.
-async function cargarEquipo(contratoRef, contrato, puedeGestionar) {
+function cargarEquipo(contratoRef, contrato, puedeGestionar, empleados) {
   const lista = document.getElementById("equipoLista");
   const badge = document.getElementById("equipoBadge");
   const form = document.getElementById("agregarEquipoForm");
   const select = document.getElementById("equipoSelect");
   const alertBox = document.getElementById("equipoAlert");
 
-  const empleadosSnap = await getDocs(query(collection(db, "empleados"), orderBy("nombre")));
-  const empleados = empleadosSnap.docs.map((d) => d.data());
   const porEmail = Object.fromEntries(empleados.map((e) => [e.email, e]));
 
   function render() {
@@ -321,6 +319,75 @@ async function cargarEquipo(contratoRef, contrato, puedeGestionar) {
       render();
       alertBox.textContent = "Agregado al equipo.";
       alertBox.className = "form-alert show ok";
+    });
+  }
+
+  render();
+}
+
+// ---- Aprobación del contrato ----
+// Cada empleado activo marcado como aprobador obligatorio (Empleados >
+// "Debe leer y aprobar cada contrato nuevo" — ej. Administradora, Gerente)
+// debe leer y aprobar este contrato. Se guarda en contratos/{id}.aprobaciones,
+// un mapa por email — ver firestore.rules: un aprobador sin rol de gestor
+// (esGestor) solo puede tocar SU PROPIA entrada ahí, nunca la de otro ni el
+// resto del contrato.
+function cargarAprobaciones(contratoRef, contrato, empleados, user) {
+  const lista = document.getElementById("aprobacionLista");
+  const badge = document.getElementById("aprobacionBadge");
+  const sinAprobadores = document.getElementById("sinAprobadores");
+
+  const aprobadores = empleados.filter((e) => e.estado === "activo" && e.aprobadorContratos === true);
+  sinAprobadores.classList.toggle("oculto", aprobadores.length > 0);
+  if (!aprobadores.length) {
+    badge.textContent = "";
+    return;
+  }
+
+  function render() {
+    const aprobaciones = contrato.aprobaciones || {};
+    const aprobados = aprobadores.filter((a) => aprobaciones[a.email]).length;
+    badge.textContent = `${aprobados}/${aprobadores.length}`;
+    badge.classList.toggle("completo", aprobados === aprobadores.length);
+
+    lista.innerHTML = "";
+    aprobadores.forEach((a) => {
+      const info = aprobaciones[a.email];
+      const fila = campo("div", { class: "control-equipo-fila" });
+      fila.appendChild(campo("span", { text: a.nombre || a.email }));
+      fila.appendChild(campo("span", { class: "text-muted", text: a.cargo || a.email }));
+      fila.appendChild(info
+        ? campo("span", { class: "control-estado-pill control-estado-vigente", text: `✅ Aprobado el ${formatearFechaHora(info.en)}` })
+        : campo("span", { class: "control-badge", text: "⏳ Pendiente" }));
+
+      if (a.email === user.email) {
+        const btn = document.createElement("button");
+        btn.type = "button";
+        btn.className = "control-btn-mini";
+        btn.textContent = info ? "Quitar mi aprobación" : "Marcar como leído y aprobado";
+        btn.addEventListener("click", async () => {
+          btn.disabled = true;
+          try {
+            if (info) {
+              await updateDoc(contratoRef, { [`aprobaciones.${user.email}`]: deleteField(), actualizadoEn: serverTimestamp() });
+              const restante = { ...contrato.aprobaciones };
+              delete restante[user.email];
+              contrato.aprobaciones = restante;
+            } else {
+              await updateDoc(contratoRef, { [`aprobaciones.${user.email}`]: { en: serverTimestamp() }, actualizadoEn: serverTimestamp() });
+              contrato.aprobaciones = { ...(contrato.aprobaciones || {}), [user.email]: { en: new Date() } };
+            }
+            render();
+          } catch (err) {
+            window.alert(err.message || "No se pudo guardar la aprobación.");
+          } finally {
+            btn.disabled = false;
+          }
+        });
+        fila.appendChild(btn);
+      }
+
+      lista.appendChild(fila);
     });
   }
 
@@ -392,8 +459,10 @@ function renderInformesMensuales(contrato, documentosConMes) {
 // la lista (ni "Ver" ni "+ Agregar documento manual" — aviso: al igual que
 // camposVisibles, ocultar "Ver" es solo de interfaz, no bloquea el dato en
 // Firestore; lo que sí es una barrera real es que la regla de Firestore le
-// niega crear filas en esta subcolección).
-function cargarDocumentosContrato(contratoId, contrato, esEmpleado, puedeArchivar, esGestor) {
+// niega crear filas en esta subcolección). Excepción: un aprobador de
+// contratos SÍ necesita poder abrir "Ver" aunque su rol sea "empleado" —
+// si no, no podría leer el contrato antes de aprobarlo (ver puedeVer).
+function cargarDocumentosContrato(contratoId, contrato, esEmpleado, puedeArchivar, esGestor, puedeVer) {
   const tbody = document.getElementById("listaDocumentosContrato");
   const sinDocs = document.getElementById("sinDocumentosContrato");
   const badge = document.getElementById("documentosBadge");
@@ -455,7 +524,7 @@ function cargarDocumentosContrato(contratoId, contrato, esEmpleado, puedeArchiva
       fila.appendChild(campo("td", { text: d.creadoEn ? formatearFechaHora(d.creadoEn) : "" }));
       const tdAccion = document.createElement("td");
       tdAccion.className = "control-tabla-acciones";
-      if (!esEmpleado) {
+      if (puedeVer) {
         const ver = document.createElement("a");
         ver.href = enlaceDocumento(d);
         ver.className = "control-btn-mini";
@@ -581,6 +650,11 @@ requireAuth(async (user) => {
   const esGestor = esAdmin || esCoadmin;
   const esApoyo = perfilActivo && perfil?.rol === "apoyo";
   const esEmpleado = perfilActivo && perfil?.rol === "empleado";
+  // Aprobador obligatorio (Empleados > "Debe leer y aprobar cada contrato
+  // nuevo") — necesita poder abrir "Ver" en Documentos del contrato aunque
+  // su rol de contratos sea "empleado", si no no podría leerlo antes de
+  // aprobarlo (ver cargarDocumentosContrato).
+  const esAprobador = perfilActivo && perfil?.aprobadorContratos === true;
   const camposPermitidos = new Set(esApoyo ? (perfil.camposPermitidos || []) : []);
   const camposVisibles = new Set(esEmpleado ? (perfil.camposVisibles || []) : []);
 
@@ -691,12 +765,16 @@ requireAuth(async (user) => {
     window.location.href = "contratos.html";
   });
 
-  await cargarEquipo(contratoRef, contrato, esGestor);
+  const empleadosSnap = await getDocs(query(collection(db, "empleados"), orderBy("nombre")));
+  const empleados = empleadosSnap.docs.map((d) => d.data());
+
+  cargarEquipo(contratoRef, contrato, esGestor, empleados);
+  cargarAprobaciones(contratoRef, contrato, empleados, user);
   // Mismo permiso que exige la regla de Firestore para escribir en
   // contratos/{id}/documentos: gestor siempre, apoyo solo si está en el
   // equipo de este contrato puntual.
   const puedeArchivar = esGestor || (esApoyo && (contrato.equipo || []).includes(user.email));
-  cargarDocumentosContrato(id, contrato, esEmpleado, puedeArchivar, esGestor);
+  cargarDocumentosContrato(id, contrato, esEmpleado, puedeArchivar, esGestor, !esEmpleado || esAprobador);
 
   const badges = { general: document.getElementById("avanceGeneral") };
   const contenedor = document.getElementById("camposContainer");
