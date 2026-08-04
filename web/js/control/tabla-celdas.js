@@ -140,3 +140,17 @@ export function anchosColumnaEditor(filas, merges, numFilas, numCols) {
   }
   return pesos;
 }
+
+// Ajusta "filas" (en el sitio, misma referencia) a un número exacto de
+// filas y columnas de una sola vez — crece agregando celdas vacías al
+// final, encoge quitando desde el final. Para el control "Filas x
+// Columnas" del editor, en vez de tener que hacer clic en +/- Fila y +/-
+// Columna una por una hasta llegar al tamaño que se necesita.
+export function redimensionarFilas(filas, numFilasObjetivo, numColsObjetivo) {
+  while (filas.length < numFilasObjetivo) filas.push(new Array(numColsObjetivo).fill(""));
+  while (filas.length > numFilasObjetivo) filas.pop();
+  filas.forEach((fila) => {
+    while (fila.length < numColsObjetivo) fila.push("");
+    while (fila.length > numColsObjetivo) fila.pop();
+  });
+}

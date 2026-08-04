@@ -1419,6 +1419,17 @@ form.pqr-form .control-3botones button:disabled { opacity: 0.5; cursor: not-allo
 }
 
 .control-tabla-editor { display: flex; flex-direction: column; gap: 8px; }
+.control-tabla-tamano { display: flex; align-items: center; gap: 10px; flex-wrap: wrap; }
+.control-tabla-tamano label { display: flex; align-items: center; gap: 4px; font-size: 12.5px; color: var(--text-muted); }
+.control-tabla-tamano input[type="number"] {
+  width: 60px;
+  padding: 4px 6px;
+  border: 1px solid var(--border);
+  border-radius: 6px;
+  background: var(--card-bg);
+  color: var(--text);
+  font-size: 12.5px;
+}
 .control-tabla-grid { display: grid; gap: 4px; overflow-x: auto; }
 .control-tabla-grid input {
   min-width: 90px;

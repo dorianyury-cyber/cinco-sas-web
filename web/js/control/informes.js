@@ -12,7 +12,8 @@ import { truncar } from "./texto.js";
 import { crearCampoTextoRico } from "./texto-rico.js";
 import {
   normalizarMerges, celdaCombinada, expandirRangoConMerges, quitarMergesQueIntersectan,
-  celdaCentrada, normalizarCentrados, centrarRango, alinearIzquierdaRango, anchosColumnaEditor
+  celdaCentrada, normalizarCentrados, centrarRango, alinearIzquierdaRango, anchosColumnaEditor,
+  redimensionarFilas
 } from "./tabla-celdas.js";
 
 // Área/tipo fijos para que un informe quede en el Listado Maestro de
@@ -366,6 +367,40 @@ function renderTablaEditor(bloque) {
   bloque.filas.forEach((fila) => { while (fila.length < numCols) fila.push(""); });
   bloque.merges = normalizarMerges(bloque.merges || [], numFilas, numCols);
   bloque.centrados = normalizarCentrados(bloque.centrados || [], numFilas, numCols);
+
+  // Tamaño directo: para tablas grandes es más rápido escribir "12 filas,
+  // 9 columnas" de una vez que hacer clic en +Fila/+Columna una por una.
+  const tamanoDiv = document.createElement("div");
+  tamanoDiv.className = "control-tabla-tamano";
+  const filasSizeInput = document.createElement("input");
+  filasSizeInput.type = "number";
+  filasSizeInput.min = "1";
+  filasSizeInput.value = numFilas;
+  const colsSizeInput = document.createElement("input");
+  colsSizeInput.type = "number";
+  colsSizeInput.min = "1";
+  colsSizeInput.value = numCols;
+  const labelFilas = document.createElement("label");
+  labelFilas.textContent = "Filas";
+  labelFilas.appendChild(filasSizeInput);
+  const labelCols = document.createElement("label");
+  labelCols.textContent = "Columnas";
+  labelCols.appendChild(colsSizeInput);
+  const tamanoBtn = document.createElement("button");
+  tamanoBtn.type = "button";
+  tamanoBtn.className = "control-btn-mini";
+  tamanoBtn.textContent = "↕ Cambiar tamaño";
+  tamanoBtn.title = "Ajusta la tabla al número de filas y columnas escrito (agrega vacías o quita desde el final)";
+  tamanoBtn.addEventListener("click", () => {
+    const nf = Math.max(1, parseInt(filasSizeInput.value, 10) || numFilas);
+    const nc = Math.max(1, parseInt(colsSizeInput.value, 10) || numCols);
+    if (nf === numFilas && nc === numCols) return;
+    guardarHistorialBloques();
+    redimensionarFilas(bloque.filas, nf, nc);
+    renderBloques();
+  });
+  tamanoDiv.append(labelFilas, labelCols, tamanoBtn);
+  cont.appendChild(tamanoDiv);
 
   const grid = document.createElement("div");
   grid.className = "control-tabla-grid";
