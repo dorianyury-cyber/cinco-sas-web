@@ -739,11 +739,13 @@ requireAuth(async (user) => {
       // Sube las imágenes del editor antes de guardar el registro.
       const idInforme = informeIdEnEdicion.value || doc(collection(db, "informes")).id;
       const bloquesFinal = [];
-      let n = 0;
       for (const bloque of bloques) {
         if (bloque.tipo === "imagen" && bloque.blob) {
-          n += 1;
-          const archivoRef = ref(storage, `informes/${idInforme}/${n}.jpg`);
+          // Nombre único de verdad (no un contador 1.jpg/2.jpg que arranca
+          // de nuevo en cada guardado): si el informe ya tenía imágenes de
+          // una edición anterior, un contador reiniciado pisa esos archivos
+          // en Storage y los deja con un enlace roto — pasó en producción.
+          const archivoRef = ref(storage, `informes/${idInforme}/${crypto.randomUUID()}.jpg`);
           await uploadBytes(archivoRef, bloque.blob);
           const url = await getDownloadURL(archivoRef);
           bloquesFinal.push({ tipo: "imagen", url, nombre: bloque.nombre || "", pieDeFoto: bloque.pieDeFoto || "" });
