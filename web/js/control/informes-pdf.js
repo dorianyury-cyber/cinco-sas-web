@@ -438,9 +438,13 @@ export async function generarInformePDF(informe) {
       y += alturaFilas[fi];
     });
 
-    // Nota/pie de la tabla, abajo a la derecha.
+    // Nota/pie de la tabla, abajo a la derecha. y+=2 quedaba casi pegado al
+    // borde inferior de la última fila: doc.text ubica el texto por su
+    // línea base, que para este tamaño de fuente sube ~3mm por encima de
+    // "y" — con solo 2mm de por medio, el texto terminaba invadiendo la
+    // fila de arriba en vez de quedar debajo.
     if (bloque.nota) {
-      y += 2;
+      y += 5;
       doc.setFont("helvetica", "italic");
       doc.setFontSize(9);
       doc.setTextColor(...TEXT_MUTED);
