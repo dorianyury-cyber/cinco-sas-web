@@ -92,20 +92,33 @@ function sinBordes() {
 
 // Anchos de columna proporcionales al contenido (más caracteres = más
 // ancho), no partes iguales — mismo criterio que calcularAnchosColumna en
-// informes-pdf.js, adaptado a DXA (docx no mide texto como jsPDF).
+// informes-pdf.js (misma corrección: cada columna se garantiza su mínimo
+// primero y el espacio que sobra se reparte solo entre las que pidieron
+// más, para que una tabla con varias columnas no termine con todas más
+// angostas que ese mínimo solo porque una pedía mucho espacio).
 function anchosColumnaDocx(filas) {
   const numCols = Math.max(...filas.map((f) => f.length));
   const anchoMinDxa = 900;
-  const anchoMaxDxa = ANCHO_UTIL_DXA * 0.55;
-  const anchosCrudos = [];
+  const anchoMaxDxa = ANCHO_UTIL_DXA * 0.6;
+
+  const deseados = [];
   for (let c = 0; c < numCols; c++) {
     let maxLen = 0;
     filas.forEach((fila) => { const len = String(fila[c] || "").length; if (len > maxLen) maxLen = len; });
-    anchosCrudos.push(Math.min(Math.max(maxLen * 95 + 300, anchoMinDxa), anchoMaxDxa));
+    deseados.push(Math.min(Math.max(maxLen * 95 + 300, anchoMinDxa), anchoMaxDxa));
   }
-  const total = anchosCrudos.reduce((a, b) => a + b, 0);
-  const factor = ANCHO_UTIL_DXA / total;
-  return anchosCrudos.map((a) => Math.round(a * factor));
+
+  const totalDeseado = deseados.reduce((a, b) => a + b, 0);
+  if (totalDeseado <= ANCHO_UTIL_DXA) {
+    const factor = ANCHO_UTIL_DXA / totalDeseado;
+    return deseados.map((a) => Math.round(a * factor));
+  }
+
+  const espacioLibre = ANCHO_UTIL_DXA - anchoMinDxa * numCols;
+  const extra = deseados.map((d) => Math.max(0, d - anchoMinDxa));
+  const totalExtra = extra.reduce((a, b) => a + b, 0);
+  if (espacioLibre <= 0 || totalExtra === 0) return deseados.map(() => Math.round(ANCHO_UTIL_DXA / numCols));
+  return deseados.map((d, c) => Math.round(anchoMinDxa + (extra[c] / totalExtra) * espacioLibre));
 }
 
 export async function generarInformeDocxBlob(informe) {

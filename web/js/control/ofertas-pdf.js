@@ -54,22 +54,39 @@ function cargarImagenComoDataURL(url, colorFondo = "#ffffff", formato = "PNG") {
   });
 }
 
+// Ver la nota completa en calcularAnchosColumna de informes-pdf.js: cada
+// columna se garantiza un ancho mínimo primero, y el espacio que sobra se
+// reparte solo entre las que pidieron más — una normalización proporcional
+// simple podía encoger TODAS las columnas por debajo de ese mínimo cuando
+// había muchas columnas o alguna con texto largo, y el texto se salía de
+// su celda.
 function calcularAnchosColumna(doc, filas, anchoUtil) {
   const numCols = Math.max(...filas.map((f) => f.length));
   const anchoMin = 18;
-  const anchoMax = anchoUtil * 0.55;
-  const anchosCrudos = [];
+  const anchoMax = anchoUtil * 0.6;
+
+  const deseados = [];
   for (let c = 0; c < numCols; c++) {
     let maximo = 0;
-    filas.forEach((fila) => {
-      const ancho = doc.getTextWidth(fila[c] || "");
+    filas.forEach((fila, fi) => {
+      doc.setFont("helvetica", fi === 0 ? "bold" : "normal");
+      const ancho = doc.getTextWidth(String(fila[c] || ""));
       if (ancho > maximo) maximo = ancho;
     });
-    anchosCrudos.push(Math.min(Math.max(maximo + 6, anchoMin), anchoMax));
+    deseados.push(Math.min(Math.max(maximo + 6, anchoMin), anchoMax));
   }
-  const total = anchosCrudos.reduce((a, b) => a + b, 0);
-  const factor = anchoUtil / total;
-  return anchosCrudos.map((a) => a * factor);
+
+  const totalDeseado = deseados.reduce((a, b) => a + b, 0);
+  if (totalDeseado <= anchoUtil) {
+    const factor = anchoUtil / totalDeseado;
+    return deseados.map((a) => a * factor);
+  }
+
+  const espacioLibre = anchoUtil - anchoMin * numCols;
+  const extra = deseados.map((d) => Math.max(0, d - anchoMin));
+  const totalExtra = extra.reduce((a, b) => a + b, 0);
+  if (espacioLibre <= 0 || totalExtra === 0) return deseados.map(() => anchoUtil / numCols);
+  return deseados.map((d, c) => anchoMin + (extra[c] / totalExtra) * espacioLibre);
 }
 
 // Misma regla de negocio que ofertas.js (copiada, no compartida — ver

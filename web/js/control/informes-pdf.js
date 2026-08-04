@@ -74,28 +74,59 @@ function formatearFecha(fechaISO) {
 }
 
 // Anchos de columna proporcionales al contenido real (encabezado + celdas),
-// no partes iguales — respetando un mínimo y un máximo por columna, mismo
-// criterio que el resto de la suite (ver calcularAnchosColumna en pdf.js
-// de LBDC Neiva).
+// no partes iguales — respetando un mínimo por columna, mismo criterio que
+// el resto de la suite (ver calcularAnchosColumna en pdf.js de LBDC
+// Neiva), con una corrección importante: si hay muchas columnas o alguna
+// pide mucho ancho, la normalización proporcional simple podía encoger
+// TODAS las columnas por debajo de ese mínimo (una tabla con varias
+// columnas angostas + una de texto largo terminaba con celdas tan
+// estrechas que el texto se salía de su celda) — aquí cada columna se
+// garantiza su mínimo primero, y el espacio que sobra se reparte solo
+// entre las que pidieron más.
 function calcularAnchosColumna(doc, filas, anchoUtil) {
   // No todas las filas tienen necesariamente el mismo número de celdas
   // (ej. tablas importadas de Word con celdas combinadas) — se usa el
   // máximo, no solo filas[0].length, para no perder columnas.
   const numCols = Math.max(...filas.map((f) => f.length));
   const anchoMin = 18;
-  const anchoMax = anchoUtil * 0.55;
-  const anchosCrudos = [];
+  const anchoMax = anchoUtil * 0.6;
+
+  // Ancho que cada columna "pide": la línea más larga que le toque
+  // dibujar, midiendo cada fila con su fuente real (la cabecera va en
+  // negrilla, más ancha que el resto a igual tamaño — medirla con la
+  // fuente normal subestimaba cuánto espacio necesitaba de verdad).
+  const deseados = [];
   for (let c = 0; c < numCols; c++) {
     let maximo = 0;
-    filas.forEach((fila) => {
-      const ancho = doc.getTextWidth(fila[c] || "");
+    filas.forEach((fila, fi) => {
+      doc.setFont("helvetica", fi === 0 ? "bold" : "normal");
+      const ancho = doc.getTextWidth(String(fila[c] || ""));
       if (ancho > maximo) maximo = ancho;
     });
-    anchosCrudos.push(Math.min(Math.max(maximo + 6, anchoMin), anchoMax));
+    deseados.push(Math.min(Math.max(maximo + 6, anchoMin), anchoMax));
   }
-  const total = anchosCrudos.reduce((a, b) => a + b, 0);
-  const factor = anchoUtil / total;
-  return anchosCrudos.map((a) => a * factor);
+
+  const totalDeseado = deseados.reduce((a, b) => a + b, 0);
+  if (totalDeseado <= anchoUtil) {
+    // Cabe todo con el ancho que cada columna pidió — se reparte el
+    // sobrante proporcionalmente, en vez de dejar espacio muerto sin usar.
+    const factor = anchoUtil / totalDeseado;
+    return deseados.map((a) => a * factor);
+  }
+
+  // No cabe todo: cada columna se queda con al menos anchoMin, y el resto
+  // del ancho de la página se reparte entre las columnas según cuánto
+  // pedían de más sobre ese mínimo — así una columna angosta (ej. "Nivel")
+  // no se encoge solo porque otra (ej. "Notas") pedía mucho espacio.
+  const espacioLibre = anchoUtil - anchoMin * numCols;
+  const extra = deseados.map((d) => Math.max(0, d - anchoMin));
+  const totalExtra = extra.reduce((a, b) => a + b, 0);
+  if (espacioLibre <= 0 || totalExtra === 0) {
+    // Demasiadas columnas para el ancho mínimo de todas — repartir parejo
+    // es lo mejor que se puede hacer.
+    return deseados.map(() => anchoUtil / numCols);
+  }
+  return deseados.map((d, c) => anchoMin + (extra[c] / totalExtra) * espacioLibre);
 }
 
 export async function generarInformePDF(informe) {
