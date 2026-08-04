@@ -115,3 +115,28 @@ export function centrarRango(centrados, fMin, fMax, cMin, cMax) {
 export function alinearIzquierdaRango(centrados, fMin, fMax, cMin, cMax) {
   return centrados.filter((c) => !(c.fila >= fMin && c.fila <= fMax && c.col >= cMin && c.col <= cMax));
 }
+
+// ---- ancho de columnas del editor (cuadrícula de <input>) ----
+// Mismo criterio de "eficiencia de espacio" que calcularAnchosColumna (PDF)
+// y anchosColumnaDocx (Word) — el ancho de cada columna no se reparte en
+// partes iguales, sino proporcional a cuánto texto tiene esa columna. Acá
+// se usa el largo del texto (en caracteres) en vez de medir con
+// getTextWidth/canvas porque es la cuadrícula EN VIVO del editor (se
+// recalcula en cada tecla) y no vale la pena el costo/la complejidad de
+// medir con precisión de píxeles solo para la vista de edición.
+export function anchosColumnaEditor(filas, merges, numFilas, numCols) {
+  const ANCHO_MIN_CH = 6;
+  const ANCHO_MAX_CH = 40;
+  const pesos = [];
+  for (let ci = 0; ci < numCols; ci++) {
+    let maxLargo = ANCHO_MIN_CH;
+    for (let fi = 0; fi < numFilas; fi++) {
+      const info = celdaCombinada(merges, fi, ci);
+      if (info && !info.esAncla) continue; // el texto de una celda combinada no cuenta para su propia columna
+      const largo = String(filas[fi]?.[ci] || "").length;
+      if (largo > maxLargo) maxLargo = largo;
+    }
+    pesos.push(Math.min(maxLargo, ANCHO_MAX_CH));
+  }
+  return pesos;
+}

@@ -12,7 +12,7 @@ import { LINEAS_SERVICIO } from "./lineas-servicio.js";
 import { crearCampoTextoRico } from "./texto-rico.js";
 import {
   normalizarMerges, celdaCombinada, expandirRangoConMerges, quitarMergesQueIntersectan,
-  celdaCentrada, normalizarCentrados, centrarRango, alinearIzquierdaRango
+  celdaCentrada, normalizarCentrados, centrarRango, alinearIzquierdaRango, anchosColumnaEditor
 } from "./tabla-celdas.js";
 
 // Área/tipo fijos para que una oferta quede en el Listado Maestro de
@@ -351,7 +351,10 @@ function renderTablaEditor(bloque) {
 
   const grid = document.createElement("div");
   grid.className = "control-tabla-grid";
-  grid.style.gridTemplateColumns = `repeat(${numCols}, minmax(90px, 1fr))`;
+  // Ancho de columna proporcional a su contenido (no partes iguales) —
+  // mismo criterio que el PDF, ver anchosColumnaEditor.
+  const pesosCol = anchosColumnaEditor(bloque.filas, bloque.merges, numFilas, numCols);
+  grid.style.gridTemplateColumns = pesosCol.map((p) => `minmax(90px, ${p}fr)`).join(" ");
 
   // Pinta el rango [bloque._selA.._selB] (si hay uno activo) como
   // seleccionado — se llama tras cada clic/arrastre sin re-renderizar toda
