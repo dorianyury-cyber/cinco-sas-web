@@ -12,7 +12,7 @@
 import { nombreLinea } from "./lineas-servicio.js";
 import { parsearHtmlARuns } from "./texto-rico.js";
 import {
-  normalizarMerges, celdaCombinada, filasSinTextoCombinado, normalizarCentrados, celdaCentrada
+  normalizarMerges, celdaCombinada, normalizarCentrados, celdaCentrada
 } from "./tabla-celdas.js";
 
 const NAVY = [31, 39, 50];
@@ -63,7 +63,7 @@ function cargarImagenComoDataURL(url, colorFondo = "#ffffff", formato = "PNG") {
 // simple podía encoger TODAS las columnas por debajo de ese mínimo cuando
 // había muchas columnas o alguna con texto largo, y el texto se salía de
 // su celda.
-function calcularAnchosColumna(doc, filas, anchoUtil) {
+function calcularAnchosColumna(doc, filas, anchoUtil, merges = []) {
   const numCols = Math.max(...filas.map((f) => f.length));
   const anchoMin = 18;
   const anchoMax = anchoUtil * 0.6;
@@ -72,12 +72,28 @@ function calcularAnchosColumna(doc, filas, anchoUtil) {
   for (let c = 0; c < numCols; c++) {
     let maximo = 0;
     filas.forEach((fila, fi) => {
+      if (celdaCombinada(merges, fi, c)) return;
       doc.setFont("helvetica", fi === 0 ? "bold" : "normal");
       const ancho = doc.getTextWidth(String(fila[c] || ""));
       if (ancho > maximo) maximo = ancho;
     });
-    deseados.push(Math.min(Math.max(maximo + 6, anchoMin), anchoMax));
+    deseados.push(maximo);
   }
+
+  // El ancho que pide una celda combinada se reparte entre las columnas
+  // que abarca — ver el comentario largo en calcularAnchosColumna de
+  // informes-pdf.js (misma lógica, copiada acá).
+  merges.forEach((m) => {
+    const texto = String(filas[m.fila]?.[m.col] || "");
+    if (!texto) return;
+    doc.setFont("helvetica", m.fila === 0 ? "bold" : "normal");
+    const anchoPorColumna = doc.getTextWidth(texto) / m.cols;
+    for (let c = m.col; c < m.col + m.cols; c++) {
+      if (anchoPorColumna > deseados[c]) deseados[c] = anchoPorColumna;
+    }
+  });
+
+  for (let c = 0; c < numCols; c++) deseados[c] = Math.min(Math.max(deseados[c] + 6, anchoMin), anchoMax);
 
   const totalDeseado = deseados.reduce((a, b) => a + b, 0);
   if (totalDeseado <= anchoUtil) {
@@ -316,7 +332,7 @@ export async function generarOfertaPDF(oferta) {
     // en realidad ese texto se reparte entre varias).
     const merges = normalizarMerges(bloque.merges || [], numFilas, numCols);
     const centrados = normalizarCentrados(bloque.centrados || [], numFilas, numCols);
-    const anchos = calcularAnchosColumna(doc, filasSinTextoCombinado(filas, merges), anchoUtil);
+    const anchos = calcularAnchosColumna(doc, filas, anchoUtil, merges);
 
     // Alto de cada fila, en dos pasadas: primero cada celda "propia" de esa
     // fila (normal, o ancla de un merge que no combina filas hacia abajo);

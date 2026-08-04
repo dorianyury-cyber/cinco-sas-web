@@ -38,16 +38,6 @@ export function celdaCombinada(merges, fi, ci) {
   return null;
 }
 
-// Copia de "filas" con el texto de las celdas combinadas en blanco, para
-// pasársela a calcularAnchosColumna (PDF) / anchosColumnaDocx (Word) sin
-// tocar esas funciones — así una celda combinada con texto largo no obliga
-// a una sola columna a ensancharse de más (su texto en realidad se reparte
-// entre todas las columnas que abarca).
-export function filasSinTextoCombinado(filas, merges) {
-  if (!merges.length) return filas;
-  return filas.map((fila, fi) => fila.map((valor, ci) => (celdaCombinada(merges, fi, ci) ? "" : valor)));
-}
-
 // Amplía un rango [fMin..fMax, cMin..cMax] hasta que incluya completo
 // cualquier merge que toque, igual que Excel al seleccionar sobre celdas
 // ya combinadas (repite hasta que el rango deja de crecer).
@@ -127,18 +117,28 @@ export function alinearIzquierdaRango(centrados, fMin, fMax, cMin, cMax) {
 export function anchosColumnaEditor(filas, merges, numFilas, numCols) {
   const ANCHO_MIN_CH = 6;
   const ANCHO_MAX_CH = 40;
-  const pesos = [];
+  const pesos = new Array(numCols).fill(ANCHO_MIN_CH);
   for (let ci = 0; ci < numCols; ci++) {
-    let maxLargo = ANCHO_MIN_CH;
     for (let fi = 0; fi < numFilas; fi++) {
-      const info = celdaCombinada(merges, fi, ci);
-      if (info && !info.esAncla) continue; // el texto de una celda combinada no cuenta para su propia columna
+      if (celdaCombinada(merges, fi, ci)) continue; // se mide aparte, más abajo, repartido entre las columnas que abarca
       const largo = String(filas[fi]?.[ci] || "").length;
-      if (largo > maxLargo) maxLargo = largo;
+      if (largo > pesos[ci]) pesos[ci] = largo;
     }
-    pesos.push(Math.min(maxLargo, ANCHO_MAX_CH));
   }
-  return pesos;
+  // El largo de una celda combinada se reparte entre las columnas que
+  // abarca — mismo criterio que calcularAnchosColumna (PDF) y
+  // anchosColumnaDocx (Word): ni se ignora del todo (dejaba angostas
+  // columnas cuya única pista de ancho era un encabezado combinado), ni se
+  // le carga entero a una sola columna.
+  merges.forEach((m) => {
+    const texto = String(filas[m.fila]?.[m.col] || "");
+    if (!texto) return;
+    const largoPorColumna = texto.length / m.cols;
+    for (let ci = m.col; ci < m.col + m.cols; ci++) {
+      if (largoPorColumna > pesos[ci]) pesos[ci] = largoPorColumna;
+    }
+  });
+  return pesos.map((p) => Math.min(p, ANCHO_MAX_CH));
 }
 
 // Ajusta "filas" (en el sitio, misma referencia) a un número exacto de

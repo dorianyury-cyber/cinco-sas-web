@@ -10,7 +10,7 @@
 
 import { parsearHtmlARuns } from "./texto-rico.js";
 import {
-  normalizarMerges, celdaCombinada, filasSinTextoCombinado, normalizarCentrados, celdaCentrada
+  normalizarMerges, celdaCombinada, normalizarCentrados, celdaCentrada
 } from "./tabla-celdas.js";
 
 const NAVY_HEX = "1F2732";
@@ -99,7 +99,7 @@ function sinBordes() {
 // primero y el espacio que sobra se reparte solo entre las que pidieron
 // más, para que una tabla con varias columnas no termine con todas más
 // angostas que ese mínimo solo porque una pedía mucho espacio).
-function anchosColumnaDocx(filas) {
+function anchosColumnaDocx(filas, merges = []) {
   const numCols = Math.max(...filas.map((f) => f.length));
   const anchoMinDxa = 900;
   const anchoMaxDxa = ANCHO_UTIL_DXA * 0.6;
@@ -107,9 +107,27 @@ function anchosColumnaDocx(filas) {
   const deseados = [];
   for (let c = 0; c < numCols; c++) {
     let maxLen = 0;
-    filas.forEach((fila) => { const len = String(fila[c] || "").length; if (len > maxLen) maxLen = len; });
-    deseados.push(Math.min(Math.max(maxLen * 95 + 300, anchoMinDxa), anchoMaxDxa));
+    filas.forEach((fila, fi) => {
+      if (celdaCombinada(merges, fi, c)) return;
+      const len = String(fila[c] || "").length;
+      if (len > maxLen) maxLen = len;
+    });
+    deseados.push(maxLen);
   }
+
+  // El largo de una celda combinada se reparte entre las columnas que
+  // abarca — ver el comentario largo en calcularAnchosColumna de
+  // informes-pdf.js (misma lógica, adaptada a caracteres en vez de mm).
+  merges.forEach((m) => {
+    const texto = String(filas[m.fila]?.[m.col] || "");
+    if (!texto) return;
+    const largoPorColumna = texto.length / m.cols;
+    for (let c = m.col; c < m.col + m.cols; c++) {
+      if (largoPorColumna > deseados[c]) deseados[c] = largoPorColumna;
+    }
+  });
+
+  for (let c = 0; c < numCols; c++) deseados[c] = Math.min(Math.max(deseados[c] * 95 + 300, anchoMinDxa), anchoMaxDxa);
 
   const totalDeseado = deseados.reduce((a, b) => a + b, 0);
   if (totalDeseado <= ANCHO_UTIL_DXA) {
@@ -273,7 +291,7 @@ export async function generarInformeDocxBlob(informe) {
       // una celda combinada se excluye del cálculo de ancho de columna.
       const merges = normalizarMerges(bloque.merges || [], numFilasTabla, numColsTabla);
       const centrados = normalizarCentrados(bloque.centrados || [], numFilasTabla, numColsTabla);
-      const anchos = anchosColumnaDocx(filasSinTextoCombinado(filas, merges));
+      const anchos = anchosColumnaDocx(filas, merges);
       const margenesCelda = { top: 60, bottom: 60, left: 100, right: 100 };
 
       const filasDocx = filas.map((fila, fi) => {
