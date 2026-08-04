@@ -111,8 +111,26 @@ function anchosColumnaDocx(filas) {
 export async function generarInformeDocxBlob(informe) {
   const {
     Document, Packer, Paragraph, TextRun, ImageRun, Table, TableRow, TableCell,
-    ShadingType, WidthType, Header, Footer, AlignmentType, PageNumber, VerticalAlign, HeadingLevel
+    ShadingType, WidthType, Header, Footer, AlignmentType, PageNumber, VerticalAlign, HeadingLevel, LevelFormat
   } = window.docx;
+
+  // Numeración automática de Título 1..4 (1 / 1.1 / 1.1.1 / 1.1.1.1), como
+  // la numeración multinivel nativa de Word ligada a un solo "numId": cada
+  // nivel arranca su contador en 1 y Word lo reinicia solo al aparecer un
+  // título de nivel superior (comportamiento por defecto de OOXML, no hay
+  // que configurarlo aparte). Referenciada por nivel (0-3) desde cada
+  // párrafo de título más abajo.
+  const REF_NUMERACION_TITULOS = "numeracion-titulos";
+  const numeracionTitulos = {
+    reference: REF_NUMERACION_TITULOS,
+    levels: [0, 1, 2, 3].map((nivel) => ({
+      level: nivel,
+      format: LevelFormat.DECIMAL,
+      text: Array.from({ length: nivel + 1 }, (_, i) => `%${i + 1}`).join(".") + ".",
+      alignment: AlignmentType.START,
+      style: { paragraph: { indent: { left: nivel * 360, hanging: 360 } } }
+    }))
+  };
 
   // ---- encabezado: banda navy con el logo (mismo criterio que el PDF) ----
   let celdaLogo = [new Paragraph({ children: [] })];
@@ -203,6 +221,7 @@ export async function generarInformeDocxBlob(informe) {
 
   // ---- cuerpo por bloques, en el mismo orden que en el editor ----
   const HEADING_POR_NIVEL = { titulo1: HeadingLevel.HEADING_1, titulo2: HeadingLevel.HEADING_2, titulo3: HeadingLevel.HEADING_3, titulo4: HeadingLevel.HEADING_4 };
+  const NIVEL_NUMERACION = { titulo1: 0, titulo2: 1, titulo3: 2, titulo4: 3 };
   let numeroTabla = 0;
   let numeroFigura = 0;
 
@@ -210,6 +229,7 @@ export async function generarInformeDocxBlob(informe) {
     if (bloque.tipo in HEADING_POR_NIVEL) {
       cuerpo.push(new Paragraph({
         heading: HEADING_POR_NIVEL[bloque.tipo],
+        numbering: { reference: REF_NUMERACION_TITULOS, level: NIVEL_NUMERACION[bloque.tipo] },
         children: [new TextRun({ text: bloque.texto || "", bold: true, color: NAVY_HEX })]
       }));
       continue;
@@ -272,6 +292,7 @@ export async function generarInformeDocxBlob(informe) {
   }
 
   const documento = new Document({
+    numbering: { config: [numeracionTitulos] },
     sections: [{
       properties: {
         page: {
