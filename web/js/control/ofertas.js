@@ -291,6 +291,26 @@ function renderBloques() {
   });
 }
 
+// Rellena una tabla desde texto copiado de Excel (celdas separadas por
+// tabulador, filas por salto de línea) o de una tabla de Word — mismo
+// criterio que informes.js. Crece filas/columnas si el pegado no cabe en
+// el tamaño actual.
+function pegarEnTabla(bloque, filaInicio, colInicio, texto) {
+  const filas = texto.replace(/\r/g, "").split("\n");
+  while (filas.length > 1 && filas[filas.length - 1] === "") filas.pop();
+  const datos = filas.map((fila) => fila.split("\t"));
+
+  const colsNecesarias = colInicio + Math.max(...datos.map((f) => f.length));
+  const filasNecesarias = filaInicio + datos.length;
+  while (bloque.filas[0].length < colsNecesarias) bloque.filas.forEach((fila) => fila.push(""));
+  while (bloque.filas.length < filasNecesarias) bloque.filas.push(bloque.filas[0].map(() => ""));
+
+  datos.forEach((fila, fi) => {
+    fila.forEach((valor, ci) => { bloque.filas[filaInicio + fi][colInicio + ci] = valor; });
+  });
+  renderBloques();
+}
+
 function renderTablaEditor(bloque) {
   const cont = document.createElement("div");
   cont.className = "control-tabla-editor";
@@ -315,6 +335,16 @@ function renderTablaEditor(bloque) {
       celdaInput.value = celda;
       celdaInput.placeholder = fi === 0 ? `Columna ${ci + 1}` : "";
       celdaInput.addEventListener("input", () => { bloque.filas[fi][ci] = celdaInput.value; });
+      // Recuerda dónde estaba el cursor para que el botón "Pegar tabla"
+      // sepa dónde empezar si el pegado no se hizo directo sobre una celda.
+      celdaInput.addEventListener("focus", () => { bloque._filaFoco = fi; bloque._colFoco = ci; });
+      // Pegado directo de Excel/Word: si trae varias celdas (tabulador o
+      // salto de línea) se reparte por la cuadrícula; si es una sola celda
+      // se deja el pegado normal del navegador.
+      celdaInput.addEventListener("paste", (e) => {
+        const texto = e.clipboardData?.getData("text/plain") ?? "";
+        if (/\t|\n/.test(texto)) { e.preventDefault(); pegarEnTabla(bloque, fi, ci, texto); }
+      });
       filaEl.appendChild(celdaInput);
     });
     grid.appendChild(filaEl);
@@ -355,7 +385,23 @@ function renderTablaEditor(bloque) {
   quitarCol.addEventListener("click", () => {
     if (bloque.filas[0].length > 1) { bloque.filas.forEach((fila) => fila.pop()); renderBloques(); }
   });
-  botones.append(agregarFila, quitarFila, agregarCol, quitarCol);
+  const pegarBtn = document.createElement("button");
+  pegarBtn.type = "button";
+  pegarBtn.className = "control-btn-mini";
+  pegarBtn.textContent = "📋 Pegar desde Excel/Word";
+  pegarBtn.title = "Copia el rango en Excel (o la tabla en Word) y haz clic aquí — también puedes pegar (Ctrl+V) directo sobre cualquier celda";
+  pegarBtn.addEventListener("click", async () => {
+    const fi = bloque._filaFoco ?? 0;
+    const ci = bloque._colFoco ?? 0;
+    try {
+      const texto = await navigator.clipboard.readText();
+      if (!texto) { mostrarAlerta("El portapapeles está vacío. Copia primero el rango en Excel o la tabla en Word.", "error"); return; }
+      pegarEnTabla(bloque, fi, ci, texto);
+    } catch (e) {
+      mostrarAlerta("El navegador no dejó leer el portapapeles automáticamente. Haz clic en la celda donde quieres empezar y pega con Ctrl+V — funciona igual.", "error");
+    }
+  });
+  botones.append(agregarFila, quitarFila, agregarCol, quitarCol, pegarBtn);
   cont.appendChild(botones);
 
   return cont;
