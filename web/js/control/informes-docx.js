@@ -9,6 +9,7 @@
 // web/js/vendor/docx.iife.js, script clásico -> window.docx).
 
 import { parsearHtmlARuns } from "./texto-rico.js";
+import { normalizarMerges, celdaCombinada, filasSinTextoCombinado } from "./tabla-celdas.js";
 
 const NAVY_HEX = "1F2732";
 const MUTED_HEX = "5C6570";
@@ -121,10 +122,19 @@ function anchosColumnaDocx(filas) {
   return deseados.map((d, c) => Math.round(anchoMinDxa + (extra[c] / totalExtra) * espacioLibre));
 }
 
+// Suma "cantidad" valores consecutivos de un arreglo desde "inicio" — para
+// juntar el ancho de varias columnas que abarca una celda combinada.
+function sumaRango(valores, inicio, cantidad) {
+  let total = 0;
+  for (let i = inicio; i < inicio + cantidad; i++) total += valores[i];
+  return total;
+}
+
 export async function generarInformeDocxBlob(informe) {
   const {
     Document, Packer, Paragraph, TextRun, ImageRun, Table, TableRow, TableCell,
-    ShadingType, WidthType, Header, Footer, AlignmentType, PageNumber, VerticalAlign, HeadingLevel, LevelFormat
+    ShadingType, WidthType, Header, Footer, AlignmentType, PageNumber, VerticalAlign, HeadingLevel, LevelFormat,
+    VerticalMergeType
   } = window.docx;
 
   // Numeración automática de Título 1..4 (1 / 1.1 / 1.1.1 / 1.1.1.1), como
@@ -255,15 +265,47 @@ export async function generarInformeDocxBlob(informe) {
       const tituloTexto = `Tabla ${numeroTabla}. ${bloque.titulo || ""}`.trim();
       cuerpo.push(new Paragraph({ alignment: AlignmentType.CENTER, children: [new TextRun({ text: tituloTexto, bold: true, color: NAVY_HEX, size: 19 })] }));
 
-      const anchos = anchosColumnaDocx(filas);
-      const filasDocx = filas.map((fila, fi) => new TableRow({
-        children: anchos.map((ancho, ci) => new TableCell({
-          width: { size: ancho, type: WidthType.DXA },
-          shading: fi === 0 ? { type: ShadingType.CLEAR, fill: GRIS_CLARO_HEX, color: "auto" } : undefined,
-          margins: { top: 60, bottom: 60, left: 100, right: 100 },
-          children: [new Paragraph({ children: [new TextRun({ text: String(fila[ci] || ""), bold: fi === 0, size: 17 })] })]
-        }))
-      }));
+      const numFilasTabla = filas.length;
+      const numColsTabla = Math.max(...filas.map((f) => f.length));
+      // Combinar celdas, ver web/js/control/tabla-celdas.js — el texto de
+      // una celda combinada se excluye del cálculo de ancho de columna.
+      const merges = normalizarMerges(bloque.merges || [], numFilasTabla, numColsTabla);
+      const anchos = anchosColumnaDocx(filasSinTextoCombinado(filas, merges));
+      const margenesCelda = { top: 60, bottom: 60, left: 100, right: 100 };
+
+      const filasDocx = filas.map((fila, fi) => {
+        const celdas = [];
+        for (let ci = 0; ci < numColsTabla; ci++) {
+          const info = celdaCombinada(merges, fi, ci);
+          if (info && !info.esAncla) {
+            // Celda cubierta por un merge: si es puramente horizontal
+            // (mismo renglón que su ancla), columnSpan ya la cubre y no se
+            // agrega ninguna celda. Si es una fila de continuación de un
+            // merge vertical, docx.js sí exige una celda "placeholder" en
+            // la columna donde arranca ese merge, marcada CONTINUE.
+            if (ci === info.merge.col && fi > info.merge.fila) {
+              celdas.push(new TableCell({
+                width: { size: sumaRango(anchos, ci, info.merge.cols), type: WidthType.DXA },
+                columnSpan: info.merge.cols > 1 ? info.merge.cols : undefined,
+                verticalMerge: VerticalMergeType.CONTINUE,
+                margins: margenesCelda,
+                children: [new Paragraph({ children: [] })]
+              }));
+            }
+            continue;
+          }
+          const ancho = info ? sumaRango(anchos, ci, info.merge.cols) : anchos[ci];
+          celdas.push(new TableCell({
+            width: { size: ancho, type: WidthType.DXA },
+            shading: fi === 0 ? { type: ShadingType.CLEAR, fill: GRIS_CLARO_HEX, color: "auto" } : undefined,
+            columnSpan: info && info.merge.cols > 1 ? info.merge.cols : undefined,
+            verticalMerge: info && info.merge.filas > 1 ? VerticalMergeType.RESTART : undefined,
+            margins: margenesCelda,
+            children: [new Paragraph({ children: [new TextRun({ text: String(fila[ci] || ""), bold: fi === 0, size: 17 })] })]
+          }));
+        }
+        return new TableRow({ children: celdas });
+      });
       cuerpo.push(new Table({ width: { size: ANCHO_UTIL_DXA, type: WidthType.DXA }, rows: filasDocx }));
 
       if (bloque.nota) {

@@ -1419,17 +1419,23 @@ form.pqr-form .control-3botones button:disabled { opacity: 0.5; cursor: not-allo
 }
 
 .control-tabla-editor { display: flex; flex-direction: column; gap: 8px; }
-.control-tabla-grid { display: flex; flex-direction: column; gap: 4px; overflow-x: auto; }
-.control-tabla-fila { display: flex; gap: 4px; }
-.control-tabla-fila input {
-  flex: 1;
+.control-tabla-grid { display: grid; gap: 4px; overflow-x: auto; }
+.control-tabla-grid input {
   min-width: 90px;
+  width: 100%;
   padding: 6px 8px;
   border: 1px solid var(--border);
   border-radius: 6px;
   background: var(--card-bg);
   color: var(--text);
   font-size: 12.5px;
+}
+/* Resalta el rango de celdas seleccionado por arrastre, antes de combinar
+   o separar — mismo acento ámbar que el resto de la suite. */
+.control-tabla-grid input.control-celda-sel {
+  border-color: var(--cinco-amber);
+  box-shadow: 0 0 0 2px rgba(254, 178, 9, 0.35);
+  background: rgba(254, 178, 9, 0.1);
 }
 .control-tabla-botones { display: flex; gap: 8px; flex-wrap: wrap; }
 

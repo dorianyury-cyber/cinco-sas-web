@@ -10,6 +10,9 @@ import { registrarDocumentoSGC } from "./documentos-sgc.js";
 import { truncar } from "./texto.js";
 import { LINEAS_SERVICIO } from "./lineas-servicio.js";
 import { crearCampoTextoRico } from "./texto-rico.js";
+import {
+  normalizarMerges, celdaCombinada, expandirRangoConMerges, quitarMergesQueIntersectan
+} from "./tabla-celdas.js";
 
 // Área/tipo fijos para que una oferta quede en el Listado Maestro de
 // Documentos (SGC) sin pedir un campo más en el formulario — mismo
@@ -123,7 +126,7 @@ function bloquesPorDefecto() {
 }
 
 function nuevaTabla() {
-  return { tipo: "tabla", titulo: "", filas: [["", ""], ["", ""]] };
+  return { tipo: "tabla", titulo: "", filas: [["", ""], ["", ""]], merges: [] };
 }
 
 function redimensionarImagen(file) {
@@ -305,10 +308,20 @@ function pegarEnTabla(bloque, filaInicio, colInicio, texto) {
   while (bloque.filas[0].length < colsNecesarias) bloque.filas.forEach((fila) => fila.push(""));
   while (bloque.filas.length < filasNecesarias) bloque.filas.push(bloque.filas[0].map(() => ""));
 
+  // Los datos pegados ya no respetan ninguna combinación previa que caiga
+  // dentro del rango que se va a sobrescribir.
+  bloque.merges = quitarMergesQueIntersectan(
+    bloque.merges || [], filaInicio, filaInicio + datos.length - 1, colInicio, colsNecesarias - 1
+  );
+
   datos.forEach((fila, fi) => {
     fila.forEach((valor, ci) => { bloque.filas[filaInicio + fi][colInicio + ci] = valor; });
   });
   renderBloques();
+}
+
+function rangoOrdenado(a, b) {
+  return { fMin: Math.min(a.fi, b.fi), fMax: Math.max(a.fi, b.fi), cMin: Math.min(a.ci, b.ci), cMax: Math.max(a.ci, b.ci) };
 }
 
 function renderTablaEditor(bloque) {
@@ -323,17 +336,41 @@ function renderTablaEditor(bloque) {
   tituloInput.addEventListener("input", () => { bloque.titulo = tituloInput.value; });
   cont.appendChild(tituloInput);
 
+  const numFilas = bloque.filas.length;
+  const numCols = bloque.filas[0].length;
+  bloque.merges = normalizarMerges(bloque.merges || [], numFilas, numCols);
+
   const grid = document.createElement("div");
   grid.className = "control-tabla-grid";
+  grid.style.gridTemplateColumns = `repeat(${numCols}, minmax(90px, 1fr))`;
+
+  // Pinta el rango [bloque._selA.._selB] (si hay uno activo) como
+  // seleccionado — se llama tras cada clic/arrastre sin re-renderizar toda
+  // la cuadrícula, para no perder el foco mientras se arrastra.
+  function actualizarResaltado() {
+    const rango = bloque._selA && bloque._selB ? rangoOrdenado(bloque._selA, bloque._selB) : null;
+    grid.querySelectorAll("input").forEach((input) => {
+      const fi = Number(input.dataset.fi);
+      const ci = Number(input.dataset.ci);
+      const sel = !!rango && fi >= rango.fMin && fi <= rango.fMax && ci >= rango.cMin && ci <= rango.cMax;
+      input.classList.toggle("control-celda-sel", sel);
+    });
+  }
+
   bloque.filas.forEach((fila, fi) => {
-    const filaEl = document.createElement("div");
-    filaEl.className = "control-tabla-fila";
     fila.forEach((celda, ci) => {
+      const info = celdaCombinada(bloque.merges, fi, ci);
+      if (info && !info.esAncla) return; // celda cubierta por un rango combinado: no se dibuja
+
       const celdaInput = document.createElement("input");
       celdaInput.type = "text";
       celdaInput.maxLength = 300;
       celdaInput.value = celda;
       celdaInput.placeholder = fi === 0 ? `Columna ${ci + 1}` : "";
+      celdaInput.dataset.fi = fi;
+      celdaInput.dataset.ci = ci;
+      celdaInput.style.gridColumn = info ? `${ci + 1} / span ${info.merge.cols}` : `${ci + 1}`;
+      celdaInput.style.gridRow = info ? `${fi + 1} / span ${info.merge.filas}` : `${fi + 1}`;
       celdaInput.addEventListener("input", () => { bloque.filas[fi][ci] = celdaInput.value; });
       // Recuerda dónde estaba el cursor para que el botón "Pegar tabla"
       // sepa dónde empezar si el pegado no se hizo directo sobre una celda.
@@ -345,11 +382,25 @@ function renderTablaEditor(bloque) {
         const texto = e.clipboardData?.getData("text/plain") ?? "";
         if (/\t|\n/.test(texto)) { e.preventDefault(); pegarEnTabla(bloque, fi, ci, texto); }
       });
-      filaEl.appendChild(celdaInput);
+      // Selección de un rango arrastrando sobre la cuadrícula (como en
+      // Excel), para los botones "Combinar celdas"/"Separar celdas" — un
+      // solo clic selecciona esa celda sola y no estorba para escribir.
+      celdaInput.addEventListener("mousedown", () => {
+        bloque._selA = { fi, ci };
+        bloque._selB = { fi, ci };
+        actualizarResaltado();
+      });
+      celdaInput.addEventListener("mouseenter", (e) => {
+        if (e.buttons === 1 && bloque._selA) {
+          bloque._selB = { fi, ci };
+          actualizarResaltado();
+        }
+      });
+      grid.appendChild(celdaInput);
     });
-    grid.appendChild(filaEl);
   });
   cont.appendChild(grid);
+  actualizarResaltado();
 
   const botones = document.createElement("div");
   botones.className = "control-tabla-botones";
@@ -401,7 +452,61 @@ function renderTablaEditor(bloque) {
       mostrarAlerta("El navegador no dejó leer el portapapeles automáticamente. Haz clic en la celda donde quieres empezar y pega con Ctrl+V — funciona igual.", "error");
     }
   });
-  botones.append(agregarFila, quitarFila, agregarCol, quitarCol, pegarBtn);
+  const combinarBtn = document.createElement("button");
+  combinarBtn.type = "button";
+  combinarBtn.className = "control-btn-mini";
+  combinarBtn.textContent = "🔗 Combinar celdas";
+  combinarBtn.title = "Arrastra sobre las celdas que quieras combinar y haz clic aquí";
+  combinarBtn.addEventListener("click", () => {
+    if (!bloque._selA || !bloque._selB) {
+      mostrarAlerta("Arrastra sobre las celdas que quieras combinar antes de hacer clic aquí.", "error");
+      return;
+    }
+    let { fMin, fMax, cMin, cMax } = expandirRangoConMerges(bloque.merges, rangoOrdenado(bloque._selA, bloque._selB));
+    if (fMin === fMax && cMin === cMax) {
+      mostrarAlerta("Selecciona al menos 2 celdas para combinar.", "error");
+      return;
+    }
+    // El texto de las celdas que se van a "esconder" no se pierde: se une
+    // al de la celda ancla (arriba-izquierda), separado por espacios.
+    const textos = [];
+    for (let fi = fMin; fi <= fMax; fi++) {
+      for (let ci = cMin; ci <= cMax; ci++) {
+        if (bloque.filas[fi][ci]) textos.push(bloque.filas[fi][ci]);
+      }
+    }
+    bloque.filas[fMin][cMin] = textos.join(" ").trim();
+    for (let fi = fMin; fi <= fMax; fi++) {
+      for (let ci = cMin; ci <= cMax; ci++) {
+        if (fi !== fMin || ci !== cMin) bloque.filas[fi][ci] = "";
+      }
+    }
+    bloque.merges = quitarMergesQueIntersectan(bloque.merges, fMin, fMax, cMin, cMax);
+    bloque.merges.push({ fila: fMin, col: cMin, filas: fMax - fMin + 1, cols: cMax - cMin + 1 });
+    bloque._selA = { fi: fMin, ci: cMin };
+    bloque._selB = { fi: fMin, ci: cMin };
+    renderBloques();
+  });
+  const separarBtn = document.createElement("button");
+  separarBtn.type = "button";
+  separarBtn.className = "control-btn-mini";
+  separarBtn.textContent = "✂ Separar celdas";
+  separarBtn.title = "Selecciona (o haz clic sobre) una celda combinada y haz clic aquí para deshacer la combinación";
+  separarBtn.addEventListener("click", () => {
+    if (!bloque._selA || !bloque._selB) {
+      mostrarAlerta("Haz clic sobre la celda combinada que quieras separar.", "error");
+      return;
+    }
+    const { fMin, fMax, cMin, cMax } = expandirRangoConMerges(bloque.merges, rangoOrdenado(bloque._selA, bloque._selB));
+    const quedan = quitarMergesQueIntersectan(bloque.merges, fMin, fMax, cMin, cMax);
+    if (quedan.length === bloque.merges.length) {
+      mostrarAlerta("No hay celdas combinadas en la selección.", "error");
+      return;
+    }
+    bloque.merges = quedan;
+    renderBloques();
+  });
+  botones.append(agregarFila, quitarFila, agregarCol, quitarCol, pegarBtn, combinarBtn, separarBtn);
   cont.appendChild(botones);
 
   return cont;

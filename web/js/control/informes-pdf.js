@@ -15,6 +15,7 @@
 // ahí, ya con el número de página real (anotado + el corrimiento).
 
 import { parsearHtmlARuns } from "./texto-rico.js";
+import { normalizarMerges, celdaCombinada, filasSinTextoCombinado } from "./tabla-celdas.js";
 
 const NAVY = [31, 39, 50];
 const NAVY_HEX = "#1f2732";
@@ -127,6 +128,15 @@ function calcularAnchosColumna(doc, filas, anchoUtil) {
     return deseados.map(() => anchoUtil / numCols);
   }
   return deseados.map((d, c) => anchoMin + (extra[c] / totalExtra) * espacioLibre);
+}
+
+// Suma "cantidad" valores consecutivos de un arreglo desde "inicio" — para
+// juntar el ancho de varias columnas o el alto de varias filas que abarca
+// una celda combinada.
+function sumaRango(valores, inicio, cantidad) {
+  let total = 0;
+  for (let i = inicio; i < inicio + cantidad; i++) total += valores[i];
+  return total;
 }
 
 export async function generarInformePDF(informe) {
@@ -343,32 +353,85 @@ export async function generarInformePDF(informe) {
     const padding = 2.2;
     doc.setFont("helvetica", "normal");
     doc.setFontSize(8.5);
-    const anchos = calcularAnchosColumna(doc, filas, anchoUtil);
+    const numFilas = filas.length;
+    const numCols = Math.max(...filas.map((f) => f.length));
+    // Combinar celdas, ver web/js/control/tabla-celdas.js — el texto de
+    // una celda combinada se excluye del cálculo de ancho de columna (si
+    // no, una sola columna terminaría cargando con todo ese ancho, cuando
+    // en realidad ese texto se reparte entre varias).
+    const merges = normalizarMerges(bloque.merges || [], numFilas, numCols);
+    const anchos = calcularAnchosColumna(doc, filasSinTextoCombinado(filas, merges), anchoUtil);
+
+    // Alto de cada fila, en dos pasadas: primero cada celda "propia" de esa
+    // fila (normal, o ancla de un merge que no combina filas hacia abajo);
+    // luego, para cada merge vertical, si el texto pide más alto que la
+    // suma actual de las filas que abarca, se reparte la diferencia entre
+    // ellas — así una celda combinada verticalmente no queda con el texto
+    // recortado.
+    const alturaFilas = new Array(numFilas).fill(0);
+    filas.forEach((fila, fi) => {
+      doc.setFont("helvetica", fi === 0 ? "bold" : "normal");
+      for (let ci = 0; ci < numCols; ci++) {
+        const info = celdaCombinada(merges, fi, ci);
+        if (info && !info.esAncla) continue;
+        if (info && info.merge.filas > 1) continue;
+        const ancho = info ? sumaRango(anchos, ci, info.merge.cols) : anchos[ci];
+        const lineas = doc.splitTextToSize(String(fila[ci] || ""), ancho - padding * 2);
+        const alto = lineas.length * 4.2 + padding * 2;
+        if (alto > alturaFilas[fi]) alturaFilas[fi] = alto;
+      }
+    });
+    for (let fi = 0; fi < numFilas; fi++) if (!alturaFilas[fi]) alturaFilas[fi] = 4.2 + padding * 2;
+    merges.filter((m) => m.filas > 1).forEach((m) => {
+      doc.setFont("helvetica", m.fila === 0 ? "bold" : "normal");
+      const ancho = sumaRango(anchos, m.col, m.cols);
+      const lineas = doc.splitTextToSize(String(filas[m.fila][m.col] || ""), ancho - padding * 2);
+      const altoNecesario = lineas.length * 4.2 + padding * 2;
+      const altoActual = sumaRango(alturaFilas, m.fila, m.filas);
+      if (altoNecesario > altoActual) {
+        const extra = (altoNecesario - altoActual) / m.filas;
+        for (let r = m.fila; r < m.fila + m.filas; r++) alturaFilas[r] += extra;
+      }
+    });
 
     filas.forEach((fila, fi) => {
       doc.setFont("helvetica", fi === 0 ? "bold" : "normal");
-      // Siempre se recorre anchos.length (no fila.length): una fila con
-      // menos celdas que el máximo de la tabla (celdas combinadas en el
-      // Word de origen) rellena con vacío en vez de desalinear columnas.
-      const lineasPorCelda = anchos.map((ancho, ci) => doc.splitTextToSize(String(fila[ci] || ""), ancho - padding * 2));
-      const alturaFila = Math.max(...lineasPorCelda.map((l) => l.length)) * 4.2 + padding * 2;
+      // Si esta fila arranca un merge vertical, hay que verificar que
+      // quepa el bloque completo (todas las filas que abarca) antes de
+      // dibujar — una celda combinada no se puede partir entre dos
+      // páginas. Las filas "de en medio" de ese bloque no repiten el
+      // chequeo (ya se validó al llegar a la fila ancla).
+      const inicioMergeVertical = merges.find((m) => m.fila === fi && m.filas > 1);
+      const esContinuacion = merges.some((m) => m.filas > 1 && fi > m.fila && fi < m.fila + m.filas);
+      if (!esContinuacion) {
+        saltoSiNoCabe(inicioMergeVertical ? sumaRango(alturaFilas, fi, inicioMergeVertical.filas) : alturaFilas[fi]);
+      }
 
-      saltoSiNoCabe(alturaFila);
       let x = margenX;
       if (fi === 0) doc.setFillColor(...GRIS_CLARO);
-      anchos.forEach((ancho, ci) => {
-        if (fi === 0) doc.rect(x, y, ancho, alturaFila, "F");
-        doc.setDrawColor(210, 214, 219);
-        doc.rect(x, y, ancho, alturaFila);
-        x += ancho;
-      });
+      for (let ci = 0; ci < numCols; ci++) {
+        const info = celdaCombinada(merges, fi, ci);
+        if (!info || info.esAncla) {
+          const ancho = info ? sumaRango(anchos, ci, info.merge.cols) : anchos[ci];
+          const alto = info && info.merge.filas > 1 ? sumaRango(alturaFilas, fi, info.merge.filas) : alturaFilas[fi];
+          if (fi === 0) doc.rect(x, y, ancho, alto, "F");
+          doc.setDrawColor(210, 214, 219);
+          doc.rect(x, y, ancho, alto);
+        }
+        x += anchos[ci];
+      }
       x = margenX;
       doc.setTextColor(20, 22, 26);
-      anchos.forEach((ancho, ci) => {
-        doc.text(lineasPorCelda[ci], x + padding, y + padding + 3.2);
-        x += ancho;
-      });
-      y += alturaFila;
+      for (let ci = 0; ci < numCols; ci++) {
+        const info = celdaCombinada(merges, fi, ci);
+        if (!info || info.esAncla) {
+          const ancho = info ? sumaRango(anchos, ci, info.merge.cols) : anchos[ci];
+          const lineas = doc.splitTextToSize(String(fila[ci] || ""), ancho - padding * 2);
+          doc.text(lineas, x + padding, y + padding + 3.2);
+        }
+        x += anchos[ci];
+      }
+      y += alturaFilas[fi];
     });
 
     // Nota/pie de la tabla, abajo a la derecha.
