@@ -80,3 +80,38 @@ export function quitarMergesQueIntersectan(merges, fMin, fMax, cMin, cMax) {
     return !(m.fila <= fMax && mfMax >= fMin && m.col <= cMax && mcMax >= cMin);
   });
 }
+
+// ---- alineación de celdas (centrado) ----
+// bloque.centrados: array de { fila, col } — lista dispersa de qué celdas
+// están centradas (todo lo que no está en la lista se alinea a la
+// izquierda, el valor por defecto). Mismo criterio de "lista dispersa de
+// coordenadas" que los merges, pero sin filas/cols porque acá cada celda
+// se marca individualmente (al centrar una fila o columna completa se
+// agregan todas sus coordenadas, no un solo rango).
+
+export function celdaCentrada(centrados, fi, ci) {
+  return (centrados || []).some((c) => c.fila === fi && c.col === ci);
+}
+
+// Recorta cualquier coordenada que se salga de las dimensiones actuales de
+// la tabla — mismo criterio que normalizarMerges.
+export function normalizarCentrados(centrados, numFilas, numCols) {
+  return (centrados || []).filter((c) => c && c.fila >= 0 && c.col >= 0 && c.fila < numFilas && c.col < numCols);
+}
+
+// Agrega al centrado todas las coordenadas de [fMin..fMax, cMin..cMax] que
+// todavía no estén marcadas.
+export function centrarRango(centrados, fMin, fMax, cMin, cMax) {
+  const resultado = centrados.slice();
+  for (let fi = fMin; fi <= fMax; fi++) {
+    for (let ci = cMin; ci <= cMax; ci++) {
+      if (!celdaCentrada(resultado, fi, ci)) resultado.push({ fila: fi, col: ci });
+    }
+  }
+  return resultado;
+}
+
+// Quita del centrado cualquier coordenada dentro de [fMin..fMax, cMin..cMax].
+export function alinearIzquierdaRango(centrados, fMin, fMax, cMin, cMax) {
+  return centrados.filter((c) => !(c.fila >= fMin && c.fila <= fMax && c.col >= cMin && c.col <= cMax));
+}

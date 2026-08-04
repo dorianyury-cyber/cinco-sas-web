@@ -9,7 +9,9 @@
 // web/js/vendor/docx.iife.js, script clásico -> window.docx).
 
 import { parsearHtmlARuns } from "./texto-rico.js";
-import { normalizarMerges, celdaCombinada, filasSinTextoCombinado } from "./tabla-celdas.js";
+import {
+  normalizarMerges, celdaCombinada, filasSinTextoCombinado, normalizarCentrados, celdaCentrada
+} from "./tabla-celdas.js";
 
 const NAVY_HEX = "1F2732";
 const MUTED_HEX = "5C6570";
@@ -270,6 +272,7 @@ export async function generarInformeDocxBlob(informe) {
       // Combinar celdas, ver web/js/control/tabla-celdas.js — el texto de
       // una celda combinada se excluye del cálculo de ancho de columna.
       const merges = normalizarMerges(bloque.merges || [], numFilasTabla, numColsTabla);
+      const centrados = normalizarCentrados(bloque.centrados || [], numFilasTabla, numColsTabla);
       const anchos = anchosColumnaDocx(filasSinTextoCombinado(filas, merges));
       const margenesCelda = { top: 60, bottom: 60, left: 100, right: 100 };
 
@@ -301,7 +304,10 @@ export async function generarInformeDocxBlob(informe) {
             columnSpan: info && info.merge.cols > 1 ? info.merge.cols : undefined,
             verticalMerge: info && info.merge.filas > 1 ? VerticalMergeType.RESTART : undefined,
             margins: margenesCelda,
-            children: [new Paragraph({ children: [new TextRun({ text: String(fila[ci] || ""), bold: fi === 0, size: 17 })] })]
+            children: [new Paragraph({
+              alignment: celdaCentrada(centrados, fi, ci) ? AlignmentType.CENTER : undefined,
+              children: [new TextRun({ text: String(fila[ci] || ""), bold: fi === 0, size: 17 })]
+            })]
           }));
         }
         return new TableRow({ children: celdas });

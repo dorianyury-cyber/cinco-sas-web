@@ -15,7 +15,9 @@
 // ahí, ya con el número de página real (anotado + el corrimiento).
 
 import { parsearHtmlARuns } from "./texto-rico.js";
-import { normalizarMerges, celdaCombinada, filasSinTextoCombinado } from "./tabla-celdas.js";
+import {
+  normalizarMerges, celdaCombinada, filasSinTextoCombinado, normalizarCentrados, celdaCentrada
+} from "./tabla-celdas.js";
 
 const NAVY = [31, 39, 50];
 const NAVY_HEX = "#1f2732";
@@ -360,6 +362,7 @@ export async function generarInformePDF(informe) {
     // no, una sola columna terminaría cargando con todo ese ancho, cuando
     // en realidad ese texto se reparte entre varias).
     const merges = normalizarMerges(bloque.merges || [], numFilas, numCols);
+    const centrados = normalizarCentrados(bloque.centrados || [], numFilas, numCols);
     const anchos = calcularAnchosColumna(doc, filasSinTextoCombinado(filas, merges), anchoUtil);
 
     // Alto de cada fila, en dos pasadas: primero cada celda "propia" de esa
@@ -427,7 +430,8 @@ export async function generarInformePDF(informe) {
         if (!info || info.esAncla) {
           const ancho = info ? sumaRango(anchos, ci, info.merge.cols) : anchos[ci];
           const lineas = doc.splitTextToSize(String(fila[ci] || ""), ancho - padding * 2);
-          doc.text(lineas, x + padding, y + padding + 3.2);
+          if (celdaCentrada(centrados, fi, ci)) doc.text(lineas, x + ancho / 2, y + padding + 3.2, { align: "center" });
+          else doc.text(lineas, x + padding, y + padding + 3.2);
         }
         x += anchos[ci];
       }

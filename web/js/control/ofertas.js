@@ -11,7 +11,8 @@ import { truncar } from "./texto.js";
 import { LINEAS_SERVICIO } from "./lineas-servicio.js";
 import { crearCampoTextoRico } from "./texto-rico.js";
 import {
-  normalizarMerges, celdaCombinada, expandirRangoConMerges, quitarMergesQueIntersectan
+  normalizarMerges, celdaCombinada, expandirRangoConMerges, quitarMergesQueIntersectan,
+  celdaCentrada, normalizarCentrados, centrarRango, alinearIzquierdaRango
 } from "./tabla-celdas.js";
 
 // Área/tipo fijos para que una oferta quede en el Listado Maestro de
@@ -126,7 +127,7 @@ function bloquesPorDefecto() {
 }
 
 function nuevaTabla() {
-  return { tipo: "tabla", titulo: "", filas: [["", ""], ["", ""]], merges: [] };
+  return { tipo: "tabla", titulo: "", filas: [["", ""], ["", ""]], merges: [], centrados: [] };
 }
 
 function redimensionarImagen(file) {
@@ -336,9 +337,17 @@ function renderTablaEditor(bloque) {
   tituloInput.addEventListener("input", () => { bloque.titulo = tituloInput.value; });
   cont.appendChild(tituloInput);
 
+  // Una tabla pegada desde Excel/Word puede llegar "dispareja" (una fila
+  // con menos celdas que las demás, típicamente porque el origen tenía una
+  // celda ya combinada) — se completa a un rectángulo parejo con celdas
+  // vacías antes de seguir. Si no, "+ Fila"/"+ Columna" (que se basan en el
+  // ancho de la fila 0) heredaban ese ancho corto y agregaban filas/columnas
+  // incompletas.
   const numFilas = bloque.filas.length;
-  const numCols = bloque.filas[0].length;
+  const numCols = Math.max(...bloque.filas.map((f) => f.length));
+  bloque.filas.forEach((fila) => { while (fila.length < numCols) fila.push(""); });
   bloque.merges = normalizarMerges(bloque.merges || [], numFilas, numCols);
+  bloque.centrados = normalizarCentrados(bloque.centrados || [], numFilas, numCols);
 
   const grid = document.createElement("div");
   grid.className = "control-tabla-grid";
@@ -371,6 +380,7 @@ function renderTablaEditor(bloque) {
       celdaInput.dataset.ci = ci;
       celdaInput.style.gridColumn = info ? `${ci + 1} / span ${info.merge.cols}` : `${ci + 1}`;
       celdaInput.style.gridRow = info ? `${fi + 1} / span ${info.merge.filas}` : `${fi + 1}`;
+      celdaInput.style.textAlign = celdaCentrada(bloque.centrados, fi, ci) ? "center" : "left";
       celdaInput.addEventListener("input", () => { bloque.filas[fi][ci] = celdaInput.value; });
       // Recuerda dónde estaba el cursor para que el botón "Pegar tabla"
       // sepa dónde empezar si el pegado no se hizo directo sobre una celda.
@@ -409,7 +419,7 @@ function renderTablaEditor(bloque) {
   agregarFila.className = "control-btn-mini";
   agregarFila.textContent = "+ Fila";
   agregarFila.addEventListener("click", () => {
-    bloque.filas.push(bloque.filas[0].map(() => ""));
+    bloque.filas.push(new Array(numCols).fill(""));
     renderBloques();
   });
   const quitarFila = document.createElement("button");
@@ -432,9 +442,9 @@ function renderTablaEditor(bloque) {
   quitarCol.type = "button";
   quitarCol.className = "control-btn-mini";
   quitarCol.textContent = "- Columna";
-  quitarCol.disabled = bloque.filas[0].length <= 1;
+  quitarCol.disabled = numCols <= 1;
   quitarCol.addEventListener("click", () => {
-    if (bloque.filas[0].length > 1) { bloque.filas.forEach((fila) => fila.pop()); renderBloques(); }
+    if (numCols > 1) { bloque.filas.forEach((fila) => fila.pop()); renderBloques(); }
   });
   const pegarBtn = document.createElement("button");
   pegarBtn.type = "button";
@@ -506,7 +516,35 @@ function renderTablaEditor(bloque) {
     bloque.merges = quedan;
     renderBloques();
   });
-  botones.append(agregarFila, quitarFila, agregarCol, quitarCol, pegarBtn, combinarBtn, separarBtn);
+  const centrarBtn = document.createElement("button");
+  centrarBtn.type = "button";
+  centrarBtn.className = "control-btn-mini";
+  centrarBtn.textContent = "↔ Centrar";
+  centrarBtn.title = "Arrastra sobre las celdas (una fila, una columna o cualquier bloque) y haz clic aquí para centrar su texto";
+  centrarBtn.addEventListener("click", () => {
+    if (!bloque._selA || !bloque._selB) {
+      mostrarAlerta("Arrastra sobre las celdas que quieras centrar antes de hacer clic aquí.", "error");
+      return;
+    }
+    const { fMin, fMax, cMin, cMax } = rangoOrdenado(bloque._selA, bloque._selB);
+    bloque.centrados = centrarRango(bloque.centrados, fMin, fMax, cMin, cMax);
+    renderBloques();
+  });
+  const izquierdaBtn = document.createElement("button");
+  izquierdaBtn.type = "button";
+  izquierdaBtn.className = "control-btn-mini";
+  izquierdaBtn.textContent = "⇤ Izquierda";
+  izquierdaBtn.title = "Arrastra sobre las celdas y haz clic aquí para volver a alinear su texto a la izquierda";
+  izquierdaBtn.addEventListener("click", () => {
+    if (!bloque._selA || !bloque._selB) {
+      mostrarAlerta("Arrastra sobre las celdas que quieras alinear a la izquierda antes de hacer clic aquí.", "error");
+      return;
+    }
+    const { fMin, fMax, cMin, cMax } = rangoOrdenado(bloque._selA, bloque._selB);
+    bloque.centrados = alinearIzquierdaRango(bloque.centrados, fMin, fMax, cMin, cMax);
+    renderBloques();
+  });
+  botones.append(agregarFila, quitarFila, agregarCol, quitarCol, pegarBtn, combinarBtn, separarBtn, centrarBtn, izquierdaBtn);
   cont.appendChild(botones);
 
   return cont;
