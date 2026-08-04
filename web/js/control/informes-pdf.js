@@ -43,7 +43,12 @@ const TIPO_LABEL = {
   obra: "Informe de obra", capacitacion: "Informe de capacitación", otro: "Informe"
 };
 
-function cargarImagenComoDataURL(url, colorFondo = "#ffffff") {
+// formato "PNG" (por defecto, para el logo — necesita transparencia) o
+// "JPEG" (para las fotos/gráficos que sube el usuario en el cuerpo del
+// informe): re-exportar como PNG sin pérdida infla muchísimo capturas de
+// pantalla o fotos, aunque ya se hayan comprimido a JPEG al subirlas — el
+// informe pasaba de unos pocos KB por imagen a varios MB por este motivo.
+function cargarImagenComoDataURL(url, colorFondo = "#ffffff", formato = "PNG") {
   return new Promise((resolve, reject) => {
     const img = new Image();
     if (/^https?:/.test(url)) img.crossOrigin = "anonymous";
@@ -55,7 +60,8 @@ function cargarImagenComoDataURL(url, colorFondo = "#ffffff") {
       ctx.fillStyle = colorFondo;
       ctx.fillRect(0, 0, canvas.width, canvas.height);
       ctx.drawImage(img, 0, 0);
-      resolve({ dataUrl: canvas.toDataURL("image/png"), ancho: img.naturalWidth, alto: img.naturalHeight });
+      const dataUrl = formato === "JPEG" ? canvas.toDataURL("image/jpeg", 0.82) : canvas.toDataURL("image/png");
+      resolve({ dataUrl, ancho: img.naturalWidth, alto: img.naturalHeight });
     };
     img.onerror = reject;
     img.src = url;
@@ -238,7 +244,7 @@ export async function generarInformePDF(informe) {
 
   async function dibujarImagen(bloque) {
     try {
-      const img = await cargarImagenComoDataURL(bloque.url);
+      const img = await cargarImagenComoDataURL(bloque.url, "#ffffff", "JPEG");
 
       // Nombre arriba, centrado (mismo criterio que el título de una
       // tabla) — la Lista de gráficos del índice usa este mismo texto.
@@ -259,7 +265,7 @@ export async function generarInformePDF(informe) {
       if (alto > altoMaximo) { alto = altoMaximo; ancho = alto * (img.ancho / img.alto); }
       saltoSiNoCabe(alto + 10);
       const x = margenX + (anchoUtil - ancho) / 2;
-      doc.addImage(img.dataUrl, "PNG", x, y, ancho, alto);
+      doc.addImage(img.dataUrl, "JPEG", x, y, ancho, alto);
       y += alto + 3;
 
       // Pie de página de la gráfica, abajo a la derecha.

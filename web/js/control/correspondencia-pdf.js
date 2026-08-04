@@ -29,7 +29,11 @@ const VERSION_FORMATO = "1";
 // oscuros, como el encabezado navy del sitio web), por eso el logo se
 // aplana contra NAVY, no contra blanco — si no, el texto blanco
 // desaparece contra la página.
-function cargarImagenComoDataURL(url, colorFondo = "#ffffff") {
+// formato "PNG" (por defecto, para el logo — necesita transparencia) o
+// "JPEG" (para las fotos que se insertan en la carta): re-exportar como
+// PNG sin pérdida infla muchísimo capturas de pantalla o fotos, aunque ya
+// se hayan comprimido a JPEG al subirlas.
+function cargarImagenComoDataURL(url, colorFondo = "#ffffff", formato = "PNG") {
   return new Promise((resolve, reject) => {
     const img = new Image();
     // Solo hace falta pedir CORS para URLs remotas (Storage) — pedirlo para
@@ -44,7 +48,8 @@ function cargarImagenComoDataURL(url, colorFondo = "#ffffff") {
       ctx.fillStyle = colorFondo;
       ctx.fillRect(0, 0, canvas.width, canvas.height);
       ctx.drawImage(img, 0, 0);
-      resolve({ dataUrl: canvas.toDataURL("image/png"), ancho: img.naturalWidth, alto: img.naturalHeight });
+      const dataUrl = formato === "JPEG" ? canvas.toDataURL("image/jpeg", 0.82) : canvas.toDataURL("image/png");
+      resolve({ dataUrl, ancho: img.naturalWidth, alto: img.naturalHeight });
     };
     img.onerror = reject;
     img.src = url;
@@ -129,13 +134,13 @@ export async function generarCartaPDF(datos) {
   for (const bloque of bloques) {
     if (bloque.tipo === "imagen") {
       try {
-        const img = await cargarImagenComoDataURL(bloque.url);
+        const img = await cargarImagenComoDataURL(bloque.url, "#ffffff", "JPEG");
         let anchoImg = anchoUtil;
         let altoImg = anchoImg * (img.alto / img.ancho);
         const altoMaximo = 90;
         if (altoImg > altoMaximo) { altoImg = altoMaximo; anchoImg = altoImg * (img.ancho / img.alto); }
         if (y + altoImg > altoPagina - 45) { doc.addPage(); y = 20; }
-        doc.addImage(img.dataUrl, "PNG", margenX, y, anchoImg, altoImg);
+        doc.addImage(img.dataUrl, "JPEG", margenX, y, anchoImg, altoImg);
         y += altoImg + 6;
       } catch (e) {
         // Antes esto fallaba en silencio y la carta se veía "completa"

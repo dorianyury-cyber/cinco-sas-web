@@ -30,7 +30,11 @@ const VERSION_FORMATO = "1";
 const formatoMoneda = new Intl.NumberFormat("es-CO", { style: "currency", currency: "COP", maximumFractionDigits: 0 });
 const formatoCantidad = new Intl.NumberFormat("es-CO", { maximumFractionDigits: 2 });
 
-function cargarImagenComoDataURL(url, colorFondo = "#ffffff") {
+// formato "PNG" (por defecto, para el logo/firma — pueden necesitar
+// transparencia) o "JPEG" (para las fotos/gráficos del cuerpo de la
+// oferta): re-exportar como PNG sin pérdida infla muchísimo capturas de
+// pantalla o fotos, aunque ya se hayan comprimido a JPEG al subirlas.
+function cargarImagenComoDataURL(url, colorFondo = "#ffffff", formato = "PNG") {
   return new Promise((resolve, reject) => {
     const img = new Image();
     if (/^https?:/.test(url)) img.crossOrigin = "anonymous";
@@ -42,7 +46,8 @@ function cargarImagenComoDataURL(url, colorFondo = "#ffffff") {
       ctx.fillStyle = colorFondo;
       ctx.fillRect(0, 0, canvas.width, canvas.height);
       ctx.drawImage(img, 0, 0);
-      resolve({ dataUrl: canvas.toDataURL("image/png"), ancho: img.naturalWidth, alto: img.naturalHeight });
+      const dataUrl = formato === "JPEG" ? canvas.toDataURL("image/jpeg", 0.82) : canvas.toDataURL("image/png");
+      resolve({ dataUrl, ancho: img.naturalWidth, alto: img.naturalHeight });
     };
     img.onerror = reject;
     img.src = url;
@@ -227,14 +232,14 @@ export async function generarOfertaPDF(oferta) {
 
   async function dibujarImagen(bloque) {
     try {
-      const img = await cargarImagenComoDataURL(bloque.url);
+      const img = await cargarImagenComoDataURL(bloque.url, "#ffffff", "JPEG");
       let ancho = anchoUtil * 0.85;
       let alto = ancho * (img.alto / img.ancho);
       const altoMaximo = 100;
       if (alto > altoMaximo) { alto = altoMaximo; ancho = alto * (img.ancho / img.alto); }
       saltoSiNoCabe(alto + 10);
       const x = margenX + (anchoUtil - ancho) / 2;
-      doc.addImage(img.dataUrl, "PNG", x, y, ancho, alto);
+      doc.addImage(img.dataUrl, "JPEG", x, y, ancho, alto);
       y += alto + 3;
       if (bloque.pieDeFoto) {
         doc.setFont("helvetica", "italic");
