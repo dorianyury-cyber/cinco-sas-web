@@ -179,7 +179,18 @@ export async function generarOfertaPDF(oferta) {
     y += lineHeight * 0.5;
   }
 
-  function dibujarTitulo(nivel, texto) {
+  // Numeración automática 1 / 1.1 / 1.1.1 / 1.1.1.1 para Título 1..4 —
+  // mismo criterio que informes-pdf.js: cada nivel arranca en 1 y se
+  // reinicia solo cuando aparece un título de nivel superior.
+  const contadoresTitulo = [0, 0, 0, 0];
+  function numeroTitulo(nivel) {
+    contadoresTitulo[nivel - 1] += 1;
+    for (let i = nivel; i < contadoresTitulo.length; i++) contadoresTitulo[i] = 0;
+    return contadoresTitulo.slice(0, nivel).join(".") + ".";
+  }
+
+  function dibujarTitulo(nivel, textoOriginal) {
+    const texto = `${numeroTitulo(nivel)} ${textoOriginal || ""}`.trim();
     if (nivel === 1) {
       // A diferencia de informes-pdf.js (capítulos largos, sí conviene
       // arrancar página nueva), una oferta tiene secciones cortas — forzar
