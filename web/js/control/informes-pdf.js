@@ -170,14 +170,21 @@ export async function generarInformePDF(informe) {
       anchoLinea = 0;
     }
 
+    // lineaNueva: true justo tras un salto explícito (fin de línea/viñeta en
+    // el HTML), no tras un salto de línea automático por ajuste de ancho —
+    // así el espacio de sangría de una viñeta ("    o texto") sobrevive,
+    // pero se sigue evitando arrancar una línea de ajuste con un espacio
+    // suelto.
+    let lineaNueva = true;
     tokens.forEach((token) => {
-      if (token.salto) { trazarLinea(); y += lineHeight * 0.3; return; }
+      if (token.salto) { trazarLinea(); y += lineHeight * 0.3; lineaNueva = true; return; }
       const ancho = medirToken(token);
       const esEspacio = /^\s+$/.test(token.texto);
-      if (esEspacio && !linea.length) return; // no arrancar una línea con espacio
+      if (esEspacio && !linea.length && !lineaNueva) return; // no arrancar una línea de ajuste con espacio
       if (!esEspacio && anchoLinea + ancho > anchoUtil && linea.length) trazarLinea();
       linea.push(token);
       anchoLinea += ancho;
+      lineaNueva = false;
     });
     trazarLinea();
     y += lineHeight * 0.5;
@@ -197,12 +204,18 @@ export async function generarInformePDF(informe) {
       doc.setFont("helvetica", "bold");
       doc.setFontSize(12.5);
       doc.setTextColor(...NAVY);
-    } else {
+    } else if (nivel === 3) {
       saltoSiNoCabe(lineHeight * 2.2);
       y += 2;
       doc.setFont("helvetica", "bold");
       doc.setFontSize(11);
       doc.setTextColor(30, 34, 40);
+    } else {
+      saltoSiNoCabe(lineHeight * 2);
+      y += 1.5;
+      doc.setFont("helvetica", "bolditalic");
+      doc.setFontSize(10);
+      doc.setTextColor(...TEXT_MUTED);
     }
     indiceEntradas.push({ texto: texto || "", nivel, pagina: doc.internal.getNumberOfPages() });
     const lineas = doc.splitTextToSize(texto || "", anchoUtil);
@@ -326,6 +339,7 @@ export async function generarInformePDF(informe) {
     if (bloque.tipo === "titulo1") dibujarTitulo(1, bloque.texto);
     else if (bloque.tipo === "titulo2") dibujarTitulo(2, bloque.texto);
     else if (bloque.tipo === "titulo3") dibujarTitulo(3, bloque.texto);
+    else if (bloque.tipo === "titulo4") dibujarTitulo(4, bloque.texto);
     else if (bloque.tipo === "tabla") dibujarTabla(bloque);
     else if (bloque.tipo === "imagen") await dibujarImagen(bloque);
     else dibujarParrafo(bloque.texto);

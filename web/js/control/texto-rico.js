@@ -49,6 +49,19 @@ export function crearCampoTextoRico({ valor, placeholder, onInput }) {
   btnCursiva.title = "Cursiva";
   btnCursiva.innerHTML = "<i>C</i>";
 
+  const btnVineta = document.createElement("button");
+  btnVineta.type = "button";
+  btnVineta.className = "control-rich-btn";
+  btnVineta.dataset.cmd = "insertUnorderedList";
+  btnVineta.title = "Viñeta";
+  btnVineta.textContent = "•";
+
+  const btnTabulador = document.createElement("button");
+  btnTabulador.type = "button";
+  btnTabulador.className = "control-rich-btn";
+  btnTabulador.title = "Sangría / sub-viñeta (Tab dentro del texto hace lo mismo, Shift+Tab quita sangría)";
+  btnTabulador.textContent = "⇥";
+
   const inputColor = document.createElement("input");
   inputColor.type = "color";
   inputColor.className = "control-rich-color";
@@ -56,7 +69,7 @@ export function crearCampoTextoRico({ valor, placeholder, onInput }) {
   inputColor.title = "Color de letra";
   inputColor.value = "#1a1a1a";
 
-  toolbar.append(btnNegrita, btnCursiva, inputColor);
+  toolbar.append(btnNegrita, btnCursiva, btnVineta, btnTabulador, inputColor);
 
   const editable = document.createElement("div");
   editable.className = "control-rich-editable";
@@ -65,6 +78,29 @@ export function crearCampoTextoRico({ valor, placeholder, onInput }) {
   editable.innerHTML = htmlParaCampoRico(valor);
 
   editable.addEventListener("input", () => onInput?.(editable.innerHTML));
+
+  // "indent" fuera de una viñeta se vuelve una cita/blockquote que el
+  // exportador a PDF/Word no sabe dibujar (parsearHtmlARuns solo entiende
+  // sangría dentro de <ul>/<li>) — por eso, si el cursor no está ya en una
+  // viñeta, primero se crea una antes de sangrar.
+  function sangrar(quitar) {
+    editable.focus();
+    if (!quitar && !document.queryCommandState("insertUnorderedList")) {
+      document.execCommand("insertUnorderedList", false, null);
+    }
+    document.execCommand(quitar ? "outdent" : "indent", false, null);
+    onInput?.(editable.innerHTML);
+  }
+
+  // Tab/Shift+Tab dentro del campo = sangrar/quitar sangría (crea sub-viñeta
+  // cuando el cursor está dentro de una viñeta), en vez de saltar de foco al
+  // siguiente campo — mismo resultado que el botón "⇥" pero con la tecla que
+  // el usuario espera para "tabulador".
+  editable.addEventListener("keydown", (e) => {
+    if (e.key !== "Tab") return;
+    e.preventDefault();
+    sangrar(e.shiftKey);
+  });
 
   let ultimaSeleccion = null;
   editable.addEventListener("mouseup", guardarSeleccion);
@@ -80,6 +116,7 @@ export function crearCampoTextoRico({ valor, placeholder, onInput }) {
   toolbar.addEventListener("click", (e) => {
     const btn = e.target.closest(".control-rich-btn");
     if (!btn) return;
+    if (btn === btnTabulador) { sangrar(false); return; }
     editable.focus();
     document.execCommand(btn.dataset.cmd, false, null);
     onInput?.(editable.innerHTML);
@@ -107,13 +144,19 @@ export function crearCampoTextoRico({ valor, placeholder, onInput }) {
 // página/posición (no se comparte esa parte: cada archivo ya maneja su
 // propio "y" e "saltoSiNoCabe", como el resto de los -pdf.js de este
 // proyecto).
+// Marcador según nivel de anidación (0 = viñeta de primer nivel), igual al
+// criterio que ya se usaba tecleando a mano "·" / "o" en los informes.
+// Se evitan glifos "○"/"▪": la fuente helvetica estándar de jsPDF (WinAnsi)
+// no los tiene y saldrían en blanco en el PDF.
+const MARCADORES_VINETA = ["•", "o", "-"];
+
 export function parsearHtmlARuns(html) {
   if (!html) return [];
   const raiz = document.createElement("div");
   raiz.innerHTML = html;
   const runs = [];
 
-  function caminar(nodo, estilo) {
+  function caminar(nodo, estilo, nivel) {
     if (nodo.nodeType === Node.TEXT_NODE) {
       if (nodo.textContent) runs.push({ texto: nodo.textContent, ...estilo });
       return;
@@ -121,15 +164,50 @@ export function parsearHtmlARuns(html) {
     if (nodo.nodeType !== Node.ELEMENT_NODE) return;
     if (nodo.tagName === "BR") { runs.push({ salto: true }); return; }
 
+    // Las listas (creadas con los botones "•"/"⇥" o Tab dentro del campo
+    // rico) se aplanan a texto plano con el marcador + sangría ya puestos,
+    // en vez de introducir un formato de "run" nuevo: así ningún *-pdf.js /
+    // *-docx.js necesita enterarse de que existen viñetas.
+    if (nodo.tagName === "UL" || nodo.tagName === "OL") {
+      nodo.childNodes.forEach((hijo) => {
+        if (hijo.nodeType === Node.ELEMENT_NODE && hijo.tagName === "LI") caminarItemLista(hijo, estilo, nivel);
+      });
+      return;
+    }
+
     const nuevoEstilo = { ...estilo };
     if (nodo.tagName === "B" || nodo.tagName === "STRONG") nuevoEstilo.negrita = true;
     if (nodo.tagName === "I" || nodo.tagName === "EM") nuevoEstilo.cursiva = true;
     if (nodo.style && nodo.style.color) nuevoEstilo.color = rgbDesdeCss(nodo.style.color);
 
-    nodo.childNodes.forEach((hijo) => caminar(hijo, nuevoEstilo));
+    nodo.childNodes.forEach((hijo) => caminar(hijo, nuevoEstilo, nivel));
     if (nodo.tagName === "DIV" || nodo.tagName === "P") runs.push({ salto: true });
   }
-  raiz.childNodes.forEach((hijo) => caminar(hijo, {}));
+
+  function caminarItemLista(li, estilo, nivel) {
+    const marcador = MARCADORES_VINETA[Math.min(nivel, MARCADORES_VINETA.length - 1)];
+    runs.push({ texto: "    ".repeat(nivel) + marcador + " ", ...estilo });
+    const hijos = Array.from(li.childNodes);
+    hijos.forEach((hijo) => {
+      // Chrome anida "indent" dentro de una viñeta como <ul> hijo del <li>.
+      if (hijo.nodeType === Node.ELEMENT_NODE && (hijo.tagName === "UL" || hijo.tagName === "OL")) {
+        runs.push({ salto: true });
+        hijo.childNodes.forEach((nieto) => {
+          if (nieto.nodeType === Node.ELEMENT_NODE && nieto.tagName === "LI") caminarItemLista(nieto, estilo, nivel + 1);
+        });
+      } else {
+        caminar(hijo, estilo, nivel);
+      }
+    });
+    // Si el último hijo fue una sub-lista, ella ya cerró su último ítem con
+    // su propio salto — no duplicarlo (dejaría una línea en blanco antes
+    // del siguiente ítem del nivel superior).
+    const ultimo = hijos[hijos.length - 1];
+    const terminaEnSublista = ultimo?.nodeType === Node.ELEMENT_NODE && (ultimo.tagName === "UL" || ultimo.tagName === "OL");
+    if (!terminaEnSublista) runs.push({ salto: true });
+  }
+
+  raiz.childNodes.forEach((hijo) => caminar(hijo, {}, 0));
   while (runs.length && runs[runs.length - 1].salto) runs.pop();
   return runs;
 }

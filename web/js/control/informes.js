@@ -162,15 +162,16 @@ function quitarBloque(indice) {
   renderBloques();
 }
 
-const TITULO_LABEL = { titulo1: "Título 1", titulo2: "Título 2", titulo3: "Título 3" };
+const TITULO_LABEL = { titulo1: "Título 1", titulo2: "Título 2", titulo3: "Título 3", titulo4: "Título 4" };
 
 // Tipos de bloque que se pueden insertar desde un "hueco" entre bloques
-// (o antes del primero) — mismas 6 opciones que la barra de abajo, para
+// (o antes del primero) — mismas 7 opciones que la barra de abajo, para
 // no obligar a agregar siempre al final y reordenar a mano.
 const TIPOS_INSERTABLES = [
   { tipo: "titulo1", etiqueta: "Título 1" },
   { tipo: "titulo2", etiqueta: "Título 2" },
   { tipo: "titulo3", etiqueta: "Título 3" },
+  { tipo: "titulo4", etiqueta: "Título 4" },
   { tipo: "parrafo", etiqueta: "Párrafo" },
   { tipo: "tabla", etiqueta: "Tabla" },
   { tipo: "imagen", etiqueta: "Gráfico / imagen" }
@@ -381,6 +382,7 @@ function renderTablaEditor(bloque) {
 document.getElementById("agregarTitulo1Btn").addEventListener("click", () => { guardarHistorialBloques(); bloques.push({ tipo: "titulo1", texto: "" }); renderBloques(); });
 document.getElementById("agregarTitulo2Btn").addEventListener("click", () => { guardarHistorialBloques(); bloques.push({ tipo: "titulo2", texto: "" }); renderBloques(); });
 document.getElementById("agregarTitulo3Btn").addEventListener("click", () => { guardarHistorialBloques(); bloques.push({ tipo: "titulo3", texto: "" }); renderBloques(); });
+document.getElementById("agregarTitulo4Btn").addEventListener("click", () => { guardarHistorialBloques(); bloques.push({ tipo: "titulo4", texto: "" }); renderBloques(); });
 document.getElementById("agregarParrafoBtn").addEventListener("click", () => { guardarHistorialBloques(); bloques.push({ tipo: "parrafo", texto: "" }); renderBloques(); });
 document.getElementById("agregarTablaBtn").addEventListener("click", () => { guardarHistorialBloques(); bloques.push(nuevaTabla()); renderBloques(); });
 document.getElementById("agregarImagenBtn").addEventListener("click", () => inputImagen.click());
@@ -454,7 +456,7 @@ document.getElementById("importarJsonBtn").addEventListener("click", () => {
   // formulario (para no dejarlo a medio cargar) y con un mensaje que diga
   // cuál bloque falló, en vez de dejar que renderBloques() reviente más
   // adelante al toparse con una tabla sin filas.
-  const TIPOS_VALIDOS = ["titulo1", "titulo2", "titulo3", "parrafo", "tabla", "imagen"];
+  const TIPOS_VALIDOS = ["titulo1", "titulo2", "titulo3", "titulo4", "parrafo", "tabla", "imagen"];
   for (let i = 0; i < datos.bloques.length; i++) {
     const b = datos.bloques[i];
     if (!TIPOS_VALIDOS.includes(b.tipo)) {

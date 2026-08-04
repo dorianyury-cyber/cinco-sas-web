@@ -167,15 +167,16 @@ function quitarBloque(indice) {
   renderBloques();
 }
 
-const TITULO_LABEL = { titulo1: "Título 1", titulo2: "Título 2", titulo3: "Título 3" };
+const TITULO_LABEL = { titulo1: "Título 1", titulo2: "Título 2", titulo3: "Título 3", titulo4: "Título 4" };
 
 // Tipos de bloque que se pueden insertar desde un "hueco" entre bloques
-// (o antes del primero) — mismas 6 opciones que la barra de abajo, para
+// (o antes del primero) — mismas 7 opciones que la barra de abajo, para
 // no obligar a agregar siempre al final y reordenar a mano.
 const TIPOS_INSERTABLES = [
   { tipo: "titulo1", etiqueta: "Título 1" },
   { tipo: "titulo2", etiqueta: "Título 2" },
   { tipo: "titulo3", etiqueta: "Título 3" },
+  { tipo: "titulo4", etiqueta: "Título 4" },
   { tipo: "parrafo", etiqueta: "Párrafo" },
   { tipo: "tabla", etiqueta: "Tabla" },
   { tipo: "imagen", etiqueta: "Gráfico / imagen" }
@@ -363,6 +364,7 @@ function renderTablaEditor(bloque) {
 document.getElementById("agregarTitulo1Btn").addEventListener("click", () => { bloques.push({ tipo: "titulo1", texto: "" }); renderBloques(); });
 document.getElementById("agregarTitulo2Btn").addEventListener("click", () => { bloques.push({ tipo: "titulo2", texto: "" }); renderBloques(); });
 document.getElementById("agregarTitulo3Btn").addEventListener("click", () => { bloques.push({ tipo: "titulo3", texto: "" }); renderBloques(); });
+document.getElementById("agregarTitulo4Btn").addEventListener("click", () => { bloques.push({ tipo: "titulo4", texto: "" }); renderBloques(); });
 document.getElementById("agregarParrafoBtn").addEventListener("click", () => { bloques.push({ tipo: "parrafo", texto: "" }); renderBloques(); });
 document.getElementById("agregarTablaBtn").addEventListener("click", () => { bloques.push(nuevaTabla()); renderBloques(); });
 document.getElementById("agregarImagenBtn").addEventListener("click", () => inputImagen.click());

@@ -202,7 +202,7 @@ export async function generarInformeDocxBlob(informe) {
   cuerpo.push(new Paragraph({ text: "" }));
 
   // ---- cuerpo por bloques, en el mismo orden que en el editor ----
-  const HEADING_POR_NIVEL = { titulo1: HeadingLevel.HEADING_1, titulo2: HeadingLevel.HEADING_2, titulo3: HeadingLevel.HEADING_3 };
+  const HEADING_POR_NIVEL = { titulo1: HeadingLevel.HEADING_1, titulo2: HeadingLevel.HEADING_2, titulo3: HeadingLevel.HEADING_3, titulo4: HeadingLevel.HEADING_4 };
   let numeroTabla = 0;
   let numeroFigura = 0;
 

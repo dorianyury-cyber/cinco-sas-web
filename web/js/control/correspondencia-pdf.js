@@ -199,14 +199,21 @@ export async function generarCartaPDF(datos) {
         linea = [];
         anchoLinea = 0;
       };
+      // lineaNueva: true justo tras un salto explícito (fin de línea/viñeta
+      // en el HTML), no tras un salto de línea automático por ajuste de
+      // ancho — así el espacio de sangría de una viñeta ("    o texto")
+      // sobrevive, pero se sigue evitando arrancar una línea de ajuste con
+      // un espacio suelto.
+      let lineaNueva = true;
       tokens.forEach((token) => {
-        if (token.salto) { trazarLinea(); y += 5.5 * 0.3; return; }
+        if (token.salto) { trazarLinea(); y += 5.5 * 0.3; lineaNueva = true; return; }
         const ancho = medirToken(token);
         const esEspacio = /^\s+$/.test(token.texto);
-        if (esEspacio && !linea.length) return;
+        if (esEspacio && !linea.length && !lineaNueva) return;
         if (!esEspacio && anchoLinea + ancho > anchoUtil && linea.length) trazarLinea();
         linea.push(token);
         anchoLinea += ancho;
+        lineaNueva = false;
       });
       trazarLinea();
       y += 5;

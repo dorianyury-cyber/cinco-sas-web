@@ -1389,6 +1389,8 @@ form.pqr-form .control-3botones button:disabled { opacity: 0.5; cursor: not-allo
 }
 .control-rich-editable:focus { outline: none; border-color: var(--cinco-amber); box-shadow: 0 0 0 3px rgba(254, 178, 9, 0.18); }
 .control-rich-editable:empty:before { content: attr(data-placeholder); color: var(--text-muted); }
+.control-rich-editable ul, .control-rich-editable ol { margin: 4px 0; padding-left: 22px; }
+.control-rich-editable li { margin: 2px 0; }
 /* Hueco entre bloques (y antes del primero): botones siempre visibles
    para insertar un bloque nuevo ahí mismo, no solo al final de la lista
    (pedido explícito: no obligar a bajar hasta el final para agregar un
