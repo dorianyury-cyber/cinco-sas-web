@@ -101,7 +101,11 @@ function sinBordes() {
 // angostas que ese mínimo solo porque una pedía mucho espacio).
 function anchosColumnaDocx(filas, merges = []) {
   const numCols = Math.max(...filas.map((f) => f.length));
-  const anchoMinDxa = 900;
+  // Mismo ajuste que calcularAnchosColumna en informes-pdf.js: con muchas
+  // columnas, 900dxa de mínimo por columna puede no caber ni una vez en el
+  // ancho útil — se reduce el mínimo para dejar margen real que repartir
+  // proporcionalmente, en vez de caer al reparto parejo de más abajo.
+  const anchoMinDxa = Math.min(900, (ANCHO_UTIL_DXA / numCols) * 0.6);
   const anchoMaxDxa = ANCHO_UTIL_DXA * 0.6;
 
   const deseados = [];
@@ -345,9 +349,13 @@ export async function generarInformeDocxBlob(informe) {
       cuerpo.push(new Paragraph({ alignment: AlignmentType.CENTER, children: [new TextRun({ text: nombreTexto, bold: true, color: NAVY_HEX, size: 19 })] }));
       try {
         const img = await cargarImagenParaDocx(bloque.url, "#ffffff", "image/jpeg", "jpg");
-        let anchoPx = Math.round(ANCHO_UTIL_MM * PX_POR_MM * 0.85);
+        // Mismo "Tamaño en el informe" elegido en el editor que usa el PDF
+        // (ver dibujarImagen en informes-pdf.js) — 85% si el bloque es de
+        // antes de que existiera el control.
+        const escalaImagen = Math.min(100, Math.max(30, bloque.tamano || 85)) / 100;
+        let anchoPx = Math.round(ANCHO_UTIL_MM * PX_POR_MM * escalaImagen);
         let altoPx = Math.round(anchoPx * (img.alto / img.ancho));
-        const altoMaximoPx = Math.round(90 * PX_POR_MM);
+        const altoMaximoPx = Math.round(200 * PX_POR_MM);
         if (altoPx > altoMaximoPx) { altoPx = altoMaximoPx; anchoPx = Math.round(altoPx * (img.ancho / img.alto)); }
         cuerpo.push(new Paragraph({
           alignment: AlignmentType.CENTER,

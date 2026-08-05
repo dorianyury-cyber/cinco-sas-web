@@ -268,9 +268,29 @@ function renderBloques() {
       nombre.addEventListener("input", () => { bloque.nombre = nombre.value; });
       contenido.appendChild(nombre);
       const img = document.createElement("img");
-      img.src = bloque.previewUrl;
+      img.src = bloque.previewUrl || bloque.url;
       img.className = "control-bloque-imagen";
+      img.style.width = `${bloque.tamano || 85}%`;
       contenido.appendChild(img);
+
+      const tamanoFila = document.createElement("div");
+      tamanoFila.className = "control-imagen-tamano";
+      const tamanoTexto = document.createElement("span");
+      tamanoTexto.textContent = `Tamaño en el informe: ${bloque.tamano || 85}%`;
+      const tamano = document.createElement("input");
+      tamano.type = "range";
+      tamano.min = "30";
+      tamano.max = "100";
+      tamano.step = "5";
+      tamano.value = String(bloque.tamano || 85);
+      tamano.addEventListener("input", () => {
+        bloque.tamano = Number(tamano.value);
+        tamanoTexto.textContent = `Tamaño en el informe: ${tamano.value}%`;
+        img.style.width = `${tamano.value}%`;
+      });
+      tamanoFila.append(tamanoTexto, tamano);
+      contenido.appendChild(tamanoFila);
+
       const pie = document.createElement("input");
       pie.type = "text";
       pie.maxLength = 200;
@@ -941,9 +961,9 @@ requireAuth(async (user) => {
           const archivoRef = ref(storage, `informes/${idInforme}/${crypto.randomUUID()}.jpg`);
           await uploadBytes(archivoRef, bloque.blob);
           const url = await getDownloadURL(archivoRef);
-          bloquesFinal.push({ tipo: "imagen", url, nombre: bloque.nombre || "", pieDeFoto: bloque.pieDeFoto || "" });
+          bloquesFinal.push({ tipo: "imagen", url, nombre: bloque.nombre || "", pieDeFoto: bloque.pieDeFoto || "", tamano: bloque.tamano || 85 });
         } else if (bloque.tipo === "imagen") {
-          bloquesFinal.push({ tipo: "imagen", url: bloque.url, nombre: bloque.nombre || "", pieDeFoto: bloque.pieDeFoto || "" });
+          bloquesFinal.push({ tipo: "imagen", url: bloque.url, nombre: bloque.nombre || "", pieDeFoto: bloque.pieDeFoto || "", tamano: bloque.tamano || 85 });
         } else if (bloque.tipo === "tabla") {
           bloquesFinal.push({ ...bloque, filas: filasParaGuardar(bloque.filas) });
         } else {
@@ -1075,7 +1095,7 @@ requireAuth(async (user) => {
       const contratoId = selectContrato.value;
       const contrato = contratoId ? contratosPorId[contratoId] : null;
       const bloquesPreview = bloques.map((b) => {
-        if (b.tipo === "imagen") return { tipo: "imagen", url: b.url || URL.createObjectURL(b.blob), nombre: b.nombre || "", pieDeFoto: b.pieDeFoto || "" };
+        if (b.tipo === "imagen") return { tipo: "imagen", url: b.url || URL.createObjectURL(b.blob), nombre: b.nombre || "", pieDeFoto: b.pieDeFoto || "", tamano: b.tamano || 85 };
         if (b.tipo === "tabla") return { ...b, filas: filasParaGuardar(b.filas) };
         return b;
       });

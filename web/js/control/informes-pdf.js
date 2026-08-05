@@ -91,7 +91,15 @@ function calcularAnchosColumna(doc, filas, anchoUtil, merges = []) {
   // (ej. tablas importadas de Word con celdas combinadas) — se usa el
   // máximo, no solo filas[0].length, para no perder columnas.
   const numCols = Math.max(...filas.map((f) => f.length));
-  const anchoMin = 18;
+  // Con muchas columnas (tablas con varios sub-encabezados, ej. "SOL/EJE"
+  // repetido por dependencia), 18mm de mínimo por columna puede pedir más
+  // ancho del que existe en la página — eso hacía caer al reparto parejo
+  // de la línea de abajo, que ignora el contenido por completo y partía
+  // palabras letra por letra en la columna de texto largo. El mínimo se
+  // reduce cuando hace falta (nunca a más de un 60% del reparto parejo, o
+  // el "sobrante" para repartir proporcionalmente después quedaría en
+  // cero y volveríamos al mismo problema).
+  const anchoMin = Math.min(18, (anchoUtil / numCols) * 0.6);
   const anchoMax = anchoUtil * 0.6;
 
   // Ancho que cada columna "pide": la línea más larga que le toque
@@ -185,6 +193,11 @@ export async function generarInformePDF(informe) {
   const indiceEntradas = [];
   const graficosEntradas = [];
   const tablasEntradas = [];
+  // Páginas del cuerpo donde se dibujó algo de verdad — al terminar se
+  // borra cualquier página que haya quedado por fuera de este set (ver
+  // más abajo, después del bucle de bloques): nunca debería quedar una
+  // página del informe completamente en blanco entre dos con contenido.
+  const paginasConContenido = new Set();
 
   function saltoSiNoCabe(alturaNecesaria) {
     if (y + alturaNecesaria > margenInferior) {
@@ -227,6 +240,7 @@ export async function generarInformePDF(informe) {
     function trazarLinea() {
       if (!linea.length) { y += lineHeight; return; }
       saltoSiNoCabe(lineHeight);
+      paginasConContenido.add(doc.internal.getNumberOfPages());
       let x = margenX;
       linea.forEach((token) => {
         doc.setFont("helvetica", estiloFuente(token.negrita, token.cursiva));
@@ -302,6 +316,7 @@ export async function generarInformePDF(informe) {
     indiceEntradas.push({ texto: texto || "", nivel, pagina: doc.internal.getNumberOfPages() });
     const lineas = doc.splitTextToSize(texto || "", anchoUtil);
     doc.text(lineas, margenX, y);
+    paginasConContenido.add(doc.internal.getNumberOfPages());
     y += lineas.length * (lineHeight + (nivel === 1 ? 1.5 : 0.5)) + 3;
   }
 
@@ -319,16 +334,24 @@ export async function generarInformePDF(informe) {
       doc.setTextColor(...NAVY);
       const lineasNombre = doc.splitTextToSize(nombre, anchoUtil);
       doc.text(lineasNombre, anchoPagina / 2, y, { align: "center" });
+      paginasConContenido.add(doc.internal.getNumberOfPages());
       y += lineasNombre.length * lineHeight;
       graficosEntradas.push({ texto: bloque.nombre || `Figura ${numero}`, pagina: doc.internal.getNumberOfPages() });
 
-      let ancho = anchoUtil * 0.85;
+      // "Tamaño en el informe" del editor (30–100% del ancho útil, 85% si
+      // el bloque es de antes de que existiera el control) — el tope de
+      // alto ya no es un número fijo de 100mm sino lo que de verdad cabe
+      // en una página completa, para que subir el tamaño a 100% sirva de
+      // algo también con fotos verticales.
+      const escalaImagen = Math.min(100, Math.max(30, bloque.tamano || 85)) / 100;
+      let ancho = anchoUtil * escalaImagen;
       let alto = ancho * (img.alto / img.ancho);
-      const altoMaximo = 100;
+      const altoMaximo = Math.max(60, margenInferior - margenSuperior - 20);
       if (alto > altoMaximo) { alto = altoMaximo; ancho = alto * (img.ancho / img.alto); }
       saltoSiNoCabe(alto + 10);
       const x = margenX + (anchoUtil - ancho) / 2;
       doc.addImage(img.dataUrl, "JPEG", x, y, ancho, alto);
+      paginasConContenido.add(doc.internal.getNumberOfPages());
       y += alto + 3;
 
       // Pie de página de la gráfica, abajo a la derecha.
@@ -349,6 +372,7 @@ export async function generarInformePDF(informe) {
       doc.setFontSize(9);
       doc.setTextColor(178, 52, 52);
       doc.text("Aviso: no se pudo cargar esta imagen al generar el documento.", margenX + 4, y + 8);
+      paginasConContenido.add(doc.internal.getNumberOfPages());
       y += 20;
     }
   }
@@ -369,6 +393,7 @@ export async function generarInformePDF(informe) {
     doc.setTextColor(...NAVY);
     const lineasTitulo = doc.splitTextToSize(tituloTexto, anchoUtil);
     doc.text(lineasTitulo, anchoPagina / 2, y, { align: "center" });
+    paginasConContenido.add(doc.internal.getNumberOfPages());
     y += lineasTitulo.length * lineHeight;
     tablasEntradas.push({ texto: bloque.titulo || `Tabla ${numero}`, pagina: doc.internal.getNumberOfPages() });
 
@@ -429,6 +454,7 @@ export async function generarInformePDF(informe) {
       if (!esContinuacion) {
         saltoSiNoCabe(inicioMergeVertical ? sumaRango(alturaFilas, fi, inicioMergeVertical.filas) : alturaFilas[fi]);
       }
+      paginasConContenido.add(doc.internal.getNumberOfPages());
 
       let x = margenX;
       if (fi === 0) doc.setFillColor(...GRIS_CLARO);
@@ -471,6 +497,7 @@ export async function generarInformePDF(informe) {
       const lineasNota = doc.splitTextToSize(bloque.nota, anchoUtil);
       saltoSiNoCabe(lineasNota.length * 4.5);
       doc.text(lineasNota, anchoPagina - margenX, y, { align: "right" });
+      paginasConContenido.add(doc.internal.getNumberOfPages());
       y += lineasNota.length * 4.5;
     }
     y += 6;
@@ -485,6 +512,29 @@ export async function generarInformePDF(informe) {
     else if (bloque.tipo === "imagen") await dibujarImagen(bloque);
     else dibujarParrafo(bloque.texto);
   }
+
+  // ---- nunca dejar una página del cuerpo completamente en blanco: puede
+  // pasar cuando un bloque "empuja" a la página siguiente (ej. una imagen o
+  // una fila combinada que no cabía) y la página que deja atrás no tenía
+  // nada más que dibujar. Se borran esas páginas de una — el índice/listas
+  // todavía no se dibujaron (van antes, insertados más adelante), así que
+  // solo hay que corregir los números de página ya anotados en
+  // indiceEntradas/graficosEntradas/tablasEntradas.
+  const totalPaginasCuerpo = doc.internal.getNumberOfPages();
+  const paginasVacias = [];
+  for (let p = 1; p <= totalPaginasCuerpo; p++) {
+    if (!paginasConContenido.has(p)) paginasVacias.push(p);
+  }
+  if (paginasVacias.length === totalPaginasCuerpo) paginasVacias.pop(); // nunca dejar el documento sin ninguna página de cuerpo
+  for (let i = paginasVacias.length - 1; i >= 0; i--) doc.deletePage(paginasVacias[i]);
+  function corregirPagina(p) {
+    let corrimiento = 0;
+    for (const vacia of paginasVacias) if (vacia < p) corrimiento++;
+    return p - corrimiento;
+  }
+  indiceEntradas.forEach((e) => { e.pagina = corregirPagina(e.pagina); });
+  graficosEntradas.forEach((e) => { e.pagina = corregirPagina(e.pagina); });
+  tablasEntradas.forEach((e) => { e.pagina = corregirPagina(e.pagina); });
 
   // ---- calcular cuántas páginas necesitan portada + índice + listas ----
   const ENTRADAS_POR_PAGINA = 34;
