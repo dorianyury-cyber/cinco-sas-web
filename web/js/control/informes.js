@@ -3,7 +3,7 @@ import {
   collection, doc, getDoc, getDocs, deleteDoc, updateDoc, setDoc, runTransaction,
   serverTimestamp, onSnapshot, query, orderBy
 } from "https://www.gstatic.com/firebasejs/10.7.1/firebase-firestore.js";
-import { ref, uploadBytes, getDownloadURL } from "https://www.gstatic.com/firebasejs/10.7.1/firebase-storage.js";
+import { ref, uploadBytes, getDownloadURL, deleteObject } from "https://www.gstatic.com/firebasejs/10.7.1/firebase-storage.js";
 import { auth, db, storage, requireAuth, obtenerPerfil } from "./firebase-control.js";
 import { generarInformePDF } from "./informes-pdf.js";
 import { descargarInformeDocx } from "./informes-docx.js";
@@ -132,6 +132,15 @@ function nuevaTabla() {
   return { tipo: "tabla", titulo: "", nota: "", filas: [["", ""], ["", ""]], merges: [], centrados: [] };
 }
 
+// Bloque de firma: reemplaza la tabla-con-celda-vacía que se venía usando
+// a mano para "Elaboró"/"Aprobó" (quedaba como una tabla más, sin espacio
+// real para firmar) por una línea de firma dibujada arriba del nombre —
+// admite varios firmantes en fila (ej. todo el equipo que "Elaboró") o uno
+// solo (ej. "Aprobó").
+function nuevaFirma() {
+  return { tipo: "firma", etiqueta: "Aprobó", firmantes: [{ nombre: "", cargo: "" }] };
+}
+
 function redimensionarImagen(file) {
   return new Promise((resolve, reject) => {
     const reader = new FileReader();
@@ -187,7 +196,8 @@ const TIPOS_INSERTABLES = [
   { tipo: "titulo4", etiqueta: "Título 4" },
   { tipo: "parrafo", etiqueta: "Párrafo" },
   { tipo: "tabla", etiqueta: "Tabla" },
-  { tipo: "imagen", etiqueta: "Gráfico / imagen" }
+  { tipo: "imagen", etiqueta: "Gráfico / imagen" },
+  { tipo: "firma", etiqueta: "Bloque de firma" }
 ];
 
 // Mientras se espera el selector de archivo, en qué hueco insertar la(s)
@@ -197,6 +207,7 @@ let indiceInsertarImagen = null;
 
 function crearBloquePorTipo(tipo) {
   if (tipo === "tabla") return nuevaTabla();
+  if (tipo === "firma") return nuevaFirma();
   return { tipo, texto: "" };
 }
 
@@ -259,6 +270,8 @@ function renderBloques() {
       }));
     } else if (bloque.tipo === "tabla") {
       contenido.appendChild(renderTablaEditor(bloque));
+    } else if (bloque.tipo === "firma") {
+      contenido.appendChild(renderFirmaEditor(bloque));
     } else {
       const nombre = document.createElement("input");
       nombre.type = "text";
@@ -358,6 +371,78 @@ function pegarEnTabla(bloque, filaInicio, colInicio, texto) {
 
 function rangoOrdenado(a, b) {
   return { fMin: Math.min(a.fi, b.fi), fMax: Math.max(a.fi, b.fi), cMin: Math.min(a.ci, b.ci), cMax: Math.max(a.ci, b.ci) };
+}
+
+// Editor de un bloque de firma: etiqueta (Elaboró/Aprobó/Revisó...) + uno o
+// varios firmantes en fila, cada uno con nombre y cargo — el PDF/Word
+// dibujan una línea de firma arriba del nombre de cada uno (ver
+// dibujarFirma en informes-pdf.js).
+function renderFirmaEditor(bloque) {
+  const cont = document.createElement("div");
+  cont.className = "control-firma-editor";
+
+  const etiquetaInput = document.createElement("input");
+  etiquetaInput.type = "text";
+  etiquetaInput.maxLength = 40;
+  etiquetaInput.placeholder = "Etiqueta (ej. Elaboró, Aprobó, Revisó)";
+  etiquetaInput.value = bloque.etiqueta || "";
+  etiquetaInput.addEventListener("input", () => { bloque.etiqueta = etiquetaInput.value; });
+  cont.appendChild(etiquetaInput);
+
+  if (!bloque.firmantes || !bloque.firmantes.length) bloque.firmantes = [{ nombre: "", cargo: "" }];
+
+  const lista = document.createElement("div");
+  lista.className = "control-firma-firmantes";
+  bloque.firmantes.forEach((firmante, fi) => {
+    const filaFirmante = document.createElement("div");
+    filaFirmante.className = "control-firma-firmante";
+
+    const nombreInput = document.createElement("input");
+    nombreInput.type = "text";
+    nombreInput.maxLength = 120;
+    nombreInput.placeholder = "Nombre";
+    nombreInput.value = firmante.nombre || "";
+    nombreInput.addEventListener("input", () => { firmante.nombre = nombreInput.value; });
+
+    const cargoInput = document.createElement("input");
+    cargoInput.type = "text";
+    cargoInput.maxLength = 120;
+    cargoInput.placeholder = "Cargo";
+    cargoInput.value = firmante.cargo || "";
+    cargoInput.addEventListener("input", () => { firmante.cargo = cargoInput.value; });
+
+    filaFirmante.append(nombreInput, cargoInput);
+
+    if (bloque.firmantes.length > 1) {
+      const quitarBtn = document.createElement("button");
+      quitarBtn.type = "button";
+      quitarBtn.className = "control-btn-danger";
+      quitarBtn.textContent = "Quitar";
+      quitarBtn.addEventListener("click", () => {
+        guardarHistorialBloques();
+        bloque.firmantes.splice(fi, 1);
+        renderBloques();
+      });
+      filaFirmante.appendChild(quitarBtn);
+    }
+
+    lista.appendChild(filaFirmante);
+  });
+  cont.appendChild(lista);
+
+  const agregarBtn = document.createElement("button");
+  agregarBtn.type = "button";
+  agregarBtn.className = "control-btn-mini";
+  agregarBtn.textContent = "+ Firmante";
+  agregarBtn.title = "Para varios firmantes en la misma fila (ej. todo el equipo que elaboró)";
+  agregarBtn.addEventListener("click", () => {
+    guardarHistorialBloques();
+    bloque.firmantes.push({ nombre: "", cargo: "" });
+    renderBloques();
+  });
+  cont.appendChild(agregarBtn);
+
+  return cont;
 }
 
 // Editor de una tabla: cuadrícula de <input>, con botones para agregar o
@@ -646,6 +731,7 @@ document.getElementById("agregarTitulo3Btn").addEventListener("click", () => { g
 document.getElementById("agregarTitulo4Btn").addEventListener("click", () => { guardarHistorialBloques(); bloques.push({ tipo: "titulo4", texto: "" }); renderBloques(); });
 document.getElementById("agregarParrafoBtn").addEventListener("click", () => { guardarHistorialBloques(); bloques.push({ tipo: "parrafo", texto: "" }); renderBloques(); });
 document.getElementById("agregarTablaBtn").addEventListener("click", () => { guardarHistorialBloques(); bloques.push(nuevaTabla()); renderBloques(); });
+document.getElementById("agregarFirmaBtn").addEventListener("click", () => { guardarHistorialBloques(); bloques.push(nuevaFirma()); renderBloques(); });
 document.getElementById("agregarImagenBtn").addEventListener("click", () => inputImagen.click());
 
 inputImagen.addEventListener("change", async () => {
@@ -717,7 +803,7 @@ document.getElementById("importarJsonBtn").addEventListener("click", () => {
   // formulario (para no dejarlo a medio cargar) y con un mensaje que diga
   // cuál bloque falló, en vez de dejar que renderBloques() reviente más
   // adelante al toparse con una tabla sin filas.
-  const TIPOS_VALIDOS = ["titulo1", "titulo2", "titulo3", "titulo4", "parrafo", "tabla", "imagen"];
+  const TIPOS_VALIDOS = ["titulo1", "titulo2", "titulo3", "titulo4", "parrafo", "tabla", "imagen", "firma"];
   for (let i = 0; i < datos.bloques.length; i++) {
     const b = datos.bloques[i];
     if (!TIPOS_VALIDOS.includes(b.tipo)) {
@@ -757,6 +843,39 @@ function celda(texto) {
   const td = document.createElement("td");
   td.textContent = texto;
   return td;
+}
+
+// ---- versión final (Word corregido a mano y vuelto a subir) ----
+// El PDF/Word automáticos ajustan la maqueta bien la mayoría de las veces,
+// pero algunas combinaciones de imágenes/tablas dejan espacios en blanco
+// que solo se corrigen a mano en Word (reacomodar una figura, forzar un
+// salto de página, etc.) — en vez de perder esa corrección cada vez que se
+// vuelve a generar, el informe puede tener un archivo "final" ya corregido
+// que reemplaza al automático como lo que de verdad se entrega.
+async function subirArchivoFinal(inf, file) {
+  // Un solo nivel bajo informes/{id}/ (prefijo "final__", no subcarpeta):
+  // las reglas de Storage solo dejan pasar informes/{informeId}/{archivo},
+  // un único segmento — igual que las imágenes del cuerpo del informe.
+  const archivoRef = ref(storage, `informes/${inf.id}/final__${crypto.randomUUID()}-${file.name}`);
+  await uploadBytes(archivoRef, file);
+  const url = await getDownloadURL(archivoRef);
+  await updateDoc(doc(db, "informes", inf.id), {
+    archivoFinalUrl: url,
+    archivoFinalRuta: archivoRef.fullPath,
+    archivoFinalNombre: file.name,
+    archivoFinalSubidoEn: serverTimestamp(),
+    archivoFinalSubidoPor: auth.currentUser.email
+  });
+}
+
+async function quitarArchivoFinal(inf) {
+  if (inf.archivoFinalRuta) {
+    try { await deleteObject(ref(storage, inf.archivoFinalRuta)); } catch (e) { /* si ya no existe, no pasa nada */ }
+  }
+  await updateDoc(doc(db, "informes", inf.id), {
+    archivoFinalUrl: null, archivoFinalRuta: null, archivoFinalNombre: null,
+    archivoFinalSubidoEn: null, archivoFinalSubidoPor: null
+  });
 }
 
 // paraEditar=true: guarda sobre el mismo informe (mismo radicado).
@@ -811,17 +930,38 @@ function renderTabla(informes, esGestor) {
   informes.forEach((inf) => {
     const fila = document.createElement("tr");
     fila.appendChild(celda(inf.radicado));
-    fila.appendChild(celda(inf.titulo));
+    const tdTitulo = document.createElement("td");
+    tdTitulo.textContent = inf.titulo;
+    if (inf.archivoFinalUrl) {
+      const badge = document.createElement("div");
+      badge.className = "control-badge-final";
+      badge.textContent = "✓ Versión final subida";
+      tdTitulo.appendChild(badge);
+    }
+    fila.appendChild(tdTitulo);
     fila.appendChild(celda(inf.contratoCodigo ? `${inf.contratoCodigo} — ${inf.contratoNombre || ""}` : "—"));
     fila.appendChild(celda(inf.creadoEn ? inf.creadoEn.toDate().toLocaleDateString("es-CO") : ""));
 
     const tdAccion = document.createElement("td");
     tdAccion.className = "control-tabla-acciones";
 
+    const tieneFinal = !!inf.archivoFinalUrl;
+
+    if (tieneFinal) {
+      const btnFinal = document.createElement("a");
+      btnFinal.href = inf.archivoFinalUrl;
+      btnFinal.target = "_blank";
+      btnFinal.rel = "noopener";
+      btnFinal.className = "btn-outline";
+      btnFinal.textContent = "⭐ Descargar versión final";
+      tdAccion.appendChild(btnFinal);
+    }
+
     const btnPdf = document.createElement("button");
     btnPdf.type = "button";
     btnPdf.className = "control-btn-mini";
-    btnPdf.textContent = "PDF";
+    btnPdf.textContent = tieneFinal ? "PDF (automático)" : "PDF";
+    btnPdf.title = tieneFinal ? "Genera el PDF a partir del contenido por bloques, sin las correcciones manuales de la versión final" : "";
     btnPdf.addEventListener("click", async () => {
       btnPdf.disabled = true;
       try {
@@ -835,7 +975,8 @@ function renderTabla(informes, esGestor) {
     const btnWord = document.createElement("button");
     btnWord.type = "button";
     btnWord.className = "control-btn-mini";
-    btnWord.textContent = "Word";
+    btnWord.textContent = tieneFinal ? "Word (automático)" : "Word";
+    btnWord.title = tieneFinal ? "Genera el Word a partir del contenido por bloques, sin las correcciones manuales de la versión final" : "";
     btnWord.addEventListener("click", async () => {
       btnWord.disabled = true;
       try {
@@ -848,6 +989,54 @@ function renderTabla(informes, esGestor) {
     tdAccion.append(btnPdf, btnWord);
 
     if (esGestor) {
+      const inputFinal = document.createElement("input");
+      inputFinal.type = "file";
+      inputFinal.accept = ".doc,.docx,.pdf";
+      inputFinal.hidden = true;
+      inputFinal.addEventListener("change", async () => {
+        const archivo = inputFinal.files[0];
+        inputFinal.value = "";
+        if (!archivo) return;
+        btnSubirFinal.disabled = true;
+        btnSubirFinal.textContent = "Subiendo...";
+        try {
+          await subirArchivoFinal(inf, archivo);
+        } catch (err) {
+          mostrarAlerta(err.message || "No se pudo subir el archivo.", "error");
+        } finally {
+          btnSubirFinal.disabled = false;
+          btnSubirFinal.textContent = tieneFinal ? "Reemplazar versión final" : "Subir versión final (Word/PDF)";
+        }
+      });
+
+      const btnSubirFinal = document.createElement("button");
+      btnSubirFinal.type = "button";
+      btnSubirFinal.className = "control-btn-mini";
+      btnSubirFinal.textContent = tieneFinal ? "Reemplazar versión final" : "Subir versión final (Word/PDF)";
+      btnSubirFinal.title = "Sube el Word (o PDF) ya corregido a mano — mientras esté subido, reemplaza al PDF/Word automáticos como lo que se entrega.";
+      btnSubirFinal.addEventListener("click", () => inputFinal.click());
+
+      tdAccion.append(btnSubirFinal, inputFinal);
+
+      if (tieneFinal) {
+        const btnQuitarFinal = document.createElement("button");
+        btnQuitarFinal.type = "button";
+        btnQuitarFinal.className = "control-btn-mini";
+        btnQuitarFinal.textContent = "Quitar versión final";
+        btnQuitarFinal.addEventListener("click", async () => {
+          const confirmado = window.confirm(`¿Quitar la versión final de "${inf.titulo}"? Vuelve a quedar el PDF/Word generado automáticamente.`);
+          if (!confirmado) return;
+          btnQuitarFinal.disabled = true;
+          try {
+            await quitarArchivoFinal(inf);
+          } catch (err) {
+            mostrarAlerta(err.message || "No se pudo quitar el archivo.", "error");
+            btnQuitarFinal.disabled = false;
+          }
+        });
+        tdAccion.appendChild(btnQuitarFinal);
+      }
+
       const btnEditar = document.createElement("button");
       btnEditar.type = "button";
       btnEditar.className = "control-btn-mini";

@@ -158,7 +158,7 @@ export async function generarInformeDocxBlob(informe) {
   const {
     Document, Packer, Paragraph, TextRun, ImageRun, Table, TableRow, TableCell,
     ShadingType, WidthType, Header, Footer, AlignmentType, PageNumber, VerticalAlign, HeadingLevel, LevelFormat,
-    VerticalMergeType
+    VerticalMergeType, BorderStyle
   } = window.docx;
 
   // Numeración automática de Título 1..4 (1 / 1.1 / 1.1.1 / 1.1.1.1), como
@@ -369,6 +369,40 @@ export async function generarInformeDocxBlob(informe) {
       if (bloque.pieDeFoto) {
         cuerpo.push(new Paragraph({ alignment: AlignmentType.RIGHT, children: [new TextRun({ text: bloque.pieDeFoto, italics: true, color: MUTED_HEX, size: 17 })] }));
       }
+      cuerpo.push(new Paragraph({ text: "" }));
+      continue;
+    }
+
+    if (bloque.tipo === "firma") {
+      const firmantes = bloque.firmantes && bloque.firmantes.length ? bloque.firmantes : [{ nombre: "", cargo: "" }];
+      if (bloque.etiqueta) {
+        cuerpo.push(new Paragraph({ children: [new TextRun({ text: bloque.etiqueta.toUpperCase(), bold: true, color: NAVY_HEX, size: 19 })] }));
+      }
+      const anchoColumnaDxa = Math.round(ANCHO_UTIL_DXA / firmantes.length);
+      // Fila 1: espacio en blanco para firmar a mano; fila 2: línea de firma
+      // (borde superior de la celda) con el nombre y cargo debajo.
+      const celdaEspacio = () => new TableCell({
+        width: { size: anchoColumnaDxa, type: WidthType.DXA },
+        borders: sinBordes(),
+        children: [new Paragraph({ text: "" }), new Paragraph({ text: "" })]
+      });
+      const celdaFirma = (f) => new TableCell({
+        width: { size: anchoColumnaDxa, type: WidthType.DXA },
+        borders: { ...sinBordes(), top: { style: BorderStyle.SINGLE, size: 4, color: "787E86" } },
+        margins: { top: 60 },
+        children: [
+          new Paragraph({ alignment: AlignmentType.CENTER, children: [new TextRun({ text: f.nombre || "", bold: true, size: 19 })] }),
+          ...(f.cargo ? [new Paragraph({ alignment: AlignmentType.CENTER, children: [new TextRun({ text: f.cargo, color: MUTED_HEX, size: 17 })] })] : [])
+        ]
+      });
+      cuerpo.push(new Table({
+        width: { size: ANCHO_UTIL_DXA, type: WidthType.DXA },
+        borders: sinBordes(),
+        rows: [
+          new TableRow({ children: firmantes.map(() => celdaEspacio()) }),
+          new TableRow({ children: firmantes.map((f) => celdaFirma(f)) })
+        ]
+      }));
       cuerpo.push(new Paragraph({ text: "" }));
       continue;
     }

@@ -503,6 +503,63 @@ export async function generarInformePDF(informe) {
     y += 6;
   }
 
+  // Bloque de firma: etiqueta ("APROBÓ", "ELABORÓ"...) y una fila de uno o
+  // varios firmantes, cada uno con una línea de firma real arriba del
+  // nombre — reemplaza la tabla-con-celda-vacía que se usaba a mano antes
+  // (no dejaba espacio de verdad para firmar, y quedaba en la Lista de
+  // tablas del índice como si fuera una tabla de datos).
+  function dibujarFirma(bloque) {
+    const firmantes = bloque.firmantes && bloque.firmantes.length ? bloque.firmantes : [{ nombre: "", cargo: "" }];
+    const numFirmantes = firmantes.length;
+    const anchoColumna = anchoUtil / numFirmantes;
+    const anchoLinea = Math.min(60, anchoColumna * 0.75);
+
+    doc.setFont("helvetica", "bold");
+    doc.setFontSize(10);
+    const lineasNombrePorFirmante = firmantes.map((f) => doc.splitTextToSize(f.nombre || "", anchoColumna - 6));
+    doc.setFont("helvetica", "normal");
+    doc.setFontSize(8.5);
+    const lineasCargoPorFirmante = firmantes.map((f) => (f.cargo ? doc.splitTextToSize(f.cargo, anchoColumna - 6) : []));
+    const maxLineasNombre = Math.max(1, ...lineasNombrePorFirmante.map((l) => l.length));
+    const maxLineasCargo = Math.max(0, ...lineasCargoPorFirmante.map((l) => l.length));
+
+    const altoEtiqueta = bloque.etiqueta ? 9 : 0;
+    const espacioParaFirmar = 15;
+    const altoNombre = maxLineasNombre * 4.2 + 5;
+    const altoCargo = maxLineasCargo * 3.8;
+    saltoSiNoCabe(altoEtiqueta + espacioParaFirmar + altoNombre + altoCargo + 4);
+    paginasConContenido.add(doc.internal.getNumberOfPages());
+
+    if (bloque.etiqueta) {
+      doc.setFont("helvetica", "bold");
+      doc.setFontSize(10);
+      doc.setTextColor(...NAVY);
+      doc.text(bloque.etiqueta.toUpperCase(), margenX, y);
+    }
+    y += altoEtiqueta + espacioParaFirmar;
+
+    firmantes.forEach((firmante, i) => {
+      const xCentro = margenX + anchoColumna * i + anchoColumna / 2;
+      doc.setDrawColor(120, 126, 134);
+      doc.setLineWidth(0.4);
+      doc.line(xCentro - anchoLinea / 2, y, xCentro + anchoLinea / 2, y);
+
+      doc.setFont("helvetica", "bold");
+      doc.setFontSize(10);
+      doc.setTextColor(20, 22, 26);
+      doc.text(lineasNombrePorFirmante[i].length ? lineasNombrePorFirmante[i] : [" "], xCentro, y + 5, { align: "center" });
+
+      if (lineasCargoPorFirmante[i].length) {
+        doc.setFont("helvetica", "normal");
+        doc.setFontSize(8.5);
+        doc.setTextColor(...TEXT_MUTED);
+        doc.text(lineasCargoPorFirmante[i], xCentro, y + 5 + maxLineasNombre * 4.2 + 3, { align: "center" });
+      }
+    });
+
+    y += altoNombre + altoCargo + 6;
+  }
+
   for (const bloque of informe.bloques || []) {
     if (bloque.tipo === "titulo1") dibujarTitulo(1, bloque.texto);
     else if (bloque.tipo === "titulo2") dibujarTitulo(2, bloque.texto);
@@ -510,6 +567,7 @@ export async function generarInformePDF(informe) {
     else if (bloque.tipo === "titulo4") dibujarTitulo(4, bloque.texto);
     else if (bloque.tipo === "tabla") dibujarTabla(bloque);
     else if (bloque.tipo === "imagen") await dibujarImagen(bloque);
+    else if (bloque.tipo === "firma") dibujarFirma(bloque);
     else dibujarParrafo(bloque.texto);
   }
 
