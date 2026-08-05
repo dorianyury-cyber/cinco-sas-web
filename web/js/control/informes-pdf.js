@@ -508,11 +508,20 @@ export async function generarInformePDF(informe) {
   // nombre — reemplaza la tabla-con-celda-vacía que se usaba a mano antes
   // (no dejaba espacio de verdad para firmar, y quedaba en la Lista de
   // tablas del índice como si fuera una tabla de datos).
-  function dibujarFirma(bloque) {
+  async function dibujarFirma(bloque) {
     const firmantes = bloque.firmantes && bloque.firmantes.length ? bloque.firmantes : [{ nombre: "", cargo: "" }];
     const numFirmantes = firmantes.length;
     const anchoColumna = anchoUtil / numFirmantes;
     const anchoLinea = Math.min(60, anchoColumna * 0.75);
+
+    // Firma digital (imagen subida en el editor) por firmante — si no hay,
+    // ese firmante deja el espacio en blanco de siempre para firmar a mano.
+    const altoFirmaImg = 14;
+    const imagenesFirma = await Promise.all(firmantes.map(async (f) => {
+      if (!f.firmaUrl) return null;
+      try { return await cargarImagenComoDataURL(f.firmaUrl); } catch (e) { return null; }
+    }));
+    const hayFirmaDigital = imagenesFirma.some((img) => img);
 
     doc.setFont("helvetica", "bold");
     doc.setFontSize(10);
@@ -524,7 +533,7 @@ export async function generarInformePDF(informe) {
     const maxLineasCargo = Math.max(0, ...lineasCargoPorFirmante.map((l) => l.length));
 
     const altoEtiqueta = bloque.etiqueta ? 9 : 0;
-    const espacioParaFirmar = 15;
+    const espacioParaFirmar = hayFirmaDigital ? altoFirmaImg + 4 : 15;
     const altoNombre = maxLineasNombre * 4.2 + 5;
     const altoCargo = maxLineasCargo * 3.8;
     saltoSiNoCabe(altoEtiqueta + espacioParaFirmar + altoNombre + altoCargo + 4);
@@ -540,6 +549,15 @@ export async function generarInformePDF(informe) {
 
     firmantes.forEach((firmante, i) => {
       const xCentro = margenX + anchoColumna * i + anchoColumna / 2;
+
+      const imgFirma = imagenesFirma[i];
+      if (imgFirma) {
+        let anchoImg = altoFirmaImg * (imgFirma.ancho / imgFirma.alto);
+        if (anchoImg > anchoColumna - 6) anchoImg = anchoColumna - 6;
+        const altoImg = anchoImg * (imgFirma.alto / imgFirma.ancho);
+        doc.addImage(imgFirma.dataUrl, "PNG", xCentro - anchoImg / 2, y - altoFirmaImg - 2, anchoImg, altoImg);
+      }
+
       doc.setDrawColor(120, 126, 134);
       doc.setLineWidth(0.4);
       doc.line(xCentro - anchoLinea / 2, y, xCentro + anchoLinea / 2, y);
@@ -567,7 +585,7 @@ export async function generarInformePDF(informe) {
     else if (bloque.tipo === "titulo4") dibujarTitulo(4, bloque.texto);
     else if (bloque.tipo === "tabla") dibujarTabla(bloque);
     else if (bloque.tipo === "imagen") await dibujarImagen(bloque);
-    else if (bloque.tipo === "firma") dibujarFirma(bloque);
+    else if (bloque.tipo === "firma") await dibujarFirma(bloque);
     else dibujarParrafo(bloque.texto);
   }
 

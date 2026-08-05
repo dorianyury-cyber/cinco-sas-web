@@ -99,15 +99,19 @@ const MAX_HISTORIAL_BLOQUES = 20;
 const deshacerBtn = document.getElementById("deshacerBloqueBtn");
 
 function clonarBloques(lista) {
-  return lista.map((b) => (
-    b.tipo === "tabla"
-      ? {
-          ...b, filas: b.filas.map((fila) => [...fila]),
-          merges: (b.merges || []).map((m) => ({ ...m })),
-          centrados: (b.centrados || []).map((c) => ({ ...c }))
-        }
-      : { ...b }
-  ));
+  return lista.map((b) => {
+    if (b.tipo === "tabla") {
+      return {
+        ...b, filas: b.filas.map((fila) => [...fila]),
+        merges: (b.merges || []).map((m) => ({ ...m })),
+        centrados: (b.centrados || []).map((c) => ({ ...c }))
+      };
+    }
+    if (b.tipo === "firma") {
+      return { ...b, firmantes: (b.firmantes || []).map((f) => ({ ...f })) };
+    }
+    return { ...b };
+  });
 }
 
 function guardarHistorialBloques() {
@@ -443,6 +447,51 @@ function renderFirmaEditor(bloque) {
     cargoInput.addEventListener("input", () => { firmante.cargo = cargoInput.value; });
 
     filaFirmante.append(nombreInput, cargoInput);
+
+    const firmaWrap = document.createElement("div");
+    firmaWrap.className = "control-firma-imagen-wrap";
+    const previewFirma = firmante.firmaPreviewUrl || firmante.firmaUrl;
+    if (previewFirma) {
+      const imgFirma = document.createElement("img");
+      imgFirma.src = previewFirma;
+      imgFirma.className = "control-firma-imagen-preview";
+      firmaWrap.appendChild(imgFirma);
+    }
+    const inputFirmaImg = document.createElement("input");
+    inputFirmaImg.type = "file";
+    inputFirmaImg.accept = "image/*";
+    inputFirmaImg.hidden = true;
+    inputFirmaImg.addEventListener("change", () => {
+      const archivo = inputFirmaImg.files[0];
+      if (!archivo) return;
+      guardarHistorialBloques();
+      firmante.firmaBlob = archivo;
+      firmante.firmaPreviewUrl = URL.createObjectURL(archivo);
+      firmante.firmaUrl = null;
+      renderBloques();
+    });
+    const btnFirmaImg = document.createElement("button");
+    btnFirmaImg.type = "button";
+    btnFirmaImg.className = "control-btn-mini";
+    btnFirmaImg.textContent = previewFirma ? "Cambiar firma digital" : "+ Firma digital";
+    btnFirmaImg.title = "Sube una imagen de la firma (ej. escaneada o recortada de un PDF firmado) para que salga arriba del nombre, en vez de dejar el espacio en blanco para firmar a mano";
+    btnFirmaImg.addEventListener("click", () => inputFirmaImg.click());
+    firmaWrap.append(btnFirmaImg, inputFirmaImg);
+    if (previewFirma) {
+      const quitarFirmaImgBtn = document.createElement("button");
+      quitarFirmaImgBtn.type = "button";
+      quitarFirmaImgBtn.className = "control-btn-mini";
+      quitarFirmaImgBtn.textContent = "Quitar firma digital";
+      quitarFirmaImgBtn.addEventListener("click", () => {
+        guardarHistorialBloques();
+        firmante.firmaBlob = null;
+        firmante.firmaPreviewUrl = null;
+        firmante.firmaUrl = null;
+        renderBloques();
+      });
+      firmaWrap.appendChild(quitarFirmaImgBtn);
+    }
+    filaFirmante.appendChild(firmaWrap);
 
     if (bloque.firmantes.length > 1) {
       const quitarBtn = document.createElement("button");
@@ -1187,6 +1236,18 @@ requireAuth(async (user) => {
           bloquesFinal.push({ tipo: "imagen", url: bloque.url, nombre: bloque.nombre || "", pieDeFoto: bloque.pieDeFoto || "", tamano: bloque.tamano || 85 });
         } else if (bloque.tipo === "tabla") {
           bloquesFinal.push({ ...bloque, filas: filasParaGuardar(bloque.filas) });
+        } else if (bloque.tipo === "firma") {
+          const firmantes = [];
+          for (const firmante of bloque.firmantes || []) {
+            let firmaUrl = firmante.firmaUrl || null;
+            if (firmante.firmaBlob) {
+              const archivoRef = ref(storage, `informes/${idInforme}/${crypto.randomUUID()}.png`);
+              await uploadBytes(archivoRef, firmante.firmaBlob);
+              firmaUrl = await getDownloadURL(archivoRef);
+            }
+            firmantes.push({ nombre: firmante.nombre || "", cargo: firmante.cargo || "", firmaUrl });
+          }
+          bloquesFinal.push({ tipo: "firma", etiqueta: bloque.etiqueta || "", firmantes });
         } else {
           bloquesFinal.push(bloque);
         }
@@ -1319,6 +1380,15 @@ requireAuth(async (user) => {
       const bloquesPreview = bloques.map((b) => {
         if (b.tipo === "imagen") return { tipo: "imagen", url: b.url || URL.createObjectURL(b.blob), nombre: b.nombre || "", pieDeFoto: b.pieDeFoto || "", tamano: b.tamano || 85 };
         if (b.tipo === "tabla") return { ...b, filas: filasParaGuardar(b.filas) };
+        if (b.tipo === "firma") {
+          return {
+            tipo: "firma", etiqueta: b.etiqueta || "",
+            firmantes: (b.firmantes || []).map((f) => ({
+              nombre: f.nombre || "", cargo: f.cargo || "",
+              firmaUrl: f.firmaUrl || (f.firmaBlob ? URL.createObjectURL(f.firmaBlob) : null)
+            }))
+          };
+        }
         return b;
       });
       const datosPreview = {

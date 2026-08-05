@@ -1429,8 +1429,10 @@ form.pqr-form .control-3botones button:disabled { opacity: 0.5; cursor: not-allo
 
 .control-firma-editor { display: flex; flex-direction: column; gap: 8px; }
 .control-firma-firmantes { display: flex; flex-direction: column; gap: 6px; }
-.control-firma-firmante { display: flex; gap: 8px; flex-wrap: wrap; }
+.control-firma-firmante { display: flex; gap: 8px; flex-wrap: wrap; align-items: center; }
 .control-firma-firmante input { flex: 1; min-width: 160px; }
+.control-firma-imagen-wrap { display: flex; align-items: center; gap: 8px; }
+.control-firma-imagen-preview { height: 32px; max-width: 100px; object-fit: contain; border: 1px solid var(--border); border-radius: 4px; background: #fff; }
 
 .control-tabla-editor { display: flex; flex-direction: column; gap: 8px; }
 .control-tabla-tamano { display: flex; align-items: center; gap: 10px; flex-wrap: wrap; }

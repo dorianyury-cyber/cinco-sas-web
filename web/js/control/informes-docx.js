@@ -521,13 +521,36 @@ export async function generarInformeDocxBlob(informe) {
         }));
       }
       const anchoColumnaDxa = Math.round(ANCHO_UTIL_DXA / firmantes.length);
-      // Fila 1: espacio en blanco para firmar a mano; fila 2: línea de firma
-      // (borde superior de la celda) con el nombre y cargo debajo.
-      const celdaEspacio = () => new TableCell({
-        width: { size: anchoColumnaDxa, type: WidthType.DXA },
-        borders: sinBordes(),
-        children: [new Paragraph({ text: "" }), new Paragraph({ text: "" })]
-      });
+      // Fila 1: firma digital (imagen subida en el editor) si el firmante
+      // tiene una, o el espacio en blanco de siempre para firmar a mano si
+      // no; fila 2: línea de firma (borde superior de la celda) con el
+      // nombre y cargo debajo.
+      const altoFirmaImgPx = Math.round(14 * PX_POR_MM);
+      const anchoColumnaMmMenosPadding = ANCHO_UTIL_MM / firmantes.length - 6;
+      const celdasEspacio = await Promise.all(firmantes.map(async (f) => {
+        if (f.firmaUrl) {
+          try {
+            const img = await cargarImagenParaDocx(f.firmaUrl, "#ffffff", "image/png", "png");
+            let anchoImgPx = Math.round(altoFirmaImgPx * (img.ancho / img.alto));
+            const anchoMaxPx = Math.round(anchoColumnaMmMenosPadding * PX_POR_MM);
+            if (anchoImgPx > anchoMaxPx) anchoImgPx = anchoMaxPx;
+            const altoImgPx = Math.round(anchoImgPx * (img.alto / img.ancho));
+            return new TableCell({
+              width: { size: anchoColumnaDxa, type: WidthType.DXA },
+              borders: sinBordes(),
+              children: [new Paragraph({
+                alignment: AlignmentType.CENTER,
+                children: [new ImageRun({ data: img.buffer, transformation: { width: anchoImgPx, height: altoImgPx }, type: "png" })]
+              })]
+            });
+          } catch (e) { /* si no carga, cae al espacio en blanco de abajo */ }
+        }
+        return new TableCell({
+          width: { size: anchoColumnaDxa, type: WidthType.DXA },
+          borders: sinBordes(),
+          children: [new Paragraph({ text: "" }), new Paragraph({ text: "" })]
+        });
+      }));
       const celdaFirma = (f) => new TableCell({
         width: { size: anchoColumnaDxa, type: WidthType.DXA },
         borders: { ...sinBordes(), top: { style: BorderStyle.SINGLE, size: 4, color: "787E86" } },
@@ -541,7 +564,7 @@ export async function generarInformeDocxBlob(informe) {
         width: { size: ANCHO_UTIL_DXA, type: WidthType.DXA },
         borders: sinBordes(),
         rows: [
-          new TableRow({ children: firmantes.map(() => celdaEspacio()) }),
+          new TableRow({ children: celdasEspacio }),
           new TableRow({ children: firmantes.map((f) => celdaFirma(f)) })
         ]
       }));
