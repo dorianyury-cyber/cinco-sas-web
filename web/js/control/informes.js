@@ -243,6 +243,15 @@ function renderHueco(indice) {
 function renderBloques() {
   bloquesEditor.innerHTML = "";
   bloquesEditor.appendChild(renderHueco(0));
+  // Numeración en vivo: mismo criterio que numeroTitulo()/numeroTabla/
+  // numeroFigura en informes-pdf.js — para que se pueda ver, mientras se
+  // arma el informe, qué número le va a tocar a cada título/tabla/gráfico
+  // en el documento final (útil para detectar un bloque fuera de orden o
+  // ubicarse rápido en un informe largo), sin tener que generar el PDF.
+  const contadoresTitulo = [0, 0, 0, 0];
+  let numeroTablaVista = 0;
+  let numeroFiguraVista = 0;
+
   bloques.forEach((bloque, i) => {
     const fila = document.createElement("div");
     fila.className = "control-bloque";
@@ -250,10 +259,24 @@ function renderBloques() {
     const contenido = document.createElement("div");
     contenido.className = "control-bloque-contenido";
 
+    let numeroVista = "";
+    if (bloque.tipo in TITULO_LABEL) {
+      const nivel = Number(bloque.tipo.slice(-1));
+      contadoresTitulo[nivel - 1] += 1;
+      for (let k = nivel; k < contadoresTitulo.length; k++) contadoresTitulo[k] = 0;
+      numeroVista = contadoresTitulo.slice(0, nivel).join(".") + ".";
+    } else if (bloque.tipo === "tabla") {
+      numeroTablaVista += 1;
+      numeroVista = `Tabla ${numeroTablaVista}`;
+    } else if (bloque.tipo === "imagen") {
+      numeroFiguraVista += 1;
+      numeroVista = `Figura ${numeroFiguraVista}`;
+    }
+
     if (bloque.tipo in TITULO_LABEL) {
       const etiqueta = document.createElement("span");
       etiqueta.className = "control-bloque-etiqueta";
-      etiqueta.textContent = TITULO_LABEL[bloque.tipo];
+      etiqueta.textContent = `${TITULO_LABEL[bloque.tipo]} · ${numeroVista}`;
       contenido.appendChild(etiqueta);
       const input = document.createElement("input");
       input.type = "text";
@@ -269,10 +292,18 @@ function renderBloques() {
         onInput: (html) => { bloque.texto = html; }
       }));
     } else if (bloque.tipo === "tabla") {
+      const etiquetaTabla = document.createElement("span");
+      etiquetaTabla.className = "control-bloque-etiqueta";
+      etiquetaTabla.textContent = numeroVista;
+      contenido.appendChild(etiquetaTabla);
       contenido.appendChild(renderTablaEditor(bloque));
     } else if (bloque.tipo === "firma") {
       contenido.appendChild(renderFirmaEditor(bloque));
     } else {
+      const etiquetaImagen = document.createElement("span");
+      etiquetaImagen.className = "control-bloque-etiqueta";
+      etiquetaImagen.textContent = numeroVista;
+      contenido.appendChild(etiquetaImagen);
       const nombre = document.createElement("input");
       nombre.type = "text";
       nombre.maxLength = 200;
