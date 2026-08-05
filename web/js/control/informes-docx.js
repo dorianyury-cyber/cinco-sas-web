@@ -1,9 +1,19 @@
-// Genera el mismo informe en Word (.docx) — versión simple del cuerpo
-// (encabezado/pie con logo y radicado + títulos/párrafos/tablas/imágenes),
-// para cuando el PDF automático no deja ajustar algo a mano. No replica la
-// portada a página completa ni el índice con páginas reales del PDF (ver
-// informes-pdf.js) — eso es mucho más trabajo y frágil de mantener en
-// Word; si hace falta editar el documento, esta versión ya es suficiente.
+// Genera el mismo informe en Word (.docx) — pensado para que, si el ajuste
+// automático de espacios del PDF no queda bien del todo, se pueda bajar
+// este Word, corregir a mano la distribución de imágenes/texto, y volver a
+// subirlo como "versión final" (ver subirArchivoFinal en informes.js) sin
+// que se vea como un documento distinto al PDF: misma portada a página
+// completa, mismo encabezado/pie, y un índice + listas de gráficos/tablas
+// con números de página REALES de Word (campos TOC/PAGEREF nativos, no un
+// número calculado a mano como en el PDF) — Word los calcula solo al
+// abrir el archivo gracias a features.updateFields más abajo.
+//
+// Lo que NO se puede igualar: en qué página cae cada bloque. El PDF mide
+// milímetro a milímetro dónde corta cada página (ver informes-pdf.js);
+// Word arma sus propias páginas con su propio motor de texto (letra por
+// letra, según fuente/impresora), así que el corte de página real casi
+// nunca va a calzar exacto entre los dos — se ve como el mismo documento,
+// pero la distribución fina sigue siendo un ajuste manual en Word.
 //
 // Mismo patrón/librería que correspondencia-docx.js (docx autoalojado en
 // web/js/vendor/docx.iife.js, script clásico -> window.docx).
@@ -14,9 +24,18 @@ import {
 } from "./tabla-celdas.js";
 
 const NAVY_HEX = "1F2732";
+const AMBER_HEX = "FEB209";
+const AMBER_DARK_HEX = "D99400";
 const MUTED_HEX = "5C6570";
+const MUTED_CLARO_HEX = "C7CCD3";
+const VALOR_OSCURO_HEX = "DCE0E5";
 const GRIS_CLARO_HEX = "F5F6F8";
 const LOGO_URL = "../assets/img/logo.png";
+// El logo.png normal trae el texto "CINCO S.A.S." en blanco (pensado para
+// fondo navy) — sobre la portada clara quedaría invisible, así que ahí se
+// usa esta variante con el texto en negro (mismo criterio que
+// informes-pdf.js).
+const LOGO_URL_TEXTO_OSCURO = "../assets/img/logo-texto-oscuro.png";
 // Mismo código/versión que informes-pdf.js — actualizar los dos si cambia
 // el diseño del formato.
 const CODIGO_FORMATO = "AC-FOR-002";
@@ -57,8 +76,13 @@ function runsParaDocx(TextRun, html, tamano) {
 const PX_POR_MM = 96 / 25.4;
 const DXA_POR_MM = 1440 / 25.4;
 const MARGEN_MM = 20;
-const ANCHO_UTIL_MM = 215.9 - MARGEN_MM * 2; // carta (Letter) menos márgenes
+const ANCHO_PAGINA_MM = 215.9; // carta (Letter)
+const ALTO_PAGINA_MM = 279.4;
+const ANCHO_UTIL_MM = ANCHO_PAGINA_MM - MARGEN_MM * 2;
 const ANCHO_UTIL_DXA = Math.round(ANCHO_UTIL_MM * DXA_POR_MM);
+const ANCHO_PAGINA_DXA = Math.round(ANCHO_PAGINA_MM * DXA_POR_MM);
+const ALTO_PAGINA_DXA = Math.round(ALTO_PAGINA_MM * DXA_POR_MM);
+const mmATw = (mm) => Math.round(mm * DXA_POR_MM);
 
 function cargarImagenParaDocx(url, colorFondo, formatoSalida, type) {
   return new Promise((resolve, reject) => {
@@ -101,10 +125,10 @@ function sinBordes() {
 // angostas que ese mínimo solo porque una pedía mucho espacio).
 function anchosColumnaDocx(filas, merges = []) {
   const numCols = Math.max(...filas.map((f) => f.length));
-  // Mismo ajuste que calcularAnchosColumna en informes-pdf.js: con muchas
-  // columnas, 900dxa de mínimo por columna puede no caber ni una vez en el
-  // ancho útil — se reduce el mínimo para dejar margen real que repartir
-  // proporcionalmente, en vez de caer al reparto parejo de más abajo.
+  // Con muchas columnas, 900dxa de mínimo por columna puede no caber ni una
+  // vez en el ancho útil — se reduce el mínimo para dejar margen real que
+  // repartir proporcionalmente, en vez de caer al reparto parejo de más
+  // abajo.
   const anchoMinDxa = Math.min(900, (ANCHO_UTIL_DXA / numCols) * 0.6);
   const anchoMaxDxa = ANCHO_UTIL_DXA * 0.6;
 
@@ -158,8 +182,10 @@ export async function generarInformeDocxBlob(informe) {
   const {
     Document, Packer, Paragraph, TextRun, ImageRun, Table, TableRow, TableCell,
     ShadingType, WidthType, Header, Footer, AlignmentType, PageNumber, VerticalAlign, HeadingLevel, LevelFormat,
-    VerticalMergeType, BorderStyle
+    VerticalMergeType, BorderStyle, TableOfContents, Bookmark, PageReference, Tab, TabStopType, LeaderType, HeightRule
   } = window.docx;
+
+  const portadaClara = informe.portada === "clara";
 
   // Numeración automática de Título 1..4 (1 / 1.1 / 1.1.1 / 1.1.1.1), como
   // la numeración multinivel nativa de Word ligada a un solo "numId": cada
@@ -179,7 +205,8 @@ export async function generarInformeDocxBlob(informe) {
     }))
   };
 
-  // ---- encabezado: banda navy con el logo (mismo criterio que el PDF) ----
+  // ---- encabezado/pie de las páginas de contenido (banda navy con el
+  // logo, mismo criterio que el PDF) — la portada, más abajo, no lleva. ----
   let celdaLogo = [new Paragraph({ children: [] })];
   try {
     const logo = await cargarImagenParaDocx(LOGO_URL, `#${NAVY_HEX}`, "image/png", "png");
@@ -208,8 +235,8 @@ export async function generarInformeDocxBlob(informe) {
           verticalAlign: VerticalAlign.CENTER,
           margins: { top: 150, bottom: 150, left: 200, right: 200 },
           children: [
-            new Paragraph({ alignment: AlignmentType.RIGHT, children: [new TextRun({ text: informe.radicado || "", bold: true, color: "FFFFFF", size: 20 })] }),
-            new Paragraph({ alignment: AlignmentType.RIGHT, children: [new TextRun({ text: TIPO_LABEL[informe.tipoInforme] || "Informe", color: "C7CCD3", size: 15 })] })
+            new Paragraph({ alignment: AlignmentType.RIGHT, children: [new TextRun({ text: informe.titulo || "", bold: true, color: "FFFFFF", size: 16 })] }),
+            new Paragraph({ alignment: AlignmentType.RIGHT, children: [new TextRun({ text: TIPO_LABEL[informe.tipoInforme] || "Informe", color: MUTED_CLARO_HEX, size: 15 })] })
           ]
         })
       ]
@@ -242,40 +269,135 @@ export async function generarInformeDocxBlob(informe) {
     })]
   });
 
-  // ---- portada resumida: título + datos del contrato en línea (no a
-  // página completa, esta es la versión "simple" pensada para editar) ----
-  const cuerpo = [
-    new Paragraph({ alignment: AlignmentType.CENTER, children: [new TextRun({ text: informe.titulo || "", bold: true, color: NAVY_HEX, size: 32 })] }),
-    new Paragraph({ alignment: AlignmentType.CENTER, children: [new TextRun({ text: TIPO_LABEL[informe.tipoInforme] || "Informe", color: MUTED_HEX, size: 21 })] }),
-    new Paragraph({ text: "" })
-  ];
-  const filaDato = (etiqueta, valor) => {
+  // ---- portada a página completa (bleed real: sección propia sin
+  // márgenes) — mismo diseño que la del PDF: logo, título, tipo de
+  // informe, datos del contrato centrados, radicado y fecha abajo. Las
+  // posiciones son proporciones tomadas de las coordenadas en mm que usa
+  // dibujarPortada en informes-pdf.js, convertidas a "espacio antes" de
+  // cada párrafo — no son idénticas pixel a pixel (Word no coloca texto
+  // por coordenada absoluta), pero caen en el mismo lugar aproximado.
+  let logoPortada = null;
+  try {
+    logoPortada = await cargarImagenParaDocx(
+      portadaClara ? LOGO_URL_TEXTO_OSCURO : LOGO_URL,
+      portadaClara ? "#ffffff" : `#${NAVY_HEX}`,
+      "image/png", "png"
+    );
+  } catch (e) { /* se genera igual sin logo */ }
+
+  const colorTitulo = portadaClara ? NAVY_HEX : "FFFFFF";
+  const colorTipoPortada = portadaClara ? AMBER_DARK_HEX : AMBER_HEX;
+  const colorEtiquetaPortada = portadaClara ? NAVY_HEX : "FFFFFF";
+  const colorValorPortada = portadaClara ? MUTED_HEX : VALOR_OSCURO_HEX;
+  const colorRadicadoPortada = portadaClara ? NAVY_HEX : "FFFFFF";
+  const colorPiePortada = portadaClara ? MUTED_HEX : MUTED_CLARO_HEX;
+
+  const contenidoPortada = [];
+  if (logoPortada) {
+    const altoLogoPx = Math.round(32 * PX_POR_MM);
+    const anchoLogoPx = Math.round(altoLogoPx * (logoPortada.ancho / logoPortada.alto));
+    contenidoPortada.push(new Paragraph({
+      alignment: AlignmentType.CENTER,
+      spacing: { before: mmATw(55) },
+      children: [new ImageRun({ data: logoPortada.buffer, transformation: { width: anchoLogoPx, height: altoLogoPx }, type: "png" })]
+    }));
+  }
+  contenidoPortada.push(new Paragraph({
+    alignment: AlignmentType.CENTER,
+    spacing: { before: mmATw(28) },
+    children: [new TextRun({ text: informe.titulo || "", bold: true, color: colorTitulo, size: 40 })]
+  }));
+  contenidoPortada.push(new Paragraph({
+    alignment: AlignmentType.CENTER,
+    spacing: { before: mmATw(6) },
+    children: [new TextRun({ text: TIPO_LABEL[informe.tipoInforme] || "Informe", color: colorTipoPortada, size: 24 })]
+  }));
+
+  const filaDatoPortada = (etiqueta, valor) => {
     if (!valor) return;
-    cuerpo.push(new Paragraph({
+    contenidoPortada.push(new Paragraph({
+      alignment: AlignmentType.CENTER,
+      spacing: { before: mmATw(3) },
       children: [
-        new TextRun({ text: `${etiqueta} `, bold: true, color: NAVY_HEX, size: 19 }),
-        new TextRun({ text: String(valor), color: MUTED_HEX, size: 19 })
+        new TextRun({ text: `${etiqueta} `, bold: true, color: colorEtiquetaPortada, size: 21 }),
+        new TextRun({ text: String(valor), color: colorValorPortada, size: 21 })
       ]
     }));
   };
-  filaDato("Contrato:", informe.contratoCodigo ? `${informe.contratoCodigo}${informe.contratoNumero ? " · N.º " + informe.contratoNumero : ""}` : null);
-  filaDato("Objeto:", informe.contratoNombre);
-  filaDato("Cliente:", informe.contratoCliente);
-  filaDato("Supervisor:", informe.contratoSupervisor);
-  filaDato("Elaborado por:", informe.firmaNombre ? `${informe.firmaNombre}${informe.firmaCargo ? " — " + informe.firmaCargo : ""}` : null);
-  filaDato("Fecha:", formatearFechaLarga(informe.mes ? informe.mes + "-01" : null));
-  cuerpo.push(new Paragraph({ text: "" }));
+  // La primera fila de datos lleva un salto más grande (el hueco entre el
+  // subtítulo y el bloque de datos del contrato); las siguientes usan el
+  // espaciado corto normal entre renglones de filaDatoPortada.
+  const primeraFilaDatos = [];
+  const pushDato = (etiqueta, valor) => { if (valor) primeraFilaDatos.push([etiqueta, valor]); };
+  pushDato("Contrato:", informe.contratoCodigo ? `${informe.contratoCodigo}${informe.contratoNumero ? " · N.º " + informe.contratoNumero : ""}` : null);
+  pushDato("Objeto:", informe.contratoNombre);
+  pushDato("Cliente:", informe.contratoCliente);
+  pushDato("Supervisor:", informe.contratoSupervisor);
+  pushDato("Vigencia:", informe.contratoFechaInicio ? `${formatearFechaLarga(informe.contratoFechaInicio)} — ${informe.contratoFechaFin ? formatearFechaLarga(informe.contratoFechaFin) : "en curso"}` : null);
+  pushDato("Elaborado por:", informe.firmaNombre ? `${informe.firmaNombre}${informe.firmaCargo ? " — " + informe.firmaCargo : ""}` : null);
+  primeraFilaDatos.forEach(([etiqueta, valor], i) => {
+    if (i === 0) {
+      contenidoPortada.push(new Paragraph({
+        alignment: AlignmentType.CENTER,
+        spacing: { before: mmATw(35) },
+        children: [
+          new TextRun({ text: `${etiqueta} `, bold: true, color: colorEtiquetaPortada, size: 21 }),
+          new TextRun({ text: String(valor), color: colorValorPortada, size: 21 })
+        ]
+      }));
+    } else {
+      filaDatoPortada(etiqueta, valor);
+    }
+  });
 
-  // ---- cuerpo por bloques, en el mismo orden que en el editor ----
+  contenidoPortada.push(new Paragraph({
+    alignment: AlignmentType.CENTER,
+    spacing: { before: mmATw(38) },
+    children: [new TextRun({ text: `Radicado: ${informe.radicado || ""}`, bold: true, color: colorRadicadoPortada, size: 22 })]
+  }));
+  contenidoPortada.push(new Paragraph({
+    alignment: AlignmentType.CENTER,
+    spacing: { before: mmATw(6) },
+    children: [new TextRun({
+      text: `Cinco S.A.S. · ${formatearFechaLarga(informe.mes ? informe.mes + "-01" : null)}`,
+      color: colorPiePortada, size: 18
+    })]
+  }));
+
+  const celdaPortada = new TableCell({
+    width: { size: ANCHO_PAGINA_DXA, type: WidthType.DXA },
+    shading: portadaClara ? undefined : { type: ShadingType.CLEAR, fill: NAVY_HEX, color: "auto" },
+    margins: { top: 0, bottom: 0, left: 0, right: 0 },
+    borders: sinBordes(),
+    children: contenidoPortada
+  });
+  const tablaPortada = new Table({
+    width: { size: ANCHO_PAGINA_DXA, type: WidthType.DXA },
+    indent: { size: 0, type: WidthType.DXA },
+    borders: sinBordes(),
+    rows: [new TableRow({ height: { value: ALTO_PAGINA_DXA, rule: HeightRule.ATLEAST }, children: [celdaPortada] })]
+  });
+
+  // ---- cuerpo por bloques, en el mismo orden que en el editor — se arma
+  // primero (antes del índice/listas) para poder anotar en qué bloques van
+  // los marcadores que el índice va a referenciar. ----
   const HEADING_POR_NIVEL = { titulo1: HeadingLevel.HEADING_1, titulo2: HeadingLevel.HEADING_2, titulo3: HeadingLevel.HEADING_3, titulo4: HeadingLevel.HEADING_4 };
   const NIVEL_NUMERACION = { titulo1: 0, titulo2: 1, titulo3: 2, titulo4: 3 };
   let numeroTabla = 0;
   let numeroFigura = 0;
+  const graficosEntradas = [];
+  const tablasEntradas = [];
+  const cuerpo = [];
+  let esPrimerBloqueDeCuerpo = true;
 
   for (const bloque of informe.bloques || []) {
+    const primerBloque = esPrimerBloqueDeCuerpo;
+    esPrimerBloqueDeCuerpo = false;
+
     if (bloque.tipo in HEADING_POR_NIVEL) {
       cuerpo.push(new Paragraph({
         heading: HEADING_POR_NIVEL[bloque.tipo],
+        pageBreakBefore: primerBloque || undefined,
         numbering: { reference: REF_NUMERACION_TITULOS, level: NIVEL_NUMERACION[bloque.tipo] },
         children: [new TextRun({ text: bloque.texto || "", bold: true, color: NAVY_HEX })]
       }));
@@ -284,10 +406,16 @@ export async function generarInformeDocxBlob(informe) {
 
     if (bloque.tipo === "tabla") {
       numeroTabla += 1;
+      const idMarcador = `tabla_${numeroTabla}`;
       const filasCrudas = bloque.filas && bloque.filas.length ? bloque.filas : [[""]];
       const filas = filasCrudas.map((f) => (Array.isArray(f) ? f : f.celdas || []));
       const tituloTexto = `Tabla ${numeroTabla}. ${bloque.titulo || ""}`.trim();
-      cuerpo.push(new Paragraph({ alignment: AlignmentType.CENTER, children: [new TextRun({ text: tituloTexto, bold: true, color: NAVY_HEX, size: 19 })] }));
+      tablasEntradas.push({ texto: `Tabla ${numeroTabla}. ${bloque.titulo || ""}`.trim(), id: idMarcador });
+      cuerpo.push(new Paragraph({
+        alignment: AlignmentType.CENTER,
+        pageBreakBefore: primerBloque || undefined,
+        children: [new Bookmark({ id: idMarcador, children: [new TextRun({ text: tituloTexto, bold: true, color: NAVY_HEX, size: 19 })] })]
+      }));
 
       const numFilasTabla = filas.length;
       const numColsTabla = Math.max(...filas.map((f) => f.length));
@@ -345,8 +473,14 @@ export async function generarInformeDocxBlob(informe) {
 
     if (bloque.tipo === "imagen") {
       numeroFigura += 1;
+      const idMarcador = `figura_${numeroFigura}`;
       const nombreTexto = `Figura ${numeroFigura}. ${bloque.nombre || ""}`.trim();
-      cuerpo.push(new Paragraph({ alignment: AlignmentType.CENTER, children: [new TextRun({ text: nombreTexto, bold: true, color: NAVY_HEX, size: 19 })] }));
+      graficosEntradas.push({ texto: nombreTexto, id: idMarcador });
+      cuerpo.push(new Paragraph({
+        alignment: AlignmentType.CENTER,
+        pageBreakBefore: primerBloque || undefined,
+        children: [new Bookmark({ id: idMarcador, children: [new TextRun({ text: nombreTexto, bold: true, color: NAVY_HEX, size: 19 })] })]
+      }));
       try {
         const img = await cargarImagenParaDocx(bloque.url, "#ffffff", "image/jpeg", "jpg");
         // Mismo "Tamaño en el informe" elegido en el editor que usa el PDF
@@ -376,7 +510,10 @@ export async function generarInformeDocxBlob(informe) {
     if (bloque.tipo === "firma") {
       const firmantes = bloque.firmantes && bloque.firmantes.length ? bloque.firmantes : [{ nombre: "", cargo: "" }];
       if (bloque.etiqueta) {
-        cuerpo.push(new Paragraph({ children: [new TextRun({ text: bloque.etiqueta.toUpperCase(), bold: true, color: NAVY_HEX, size: 19 })] }));
+        cuerpo.push(new Paragraph({
+          pageBreakBefore: primerBloque || undefined,
+          children: [new TextRun({ text: bloque.etiqueta.toUpperCase(), bold: true, color: NAVY_HEX, size: 19 })]
+        }));
       }
       const anchoColumnaDxa = Math.round(ANCHO_UTIL_DXA / firmantes.length);
       // Fila 1: espacio en blanco para firmar a mano; fila 2: línea de firma
@@ -408,23 +545,78 @@ export async function generarInformeDocxBlob(informe) {
     }
 
     // párrafo
-    cuerpo.push(new Paragraph({ children: runsParaDocx(TextRun, bloque.texto, 21) }));
+    cuerpo.push(new Paragraph({
+      pageBreakBefore: primerBloque || undefined,
+      children: runsParaDocx(TextRun, bloque.texto, 21)
+    }));
     cuerpo.push(new Paragraph({ text: "" }));
   }
 
+  // ---- índice + listas de gráficos/tablas, con números de página reales
+  // de Word (campos TOC/PAGEREF — Word los calcula solos al abrir el
+  // archivo gracias a features.updateFields, más abajo). Van antes del
+  // cuerpo, cada uno arrancando en su propia página. ----
+  const listaConLider = (entradas) => entradas.map((entrada) => new Paragraph({
+    tabStops: [{ type: TabStopType.RIGHT, position: ANCHO_UTIL_DXA, leader: LeaderType.DOT }],
+    children: [
+      new TextRun({ text: entrada.texto, size: 21 }),
+      new Tab(),
+      new PageReference(entrada.id, { hyperlink: true })
+    ]
+  }));
+
+  const indiceYListas = [
+    new Paragraph({
+      pageBreakBefore: true,
+      heading: HeadingLevel.HEADING_1,
+      children: [new TextRun({ text: "Contenido", bold: true, color: NAVY_HEX })]
+    }),
+    new TableOfContents("Contenido", { hyperlink: true, headingStyleRange: "1-4" })
+  ];
+  if (graficosEntradas.length) {
+    indiceYListas.push(new Paragraph({
+      pageBreakBefore: true,
+      heading: HeadingLevel.HEADING_1,
+      children: [new TextRun({ text: "Lista de gráficos", bold: true, color: NAVY_HEX })]
+    }));
+    indiceYListas.push(...listaConLider(graficosEntradas));
+  }
+  if (tablasEntradas.length) {
+    indiceYListas.push(new Paragraph({
+      pageBreakBefore: true,
+      heading: HeadingLevel.HEADING_1,
+      children: [new TextRun({ text: "Lista de tablas", bold: true, color: NAVY_HEX })]
+    }));
+    indiceYListas.push(...listaConLider(tablasEntradas));
+  }
   const documento = new Document({
+    features: { updateFields: true },
     numbering: { config: [numeracionTitulos] },
-    sections: [{
-      properties: {
-        page: {
-          size: { width: 12240, height: 15840 }, // carta (Letter)
-          margin: { top: 1134, bottom: 1134, left: 1134, right: 1134, header: 340, footer: 340 }
-        }
+    sections: [
+      {
+        // Portada: sección propia sin márgenes (bleed real) y sin
+        // encabezado/pie — igual que la del PDF.
+        properties: {
+          page: {
+            size: { width: ANCHO_PAGINA_DXA, height: ALTO_PAGINA_DXA },
+            margin: { top: 0, bottom: 0, left: 0, right: 0, header: 0, footer: 0 }
+          }
+        },
+        children: [tablaPortada]
       },
-      headers: { default: new Header({ children: [headerTable] }) },
-      footers: { default: new Footer({ children: [footerTable] }) },
-      children: cuerpo
-    }]
+      {
+        // Índice + listas + cuerpo: márgenes normales, con encabezado/pie.
+        properties: {
+          page: {
+            size: { width: ANCHO_PAGINA_DXA, height: ALTO_PAGINA_DXA },
+            margin: { top: 1134, bottom: 1134, left: 1134, right: 1134, header: 340, footer: 340 }
+          }
+        },
+        headers: { default: new Header({ children: [headerTable] }) },
+        footers: { default: new Footer({ children: [footerTable] }) },
+        children: [...indiceYListas, ...cuerpo]
+      }
+    ]
   });
 
   return Packer.toBlob(documento);
