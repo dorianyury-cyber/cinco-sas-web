@@ -887,6 +887,7 @@ function cargarEnFormulario(informe, paraEditar) {
   document.getElementById("tipoInforme").value = informe.tipoInforme || "gestion";
   document.getElementById("portada").value = informe.portada || "oscura";
   document.getElementById("mes").value = informe.mes || "";
+  document.getElementById("fecha").value = informe.fecha || "";
   selectContrato.value = informe.contratoId || "";
   document.getElementById("firmaNombre").value = informe.firmaNombre || "";
   document.getElementById("firmaCargo").value = informe.firmaCargo || "";
@@ -1167,6 +1168,7 @@ requireAuth(async (user) => {
         tipoInforme: document.getElementById("tipoInforme").value,
         portada: document.getElementById("portada").value || "oscura",
         mes: document.getElementById("mes").value || null,
+        fecha: document.getElementById("fecha").value || null,
         firmaNombre: document.getElementById("firmaNombre").value,
         firmaCargo: document.getElementById("firmaCargo").value,
         bloques: bloquesFinal,
@@ -1293,6 +1295,7 @@ requireAuth(async (user) => {
         tipoInforme: document.getElementById("tipoInforme").value,
         portada: document.getElementById("portada").value || "oscura",
         mes: document.getElementById("mes").value || null,
+        fecha: document.getElementById("fecha").value || null,
         firmaNombre: document.getElementById("firmaNombre").value,
         firmaCargo: document.getElementById("firmaCargo").value,
         bloques: bloquesPreview,

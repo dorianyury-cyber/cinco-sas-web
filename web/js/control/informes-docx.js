@@ -3,10 +3,14 @@
 // este Word, corregir a mano la distribución de imágenes/texto, y volver a
 // subirlo como "versión final" (ver subirArchivoFinal en informes.js) sin
 // que se vea como un documento distinto al PDF: misma portada a página
-// completa, mismo encabezado/pie, y un índice + listas de gráficos/tablas
-// con números de página REALES de Word (campos TOC/PAGEREF nativos, no un
-// número calculado a mano como en el PDF) — Word los calcula solo al
-// abrir el archivo gracias a features.updateFields más abajo.
+// completa, mismo encabezado/pie, e índice ("Contenido") con número de
+// página REAL de Word (campo TOC nativo, no un número calculado a mano
+// como en el PDF) — Word lo calcula solo al abrir el archivo gracias a
+// features.updateFields más abajo. Las listas de gráficos/tablas van SIN
+// número de página: se intentó con marcadores + campo PAGEREF (mismo
+// mecanismo que el índice) pero ese campo no se actualiza de forma
+// confiable en Word — mejor una lista simple que un número que se queda
+// en blanco.
 //
 // Lo que NO se puede igualar: en qué página cae cada bloque. El PDF mide
 // milímetro a milímetro dónde corta cada página (ver informes-pdf.js);
@@ -182,7 +186,7 @@ export async function generarInformeDocxBlob(informe) {
   const {
     Document, Packer, Paragraph, TextRun, ImageRun, Table, TableRow, TableCell,
     ShadingType, WidthType, Header, Footer, AlignmentType, PageNumber, VerticalAlign, HeadingLevel, LevelFormat,
-    VerticalMergeType, BorderStyle, TableOfContents, Bookmark, PageReference, Tab, TabStopType, LeaderType, HeightRule
+    VerticalMergeType, BorderStyle, TableOfContents, HeightRule
   } = window.docx;
 
   const portadaClara = informe.portada === "clara";
@@ -359,7 +363,10 @@ export async function generarInformeDocxBlob(informe) {
     alignment: AlignmentType.CENTER,
     spacing: { before: mmATw(6) },
     children: [new TextRun({
-      text: `Cinco S.A.S. · ${formatearFechaLarga(informe.mes ? informe.mes + "-01" : null)}`,
+      // Fecha de la portada: la del campo "Fecha" del formulario si se
+      // puso una (día exacto); si no, el día 1 del "Mes"; si tampoco hay
+      // mes, la fecha de hoy (ver formatearFechaLarga).
+      text: `Cinco S.A.S. · ${formatearFechaLarga(informe.fecha || (informe.mes ? informe.mes + "-01" : null))}`,
       color: colorPiePortada, size: 18
     })]
   }));
@@ -406,15 +413,14 @@ export async function generarInformeDocxBlob(informe) {
 
     if (bloque.tipo === "tabla") {
       numeroTabla += 1;
-      const idMarcador = `tabla_${numeroTabla}`;
       const filasCrudas = bloque.filas && bloque.filas.length ? bloque.filas : [[""]];
       const filas = filasCrudas.map((f) => (Array.isArray(f) ? f : f.celdas || []));
       const tituloTexto = `Tabla ${numeroTabla}. ${bloque.titulo || ""}`.trim();
-      tablasEntradas.push({ texto: `Tabla ${numeroTabla}. ${bloque.titulo || ""}`.trim(), id: idMarcador });
+      tablasEntradas.push(tituloTexto);
       cuerpo.push(new Paragraph({
         alignment: AlignmentType.CENTER,
         pageBreakBefore: primerBloque || undefined,
-        children: [new Bookmark({ id: idMarcador, children: [new TextRun({ text: tituloTexto, bold: true, color: NAVY_HEX, size: 19 })] })]
+        children: [new TextRun({ text: tituloTexto, bold: true, color: NAVY_HEX, size: 19 })]
       }));
 
       const numFilasTabla = filas.length;
@@ -473,13 +479,12 @@ export async function generarInformeDocxBlob(informe) {
 
     if (bloque.tipo === "imagen") {
       numeroFigura += 1;
-      const idMarcador = `figura_${numeroFigura}`;
       const nombreTexto = `Figura ${numeroFigura}. ${bloque.nombre || ""}`.trim();
-      graficosEntradas.push({ texto: nombreTexto, id: idMarcador });
+      graficosEntradas.push(nombreTexto);
       cuerpo.push(new Paragraph({
         alignment: AlignmentType.CENTER,
         pageBreakBefore: primerBloque || undefined,
-        children: [new Bookmark({ id: idMarcador, children: [new TextRun({ text: nombreTexto, bold: true, color: NAVY_HEX, size: 19 })] })]
+        children: [new TextRun({ text: nombreTexto, bold: true, color: NAVY_HEX, size: 19 })]
       }));
       try {
         const img = await cargarImagenParaDocx(bloque.url, "#ffffff", "image/jpeg", "jpg");
@@ -552,18 +557,14 @@ export async function generarInformeDocxBlob(informe) {
     cuerpo.push(new Paragraph({ text: "" }));
   }
 
-  // ---- índice + listas de gráficos/tablas, con números de página reales
-  // de Word (campos TOC/PAGEREF — Word los calcula solos al abrir el
-  // archivo gracias a features.updateFields, más abajo). Van antes del
-  // cuerpo, cada uno arrancando en su propia página. ----
-  const listaConLider = (entradas) => entradas.map((entrada) => new Paragraph({
-    tabStops: [{ type: TabStopType.RIGHT, position: ANCHO_UTIL_DXA, leader: LeaderType.DOT }],
-    children: [
-      new TextRun({ text: entrada.texto, size: 21 }),
-      new Tab(),
-      new PageReference(entrada.id, { hyperlink: true })
-    ]
-  }));
+  // ---- índice (con número de página real de Word, campo TOC nativo —
+  // Word lo calcula solo al abrir el archivo gracias a features.updateFields,
+  // más abajo) + listas de gráficos/tablas. Las listas de gráficos/tablas
+  // van SIN número de página: se armaron a mano con marcadores + PAGEREF
+  // igual que el índice, pero ese campo no se actualiza de forma confiable
+  // en Word (a diferencia del TOC nativo) — mejor una lista simple que
+  // siempre se ve bien que un número que se queda pegado o en blanco.
+  const listaSimple = (entradas) => entradas.map((texto) => new Paragraph({ children: [new TextRun({ text: texto, size: 21 })] }));
 
   const indiceYListas = [
     new Paragraph({
@@ -579,7 +580,7 @@ export async function generarInformeDocxBlob(informe) {
       heading: HeadingLevel.HEADING_1,
       children: [new TextRun({ text: "Lista de gráficos", bold: true, color: NAVY_HEX })]
     }));
-    indiceYListas.push(...listaConLider(graficosEntradas));
+    indiceYListas.push(...listaSimple(graficosEntradas));
   }
   if (tablasEntradas.length) {
     indiceYListas.push(new Paragraph({
@@ -587,7 +588,7 @@ export async function generarInformeDocxBlob(informe) {
       heading: HeadingLevel.HEADING_1,
       children: [new TextRun({ text: "Lista de tablas", bold: true, color: NAVY_HEX })]
     }));
-    indiceYListas.push(...listaConLider(tablasEntradas));
+    indiceYListas.push(...listaSimple(tablasEntradas));
   }
   const documento = new Document({
     features: { updateFields: true },

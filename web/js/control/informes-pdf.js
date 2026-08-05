@@ -680,7 +680,11 @@ export async function generarInformePDF(informe) {
   doc.setFont("helvetica", "normal");
   doc.setFontSize(9);
   doc.setTextColor(...colorPie);
-  doc.text(`Cinco S.A.S. · ${formatearFecha(informe.mes ? informe.mes + "-01" : null) !== "—" ? formatearFecha(informe.mes + "-01") : new Date().toLocaleDateString("es-CO", { day: "numeric", month: "long", year: "numeric" })}`, anchoPagina / 2, altoPagina - 24, { align: "center" });
+  // Fecha de la portada: la del campo "Fecha" del formulario si se puso
+  // una (día exacto, elegido a mano); si no, el día 1 del "Mes" (como
+  // antes); si tampoco hay mes, la fecha de hoy.
+  const fechaPortada = informe.fecha || (informe.mes ? informe.mes + "-01" : null);
+  doc.text(`Cinco S.A.S. · ${fechaPortada ? formatearFecha(fechaPortada) : new Date().toLocaleDateString("es-CO", { day: "numeric", month: "long", year: "numeric" })}`, anchoPagina / 2, altoPagina - 24, { align: "center" });
 
   // ---- índice y listas: helper compartido para dibujar una lista de
   // entradas con líder de puntos hasta el número de página ----
