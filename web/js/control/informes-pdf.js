@@ -680,9 +680,14 @@ export async function generarInformePDF(informe) {
     doc.text(etiqueta, anchoPagina / 2 - 45, yPortada);
     doc.setFont("helvetica", "normal");
     doc.setTextColor(...colorValor);
-    const lineas = doc.splitTextToSize(String(valor), anchoValor);
-    doc.text(lineas, xValor, yPortada);
-    yPortada += lineas.length * 5.2 + 2;
+    // Cada salto de línea escrito a mano (ej. en "Cargo", que ahora es una
+    // caja de varias líneas) se respeta tal cual, y cada uno de esos
+    // renglones se ajusta aparte al ancho disponible si hace falta —
+    // partir el texto completo de una sola vez con splitTextToSize no
+    // garantiza conservar los saltos ya puestos.
+    const renglones = String(valor).split("\n").flatMap((linea) => doc.splitTextToSize(linea, anchoValor));
+    doc.text(renglones, xValor, yPortada);
+    yPortada += renglones.length * 5.2 + 2;
   };
   filaPortada("Contrato:", informe.contratoCodigo ? `${informe.contratoCodigo}${informe.contratoNumero ? " · N.º " + informe.contratoNumero : ""}` : null);
   filaPortada("Objeto:", informe.contratoNombre);

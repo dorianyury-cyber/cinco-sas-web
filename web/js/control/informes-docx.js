@@ -317,6 +317,14 @@ export async function generarInformeDocxBlob(informe) {
     children: [new TextRun({ text: TIPO_LABEL[informe.tipoInforme] || "Informe", color: colorTipoPortada, size: 24 })]
   }));
 
+  // Cada salto de línea escrito a mano (ej. en "Cargo", que es una caja de
+  // varias líneas) se respeta tal cual — un TextRun por renglón, con
+  // "break" (salto de línea de Word) entre uno y el siguiente.
+  const runsConSaltos = (valor) => {
+    const opcionesLineas = String(valor).split("\n").map((linea) => ({ text: linea, color: colorValorPortada, size: 21 }));
+    for (let i = 0; i < opcionesLineas.length - 1; i++) opcionesLineas[i].break = 1;
+    return opcionesLineas.map((o) => new TextRun(o));
+  };
   const filaDatoPortada = (etiqueta, valor) => {
     if (!valor) return;
     contenidoPortada.push(new Paragraph({
@@ -324,7 +332,7 @@ export async function generarInformeDocxBlob(informe) {
       spacing: { before: mmATw(3) },
       children: [
         new TextRun({ text: `${etiqueta} `, bold: true, color: colorEtiquetaPortada, size: 21 }),
-        new TextRun({ text: String(valor), color: colorValorPortada, size: 21 })
+        ...runsConSaltos(valor)
       ]
     }));
   };
@@ -346,7 +354,7 @@ export async function generarInformeDocxBlob(informe) {
         spacing: { before: mmATw(35) },
         children: [
           new TextRun({ text: `${etiqueta} `, bold: true, color: colorEtiquetaPortada, size: 21 }),
-          new TextRun({ text: String(valor), color: colorValorPortada, size: 21 })
+          ...runsConSaltos(valor)
         ]
       }));
     } else {
