@@ -801,8 +801,12 @@ export async function generarInformePDF(informe) {
         yy = margenSuperior;
       }
       const indent = indentarPorNivel ? (entrada.nivel - 1) * 6 : 0;
-      doc.setFont("helvetica", entrada.nivel === 1 || !indentarPorNivel ? "bold" : "normal");
-      doc.setFontSize(entrada.nivel === 1 || !indentarPorNivel ? 10.5 : 9.5);
+      // Solo el nivel 1 del Contenido va en negrilla — Lista de gráficos y
+      // Lista de tablas no manejan niveles (entrada.nivel queda undefined),
+      // así que sin el "indentarPorNivel" antes se colaban también en
+      // negrilla por defecto.
+      doc.setFont("helvetica", entrada.nivel === 1 ? "bold" : "normal");
+      doc.setFontSize(entrada.nivel === 1 ? 10.5 : 9.5);
       doc.setTextColor(20, 22, 26);
       const paginaFinal = entrada.pagina + offset;
       const textoPagina = String(paginaFinal);
