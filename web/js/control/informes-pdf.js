@@ -180,6 +180,37 @@ export async function generarInformePDF(informe) {
   const anchoUtil = anchoPagina - margenX * 2;
   const lineHeight = 5.2;
 
+  // Compartidos entre la simulación de páginas del índice (más abajo) y el
+  // dibujo real (dibujarListaEnPaginas): una sección de índice/gráficos/
+  // tablas que no supera media página sigue debajo de la anterior con
+  // doble espacio en vez de forzar una página nueva.
+  const alturaMediaPagina = (margenInferior - margenSuperior) / 2;
+  const dobleEspacio = 14;
+  // Avanza {pagina, yy} como lo haría dibujarListaEnPaginas al dibujar una
+  // sección de "cantidad" entradas, sin dibujar nada — se usa para calcular
+  // de antemano cuántas páginas necesitan portada + índice + listas.
+  function avanzarSeccionIndice({ pagina, yy }, cantidad) {
+    if (cantidad === 0) return { pagina, yy };
+    const alturaEstimada = 11 + cantidad * 6.4;
+    if (yy > margenSuperior) {
+      if (alturaEstimada > alturaMediaPagina || yy + dobleEspacio + alturaEstimada > margenInferior) {
+        pagina += 1;
+        yy = margenSuperior;
+      } else {
+        yy += dobleEspacio;
+      }
+    }
+    yy += 11;
+    for (let i = 0; i < cantidad; i++) {
+      if (yy > margenInferior) {
+        pagina += 1;
+        yy = margenSuperior;
+      }
+      yy += 6.4;
+    }
+    return { pagina, yy };
+  }
+
   const portadaClara = informe.portada === "clara";
 
   let logo = null;
@@ -613,14 +644,15 @@ export async function generarInformePDF(informe) {
   tablasEntradas.forEach((e) => { e.pagina = corregirPagina(e.pagina); });
 
   // ---- calcular cuántas páginas necesitan portada + índice + listas ----
-  const ENTRADAS_POR_PAGINA = 34;
-  function paginasPara(cantidad) {
-    return cantidad === 0 ? 0 : Math.ceil(cantidad / ENTRADAS_POR_PAGINA);
-  }
-  const paginasIndice = Math.max(1, paginasPara(indiceEntradas.length));
-  const paginasGraficos = paginasPara(graficosEntradas.length);
-  const paginasTablas = paginasPara(tablasEntradas.length);
-  const offset = 1 + paginasIndice + paginasGraficos + paginasTablas;
+  // Se simula el mismo recorrido que hará dibujarListaEnPaginas (con sus
+  // secciones cortas compartiendo página) para reservar exactamente esa
+  // cantidad de páginas — ni de más (dejaría páginas en blanco) ni de
+  // menos (el dibujo real se quedaría sin páginas insertadas donde escribir).
+  let estadoIndiceSimulado = { pagina: 2, yy: margenSuperior }; // el índice siempre arranca en la página 2 (la 1 es la portada)
+  estadoIndiceSimulado = avanzarSeccionIndice(estadoIndiceSimulado, Math.max(1, indiceEntradas.length));
+  estadoIndiceSimulado = avanzarSeccionIndice(estadoIndiceSimulado, graficosEntradas.length);
+  estadoIndiceSimulado = avanzarSeccionIndice(estadoIndiceSimulado, tablasEntradas.length);
+  const offset = estadoIndiceSimulado.pagina;
 
   for (let i = 0; i < offset; i++) doc.insertPage(1);
 
@@ -712,10 +744,25 @@ export async function generarInformePDF(informe) {
   // ---- índice y listas: helper compartido para dibujar una lista de
   // entradas con líder de puntos hasta el número de página ----
   let paginaActual = 2;
+  let yy = margenSuperior;
   function dibujarListaEnPaginas(tituloSeccion, entradas, { indentarPorNivel = false } = {}) {
     if (!entradas.length) return;
+
+    // Altura que ocupará esta sección (título + una línea por entrada).
+    const alturaEstimada = 11 + entradas.length * 6.4;
+    if (yy > margenSuperior) {
+      // Sección corta (<= media página) y cabe en lo que resta de la
+      // página actual: sigue debajo de la anterior con doble espacio en
+      // vez de saltar de página. Si es larga o no cabe, empieza en una
+      // página nueva.
+      if (alturaEstimada > alturaMediaPagina || yy + dobleEspacio + alturaEstimada > margenInferior) {
+        paginaActual += 1;
+        yy = margenSuperior;
+      } else {
+        yy += dobleEspacio;
+      }
+    }
     doc.setPage(paginaActual);
-    let yy = margenSuperior;
     doc.setFont("helvetica", "bold");
     doc.setFontSize(15);
     doc.setTextColor(...NAVY);
@@ -741,7 +788,6 @@ export async function generarInformePDF(informe) {
       doc.text(textoPagina, anchoPagina - margenX, yy, { align: "right" });
       yy += 6.4;
     });
-    paginaActual += 1;
   }
 
   dibujarListaEnPaginas("Contenido", indiceEntradas, { indentarPorNivel: true });

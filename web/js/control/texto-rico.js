@@ -181,7 +181,13 @@ export function parsearHtmlARuns(html) {
     if (nodo.style && nodo.style.color) nuevoEstilo.color = rgbDesdeCss(nodo.style.color);
 
     nodo.childNodes.forEach((hijo) => caminar(hijo, nuevoEstilo, nivel));
-    if (nodo.tagName === "DIV" || nodo.tagName === "P") runs.push({ salto: true });
+    // Si el último hijo ya era un <br> (o el div estaba vacío: "<div><br></div>"),
+    // sus propios hijos ya dejaron un salto puesto — no agregar un segundo,
+    // o una sola línea en blanco del editor termina ocupando el doble en el
+    // PDF/Word.
+    if ((nodo.tagName === "DIV" || nodo.tagName === "P") && !(runs.length && runs[runs.length - 1].salto)) {
+      runs.push({ salto: true });
+    }
   }
 
   function caminarItemLista(li, estilo, nivel) {
@@ -208,6 +214,11 @@ export function parsearHtmlARuns(html) {
   }
 
   raiz.childNodes.forEach((hijo) => caminar(hijo, {}, 0));
+  // Líneas en blanco sueltas al principio o al final del bloque (típico de
+  // dejar unos Enter antes/después del texto real mientras se redacta en el
+  // editor) no son contenido — se recortan por los dos lados, no solo al
+  // final, para que no se traduzcan en espacio en blanco real en el PDF/Word.
+  while (runs.length && runs[0].salto) runs.shift();
   while (runs.length && runs[runs.length - 1].salto) runs.pop();
   return runs;
 }
