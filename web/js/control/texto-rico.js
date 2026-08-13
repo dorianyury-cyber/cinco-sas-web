@@ -192,7 +192,11 @@ export function parsearHtmlARuns(html) {
 
   function caminarItemLista(li, estilo, nivel) {
     const marcador = MARCADORES_VINETA[Math.min(nivel, MARCADORES_VINETA.length - 1)];
-    runs.push({ texto: "    ".repeat(nivel) + marcador + " ", ...estilo });
+    // nivel + 1, no nivel: un <ul> de primer nivel (sin anidar, nivel=0) ya
+    // se ve indentado en el navegador por su estilo por defecto — con solo
+    // "nivel" repeticiones esa viñeta salía pegada al margen del párrafo en
+    // el PDF/Word, sin la sangría que sí se ve en el editor.
+    runs.push({ texto: "    ".repeat(nivel + 1) + marcador + " ", ...estilo });
     const hijos = Array.from(li.childNodes);
     hijos.forEach((hijo) => {
       // Chrome anida "indent" dentro de una viñeta como <ul> hijo del <li>.
