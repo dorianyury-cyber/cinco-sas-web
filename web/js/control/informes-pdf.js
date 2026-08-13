@@ -43,7 +43,8 @@ const VERSION_FORMATO = "1";
 const TIPO_LABEL = {
   gestion: "Informe de gestión", mediciones: "Informe de mediciones",
   consultoria: "Informe de consultoría", interventoria: "Informe de interventoría",
-  obra: "Informe de obra", capacitacion: "Informe de capacitación", otro: "Informe"
+  obra: "Informe de obra", capacitacion: "Informe de capacitación",
+  revisionDisenos: "Revisión de diseños eléctricos", otro: "Informe"
 };
 
 // formato "PNG" (por defecto, para el logo — necesita transparencia) o

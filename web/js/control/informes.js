@@ -28,7 +28,8 @@ const TIPO_SGC_INFORMES = "INF";
 const TIPO_LABEL = {
   gestion: "Informe de gestión", mediciones: "Informe de mediciones",
   consultoria: "Informe de consultoría", interventoria: "Informe de interventoría",
-  obra: "Informe de obra", capacitacion: "Informe de capacitación", otro: "Otro"
+  obra: "Informe de obra", capacitacion: "Informe de capacitación",
+  revisionDisenos: "Revisión de diseños eléctricos", otro: "Otro"
 };
 
 // Cada tipo de informe tiene su propio prefijo de radicado y su propio
@@ -37,7 +38,8 @@ const TIPO_LABEL = {
 // mismo código. "otro" se deja bajo IG por ser el catch-all histórico.
 const PREFIJO_TIPO = {
   gestion: "IG", mediciones: "IM", consultoria: "IC",
-  interventoria: "II", obra: "IO", capacitacion: "ICAP", otro: "IG"
+  interventoria: "II", obra: "IO", capacitacion: "ICAP",
+  revisionDisenos: "RD", otro: "IG"
 };
 
 const tbody = document.getElementById("listaInformes");
