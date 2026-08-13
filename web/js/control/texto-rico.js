@@ -181,7 +181,13 @@ export function parsearHtmlARuns(html) {
     if (nodo.style && nodo.style.color) nuevoEstilo.color = rgbDesdeCss(nodo.style.color);
 
     nodo.childNodes.forEach((hijo) => caminar(hijo, nuevoEstilo, nivel));
-    if (nodo.tagName === "DIV" || nodo.tagName === "P") runs.push({ salto: true });
+    // Si el último hijo ya era un <br> (ej. "<div><br></div>", una línea en
+    // blanco), ese <br> ya dejó puesto el salto que representa el final de
+    // esta línea — no agregar un segundo por el cierre del propio div/p, o
+    // una sola línea en blanco terminaría ocupando el doble en el PDF/Word.
+    if ((nodo.tagName === "DIV" || nodo.tagName === "P") && !(runs.length && runs[runs.length - 1].salto)) {
+      runs.push({ salto: true });
+    }
   }
 
   function caminarItemLista(li, estilo, nivel) {
@@ -209,20 +215,13 @@ export function parsearHtmlARuns(html) {
 
   raiz.childNodes.forEach((hijo) => caminar(hijo, {}, 0));
 
-  // Una línea en blanco (o varias seguidas) entre dos líneas con texto —
-  // los Enter de más que se dejan al redactar, para "separar" visualmente
-  // en el editor — no debe verse como espacio extra en el PDF/Word: cada
-  // racha de saltos consecutivos se colapsa a uno solo, igual que si no
-  // hubiera línea en blanco. Y una racha al principio o al final del
-  // bloque se recorta del todo (ahí ni siquiera ese salto único hace falta).
-  const runsColapsados = [];
-  for (const run of runs) {
-    if (run.salto && runsColapsados.length && runsColapsados[runsColapsados.length - 1].salto) continue;
-    runsColapsados.push(run);
-  }
-  while (runsColapsados.length && runsColapsados[0].salto) runsColapsados.shift();
-  while (runsColapsados.length && runsColapsados[runsColapsados.length - 1].salto) runsColapsados.pop();
-  return runsColapsados;
+  // Las líneas en blanco que el usuario deja a propósito dentro de un
+  // párrafo (al principio, en medio o al final) SÍ deben verse como espacio
+  // real en el PDF/Word — ej. para separar una lista o un bloque de texto
+  // del resto del párrafo — así que no se recortan ni se colapsan acá; el
+  // único ajuste ya está hecho arriba (evitar contar doble una misma línea
+  // en blanco).
+  return runs;
 }
 
 // "rgb(31, 39, 50)" o "#1f2732" → [31, 39, 50]. Los navegadores normalizan
