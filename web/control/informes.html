@@ -44,6 +44,17 @@
         <form class="pqr-form" id="nuevoInformeForm">
           <input type="hidden" id="informeIdEnEdicion">
 
+          <!-- Mismos botones que al final del formulario, repetidos acá
+               arriba — con informes largos (muchos bloques) evita tener que
+               bajar hasta el final cada vez que se quiere visualizar/guardar/
+               descargar. Los dos juegos se mantienen sincronizados en
+               informes.js (mismo estado de texto/disabled). -->
+          <div class="control-3botones">
+            <button type="button" class="control-btn-mini js-visualizar-informe" id="visualizarInformeBtnTop">Visualizar</button>
+            <button type="submit" class="btn js-guardar-informe" id="guardarInformeBtnTop">Guardar</button>
+            <button type="button" class="btn js-descargar-informe" id="descargarInformeBtnTop" disabled>Descargar</button>
+          </div>
+
           <details class="control-nuevo">
             <summary>Importar bloques desde JSON (contenido ya elaborado)</summary>
             <p class="text-muted control-informes-ayuda">Pega aquí el JSON con título/bloques ya armados (por ejemplo, extraído de un informe anterior en Word) — reemplaza el título, tipo, mes y el cuerpo del formulario, pero tienes que elegir tú el "Contrato relacionado" antes de generar.</p>
@@ -109,9 +120,9 @@
           <textarea id="firmaCargo" rows="3" maxlength="200"></textarea>
 
           <div class="control-3botones">
-            <button type="button" class="control-btn-mini" id="visualizarInformeBtn">Visualizar</button>
-            <button type="submit" class="btn" id="guardarInformeBtn">Guardar</button>
-            <button type="button" class="btn" id="descargarInformeBtn" disabled>Descargar</button>
+            <button type="button" class="control-btn-mini js-visualizar-informe" id="visualizarInformeBtn">Visualizar</button>
+            <button type="submit" class="btn js-guardar-informe" id="guardarInformeBtn">Guardar</button>
+            <button type="button" class="btn js-descargar-informe" id="descargarInformeBtn" disabled>Descargar</button>
           </div>
           <button type="button" class="control-btn-mini oculto" id="cancelarEdicionInformeBtn">Cancelar edición</button>
           <div class="form-alert" id="crearInformeAlert"></div>

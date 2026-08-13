@@ -44,9 +44,15 @@ const tbody = document.getElementById("listaInformes");
 const sinInformes = document.getElementById("sinInformes");
 const form = document.getElementById("nuevoInformeForm");
 const alertBox = document.getElementById("crearInformeAlert");
-const guardarBtn = document.getElementById("guardarInformeBtn");
-const visualizarBtn = document.getElementById("visualizarInformeBtn");
-const descargarBtn = document.getElementById("descargarInformeBtn");
+// Cada informe tiene dos juegos de estos tres botones (arriba y abajo del
+// formulario, ver informes.html) para no obligar a bajar hasta el final en
+// informes largos — se guardan como arreglo y cada cambio de texto/disabled
+// se aplica a los dos con forEach, así quedan siempre sincronizados.
+const guardarBtn = [...document.querySelectorAll(".js-guardar-informe")];
+const visualizarBtn = [...document.querySelectorAll(".js-visualizar-informe")];
+const descargarBtn = [...document.querySelectorAll(".js-descargar-informe")];
+function setTexto(btns, texto) { btns.forEach((b) => { b.textContent = texto; }); }
+function setDisabled(btns, valor) { btns.forEach((b) => { b.disabled = valor; }); }
 const cancelarEdicionBtn = document.getElementById("cancelarEdicionInformeBtn");
 const informeIdEnEdicion = document.getElementById("informeIdEnEdicion");
 
@@ -56,7 +62,7 @@ const informeIdEnEdicion = document.getElementById("informeIdEnEdicion");
 // "Editar" (ese informe ya está guardado, se puede descargar de una vez).
 let informeGuardadoActual = null;
 function actualizarDescargarBtn() {
-  descargarBtn.disabled = !informeGuardadoActual;
+  setDisabled(descargarBtn, !informeGuardadoActual);
 }
 const selectContrato = document.getElementById("contratoRelacionado");
 const bloquesEditor = document.getElementById("bloquesEditor");
@@ -861,7 +867,7 @@ function limpiarFormulario() {
   reiniciarHistorialBloques();
   renderBloques();
   informeIdEnEdicion.value = "";
-  guardarBtn.textContent = "Guardar";
+  setTexto(guardarBtn, "Guardar");
   cancelarEdicionBtn.classList.add("oculto");
   document.getElementById("parteSGI").disabled = false;
   informeGuardadoActual = null;
@@ -993,7 +999,7 @@ function cargarEnFormulario(informe, paraEditar) {
   const parteSGI = document.getElementById("parteSGI");
   if (paraEditar) {
     informeIdEnEdicion.value = informe.id;
-    guardarBtn.textContent = "Guardar cambios";
+    setTexto(guardarBtn, "Guardar cambios");
     cancelarEdicionBtn.classList.remove("oculto");
     // Solo se bloquea si este informe puntual ya tiene un código del SGC
     // guardado (se registró antes) — no por el simple hecho de estar
@@ -1007,7 +1013,7 @@ function cargarEnFormulario(informe, paraEditar) {
     informeGuardadoActual = informe;
   } else {
     informeIdEnEdicion.value = "";
-    guardarBtn.textContent = "Guardar";
+    setTexto(guardarBtn, "Guardar");
     cancelarEdicionBtn.classList.add("oculto");
     parteSGI.disabled = false;
     informeGuardadoActual = null;
@@ -1227,9 +1233,9 @@ requireAuth(async (user) => {
 
   form.addEventListener("submit", async (e) => {
     e.preventDefault();
-    guardarBtn.disabled = true;
+    setDisabled(guardarBtn, true);
     const enEdicion = !!informeIdEnEdicion.value;
-    guardarBtn.textContent = "Guardando...";
+    setTexto(guardarBtn, "Guardando...");
     alertBox.className = "form-alert";
 
     try {
@@ -1364,7 +1370,7 @@ requireAuth(async (user) => {
       // disponibles de una vez, sin tener que volver a buscarlo en la
       // tabla. "Cancelar edición" sigue disponible para empezar de cero.
       informeIdEnEdicion.value = idInforme;
-      guardarBtn.textContent = "Guardar cambios";
+      setTexto(guardarBtn, "Guardar cambios");
       cancelarEdicionBtn.classList.remove("oculto");
       document.getElementById("parteSGI").disabled = !!codigoSgc;
       informeGuardadoActual = informeFinal;
@@ -1377,17 +1383,17 @@ requireAuth(async (user) => {
     } catch (err) {
       mostrarAlerta(err.message || "No se pudo guardar el informe.", "error");
     } finally {
-      guardarBtn.disabled = false;
-      guardarBtn.textContent = informeIdEnEdicion.value ? "Guardar cambios" : "Guardar";
+      setDisabled(guardarBtn, false);
+      setTexto(guardarBtn, informeIdEnEdicion.value ? "Guardar cambios" : "Guardar");
     }
   });
 
   // ---- Visualizar: genera el PDF con lo que hay ahora mismo en el
   // formulario, en una pestaña nueva — no sube imágenes a Storage ni
   // guarda nada ni gasta un radicado, solo para revisar antes de guardar.
-  visualizarBtn.addEventListener("click", async () => {
-    visualizarBtn.disabled = true;
-    visualizarBtn.textContent = "Generando vista previa...";
+  visualizarBtn.forEach((btn) => btn.addEventListener("click", async () => {
+    setDisabled(visualizarBtn, true);
+    setTexto(visualizarBtn, "Generando vista previa...");
     try {
       const contratoId = selectContrato.value;
       const contrato = contratoId ? contratosPorId[contratoId] : null;
@@ -1426,27 +1432,27 @@ requireAuth(async (user) => {
     } catch (err) {
       mostrarAlerta(err.message || "No se pudo generar la vista previa.", "error");
     } finally {
-      visualizarBtn.disabled = false;
-      visualizarBtn.textContent = "Visualizar";
+      setDisabled(visualizarBtn, false);
+      setTexto(visualizarBtn, "Visualizar");
     }
-  });
+  }));
 
   // ---- Descargar: genera el PDF del último informe GUARDADO y lo
   // descarga — no vuelve a guardar nada (para eso está "Guardar").
-  descargarBtn.addEventListener("click", async () => {
+  descargarBtn.forEach((btn) => btn.addEventListener("click", async () => {
     if (!informeGuardadoActual) return;
-    descargarBtn.disabled = true;
-    descargarBtn.textContent = "Generando...";
+    setDisabled(descargarBtn, true);
+    setTexto(descargarBtn, "Generando...");
     try {
       const pdf = await generarInformePDF(informeGuardadoActual);
       pdf.save(`${informeGuardadoActual.radicado}.pdf`);
     } catch (err) {
       mostrarAlerta(err.message || "No se pudo descargar el informe.", "error");
     } finally {
-      descargarBtn.disabled = false;
-      descargarBtn.textContent = "Descargar";
+      setDisabled(descargarBtn, false);
+      setTexto(descargarBtn, "Descargar");
     }
-  });
+  }));
 });
 
 document.getElementById("logoutBtn").addEventListener("click", () => {
