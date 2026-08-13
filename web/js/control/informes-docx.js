@@ -367,7 +367,10 @@ export async function generarInformeDocxBlob(informe) {
   contenidoPortada.push(new Paragraph({
     alignment: AlignmentType.CENTER,
     spacing: { before: mmATw(38) },
-    children: [new TextRun({ text: `Radicado: ${informe.radicado || ""}`, bold: true, color: colorRadicadoPortada, size: 22 })]
+    children: [new TextRun({
+      text: `Radicado: ${informe.radicado || ""}${informe.codigoSgc ? ` · SGC: ${informe.codigoSgc}` : ""}`,
+      bold: true, color: colorRadicadoPortada, size: 22
+    })]
   }));
   contenidoPortada.push(new Paragraph({
     alignment: AlignmentType.CENTER,

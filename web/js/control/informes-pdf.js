@@ -810,7 +810,12 @@ export async function generarInformePDF(informe) {
   doc.setFont("helvetica", "bold");
   doc.setFontSize(11);
   doc.setTextColor(...colorRadicado);
-  doc.text(`Radicado: ${informe.radicado || ""}`, anchoPagina / 2, altoPagina - 30, { align: "center" });
+  // Código SGC: solo existe si el informe se marcó como "parte del Sistema
+  // de Gestión Integrado" al guardarlo — se agrega en la misma línea del
+  // radicado (no como línea aparte) para no tener que correr el resto de
+  // la portada, que ya usa posiciones fijas debajo.
+  const textoRadicado = `Radicado: ${informe.radicado || ""}${informe.codigoSgc ? ` · SGC: ${informe.codigoSgc}` : ""}`;
+  doc.text(textoRadicado, anchoPagina / 2, altoPagina - 30, { align: "center" });
   doc.setFont("helvetica", "normal");
   doc.setFontSize(9);
   doc.setTextColor(...colorPie);
