@@ -181,13 +181,7 @@ export function parsearHtmlARuns(html) {
     if (nodo.style && nodo.style.color) nuevoEstilo.color = rgbDesdeCss(nodo.style.color);
 
     nodo.childNodes.forEach((hijo) => caminar(hijo, nuevoEstilo, nivel));
-    // Si el último hijo ya era un <br> (o el div estaba vacío: "<div><br></div>"),
-    // sus propios hijos ya dejaron un salto puesto — no agregar un segundo,
-    // o una sola línea en blanco del editor termina ocupando el doble en el
-    // PDF/Word.
-    if ((nodo.tagName === "DIV" || nodo.tagName === "P") && !(runs.length && runs[runs.length - 1].salto)) {
-      runs.push({ salto: true });
-    }
+    if (nodo.tagName === "DIV" || nodo.tagName === "P") runs.push({ salto: true });
   }
 
   function caminarItemLista(li, estilo, nivel) {
@@ -214,13 +208,21 @@ export function parsearHtmlARuns(html) {
   }
 
   raiz.childNodes.forEach((hijo) => caminar(hijo, {}, 0));
-  // Líneas en blanco sueltas al principio o al final del bloque (típico de
-  // dejar unos Enter antes/después del texto real mientras se redacta en el
-  // editor) no son contenido — se recortan por los dos lados, no solo al
-  // final, para que no se traduzcan en espacio en blanco real en el PDF/Word.
-  while (runs.length && runs[0].salto) runs.shift();
-  while (runs.length && runs[runs.length - 1].salto) runs.pop();
-  return runs;
+
+  // Una línea en blanco (o varias seguidas) entre dos líneas con texto —
+  // los Enter de más que se dejan al redactar, para "separar" visualmente
+  // en el editor — no debe verse como espacio extra en el PDF/Word: cada
+  // racha de saltos consecutivos se colapsa a uno solo, igual que si no
+  // hubiera línea en blanco. Y una racha al principio o al final del
+  // bloque se recorta del todo (ahí ni siquiera ese salto único hace falta).
+  const runsColapsados = [];
+  for (const run of runs) {
+    if (run.salto && runsColapsados.length && runsColapsados[runsColapsados.length - 1].salto) continue;
+    runsColapsados.push(run);
+  }
+  while (runsColapsados.length && runsColapsados[0].salto) runsColapsados.shift();
+  while (runsColapsados.length && runsColapsados[runsColapsados.length - 1].salto) runsColapsados.pop();
+  return runsColapsados;
 }
 
 // "rgb(31, 39, 50)" o "#1f2732" → [31, 39, 50]. Los navegadores normalizan
