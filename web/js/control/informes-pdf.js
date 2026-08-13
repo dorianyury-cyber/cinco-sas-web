@@ -172,6 +172,31 @@ function sumaRango(valores, inicio, cantidad) {
 export async function generarInformePDF(informe) {
   const { jsPDF } = window.jspdf;
   const doc = new jsPDF({ unit: "mm", format: "letter" });
+
+  // Las fuentes estándar de jsPDF (Helvetica) solo soportan WinAnsi/Latin-1
+  // — un símbolo Unicode que quede fuera de ese alfabeto (≤, ≥, ≈, típicos
+  // en tablas de criterios técnicos) no se omite, se dibuja como un
+  // carácter random de esa misma tabla (por eso aparecían letras sueltas
+  // tipo "d"/"e"/"H" donde debía ir el símbolo). Se reemplaza por su
+  // equivalente en ASCII antes de que llegue a dibujarse, envolviendo
+  // doc.text/splitTextToSize una sola vez en vez de sanear texto en cada
+  // sitio donde se llama (títulos, párrafos, celdas de tabla, notas...).
+  const EQUIVALENTES_ASCII = { "≤": "<=", "≥": ">=", "≈": "~", "≠": "<>", "±": "+/-" };
+  function limpiarParaPDF(texto) {
+    if (typeof texto !== "string") return texto;
+    return texto.replace(/[≤≥≈≠±]/g, (c) => EQUIVALENTES_ASCII[c]);
+  }
+  const textoOriginal = doc.text.bind(doc);
+  doc.text = (texto, ...resto) => textoOriginal(Array.isArray(texto) ? texto.map(limpiarParaPDF) : limpiarParaPDF(texto), ...resto);
+  const splitOriginal = doc.splitTextToSize.bind(doc);
+  doc.splitTextToSize = (texto, ...resto) => splitOriginal(limpiarParaPDF(texto), ...resto);
+  // calcularAnchosColumna (y la medición palabra por palabra de los
+  // párrafos) miden con esto — si miden el texto crudo, el ancho de
+  // columna calculado no coincide con el texto ya reemplazado que se
+  // termina dibujando, y el contenido se desborda sobre la columna vecina.
+  const anchoTextoOriginal = doc.getTextWidth.bind(doc);
+  doc.getTextWidth = (texto) => anchoTextoOriginal(limpiarParaPDF(texto));
+
   const anchoPagina = doc.internal.pageSize.getWidth();
   const altoPagina = doc.internal.pageSize.getHeight();
   const margenX = 20;
