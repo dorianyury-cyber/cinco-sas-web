@@ -16,7 +16,8 @@
 
 import { parsearHtmlARuns } from "./texto-rico.js";
 import {
-  normalizarMerges, celdaCombinada, normalizarCentrados, celdaCentrada
+  normalizarMerges, celdaCombinada, normalizarCentrados, celdaCentrada,
+  normalizarNegritas, celdaNegrita, normalizarColoresCelda, colorCelda
 } from "./tabla-celdas.js";
 
 const NAVY = [31, 39, 50];
@@ -101,7 +102,12 @@ function calcularAnchosColumna(doc, filas, anchoUtil, merges = []) {
   // el "sobrante" para repartir proporcionalmente después quedaría en
   // cero y volveríamos al mismo problema).
   const anchoMin = Math.min(18, (anchoUtil / numCols) * 0.6);
-  const anchoMax = anchoUtil * 0.6;
+  // Bajado de 0.6 a 0.4: con tablas de muchas columnas (ej. un checklist
+  // con #, Ítem, Aplica, Cumple, Observaciones...) la columna de texto
+  // largo pedía el 60% de la página y dejaba a las demás peleándose por
+  // el 40% restante entre todas. 0.4 deja una sola columna dominar menos,
+  // a costa de que el texto largo envuelva en más líneas (fila más alta).
+  const anchoMax = anchoUtil * 0.4;
 
   // Ancho que cada columna "pide": la línea más larga que le toque
   // dibujar, midiendo cada fila con su fuente real (la cabecera va en
@@ -168,6 +174,16 @@ function sumaRango(valores, inicio, cantidad) {
   let total = 0;
   for (let i = inicio; i < inicio + cantidad; i++) total += valores[i];
   return total;
+}
+
+// "#rrggbb" → [r, g, b] para doc.setTextColor — el color por celda de una
+// tabla se guarda siempre en este formato (lo pone el selector de color
+// del editor), a diferencia del texto rico de párrafos que puede traer
+// "rgb(...)" normalizado por el navegador (ver rgbDesdeCss en texto-rico.js).
+function hexARgb(hex) {
+  if (!hex) return null;
+  const n = parseInt(hex.replace("#", ""), 16);
+  return [(n >> 16) & 255, (n >> 8) & 255, n & 255];
 }
 
 export async function generarInformePDF(informe) {
@@ -465,6 +481,8 @@ export async function generarInformePDF(informe) {
     // en realidad ese texto se reparte entre varias).
     const merges = normalizarMerges(bloque.merges || [], numFilas, numCols);
     const centrados = normalizarCentrados(bloque.centrados || [], numFilas, numCols);
+    const negritas = normalizarNegritas(bloque.negritas || [], numFilas, numCols);
+    const coloresCelda = normalizarColoresCelda(bloque.coloresCelda || [], numFilas, numCols);
     const anchos = calcularAnchosColumna(doc, filas, anchoUtil, merges);
 
     // Alto de cada fila, en dos pasadas: primero cada celda "propia" de esa
@@ -499,8 +517,58 @@ export async function generarInformePDF(informe) {
       }
     });
 
+    // Dibuja una fila completa (fondo/bordes + texto) en la posición yPos —
+    // se usa tanto para el recorrido normal de filas como para repetir el
+    // encabezado (fila 0) al principio de cada página nueva en la que siga
+    // la tabla, para que no queden filas "huérfanas" sin saber qué columna
+    // es cada una.
+    function dibujarFila(fila, fi, yPos) {
+      let x = margenX;
+      if (fi === 0) doc.setFillColor(...GRIS_CLARO);
+      for (let ci = 0; ci < numCols; ci++) {
+        const info = celdaCombinada(merges, fi, ci);
+        if (!info || info.esAncla) {
+          const ancho = info ? sumaRango(anchos, ci, info.merge.cols) : anchos[ci];
+          const alto = info && info.merge.filas > 1 ? sumaRango(alturaFilas, fi, info.merge.filas) : alturaFilas[fi];
+          if (fi === 0) doc.rect(x, yPos, ancho, alto, "F");
+          doc.setDrawColor(210, 214, 219);
+          doc.rect(x, yPos, ancho, alto);
+        }
+        x += anchos[ci];
+      }
+      x = margenX;
+      for (let ci = 0; ci < numCols; ci++) {
+        const info = celdaCombinada(merges, fi, ci);
+        if (!info || info.esAncla) {
+          const ancho = info ? sumaRango(anchos, ci, info.merge.cols) : anchos[ci];
+          const esNegrita = fi === 0 || celdaNegrita(negritas, fi, ci);
+          const color = hexARgb(colorCelda(coloresCelda, fi, ci)) || [20, 22, 26];
+          doc.setFont("helvetica", esNegrita ? "bold" : "normal");
+          doc.setTextColor(...color);
+          const lineas = doc.splitTextToSize(String(fila[ci] || ""), ancho - padding * 2);
+          if (celdaCentrada(centrados, fi, ci)) doc.text(lineas, x + ancho / 2, yPos + padding + 3.2, { align: "center" });
+          else doc.text(lineas, x + padding, yPos + padding + 3.2);
+        }
+        x += anchos[ci];
+      }
+    }
+
+    // Como saltoSiNoCabe, pero si de verdad toca saltar de página vuelve a
+    // pintar la fila de encabezado arriba antes de seguir (salvo que la
+    // fila que provocó el salto sea el encabezado mismo).
+    function saltoTablaSiNoCabe(alturaNecesaria, esFilaEncabezado) {
+      if (y + alturaNecesaria > margenInferior) {
+        doc.addPage();
+        y = margenSuperior;
+        if (!esFilaEncabezado && numFilas > 1) {
+          dibujarFila(filas[0], 0, y);
+          paginasConContenido.add(doc.internal.getNumberOfPages());
+          y += alturaFilas[0];
+        }
+      }
+    }
+
     filas.forEach((fila, fi) => {
-      doc.setFont("helvetica", fi === 0 ? "bold" : "normal");
       // Si esta fila arranca un merge vertical, hay que verificar que
       // quepa el bloque completo (todas las filas que abarca) antes de
       // dibujar — una celda combinada no se puede partir entre dos
@@ -509,35 +577,10 @@ export async function generarInformePDF(informe) {
       const inicioMergeVertical = merges.find((m) => m.fila === fi && m.filas > 1);
       const esContinuacion = merges.some((m) => m.filas > 1 && fi > m.fila && fi < m.fila + m.filas);
       if (!esContinuacion) {
-        saltoSiNoCabe(inicioMergeVertical ? sumaRango(alturaFilas, fi, inicioMergeVertical.filas) : alturaFilas[fi]);
+        saltoTablaSiNoCabe(inicioMergeVertical ? sumaRango(alturaFilas, fi, inicioMergeVertical.filas) : alturaFilas[fi], fi === 0);
       }
       paginasConContenido.add(doc.internal.getNumberOfPages());
-
-      let x = margenX;
-      if (fi === 0) doc.setFillColor(...GRIS_CLARO);
-      for (let ci = 0; ci < numCols; ci++) {
-        const info = celdaCombinada(merges, fi, ci);
-        if (!info || info.esAncla) {
-          const ancho = info ? sumaRango(anchos, ci, info.merge.cols) : anchos[ci];
-          const alto = info && info.merge.filas > 1 ? sumaRango(alturaFilas, fi, info.merge.filas) : alturaFilas[fi];
-          if (fi === 0) doc.rect(x, y, ancho, alto, "F");
-          doc.setDrawColor(210, 214, 219);
-          doc.rect(x, y, ancho, alto);
-        }
-        x += anchos[ci];
-      }
-      x = margenX;
-      doc.setTextColor(20, 22, 26);
-      for (let ci = 0; ci < numCols; ci++) {
-        const info = celdaCombinada(merges, fi, ci);
-        if (!info || info.esAncla) {
-          const ancho = info ? sumaRango(anchos, ci, info.merge.cols) : anchos[ci];
-          const lineas = doc.splitTextToSize(String(fila[ci] || ""), ancho - padding * 2);
-          if (celdaCentrada(centrados, fi, ci)) doc.text(lineas, x + ancho / 2, y + padding + 3.2, { align: "center" });
-          else doc.text(lineas, x + padding, y + padding + 3.2);
-        }
-        x += anchos[ci];
-      }
+      dibujarFila(fila, fi, y);
       y += alturaFilas[fi];
     });
 

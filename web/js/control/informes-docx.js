@@ -24,7 +24,8 @@
 
 import { parsearHtmlARuns } from "./texto-rico.js";
 import {
-  normalizarMerges, celdaCombinada, normalizarCentrados, celdaCentrada
+  normalizarMerges, celdaCombinada, normalizarCentrados, celdaCentrada,
+  normalizarNegritas, celdaNegrita, normalizarColoresCelda, colorCelda
 } from "./tabla-celdas.js";
 
 const NAVY_HEX = "1F2732";
@@ -438,6 +439,8 @@ export async function generarInformeDocxBlob(informe) {
       // una celda combinada se excluye del cálculo de ancho de columna.
       const merges = normalizarMerges(bloque.merges || [], numFilasTabla, numColsTabla);
       const centrados = normalizarCentrados(bloque.centrados || [], numFilasTabla, numColsTabla);
+      const negritas = normalizarNegritas(bloque.negritas || [], numFilasTabla, numColsTabla);
+      const coloresCelda = normalizarColoresCelda(bloque.coloresCelda || [], numFilasTabla, numColsTabla);
       const anchos = anchosColumnaDocx(filas, merges);
       const margenesCelda = { top: 60, bottom: 60, left: 100, right: 100 };
 
@@ -463,6 +466,7 @@ export async function generarInformeDocxBlob(informe) {
             continue;
           }
           const ancho = info ? sumaRango(anchos, ci, info.merge.cols) : anchos[ci];
+          const colorTexto = colorCelda(coloresCelda, fi, ci);
           celdas.push(new TableCell({
             width: { size: ancho, type: WidthType.DXA },
             shading: fi === 0 ? { type: ShadingType.CLEAR, fill: GRIS_CLARO_HEX, color: "auto" } : undefined,
@@ -471,11 +475,19 @@ export async function generarInformeDocxBlob(informe) {
             margins: margenesCelda,
             children: [new Paragraph({
               alignment: celdaCentrada(centrados, fi, ci) ? AlignmentType.CENTER : undefined,
-              children: [new TextRun({ text: String(fila[ci] || ""), bold: fi === 0, size: 17 })]
+              children: [new TextRun({
+                text: String(fila[ci] || ""), size: 17,
+                bold: fi === 0 || celdaNegrita(negritas, fi, ci),
+                color: colorTexto ? colorTexto.replace("#", "") : undefined
+              })]
             })]
           }));
         }
-        return new TableRow({ children: celdas });
+        // tableHeader: true en la fila 0 hace que Word la repita sola al
+        // principio de cada página nueva en la que siga la tabla — a
+        // diferencia del PDF (que arma sus páginas a mano), acá no hace
+        // falta dibujar nada de más, es una propiedad nativa de la tabla.
+        return new TableRow({ children: celdas, tableHeader: fi === 0 || undefined });
       });
       cuerpo.push(new Table({ width: { size: ANCHO_UTIL_DXA, type: WidthType.DXA }, rows: filasDocx }));
 

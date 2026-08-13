@@ -13,7 +13,8 @@ import { crearCampoTextoRico } from "./texto-rico.js";
 import {
   normalizarMerges, celdaCombinada, expandirRangoConMerges, quitarMergesQueIntersectan,
   celdaCentrada, normalizarCentrados, centrarRango, alinearIzquierdaRango, anchosColumnaEditor,
-  redimensionarFilas
+  redimensionarFilas, celdaNegrita, normalizarNegritas, negritaRango, quitarNegritaRango,
+  colorCelda, normalizarColoresCelda, colorearRango, normalizarOpcionesColumna
 } from "./tabla-celdas.js";
 
 // Área/tipo fijos para que un informe quede en el Listado Maestro de
@@ -574,6 +575,9 @@ function renderTablaEditor(bloque) {
   bloque.filas.forEach((fila) => { while (fila.length < numCols) fila.push(""); });
   bloque.merges = normalizarMerges(bloque.merges || [], numFilas, numCols);
   bloque.centrados = normalizarCentrados(bloque.centrados || [], numFilas, numCols);
+  bloque.negritas = normalizarNegritas(bloque.negritas || [], numFilas, numCols);
+  bloque.coloresCelda = normalizarColoresCelda(bloque.coloresCelda || [], numFilas, numCols);
+  bloque.opcionesColumna = normalizarOpcionesColumna(bloque.opcionesColumna || {}, numCols);
 
   // Tamaño directo: para tablas grandes es más rápido escribir "12 filas,
   // 9 columnas" de una vez que hacer clic en +Fila/+Columna una por una.
@@ -621,11 +625,11 @@ function renderTablaEditor(bloque) {
   // la cuadrícula, para no perder el foco mientras se arrastra.
   function actualizarResaltado() {
     const rango = bloque._selA && bloque._selB ? rangoOrdenado(bloque._selA, bloque._selB) : null;
-    grid.querySelectorAll("input").forEach((input) => {
-      const fi = Number(input.dataset.fi);
-      const ci = Number(input.dataset.ci);
+    grid.querySelectorAll("input, select").forEach((campo) => {
+      const fi = Number(campo.dataset.fi);
+      const ci = Number(campo.dataset.ci);
       const sel = !!rango && fi >= rango.fMin && fi <= rango.fMax && ci >= rango.cMin && ci <= rango.cMax;
-      input.classList.toggle("control-celda-sel", sel);
+      campo.classList.toggle("control-celda-sel", sel);
     });
   }
 
@@ -634,30 +638,49 @@ function renderTablaEditor(bloque) {
       const info = celdaCombinada(bloque.merges, fi, ci);
       if (info && !info.esAncla) return; // celda cubierta por un rango combinado: no se dibuja
 
-      const celdaInput = document.createElement("input");
-      celdaInput.type = "text";
-      celdaInput.maxLength = 300;
-      celdaInput.value = celda;
-      celdaInput.placeholder = fi === 0 ? `Columna ${ci + 1}` : "";
+      // Una columna con opciones definidas (ver botón "☰ Opciones") se edita
+      // con un <select> en el cuerpo — la fila 0 (encabezado) siempre es
+      // texto libre, aunque su columna tenga opciones.
+      const opciones = fi > 0 ? bloque.opcionesColumna[ci] : null;
+      const celdaInput = document.createElement(opciones ? "select" : "input");
+      if (opciones) {
+        [["", "—"], ...opciones.map((o) => [o, o])].forEach(([valor, texto]) => {
+          const opt = document.createElement("option");
+          opt.value = valor;
+          opt.textContent = texto;
+          celdaInput.appendChild(opt);
+        });
+        celdaInput.value = celda;
+        celdaInput.addEventListener("change", () => { bloque.filas[fi][ci] = celdaInput.value; });
+      } else {
+        celdaInput.type = "text";
+        celdaInput.maxLength = 300;
+        celdaInput.value = celda;
+        celdaInput.placeholder = fi === 0 ? `Columna ${ci + 1}` : "";
+        celdaInput.addEventListener("input", () => { bloque.filas[fi][ci] = celdaInput.value; });
+        // Pegado directo de Excel/Word: si trae varias celdas (tabulador o
+        // salto de línea) se reparte por la cuadrícula; si es una sola celda
+        // se deja el pegado normal del navegador.
+        celdaInput.addEventListener("paste", (e) => {
+          const texto = e.clipboardData?.getData("text/plain") ?? "";
+          if (/\t|\n/.test(texto)) { e.preventDefault(); pegarEnTabla(bloque, fi, ci, texto); }
+        });
+      }
       celdaInput.dataset.fi = fi;
       celdaInput.dataset.ci = ci;
       celdaInput.style.gridColumn = info ? `${ci + 1} / span ${info.merge.cols}` : `${ci + 1}`;
       celdaInput.style.gridRow = info ? `${fi + 1} / span ${info.merge.filas}` : `${fi + 1}`;
       celdaInput.style.textAlign = celdaCentrada(bloque.centrados, fi, ci) ? "center" : "left";
-      celdaInput.addEventListener("input", () => { bloque.filas[fi][ci] = celdaInput.value; });
+      if (celdaNegrita(bloque.negritas, fi, ci)) celdaInput.style.fontWeight = "700";
+      const colorTexto = colorCelda(bloque.coloresCelda, fi, ci);
+      if (colorTexto) celdaInput.style.color = colorTexto;
       // Recuerda dónde estaba el cursor para que el botón "Pegar tabla"
       // sepa dónde empezar si el pegado no se hizo directo sobre una celda.
       celdaInput.addEventListener("focus", () => { bloque._filaFoco = fi; bloque._colFoco = ci; });
-      // Pegado directo de Excel/Word: si trae varias celdas (tabulador o
-      // salto de línea) se reparte por la cuadrícula; si es una sola celda
-      // se deja el pegado normal del navegador.
-      celdaInput.addEventListener("paste", (e) => {
-        const texto = e.clipboardData?.getData("text/plain") ?? "";
-        if (/\t|\n/.test(texto)) { e.preventDefault(); pegarEnTabla(bloque, fi, ci, texto); }
-      });
       // Selección de un rango arrastrando sobre la cuadrícula (como en
-      // Excel), para los botones "Combinar celdas"/"Separar celdas" — un
-      // solo clic selecciona esa celda sola y no estorba para escribir.
+      // Excel), para los botones "Combinar celdas"/"Centrar"/"Negrilla"/
+      // "Color" — un solo clic selecciona esa celda sola y no estorba para
+      // escribir o elegir una opción.
       celdaInput.addEventListener("mousedown", () => {
         bloque._selA = { fi, ci };
         bloque._selB = { fi, ci };
@@ -813,7 +836,77 @@ function renderTablaEditor(bloque) {
     bloque.centrados = alinearIzquierdaRango(bloque.centrados, fMin, fMax, cMin, cMax);
     renderBloques();
   });
-  botones.append(agregarFila, quitarFila, agregarCol, quitarCol, pegarBtn, combinarBtn, separarBtn, centrarBtn, izquierdaBtn);
+  const negritaBtn = document.createElement("button");
+  negritaBtn.type = "button";
+  negritaBtn.className = "control-btn-mini";
+  negritaBtn.textContent = "N Negrilla";
+  negritaBtn.title = "Arrastra sobre las celdas y haz clic aquí para poner/quitar negrilla";
+  negritaBtn.addEventListener("click", () => {
+    if (!bloque._selA || !bloque._selB) {
+      mostrarAlerta("Arrastra sobre las celdas que quieras poner en negrilla antes de hacer clic aquí.", "error");
+      return;
+    }
+    const { fMin, fMax, cMin, cMax } = rangoOrdenado(bloque._selA, bloque._selB);
+    guardarHistorialBloques();
+    // Alterna según la primera celda del rango: si ya está en negrilla, se
+    // quita de todo el rango; si no, se pone en todo el rango.
+    const yaNegrita = celdaNegrita(bloque.negritas, fMin, cMin);
+    bloque.negritas = yaNegrita
+      ? quitarNegritaRango(bloque.negritas, fMin, fMax, cMin, cMax)
+      : negritaRango(bloque.negritas, fMin, fMax, cMin, cMax);
+    renderBloques();
+  });
+  const colorInput = document.createElement("input");
+  colorInput.type = "color";
+  colorInput.className = "control-tabla-color";
+  colorInput.title = "Arrastra sobre las celdas y elige un color para su letra";
+  colorInput.value = "#1a1e20";
+  colorInput.addEventListener("input", () => {
+    if (!bloque._selA || !bloque._selB) return;
+    const { fMin, fMax, cMin, cMax } = rangoOrdenado(bloque._selA, bloque._selB);
+    guardarHistorialBloques();
+    bloque.coloresCelda = colorearRango(bloque.coloresCelda, fMin, fMax, cMin, cMax, colorInput.value);
+    renderBloques();
+  });
+  const colorQuitarBtn = document.createElement("button");
+  colorQuitarBtn.type = "button";
+  colorQuitarBtn.className = "control-btn-mini";
+  colorQuitarBtn.textContent = "Quitar color";
+  colorQuitarBtn.title = "Arrastra sobre las celdas y haz clic aquí para volver al color de letra por defecto";
+  colorQuitarBtn.addEventListener("click", () => {
+    if (!bloque._selA || !bloque._selB) {
+      mostrarAlerta("Arrastra sobre las celdas antes de hacer clic aquí.", "error");
+      return;
+    }
+    const { fMin, fMax, cMin, cMax } = rangoOrdenado(bloque._selA, bloque._selB);
+    guardarHistorialBloques();
+    bloque.coloresCelda = colorearRango(bloque.coloresCelda, fMin, fMax, cMin, cMax, null);
+    renderBloques();
+  });
+  const opcionesBtn = document.createElement("button");
+  opcionesBtn.type = "button";
+  opcionesBtn.className = "control-btn-mini";
+  opcionesBtn.textContent = "☰ Opciones de columna";
+  opcionesBtn.title = "Haz clic en una celda de la columna y define una lista fija separada por comas (ej. Sí, No, N.A.) para que esa columna se edite con un desplegable en vez de texto libre";
+  opcionesBtn.addEventListener("click", () => {
+    if (!bloque._selA) {
+      mostrarAlerta("Haz clic en una celda de la columna que quieras convertir en lista de opciones.", "error");
+      return;
+    }
+    const ci = bloque._selA.ci;
+    const actuales = (bloque.opcionesColumna[ci] || []).join(", ");
+    const texto = window.prompt("Opciones separadas por coma para esta columna (déjalo vacío para quitar la lista):", actuales);
+    if (texto === null) return;
+    guardarHistorialBloques();
+    const opciones = texto.split(",").map((o) => o.trim()).filter(Boolean);
+    if (opciones.length) bloque.opcionesColumna[ci] = opciones;
+    else delete bloque.opcionesColumna[ci];
+    renderBloques();
+  });
+  botones.append(
+    agregarFila, quitarFila, agregarCol, quitarCol, pegarBtn, combinarBtn, separarBtn,
+    centrarBtn, izquierdaBtn, negritaBtn, colorInput, colorQuitarBtn, opcionesBtn
+  );
   cont.appendChild(botones);
 
   const notaInput = document.createElement("input");

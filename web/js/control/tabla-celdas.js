@@ -106,6 +106,71 @@ export function alinearIzquierdaRango(centrados, fMin, fMax, cMin, cMax) {
   return centrados.filter((c) => !(c.fila >= fMin && c.fila <= fMax && c.col >= cMin && c.col <= cMax));
 }
 
+// ---- negrilla y color por celda ----
+// Mismo criterio disperso que "centrados": negritas es un array de
+// {fila,col}; coloresCelda es un array de {fila,col,color} con color en
+// hex "#rrggbb". Cada celda del cuerpo (fila 0 ya sale en negrilla por ser
+// encabezado, ver dibujarTabla) puede además marcarse en negrilla y/o con
+// un color de letra propio — pensado para resaltar filas/celdas puntuales
+// dentro de una tabla larga (ej. un ítem no conforme), no para texto con
+// varios estilos mezclados dentro de la misma celda.
+
+export function celdaNegrita(negritas, fi, ci) {
+  return (negritas || []).some((c) => c.fila === fi && c.col === ci);
+}
+
+export function normalizarNegritas(negritas, numFilas, numCols) {
+  return (negritas || []).filter((c) => c && c.fila >= 0 && c.col >= 0 && c.fila < numFilas && c.col < numCols);
+}
+
+export function negritaRango(negritas, fMin, fMax, cMin, cMax) {
+  const resultado = negritas.slice();
+  for (let fi = fMin; fi <= fMax; fi++) {
+    for (let ci = cMin; ci <= cMax; ci++) {
+      if (!celdaNegrita(resultado, fi, ci)) resultado.push({ fila: fi, col: ci });
+    }
+  }
+  return resultado;
+}
+
+export function quitarNegritaRango(negritas, fMin, fMax, cMin, cMax) {
+  return negritas.filter((c) => !(c.fila >= fMin && c.fila <= fMax && c.col >= cMin && c.col <= cMax));
+}
+
+export function colorCelda(coloresCelda, fi, ci) {
+  const c = (coloresCelda || []).find((c) => c.fila === fi && c.col === ci);
+  return c ? c.color : null;
+}
+
+export function normalizarColoresCelda(coloresCelda, numFilas, numCols) {
+  return (coloresCelda || []).filter((c) => c && c.fila >= 0 && c.col >= 0 && c.fila < numFilas && c.col < numCols);
+}
+
+// Fija (o quita, si color es null) el color de todas las celdas de un rango.
+export function colorearRango(coloresCelda, fMin, fMax, cMin, cMax, color) {
+  const resultado = coloresCelda.filter((c) => !(c.fila >= fMin && c.fila <= fMax && c.col >= cMin && c.col <= cMax));
+  if (!color) return resultado;
+  for (let fi = fMin; fi <= fMax; fi++) {
+    for (let ci = cMin; ci <= cMax; ci++) resultado.push({ fila: fi, col: ci, color });
+  }
+  return resultado;
+}
+
+// ---- listas de opciones por columna (celdas tipo "Sí/No/N.A.") ----
+// bloque.opcionesColumna: objeto { [indiceColumna]: ["Sí", "No", ...] } —
+// una columna con opciones definidas se edita con un <select> en vez de un
+// <input> de texto libre en cada celda del cuerpo (la fila 0, de
+// encabezado, sigue siendo texto libre). No afecta el PDF/Word: ahí solo
+// se dibuja el valor guardado en la celda, igual que cualquier otra.
+export function normalizarOpcionesColumna(opcionesColumna, numCols) {
+  const resultado = {};
+  Object.entries(opcionesColumna || {}).forEach(([ci, opciones]) => {
+    const i = Number(ci);
+    if (i >= 0 && i < numCols && Array.isArray(opciones) && opciones.length) resultado[i] = opciones;
+  });
+  return resultado;
+}
+
 // ---- ancho de columnas del editor (cuadrícula de <input>) ----
 // Mismo criterio de "eficiencia de espacio" que calcularAnchosColumna (PDF)
 // y anchosColumnaDocx (Word) — el ancho de cada columna no se reparte en
