@@ -572,6 +572,12 @@ export async function generarInformePDF(informe) {
 
     // Firma digital (imagen subida en el editor) por firmante — si no hay,
     // ese firmante deja el espacio en blanco de siempre para firmar a mano.
+    // El alto reservado en el layout (espacioParaFirmar, más abajo) se
+    // calcula siempre sobre este tamaño base, sin importar el tamaño real
+    // que pida cada firmante: así, si alguien agranda su firma más allá de
+    // lo normal, la imagen crece hacia arriba y se monta sobre el bloque
+    // anterior (como un sello real) en vez de solo empujar más espacio en
+    // blanco antes de la línea de firma.
     const altoFirmaImg = 14;
     const imagenesFirma = await Promise.all(firmantes.map(async (f) => {
       if (!f.firmaUrl) return null;
@@ -608,10 +614,14 @@ export async function generarInformePDF(informe) {
 
       const imgFirma = imagenesFirma[i];
       if (imgFirma) {
-        let anchoImg = altoFirmaImg * (imgFirma.ancho / imgFirma.alto);
+        const altoDeseado = Math.min(60, Math.max(6, Number(firmante.altoFirma) || altoFirmaImg));
+        let anchoImg = altoDeseado * (imgFirma.ancho / imgFirma.alto);
         if (anchoImg > anchoColumna - 6) anchoImg = anchoColumna - 6;
         const altoImg = anchoImg * (imgFirma.alto / imgFirma.ancho);
-        doc.addImage(imgFirma.dataUrl, "PNG", xCentro - anchoImg / 2, y - altoFirmaImg - 2, anchoImg, altoImg);
+        // El ancla es el borde inferior (siempre 2mm arriba de la línea de
+        // firma) — la imagen crece hacia arriba, no hacia abajo, para poder
+        // montarse sobre el contenido anterior cuando altoImg > altoFirmaImg.
+        doc.addImage(imgFirma.dataUrl, "PNG", xCentro - anchoImg / 2, y - altoImg - 2, anchoImg, altoImg);
       }
 
       doc.setDrawColor(120, 126, 134);

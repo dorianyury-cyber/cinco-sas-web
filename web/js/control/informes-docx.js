@@ -533,11 +533,15 @@ export async function generarInformeDocxBlob(informe) {
       // tiene una, o el espacio en blanco de siempre para firmar a mano si
       // no; fila 2: línea de firma (borde superior de la celda) con el
       // nombre y cargo debajo.
-      const altoFirmaImgPx = Math.round(14 * PX_POR_MM);
+      // Word no dibuja libre como el PDF (es una tabla), así que agrandar la
+      // firma no la monta sobre el contenido de arriba — solo hace la
+      // imagen más grande dentro de su celda, con la fila creciendo si hace
+      // falta.
       const anchoColumnaMmMenosPadding = ANCHO_UTIL_MM / firmantes.length - 6;
       const celdasEspacio = await Promise.all(firmantes.map(async (f) => {
         if (f.firmaUrl) {
           try {
+            const altoFirmaImgPx = Math.round(Math.min(60, Math.max(6, Number(f.altoFirma) || 14)) * PX_POR_MM);
             const img = await cargarImagenParaDocx(f.firmaUrl, "#ffffff", "image/png", "png");
             let anchoImgPx = Math.round(altoFirmaImgPx * (img.ancho / img.alto));
             const anchoMaxPx = Math.round(anchoColumnaMmMenosPadding * PX_POR_MM);

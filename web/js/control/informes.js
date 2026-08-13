@@ -456,6 +456,20 @@ function renderFirmaEditor(bloque) {
       imgFirma.src = previewFirma;
       imgFirma.className = "control-firma-imagen-preview";
       firmaWrap.appendChild(imgFirma);
+
+      const tamanoLabel = document.createElement("label");
+      tamanoLabel.className = "control-firma-tamano";
+      tamanoLabel.textContent = "Tamaño (mm): ";
+      const tamanoInput = document.createElement("input");
+      tamanoInput.type = "number";
+      tamanoInput.min = "6";
+      tamanoInput.max = "60";
+      tamanoInput.step = "1";
+      tamanoInput.value = firmante.altoFirma || 14;
+      tamanoInput.title = "Alto de la firma en mm. Pasado el tamaño normal, la firma empieza a montarse sobre el contenido de arriba (como un sello real) en vez de solo ocupar más espacio en blanco.";
+      tamanoInput.addEventListener("input", () => { firmante.altoFirma = Number(tamanoInput.value) || 14; });
+      tamanoLabel.appendChild(tamanoInput);
+      firmaWrap.appendChild(tamanoLabel);
     }
     const inputFirmaImg = document.createElement("input");
     inputFirmaImg.type = "file";
@@ -1245,7 +1259,7 @@ requireAuth(async (user) => {
               await uploadBytes(archivoRef, firmante.firmaBlob);
               firmaUrl = await getDownloadURL(archivoRef);
             }
-            firmantes.push({ nombre: firmante.nombre || "", cargo: firmante.cargo || "", firmaUrl });
+            firmantes.push({ nombre: firmante.nombre || "", cargo: firmante.cargo || "", firmaUrl, altoFirma: firmante.altoFirma || 14 });
           }
           bloquesFinal.push({ tipo: "firma", etiqueta: bloque.etiqueta || "", firmantes });
         } else {
@@ -1385,7 +1399,8 @@ requireAuth(async (user) => {
             tipo: "firma", etiqueta: b.etiqueta || "",
             firmantes: (b.firmantes || []).map((f) => ({
               nombre: f.nombre || "", cargo: f.cargo || "",
-              firmaUrl: f.firmaUrl || (f.firmaBlob ? URL.createObjectURL(f.firmaBlob) : null)
+              firmaUrl: f.firmaUrl || (f.firmaBlob ? URL.createObjectURL(f.firmaBlob) : null),
+              altoFirma: f.altoFirma || 14
             }))
           };
         }
