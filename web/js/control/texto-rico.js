@@ -178,7 +178,16 @@ export function parsearHtmlARuns(html) {
     const nuevoEstilo = { ...estilo };
     if (nodo.tagName === "B" || nodo.tagName === "STRONG") nuevoEstilo.negrita = true;
     if (nodo.tagName === "I" || nodo.tagName === "EM") nuevoEstilo.cursiva = true;
-    if (nodo.style && nodo.style.color) nuevoEstilo.color = rgbDesdeCss(nodo.style.color);
+    // El color aplicado con document.execCommand("foreColor", ...) normalmente
+    // queda como style="color:..." en un <span>, pero en algunos casos el
+    // navegador lo deja como <font color="#rrggbb"> — un atributo HTML, no un
+    // estilo — que nodo.style.color no ve. Sin este segundo intento, ese
+    // color se perdía en silencio y el texto salía con el color por defecto.
+    const colorCss = (nodo.style && nodo.style.color) || nodo.getAttribute?.("color");
+    if (colorCss) {
+      const color = rgbDesdeCss(colorCss);
+      if (color) nuevoEstilo.color = color;
+    }
 
     nodo.childNodes.forEach((hijo) => caminar(hijo, nuevoEstilo, nivel));
     // Si el último hijo ya era un <br> (ej. "<div><br></div>", una línea en
