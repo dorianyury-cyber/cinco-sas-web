@@ -8,7 +8,7 @@
 // - nombres propios/ciudades de uso frecuente en la operación (lista fija,
 //   ampliar aquí si aparecen casos nuevos)
 
-const SIGLAS = ["SAS", "LTDA", "IPS", "ESE", "EPS", "ESP", "ONG", "NIT", "GGC", "AGPE"];
+const SIGLAS = ["SAS", "LTDA", "IPS", "ESE", "EPS", "ESP", "ONG", "NIT", "GGC", "AGPE", "RETIE"];
 
 const PROPIOS = [
   "Neiva", "Huila", "Colombia", "Pitalito", "Garzón", "Campoalegre",
@@ -37,6 +37,18 @@ function valorFijo(nucleo) {
   return PROPIOS.find((p) => p.toLowerCase() === nucleo.toLowerCase()) || null;
 }
 
+// Una sigla que no está en la lista fija (ej. RETIE, ANROER, o cualquier
+// otra que aparezca en un contrato futuro) se perdía en minúscula sin
+// avisar, porque solo se respetaban SIGLAS/PROPIOS. En vez de tener que
+// mantener esa lista al día con cada sigla nueva, se respeta tal cual
+// cualquier palabra de 2+ letras que el usuario ya haya escrito TODA en
+// mayúscula — se toma como señal de que es una sigla a propósito, no un
+// descuido de digitación (que normalmente no produce una palabra entera en
+// mayúscula sostenida).
+function pareceSiglaEscrita(nucleo) {
+  return nucleo.length >= 2 && nucleo === nucleo.toUpperCase() && nucleo !== nucleo.toLowerCase();
+}
+
 // Reconoce una sigla escrita con un punto entre cada letra (ej. "S.A.S.",
 // "s.a.s", "E.S.P."), un patrón muy común en razones sociales que
 // dividirPalabra() no captura por sí solo (esa función solo separa
@@ -62,6 +74,7 @@ export function capitalizarOracion(texto) {
       if (!nucleo) return palabra;
       const fijo = valorFijo(nucleo);
       if (fijo) return pre + fijo + post;
+      if (pareceSiglaEscrita(nucleo)) return pre + nucleo + post;
       const base = nucleo.toLowerCase();
       const cuerpo = i === 0 ? base.charAt(0).toUpperCase() + base.slice(1) : base;
       return pre + cuerpo + post;
@@ -92,6 +105,7 @@ export function capitalizarNombrePropio(texto) {
       if (!nucleo) return palabra;
       const fijo = valorFijo(nucleo);
       if (fijo) return pre + fijo + post;
+      if (pareceSiglaEscrita(nucleo)) return pre + nucleo + post;
       const base = nucleo.toLowerCase();
       const cuerpo = i > 0 && CONECTORES.has(base) ? base : base.charAt(0).toUpperCase() + base.slice(1);
       return pre + cuerpo + post;
