@@ -1,5 +1,8 @@
 import { signInWithEmailAndPassword, onAuthStateChanged } from "https://www.gstatic.com/firebasejs/10.7.1/firebase-auth.js";
 import { auth } from "./firebase-control.js";
+import { agregarToggleClave } from "./clave-visible.js";
+
+agregarToggleClave(document.getElementById("clave"));
 
 // Si ya hay sesión activa, saltar directo a la lista de contratos.
 onAuthStateChanged(auth, (user) => {

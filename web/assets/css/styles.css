@@ -873,6 +873,26 @@ form.pqr-form select:focus {
   border-color: var(--cinco-amber-dark);
   box-shadow: 0 0 0 3px rgba(254, 178, 9, 0.2);
 }
+/* Botón de mostrar/ocultar dentro de un campo de contraseña — ver
+   agregarToggleClave en clave-visible.js. */
+.control-clave-wrap { position: relative; }
+.control-clave-wrap input { padding-right: 44px; }
+.control-clave-toggle {
+  position: absolute;
+  right: 4px;
+  top: 50%;
+  transform: translateY(-50%);
+  width: 34px;
+  height: 34px;
+  border: none;
+  background: none;
+  cursor: pointer;
+  font-size: 16px;
+  line-height: 1;
+  color: var(--text-muted);
+  border-radius: 8px;
+}
+.control-clave-toggle:hover { color: var(--cinco-amber-dark); background: rgba(254, 178, 9, 0.12); }
 form.pqr-form textarea { resize: vertical; }
 .control-enlace-fila { display: flex; gap: 8px; align-items: center; }
 .control-enlace-fila input { flex: 1; min-width: 0; }

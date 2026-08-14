@@ -2,10 +2,13 @@ import {
   signOut, EmailAuthProvider, reauthenticateWithCredential, updatePassword
 } from "https://www.gstatic.com/firebasejs/10.7.1/firebase-auth.js";
 import { auth, requireAuth } from "./firebase-control.js";
+import { agregarToggleClave } from "./clave-visible.js";
 
 document.getElementById("logoutBtn").addEventListener("click", () => {
   signOut(auth).then(() => { window.location.href = "login.html"; });
 });
+
+["claveActual", "claveNueva", "claveConfirmar"].forEach((id) => agregarToggleClave(document.getElementById(id)));
 
 const form = document.getElementById("cambiarClaveForm");
 const alertBox = document.getElementById("cambiarClaveAlert");
