@@ -34,6 +34,15 @@
   font-display: swap;
   src: url("../fonts/poppins-800.woff2") format("woff2");
 }
+/* ---- cursiva manuscrita para el eslogan de marca (ver .brand-tagline,
+   .footer-tagline, .login-tagline) — jamás para texto de lectura ---- */
+@font-face {
+  font-family: "Alex Brush";
+  font-style: normal;
+  font-weight: 400;
+  font-display: swap;
+  src: url("../fonts/alex-brush-400.woff2") format("woff2");
+}
 
 :root {
   --cinco-navy: #1f2732;
@@ -127,6 +136,29 @@ img { max-width: 100%; display: block; }
 }
 .brand { display: flex; align-items: center; gap: 10px; }
 .brand img { height: 40px; width: auto; }
+/* Eslogan de marca ("Hacerlo mejor es nuestro reto"), en cursiva manuscrita
+   junto al logo — autoalojada igual que Poppins, un solo peso porque solo
+   se usa en este trazo decorativo, nunca en texto de lectura. */
+.brand-tagline {
+  font-family: "Alex Brush", cursive;
+  font-size: 23px;
+  line-height: 1;
+  color: #b7bcc4;
+  padding-left: 14px;
+  margin-left: 4px;
+  border-left: 1px solid rgba(255, 255, 255, 0.18);
+  white-space: nowrap;
+}
+@media (max-width: 720px) {
+  .brand-tagline { display: none; }
+}
+.login-tagline {
+  font-family: "Alex Brush", cursive;
+  font-size: 27px;
+  color: #8a8a8a;
+  text-align: center;
+  margin-top: 20px;
+}
 nav.main-nav { display: flex; gap: 4px; flex-wrap: wrap; }
 nav.main-nav a {
   color: #dfe3e8;
@@ -890,6 +922,7 @@ form.pqr-form button { margin-top: 20px; width: 100%; }
 .footer-col p { color: #9aa2ad; font-size: 13px; }
 .footer-col a { color: #aab1ba; }
 .footer-col a:hover { color: var(--cinco-amber); }
+.footer-tagline { font-family: "Alex Brush", cursive; font-size: 25px; color: #9aa2ad; margin-top: 8px; }
 .footer-links { list-style: none; padding: 0; margin: 0; display: flex; flex-direction: column; gap: 10px; }
 .footer-bottom {
   padding-top: 20px;
