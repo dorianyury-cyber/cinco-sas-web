@@ -1484,8 +1484,8 @@ form.pqr-form .control-3botones button:disabled { opacity: 0.5; cursor: not-allo
 .control-firma-firmantes { display: flex; flex-direction: column; gap: 6px; }
 .control-firma-firmante { display: flex; gap: 8px; flex-wrap: wrap; align-items: center; }
 .control-firma-firmante input { flex: 1; min-width: 160px; }
-.control-firma-imagen-wrap { display: flex; align-items: center; gap: 8px; }
-.control-firma-imagen-preview { height: 32px; max-width: 100px; object-fit: contain; border: 1px solid var(--border); border-radius: 4px; background: #fff; }
+.control-firma-imagen-wrap { display: flex; align-items: center; gap: 8px; flex-wrap: wrap; }
+.control-firma-imagen-preview { height: 110px; max-width: 260px; object-fit: contain; border: 1px solid var(--border); border-radius: 4px; background: #fff; }
 .control-firma-tamano { display: flex; align-items: center; gap: 4px; font-size: 12.5px; color: var(--text-muted); white-space: nowrap; }
 .control-firma-tamano input { flex: 0 0 auto; min-width: 0; width: 52px; }
 
