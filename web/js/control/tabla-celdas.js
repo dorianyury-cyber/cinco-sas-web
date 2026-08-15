@@ -219,3 +219,62 @@ export function redimensionarFilas(filas, numFilasObjetivo, numColsObjetivo) {
     while (fila.length > numColsObjetivo) fila.pop();
   });
 }
+
+// ---- insertar/quitar una fila en una posición cualquiera (no solo al
+// final) — para tablas largas (ej. un checklist de 20+ ítems) donde hace
+// falta meter o sacar una fila en medio sin tener que recortar y volver a
+// pegar todo lo de abajo. "indice" es 0-based; insertar en indice=N agrega
+// la fila nueva ANTES de la fila que hoy está en esa posición.
+
+export function insertarFila(filas, indice, numCols) {
+  filas.splice(indice, 0, new Array(numCols).fill(""));
+}
+
+export function eliminarFila(filas, indice) {
+  filas.splice(indice, 1);
+}
+
+// Desplaza el índice de fila de cada merge que le corresponda. Si la fila
+// se inserta/quita en medio de un merge vertical (no en su primera fila),
+// el merge crece o se encoge una fila en vez de quedar "descuadrado" —
+// igual que Excel/Word al insertar una fila en medio de celdas combinadas.
+function desplazarFilaEnMerges(merges, indice, insertando) {
+  return merges.map((m) => {
+    if (insertando) {
+      if (indice <= m.fila) return { ...m, fila: m.fila + 1 };
+      if (indice < m.fila + m.filas) return { ...m, filas: m.filas + 1 };
+      return m;
+    }
+    if (indice < m.fila) return { ...m, fila: m.fila - 1 };
+    if (indice < m.fila + m.filas) return { ...m, filas: m.filas - 1 };
+    return m;
+  });
+}
+
+// Mismo desplazamiento para las listas dispersas de coordenadas
+// (centrados/negritas/coloresCelda: todas son [{fila, col, ...}]). Al
+// quitar una fila, cualquier coordenada que estuviera justo ahí se
+// descarta (esa celda ya no existe).
+function desplazarFilaEnCoordenadas(lista, indice, insertando) {
+  if (insertando) return lista.map((c) => (c.fila >= indice ? { ...c, fila: c.fila + 1 } : c));
+  return lista.filter((c) => c.fila !== indice).map((c) => (c.fila > indice ? { ...c, fila: c.fila - 1 } : c));
+}
+
+// Envuelve insertarFila/eliminarFila + el desplazamiento de merges/
+// centrados/negritas/coloresCelda del bloque, para no repetir las cuatro
+// llamadas cada vez que el editor inserta o quita una fila.
+export function insertarFilaEnBloque(bloque, indice, numCols) {
+  insertarFila(bloque.filas, indice, numCols);
+  bloque.merges = desplazarFilaEnMerges(bloque.merges || [], indice, true);
+  bloque.centrados = desplazarFilaEnCoordenadas(bloque.centrados || [], indice, true);
+  bloque.negritas = desplazarFilaEnCoordenadas(bloque.negritas || [], indice, true);
+  bloque.coloresCelda = desplazarFilaEnCoordenadas(bloque.coloresCelda || [], indice, true);
+}
+
+export function eliminarFilaEnBloque(bloque, indice) {
+  eliminarFila(bloque.filas, indice);
+  bloque.merges = desplazarFilaEnMerges(bloque.merges || [], indice, false);
+  bloque.centrados = desplazarFilaEnCoordenadas(bloque.centrados || [], indice, false);
+  bloque.negritas = desplazarFilaEnCoordenadas(bloque.negritas || [], indice, false);
+  bloque.coloresCelda = desplazarFilaEnCoordenadas(bloque.coloresCelda || [], indice, false);
+}

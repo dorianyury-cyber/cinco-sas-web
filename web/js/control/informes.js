@@ -14,7 +14,8 @@ import {
   normalizarMerges, celdaCombinada, expandirRangoConMerges, quitarMergesQueIntersectan,
   celdaCentrada, normalizarCentrados, centrarRango, alinearIzquierdaRango, anchosColumnaEditor,
   redimensionarFilas, celdaNegrita, normalizarNegritas, negritaRango, quitarNegritaRango,
-  colorCelda, normalizarColoresCelda, colorearRango, normalizarOpcionesColumna
+  colorCelda, normalizarColoresCelda, colorearRango, normalizarOpcionesColumna,
+  insertarFilaEnBloque, eliminarFilaEnBloque
 } from "./tabla-celdas.js";
 
 // Área/tipo fijos para que un informe quede en el Listado Maestro de
@@ -700,22 +701,46 @@ function renderTablaEditor(bloque) {
 
   const botones = document.createElement("div");
   botones.className = "control-tabla-botones";
-  const agregarFila = document.createElement("button");
-  agregarFila.type = "button";
-  agregarFila.className = "control-btn-mini";
-  agregarFila.textContent = "+ Fila";
-  agregarFila.addEventListener("click", () => {
+  // Insertar/quitar relativo a la última celda donde se hizo clic
+  // (bloque._filaFoco, la misma que ya usa "Pegar desde Excel/Word") — así
+  // se puede meter o sacar una fila en medio de una tabla larga sin tener
+  // que recortar y volver a pegar todo lo de abajo. Sin ningún clic previo
+  // (bloque recién creado), caen al comportamiento de antes: agregar al
+  // final / quitar la última.
+  const agregarFilaArriba = document.createElement("button");
+  agregarFilaArriba.type = "button";
+  agregarFilaArriba.className = "control-btn-mini";
+  agregarFilaArriba.textContent = "+ Fila arriba";
+  agregarFilaArriba.title = "Inserta una fila vacía antes de la celda donde hiciste clic por última vez";
+  agregarFilaArriba.addEventListener("click", () => {
     guardarHistorialBloques();
-    bloque.filas.push(new Array(numCols).fill(""));
+    const indice = bloque._filaFoco ?? bloque.filas.length;
+    insertarFilaEnBloque(bloque, indice, numCols);
+    renderBloques();
+  });
+  const agregarFilaAbajo = document.createElement("button");
+  agregarFilaAbajo.type = "button";
+  agregarFilaAbajo.className = "control-btn-mini";
+  agregarFilaAbajo.textContent = "+ Fila abajo";
+  agregarFilaAbajo.title = "Inserta una fila vacía después de la celda donde hiciste clic por última vez";
+  agregarFilaAbajo.addEventListener("click", () => {
+    guardarHistorialBloques();
+    const indice = bloque._filaFoco === undefined ? bloque.filas.length : bloque._filaFoco + 1;
+    insertarFilaEnBloque(bloque, indice, numCols);
     renderBloques();
   });
   const quitarFila = document.createElement("button");
   quitarFila.type = "button";
   quitarFila.className = "control-btn-mini";
   quitarFila.textContent = "- Fila";
+  quitarFila.title = "Quita la fila donde hiciste clic por última vez";
   quitarFila.disabled = bloque.filas.length <= 1;
   quitarFila.addEventListener("click", () => {
-    if (bloque.filas.length > 1) { guardarHistorialBloques(); bloque.filas.pop(); renderBloques(); }
+    if (bloque.filas.length <= 1) return;
+    guardarHistorialBloques();
+    const indice = Math.min(bloque._filaFoco ?? bloque.filas.length - 1, bloque.filas.length - 1);
+    eliminarFilaEnBloque(bloque, indice);
+    renderBloques();
   });
   const agregarCol = document.createElement("button");
   agregarCol.type = "button";
@@ -904,7 +929,7 @@ function renderTablaEditor(bloque) {
     renderBloques();
   });
   botones.append(
-    agregarFila, quitarFila, agregarCol, quitarCol, pegarBtn, combinarBtn, separarBtn,
+    agregarFilaArriba, agregarFilaAbajo, quitarFila, agregarCol, quitarCol, pegarBtn, combinarBtn, separarBtn,
     centrarBtn, izquierdaBtn, negritaBtn, colorInput, colorQuitarBtn, opcionesBtn
   );
   cont.appendChild(botones);
