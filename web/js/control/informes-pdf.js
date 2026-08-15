@@ -101,7 +101,7 @@ function calcularAnchosColumna(doc, filas, anchoUtil, merges = []) {
   // reduce cuando hace falta (nunca a más de un 60% del reparto parejo, o
   // el "sobrante" para repartir proporcionalmente después quedaría en
   // cero y volveríamos al mismo problema).
-  const anchoMin = Math.min(18, (anchoUtil / numCols) * 0.6);
+  const anchoMinGeneral = Math.min(18, (anchoUtil / numCols) * 0.6);
   // Bajado de 0.6 a 0.4: con tablas de muchas columnas (ej. un checklist
   // con #, Ítem, Aplica, Cumple, Observaciones...) la columna de texto
   // largo pedía el 60% de la página y dejaba a las demás peleándose por
@@ -114,16 +114,33 @@ function calcularAnchosColumna(doc, filas, anchoUtil, merges = []) {
   // negrilla, más ancha que el resto a igual tamaño — medirla con la
   // fuente normal subestimaba cuánto espacio necesitaba de verdad). Las
   // celdas combinadas no cuentan acá — se miden aparte, más abajo.
+  //
+  // De paso se mide la palabra suelta más ancha de cada columna (ej.
+  // "Cumple" en un checklist): si una columna angosta compite con otras
+  // que piden mucho más (como "Observaciones"), puede terminar con menos
+  // ancho que esa sola palabra, y splitTextToSize la parte letra por letra
+  // ("Cumpl"/"e") en vez de mandarla entera a la siguiente línea. El
+  // mínimo de esa columna nunca baja de ahí, aunque el mínimo general sí
+  // sea menor — así una columna nunca queda más angosta que su propia
+  // palabra más larga.
   const deseados = [];
+  const anchoMinPorColumna = [];
   for (let c = 0; c < numCols; c++) {
     let maximo = 0;
+    let palabraMasAncha = 0;
     filas.forEach((fila, fi) => {
       if (celdaCombinada(merges, fi, c)) return;
       doc.setFont("helvetica", fi === 0 ? "bold" : "normal");
-      const ancho = doc.getTextWidth(String(fila[c] || ""));
+      const texto = String(fila[c] || "");
+      const ancho = doc.getTextWidth(texto);
       if (ancho > maximo) maximo = ancho;
+      texto.split(/\s+/).forEach((palabra) => {
+        const anchoPalabra = doc.getTextWidth(palabra);
+        if (anchoPalabra > palabraMasAncha) palabraMasAncha = anchoPalabra;
+      });
     });
     deseados.push(maximo);
+    anchoMinPorColumna.push(Math.min(anchoMax, Math.max(anchoMinGeneral, palabraMasAncha + 6)));
   }
 
   // El ancho que pide una celda combinada se reparte entre las columnas
@@ -142,7 +159,7 @@ function calcularAnchosColumna(doc, filas, anchoUtil, merges = []) {
     }
   });
 
-  for (let c = 0; c < numCols; c++) deseados[c] = Math.min(Math.max(deseados[c] + 6, anchoMin), anchoMax);
+  for (let c = 0; c < numCols; c++) deseados[c] = Math.min(Math.max(deseados[c] + 6, anchoMinPorColumna[c]), anchoMax);
 
   const totalDeseado = deseados.reduce((a, b) => a + b, 0);
   if (totalDeseado <= anchoUtil) {
@@ -152,19 +169,22 @@ function calcularAnchosColumna(doc, filas, anchoUtil, merges = []) {
     return deseados.map((a) => a * factor);
   }
 
-  // No cabe todo: cada columna se queda con al menos anchoMin, y el resto
-  // del ancho de la página se reparte entre las columnas según cuánto
-  // pedían de más sobre ese mínimo — así una columna angosta (ej. "Nivel")
-  // no se encoge solo porque otra (ej. "Notas") pedía mucho espacio.
-  const espacioLibre = anchoUtil - anchoMin * numCols;
-  const extra = deseados.map((d) => Math.max(0, d - anchoMin));
+  // No cabe todo: cada columna se queda con al menos su propio mínimo (el
+  // general, o el de su palabra más ancha si pide más), y el resto del
+  // ancho de la página se reparte entre las columnas según cuánto pedían
+  // de más sobre ese mínimo — así una columna angosta (ej. "Nivel") no se
+  // encoge solo porque otra (ej. "Notas") pedía mucho espacio.
+  const totalMin = anchoMinPorColumna.reduce((a, b) => a + b, 0);
+  const espacioLibre = anchoUtil - totalMin;
+  const extra = deseados.map((d, c) => Math.max(0, d - anchoMinPorColumna[c]));
   const totalExtra = extra.reduce((a, b) => a + b, 0);
   if (espacioLibre <= 0 || totalExtra === 0) {
-    // Demasiadas columnas para el ancho mínimo de todas — repartir parejo
-    // es lo mejor que se puede hacer.
+    // Demasiadas columnas para el mínimo de todas — repartir parejo es lo
+    // mejor que se puede hacer (puede seguir apretando alguna palabra
+    // suelta, pero ya no hay espacio ni para los mínimos).
     return deseados.map(() => anchoUtil / numCols);
   }
-  return deseados.map((d, c) => anchoMin + (extra[c] / totalExtra) * espacioLibre);
+  return deseados.map((d, c) => anchoMinPorColumna[c] + (extra[c] / totalExtra) * espacioLibre);
 }
 
 // Suma "cantidad" valores consecutivos de un arreglo desde "inicio" — para
