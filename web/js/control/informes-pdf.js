@@ -150,6 +150,15 @@ function calcularAnchosColumna(doc, filas, anchoUtil, merges = []) {
   // partiéndose feo en dos líneas por palabra; ni se le carga entero a una
   // sola columna, que sí desbordaba con encabezados combinando pocas
   // columnas).
+  //
+  // El bucle de arriba (deseados/anchoMinPorColumna por palabra suelta) se
+  // salta TODA celda combinada, incluida su ancla — así que una columna
+  // que ancla un merge (ej. "Cumple" combinado verticalmente con la fila
+  // de sub-encabezados, para que no quede repetida/vacía ahí abajo) perdía
+  // su mínimo por palabra y volvía a poder partirse letra por letra. Se
+  // repone acá con el mismo criterio (repartido entre las columnas que
+  // abarca el merge — para uno vertical de 1 sola columna, cols=1, así que
+  // no se reparte nada, es la palabra completa).
   merges.forEach((m) => {
     const texto = String(filas[m.fila]?.[m.col] || "");
     if (!texto) return;
@@ -157,6 +166,15 @@ function calcularAnchosColumna(doc, filas, anchoUtil, merges = []) {
     const anchoPorColumna = doc.getTextWidth(texto) / m.cols;
     for (let c = m.col; c < m.col + m.cols; c++) {
       if (anchoPorColumna > deseados[c]) deseados[c] = anchoPorColumna;
+    }
+    let palabraMasAnchaMerge = 0;
+    texto.split(/\s+/).forEach((palabra) => {
+      const anchoPalabra = doc.getTextWidth(palabra) / m.cols;
+      if (anchoPalabra > palabraMasAnchaMerge) palabraMasAnchaMerge = anchoPalabra;
+    });
+    for (let c = m.col; c < m.col + m.cols; c++) {
+      const minimo = Math.min(anchoMax, Math.max(anchoMinPorColumna[c], palabraMasAnchaMerge + 6));
+      if (minimo > anchoMinPorColumna[c]) anchoMinPorColumna[c] = minimo;
     }
   });
 
