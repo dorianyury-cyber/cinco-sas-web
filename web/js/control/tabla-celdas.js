@@ -71,6 +71,18 @@ export function quitarMergesQueIntersectan(merges, fMin, fMax, cMin, cMax) {
   });
 }
 
+// Cuántas filas desde arriba cuentan como "encabezado" (se repiten al
+// principio de cada página nueva en PDF/Word) cuando nadie lo fijó a mano:
+// si la fila 0 tiene alguna celda combinada horizontalmente (un grupo de
+// columnas, ej. "Memorias de cálculo" arriba de "Pág. inicial"/"Pág.
+// final"), la fila 1 también cuenta como encabezado — así, con solo
+// insertar una fila y combinar celdas en la fila 0, el resto sale solo,
+// sin tener que configurar nada aparte.
+export function filasEncabezadoAutomatico(numFilas, merges) {
+  const fila0TieneGrupoDeColumnas = (merges || []).some((m) => m.fila === 0 && m.cols > 1 && m.filas === 1);
+  return Math.min(numFilas, fila0TieneGrupoDeColumnas ? 2 : 1);
+}
+
 // ---- alineación de celdas (centrado) ----
 // bloque.centrados: array de { fila, col } — lista dispersa de qué celdas
 // están centradas (todo lo que no está en la lista se alinea a la

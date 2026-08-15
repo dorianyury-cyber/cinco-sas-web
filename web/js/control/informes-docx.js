@@ -25,7 +25,8 @@
 import { parsearHtmlARuns } from "./texto-rico.js";
 import {
   normalizarMerges, celdaCombinada, normalizarCentrados, celdaCentrada,
-  normalizarNegritas, celdaNegrita, normalizarColoresCelda, colorCelda
+  normalizarNegritas, celdaNegrita, normalizarColoresCelda, colorCelda,
+  filasEncabezadoAutomatico
 } from "./tabla-celdas.js";
 
 const NAVY_HEX = "1F2732";
@@ -438,15 +439,17 @@ export async function generarInformeDocxBlob(informe) {
 
       const numFilasTabla = filas.length;
       const numColsTabla = Math.max(...filas.map((f) => f.length));
-      // Cuántas filas desde arriba son encabezado (ver "Filas de
-      // encabezado" en el editor) — antes solo la fila 0 se marcaba
-      // tableHeader, así que un encabezado de dos filas (ej. "Memorias de
-      // cálculo" combinada arriba de "Pág. inicial"/"Pág. final") perdía
-      // la segunda fila al repetirse en la página siguiente.
-      const filasEncabezado = Math.max(1, Math.min(Number(bloque.filasEncabezado) || 1, numFilasTabla));
       // Combinar celdas, ver web/js/control/tabla-celdas.js — el texto de
       // una celda combinada se excluye del cálculo de ancho de columna.
       const merges = normalizarMerges(bloque.merges || [], numFilasTabla, numColsTabla);
+      // Cuántas filas desde arriba son encabezado — se detecta solo (ver
+      // filasEncabezadoAutomatico) a partir de si la fila 0 tiene columnas
+      // combinadas, salvo que "Filas de encabezado" se haya fijado a mano
+      // en el editor. Antes solo la fila 0 se marcaba tableHeader siempre,
+      // así que un encabezado de dos filas (ej. "Memorias de cálculo"
+      // combinada arriba de "Pág. inicial"/"Pág. final") perdía la segunda
+      // fila al repetirse en la página siguiente.
+      const filasEncabezado = Math.max(1, Math.min(Number(bloque.filasEncabezado) || filasEncabezadoAutomatico(numFilasTabla, merges), numFilasTabla));
       const centrados = normalizarCentrados(bloque.centrados || [], numFilasTabla, numColsTabla);
       const negritas = normalizarNegritas(bloque.negritas || [], numFilasTabla, numColsTabla);
       const coloresCelda = normalizarColoresCelda(bloque.coloresCelda || [], numFilasTabla, numColsTabla);

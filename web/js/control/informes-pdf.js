@@ -17,7 +17,8 @@
 import { parsearHtmlARuns } from "./texto-rico.js";
 import {
   normalizarMerges, celdaCombinada, normalizarCentrados, celdaCentrada,
-  normalizarNegritas, celdaNegrita, normalizarColoresCelda, colorCelda
+  normalizarNegritas, celdaNegrita, normalizarColoresCelda, colorCelda,
+  filasEncabezadoAutomatico
 } from "./tabla-celdas.js";
 
 const NAVY = [31, 39, 50];
@@ -495,18 +496,20 @@ export async function generarInformePDF(informe) {
     doc.setFontSize(8.5);
     const numFilas = filas.length;
     const numCols = Math.max(...filas.map((f) => f.length));
-    // Cuántas filas desde arriba son encabezado y se repiten al principio
-    // de cada página nueva en la que siga la tabla (ver "Filas de
-    // encabezado" en el editor) — antes solo se repetía la fila 0, así que
-    // un encabezado de dos filas (ej. "Memorias de cálculo" combinada
-    // arriba de "Pág. inicial"/"Pág. final") perdía la segunda fila al
-    // saltar de página.
-    const filasEncabezado = Math.max(1, Math.min(Number(bloque.filasEncabezado) || 1, numFilas));
     // Combinar celdas, ver web/js/control/tabla-celdas.js — el texto de
     // una celda combinada se excluye del cálculo de ancho de columna (si
     // no, una sola columna terminaría cargando con todo ese ancho, cuando
     // en realidad ese texto se reparte entre varias).
     const merges = normalizarMerges(bloque.merges || [], numFilas, numCols);
+    // Cuántas filas desde arriba son encabezado y se repiten al principio
+    // de cada página nueva en la que siga la tabla — se detecta solo (ver
+    // filasEncabezadoAutomatico) a partir de si la fila 0 tiene columnas
+    // combinadas, salvo que "Filas de encabezado" se haya fijado a mano en
+    // el editor. Antes solo se repetía la fila 0 siempre, así que un
+    // encabezado de dos filas (ej. "Memorias de cálculo" combinada arriba
+    // de "Pág. inicial"/"Pág. final") perdía la segunda fila al saltar de
+    // página.
+    const filasEncabezado = Math.max(1, Math.min(Number(bloque.filasEncabezado) || filasEncabezadoAutomatico(numFilas, merges), numFilas));
     const centrados = normalizarCentrados(bloque.centrados || [], numFilas, numCols);
     const negritas = normalizarNegritas(bloque.negritas || [], numFilas, numCols);
     const coloresCelda = normalizarColoresCelda(bloque.coloresCelda || [], numFilas, numCols);

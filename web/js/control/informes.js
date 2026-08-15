@@ -15,7 +15,7 @@ import {
   celdaCentrada, normalizarCentrados, centrarRango, alinearIzquierdaRango, anchosColumnaEditor,
   redimensionarFilas, celdaNegrita, normalizarNegritas, negritaRango, quitarNegritaRango,
   colorCelda, normalizarColoresCelda, colorearRango, normalizarOpcionesColumna,
-  insertarFilaEnBloque, eliminarFilaEnBloque
+  insertarFilaEnBloque, eliminarFilaEnBloque, filasEncabezadoAutomatico
 } from "./tabla-celdas.js";
 
 // Área/tipo fijos para que un informe quede en el Listado Maestro de
@@ -619,15 +619,17 @@ function renderTablaEditor(bloque) {
   // fila 0 — para encabezados de dos filas como "Memorias de cálculo"
   // combinada arriba de "Pág. inicial"/"Pág. final". El estilo (fondo
   // gris, negrilla) sigue siendo solo el de la fila 0, esto solo controla
-  // cuántas se repiten.
+  // cuántas se repiten. Se detecta solo en cuanto combinas celdas en la
+  // fila 0 (ver filasEncabezadoAutomatico) — este campo solo hace falta
+  // tocarlo si el cálculo automático no da lo que necesitas.
   const encabezadoDiv = document.createElement("div");
   encabezadoDiv.className = "control-tabla-tamano";
   const encabezadoInput = document.createElement("input");
   encabezadoInput.type = "number";
   encabezadoInput.min = "1";
   encabezadoInput.max = String(Math.max(1, numFilas - 1));
-  encabezadoInput.value = bloque.filasEncabezado || 1;
-  encabezadoInput.title = "Cuántas filas desde arriba son encabezado y se repiten al pasar de página (ej. 2 si tienes una fila de subtítulos combinados debajo de la principal)";
+  encabezadoInput.value = bloque.filasEncabezado || filasEncabezadoAutomatico(numFilas, bloque.merges);
+  encabezadoInput.title = "Se calcula solo según si la fila 0 tiene columnas combinadas — cámbialo aquí solo si necesitas forzar otro número";
   encabezadoInput.addEventListener("input", () => {
     const valor = Math.max(1, Math.min(parseInt(encabezadoInput.value, 10) || 1, Math.max(1, numFilas - 1)));
     bloque.filasEncabezado = valor;
