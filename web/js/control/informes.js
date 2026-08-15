@@ -143,7 +143,7 @@ deshacerBtn.addEventListener("click", () => {
 });
 
 function nuevaTabla() {
-  return { tipo: "tabla", titulo: "", nota: "", filas: [["", ""], ["", ""]], merges: [], centrados: [] };
+  return { tipo: "tabla", titulo: "", nota: "", filas: [["", ""], ["", ""]], merges: [], centrados: [], filasEncabezado: 1 };
 }
 
 // Bloque de firma: reemplaza la tabla-con-celda-vacía que se venía usando
@@ -613,6 +613,30 @@ function renderTablaEditor(bloque) {
   });
   tamanoDiv.append(labelFilas, labelCols, tamanoBtn);
   cont.appendChild(tamanoDiv);
+
+  // Cuántas filas desde arriba son "encabezado": se repiten al principio
+  // de cada página nueva en la que siga la tabla (PDF y Word), no solo la
+  // fila 0 — para encabezados de dos filas como "Memorias de cálculo"
+  // combinada arriba de "Pág. inicial"/"Pág. final". El estilo (fondo
+  // gris, negrilla) sigue siendo solo el de la fila 0, esto solo controla
+  // cuántas se repiten.
+  const encabezadoDiv = document.createElement("div");
+  encabezadoDiv.className = "control-tabla-tamano";
+  const encabezadoInput = document.createElement("input");
+  encabezadoInput.type = "number";
+  encabezadoInput.min = "1";
+  encabezadoInput.max = String(Math.max(1, numFilas - 1));
+  encabezadoInput.value = bloque.filasEncabezado || 1;
+  encabezadoInput.title = "Cuántas filas desde arriba son encabezado y se repiten al pasar de página (ej. 2 si tienes una fila de subtítulos combinados debajo de la principal)";
+  encabezadoInput.addEventListener("input", () => {
+    const valor = Math.max(1, Math.min(parseInt(encabezadoInput.value, 10) || 1, Math.max(1, numFilas - 1)));
+    bloque.filasEncabezado = valor;
+  });
+  const labelEncabezado = document.createElement("label");
+  labelEncabezado.textContent = "Filas de encabezado";
+  labelEncabezado.appendChild(encabezadoInput);
+  encabezadoDiv.appendChild(labelEncabezado);
+  cont.appendChild(encabezadoDiv);
 
   const grid = document.createElement("div");
   grid.className = "control-tabla-grid";

@@ -438,6 +438,12 @@ export async function generarInformeDocxBlob(informe) {
 
       const numFilasTabla = filas.length;
       const numColsTabla = Math.max(...filas.map((f) => f.length));
+      // Cuántas filas desde arriba son encabezado (ver "Filas de
+      // encabezado" en el editor) — antes solo la fila 0 se marcaba
+      // tableHeader, así que un encabezado de dos filas (ej. "Memorias de
+      // cálculo" combinada arriba de "Pág. inicial"/"Pág. final") perdía
+      // la segunda fila al repetirse en la página siguiente.
+      const filasEncabezado = Math.max(1, Math.min(Number(bloque.filasEncabezado) || 1, numFilasTabla));
       // Combinar celdas, ver web/js/control/tabla-celdas.js — el texto de
       // una celda combinada se excluye del cálculo de ancho de columna.
       const merges = normalizarMerges(bloque.merges || [], numFilasTabla, numColsTabla);
@@ -486,11 +492,12 @@ export async function generarInformeDocxBlob(informe) {
             })]
           }));
         }
-        // tableHeader: true en la fila 0 hace que Word la repita sola al
-        // principio de cada página nueva en la que siga la tabla — a
-        // diferencia del PDF (que arma sus páginas a mano), acá no hace
-        // falta dibujar nada de más, es una propiedad nativa de la tabla.
-        return new TableRow({ children: celdas, tableHeader: fi === 0 || undefined });
+        // tableHeader: true en las filas de encabezado hace que Word las
+        // repita solas al principio de cada página nueva en la que siga la
+        // tabla — a diferencia del PDF (que arma sus páginas a mano), acá
+        // no hace falta dibujar nada de más, es una propiedad nativa de la
+        // tabla, solo hay que marcar todas las filas que correspondan.
+        return new TableRow({ children: celdas, tableHeader: fi < filasEncabezado || undefined });
       });
       cuerpo.push(new Table({ width: { size: ANCHO_UTIL_DXA, type: WidthType.DXA }, rows: filasDocx }));
 

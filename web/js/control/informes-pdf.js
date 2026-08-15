@@ -495,6 +495,13 @@ export async function generarInformePDF(informe) {
     doc.setFontSize(8.5);
     const numFilas = filas.length;
     const numCols = Math.max(...filas.map((f) => f.length));
+    // Cuántas filas desde arriba son encabezado y se repiten al principio
+    // de cada página nueva en la que siga la tabla (ver "Filas de
+    // encabezado" en el editor) — antes solo se repetía la fila 0, así que
+    // un encabezado de dos filas (ej. "Memorias de cálculo" combinada
+    // arriba de "Pág. inicial"/"Pág. final") perdía la segunda fila al
+    // saltar de página.
+    const filasEncabezado = Math.max(1, Math.min(Number(bloque.filasEncabezado) || 1, numFilas));
     // Combinar celdas, ver web/js/control/tabla-celdas.js — el texto de
     // una celda combinada se excluye del cálculo de ancho de columna (si
     // no, una sola columna terminaría cargando con todo ese ancho, cuando
@@ -574,16 +581,19 @@ export async function generarInformePDF(informe) {
     }
 
     // Como saltoSiNoCabe, pero si de verdad toca saltar de página vuelve a
-    // pintar la fila de encabezado arriba antes de seguir (salvo que la
-    // fila que provocó el salto sea el encabezado mismo).
+    // pintar las filas de encabezado (todas las que cuenten como tal, no
+    // solo la primera) arriba antes de seguir — salvo que la fila que
+    // provocó el salto sea ella misma parte del encabezado.
     function saltoTablaSiNoCabe(alturaNecesaria, esFilaEncabezado) {
       if (y + alturaNecesaria > margenInferior) {
         doc.addPage();
         y = margenSuperior;
-        if (!esFilaEncabezado && numFilas > 1) {
-          dibujarFila(filas[0], 0, y);
-          paginasConContenido.add(doc.internal.getNumberOfPages());
-          y += alturaFilas[0];
+        if (!esFilaEncabezado && numFilas > filasEncabezado) {
+          for (let h = 0; h < filasEncabezado; h++) {
+            dibujarFila(filas[h], h, y);
+            paginasConContenido.add(doc.internal.getNumberOfPages());
+            y += alturaFilas[h];
+          }
         }
       }
     }
@@ -597,7 +607,7 @@ export async function generarInformePDF(informe) {
       const inicioMergeVertical = merges.find((m) => m.fila === fi && m.filas > 1);
       const esContinuacion = merges.some((m) => m.filas > 1 && fi > m.fila && fi < m.fila + m.filas);
       if (!esContinuacion) {
-        saltoTablaSiNoCabe(inicioMergeVertical ? sumaRango(alturaFilas, fi, inicioMergeVertical.filas) : alturaFilas[fi], fi === 0);
+        saltoTablaSiNoCabe(inicioMergeVertical ? sumaRango(alturaFilas, fi, inicioMergeVertical.filas) : alturaFilas[fi], fi < filasEncabezado);
       }
       paginasConContenido.add(doc.internal.getNumberOfPages());
       dibujarFila(fila, fi, y);
