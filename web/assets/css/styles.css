@@ -726,6 +726,11 @@ ul.clean-list li {
   position: relative;
   border-bottom: 1px solid var(--border);
   font-size: 14.5px;
+  /* Explícito, no heredado: dentro de .card (fondo siempre claro/--card-bg)
+     el texto debe leerse aunque la sección que envuelve la tarjeta sea
+     .section-dark (que pone color:#fff en toda la sección) — sin esto, el
+     texto quedaba blanco sobre blanco. */
+  color: var(--text-muted);
 }
 ul.clean-list li:last-child { border-bottom: none; }
 ul.clean-list li::before {
