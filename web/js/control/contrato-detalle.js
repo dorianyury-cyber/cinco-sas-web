@@ -168,6 +168,33 @@ function crearFilaItem(item, user, onEstadoChange, contenedor, todosLosItems, pe
   historialBox.appendChild(listaHistorial);
   panel.appendChild(historialBox);
 
+  // Borrar ítem: mismo permiso que "+ Agregar ítem" (solo Admin/Coadministrador)
+  // — pedido del usuario tras crear por error un ítem suelto que no debía
+  // estar ahí, sin forma de quitarlo. Queda dentro del panel "⋯" (no en la
+  // fila principal) para no exponer un botón de borrar en el día a día.
+  // Solo para ítems agregados manualmente (clave "manual_...", ver
+  // botonAgregarItem más abajo) — los ítems fijos de la plantilla
+  // (Servicio al Cliente/Talento Humano/Actividades) no se pueden borrar,
+  // para que todo contrato conserve siempre esa estructura base.
+  const esManual = typeof item.clave === "string" && item.clave.startsWith("manual_");
+  if (permisos.esGestor && esManual) {
+    const borrarItemBtn = campo("button", { type: "button", class: "control-btn-danger control-item-borrar" });
+    borrarItemBtn.textContent = "Borrar ítem";
+    borrarItemBtn.addEventListener("click", async () => {
+      const confirmado = window.confirm(`¿Seguro que quieres borrar el ítem "${item.nombre}" del checklist?\n\nEsta acción no se puede deshacer.`);
+      if (!confirmado) return;
+      borrarItemBtn.disabled = true;
+      try {
+        await deleteDoc(item.ref);
+        window.location.reload();
+      } catch (err) {
+        window.alert(err.message || "No se pudo borrar el ítem.");
+        borrarItemBtn.disabled = false;
+      }
+    });
+    panel.appendChild(borrarItemBtn);
+  }
+
   function renderHistorial() {
     listaHistorial.innerHTML = "";
     const historial = item.historialEstado || [];

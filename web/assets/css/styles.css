@@ -1288,6 +1288,8 @@ button.control-mes-pill.pendiente:hover { border-color: var(--cinco-amber-dark);
 .control-item-historial ul { list-style: none; padding: 0; margin: 0; display: flex; flex-direction: column; gap: 4px; }
 .control-item-historial li.text-muted { font-style: italic; }
 
+.control-item-borrar { margin-top: 12px; }
+
 @media (max-width: 760px) {
   .control-item { grid-template-columns: 1fr 1fr; row-gap: 6px; }
   .control-item-header { display: none; }
