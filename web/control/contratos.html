@@ -38,57 +38,75 @@
 
   <section class="section">
     <div class="container">
-      <details class="card control-nuevo" id="nuevoContratoDetails">
-        <summary>+ Nuevo contrato</summary>
-        <form class="pqr-form" id="nuevoContratoForm">
-          <label for="nombre">Nombre / objeto del contrato</label>
-          <input type="text" id="nombre" required maxlength="300">
-
-          <label for="cliente">Cliente</label>
-          <input type="text" id="cliente" required maxlength="120">
-
-          <label for="lineaServicio">Línea de servicio</label>
-          <select id="lineaServicio" required></select>
-
-          <label for="tipo">Tipo de servicio</label>
-          <select id="tipo" required>
-            <option value="obra">Obra</option>
-            <option value="servicio">Servicio</option>
-          </select>
-
-          <label for="numero">Número de contrato (opcional)</label>
-          <input type="text" id="numero" maxlength="60">
-
-          <label for="valorContrato">Valor del contrato</label>
-          <div class="control-input-unidad">
-            <span>$</span>
-            <input type="number" id="valorContrato" min="0">
-          </div>
-
-          <label for="fechaInicio">Fecha de inicio</label>
-          <input type="date" id="fechaInicio" required>
-
-          <label for="fechaFin">Fecha de finalización</label>
-          <input type="date" id="fechaFin">
-
-          <label for="supervisor">Nombre Supervisor/Interventor (opcional)</label>
-          <input type="text" id="supervisor" maxlength="120">
-
-          <label for="docContratoEnlace">Documento del contrato (opcional) — enlace, ej. a la carpeta en OneDrive</label>
-          <input type="url" id="docContratoEnlace" maxlength="500">
-
-          <label for="docContratoArchivo">O sube aquí el archivo (el contrato firmado, PDF o Word — para poder verlo antes de descargarlo, PDF es lo que mejor funciona)</label>
-          <input type="file" id="docContratoArchivo" accept="application/pdf,.doc,.docx">
-
-          <button type="submit" class="btn" id="crearBtn">Crear contrato</button>
-          <div class="form-alert" id="crearAlert"></div>
-        </form>
-      </details>
+      <button type="button" class="control-btn-mini" id="nuevoContratoBtn">+ Nuevo contrato</button>
 
       <div id="listaContratos" class="grid-cards grid-cards-wide control-lista"></div>
       <p id="sinContratos" class="text-muted oculto">Todavía no hay contratos registrados.</p>
     </div>
   </section>
+
+  <div class="modal-backdrop" id="nuevoContratoBackdrop">
+    <div class="modal modal-ancho">
+      <h2>Nuevo contrato</h2>
+      <form class="modal-form-grid" id="nuevoContratoForm">
+        <div class="campo-ancho">
+          <label for="nombre">Nombre / objeto del contrato</label>
+          <input type="text" id="nombre" required maxlength="300">
+        </div>
+        <div>
+          <label for="cliente">Cliente</label>
+          <input type="text" id="cliente" required maxlength="120">
+        </div>
+        <div>
+          <label for="lineaServicio">Línea de servicio</label>
+          <select id="lineaServicio" required></select>
+        </div>
+        <div>
+          <label for="tipo">Tipo de servicio</label>
+          <select id="tipo" required>
+            <option value="obra">Obra</option>
+            <option value="servicio">Servicio</option>
+          </select>
+        </div>
+        <div>
+          <label for="numero">Número de contrato (opcional)</label>
+          <input type="text" id="numero" maxlength="60">
+        </div>
+        <div>
+          <label for="valorContrato">Valor del contrato</label>
+          <div class="control-input-unidad">
+            <span>$</span>
+            <input type="number" id="valorContrato" min="0">
+          </div>
+        </div>
+        <div>
+          <label for="fechaInicio">Fecha de inicio</label>
+          <input type="date" id="fechaInicio" required>
+        </div>
+        <div>
+          <label for="fechaFin">Fecha de finalización</label>
+          <input type="date" id="fechaFin">
+        </div>
+        <div class="campo-ancho">
+          <label for="supervisor">Nombre Supervisor/Interventor (opcional)</label>
+          <input type="text" id="supervisor" maxlength="120">
+        </div>
+        <div class="campo-ancho">
+          <label for="docContratoEnlace">Documento del contrato (opcional) — enlace, ej. a la carpeta en OneDrive</label>
+          <input type="url" id="docContratoEnlace" maxlength="500">
+        </div>
+        <div class="campo-ancho">
+          <label for="docContratoArchivo">O sube aquí el archivo (el contrato firmado, PDF o Word — para poder verlo antes de descargarlo, PDF es lo que mejor funciona)</label>
+          <input type="file" id="docContratoArchivo" accept="application/pdf,.doc,.docx">
+        </div>
+        <div class="campo-ancho control-edicion-botones">
+          <button type="submit" class="btn" id="crearBtn">Crear contrato</button>
+          <button type="button" class="control-btn-mini" id="cancelarContratoBtn">Cancelar</button>
+        </div>
+        <div class="form-alert campo-ancho" id="crearAlert"></div>
+      </form>
+    </div>
+  </div>
 
   <script type="module" src="../js/control/contratos.js"></script>
 </body>

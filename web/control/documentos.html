@@ -40,30 +40,42 @@
     <div class="container">
       <p id="soloGestorAviso" class="text-muted oculto">Solo un administrador (o un empleado autorizado desde Empleados) puede crear o editar documentos del Listado Maestro. Puedes ver el catálogo, pero no modificarlo.</p>
 
-      <details class="card control-nuevo" id="nuevoDocumentoDetails">
-        <summary>+ Nuevo documento</summary>
-        <form class="pqr-form" id="nuevoDocumentoForm">
-          <label for="area">Área</label>
-          <select id="area" required></select>
+      <button type="button" class="control-btn-mini" id="nuevoDocumentoBtn">+ Nuevo documento</button>
 
-          <label for="tipo">Tipo de documento</label>
-          <select id="tipo" required></select>
-
-          <label for="nombre">Nombre del documento</label>
-          <input type="text" id="nombre" required maxlength="160">
-
-          <label for="enlace">Enlace OneDrive</label>
-          <input type="url" id="enlace" maxlength="500">
-
-          <label for="codigoAnterior">Código anterior (si es una recodificación, opcional)</label>
-          <input type="text" id="codigoAnterior" maxlength="60">
-
-          <div class="form-alert" id="vistaPreviaBox"></div>
-          <button type="button" class="control-btn-mini" id="vistaPreviaBtn">Vista previa</button>
-          <button type="submit" class="btn" id="crearDocumentoBtn">Crear documento</button>
-          <div class="form-alert" id="crearDocumentoAlert"></div>
-        </form>
-      </details>
+      <div class="modal-backdrop" id="nuevoDocumentoBackdrop">
+        <div class="modal modal-ancho">
+          <h2>Nuevo documento</h2>
+          <form class="modal-form-grid" id="nuevoDocumentoForm">
+            <div>
+              <label for="area">Área</label>
+              <select id="area" required></select>
+            </div>
+            <div>
+              <label for="tipo">Tipo de documento</label>
+              <select id="tipo" required></select>
+            </div>
+            <div class="campo-ancho">
+              <label for="nombre">Nombre del documento</label>
+              <input type="text" id="nombre" required maxlength="160">
+            </div>
+            <div class="campo-ancho">
+              <label for="enlace">Enlace OneDrive</label>
+              <input type="url" id="enlace" maxlength="500">
+            </div>
+            <div class="campo-ancho">
+              <label for="codigoAnterior">Código anterior (si es una recodificación, opcional)</label>
+              <input type="text" id="codigoAnterior" maxlength="60">
+            </div>
+            <div class="form-alert campo-ancho" id="vistaPreviaBox"></div>
+            <div class="campo-ancho control-edicion-botones">
+              <button type="button" class="control-btn-mini" id="vistaPreviaBtn">Vista previa</button>
+              <button type="submit" class="btn" id="crearDocumentoBtn">Crear documento</button>
+              <button type="button" class="control-btn-mini" id="cancelarDocumentoMaestroBtn">Cancelar</button>
+            </div>
+            <div class="form-alert campo-ancho" id="crearDocumentoAlert"></div>
+          </form>
+        </div>
+      </div>
 
       <div class="control-filtros">
         <label>Área

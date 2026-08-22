@@ -19,6 +19,17 @@ const form = document.getElementById("nuevoContratoForm");
 const alertBox = document.getElementById("crearAlert");
 const crearBtn = document.getElementById("crearBtn");
 
+// Ventana modal en vez del <details> inline (mismo cambio ya hecho en
+// Documentos del contrato, pedido del usuario para el resto de formularios
+// "+ Nuevo..." del panel).
+const nuevoContratoBackdrop = document.getElementById("nuevoContratoBackdrop");
+document.getElementById("nuevoContratoBtn").addEventListener("click", () => {
+  nuevoContratoBackdrop.classList.add("open");
+});
+document.getElementById("cancelarContratoBtn").addEventListener("click", () => {
+  nuevoContratoBackdrop.classList.remove("open");
+});
+
 const selectLinea = document.getElementById("lineaServicio");
 LINEAS_SERVICIO.forEach((l) => {
   const opt = document.createElement("option");
@@ -90,7 +101,7 @@ requireAuth(async (user) => {
   // exigen) — apoyo/empleado no ven el formulario, solo el listado.
   const perfil = await obtenerPerfil(user.email);
   const esGestor = perfil?.estado === "activo" && (perfil?.rol === "admin" || perfil?.rol === "coadmin");
-  if (!esGestor) document.getElementById("nuevoContratoDetails").classList.add("oculto");
+  if (!esGestor) document.getElementById("nuevoContratoBtn").classList.add("oculto");
 
   const empleadosSnap = await getDocs(collection(db, "empleados"));
   const totalAprobadores = empleadosSnap.docs
@@ -176,7 +187,10 @@ requireAuth(async (user) => {
       }
 
       form.reset();
-      form.closest("details").open = false;
+      // Si el documento no se pudo adjuntar, la ventana se deja abierta con
+      // el aviso visible en vez de cerrarla de una — si no, ese mensaje
+      // quedaría escondido detrás de una ventana ya cerrada.
+      if (!avisoDocumento) nuevoContratoBackdrop.classList.remove("open");
       mostrarAlerta("Contrato creado." + avisoDocumento, avisoDocumento ? "error" : "ok");
     } catch (err) {
       mostrarAlerta(err.message || "No se pudo crear el contrato.", "error");

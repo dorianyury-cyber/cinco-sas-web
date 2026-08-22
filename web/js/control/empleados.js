@@ -32,6 +32,17 @@ const form = document.getElementById("nuevoEmpleadoForm");
 const alertBox = document.getElementById("crearEmpleadoAlert");
 const crearBtn = document.getElementById("crearEmpleadoBtn");
 
+// Ventana modal en vez del <details> inline (mismo cambio ya hecho en
+// Documentos del contrato, pedido del usuario para el resto de formularios
+// "+ Nuevo..." del panel).
+const nuevoEmpleadoBackdrop = document.getElementById("nuevoEmpleadoBackdrop");
+document.getElementById("nuevoEmpleadoBtn").addEventListener("click", () => {
+  nuevoEmpleadoBackdrop.classList.add("open");
+});
+document.getElementById("cancelarEmpleadoBtn").addEventListener("click", () => {
+  nuevoEmpleadoBackdrop.classList.remove("open");
+});
+
 const selectRolNuevo = document.getElementById("rol");
 const rolAyuda = document.getElementById("rolAyuda");
 const camposContainer = document.getElementById("camposPermisoContainer");
@@ -275,7 +286,7 @@ requireAuth(async (user) => {
   const esAdmin = perfil?.estado === "activo" && perfil?.rol === "admin";
 
   if (!esAdmin) {
-    document.getElementById("nuevoEmpleadoDetails").classList.add("oculto");
+    document.getElementById("nuevoEmpleadoBtn").classList.add("oculto");
     document.getElementById("soloAdminAviso").classList.remove("oculto");
   }
 
@@ -314,7 +325,7 @@ requireAuth(async (user) => {
       });
 
       form.reset();
-      form.closest("details").open = false;
+      nuevoEmpleadoBackdrop.classList.remove("open");
       actualizarFormularioSegunRol();
       mostrarAlerta("Empleado creado.", "ok");
     } catch (err) {

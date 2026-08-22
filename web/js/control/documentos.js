@@ -18,6 +18,17 @@ const vistaPreviaBox = document.getElementById("vistaPreviaBox");
 const filtroArea = document.getElementById("filtroArea");
 const filtroTipo = document.getElementById("filtroTipo");
 const filtroEstado = document.getElementById("filtroEstado");
+
+// Ventana modal en vez del <details> inline (mismo cambio ya hecho en
+// Documentos del contrato, pedido del usuario para el resto de formularios
+// "+ Nuevo..." del panel).
+const nuevoDocumentoBackdrop = document.getElementById("nuevoDocumentoBackdrop");
+document.getElementById("nuevoDocumentoBtn").addEventListener("click", () => {
+  nuevoDocumentoBackdrop.classList.add("open");
+});
+document.getElementById("cancelarDocumentoMaestroBtn").addEventListener("click", () => {
+  nuevoDocumentoBackdrop.classList.remove("open");
+});
 const filtroSocializado = document.getElementById("filtroSocializado");
 
 function mostrarAlerta(texto, tipo) {
@@ -134,7 +145,7 @@ requireAuth(async (user) => {
   const perfil = await obtenerPerfil(user.email);
   const puedeGestionar = perfil?.estado === "activo" && (perfil?.rol === "admin" || perfil?.gestionaDocumentos === true);
   if (!puedeGestionar) {
-    document.getElementById("nuevoDocumentoDetails").classList.add("oculto");
+    document.getElementById("nuevoDocumentoBtn").classList.add("oculto");
     document.getElementById("soloGestorAviso").classList.remove("oculto");
   }
 
@@ -183,7 +194,7 @@ requireAuth(async (user) => {
       });
 
       form.reset();
-      form.closest("details").open = false;
+      nuevoDocumentoBackdrop.classList.remove("open");
       vistaPreviaBox.className = "form-alert";
       mostrarAlerta("Documento creado.", "ok");
     } catch (err) {

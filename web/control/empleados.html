@@ -40,51 +40,60 @@
     <div class="container">
       <p id="soloAdminAviso" class="text-muted oculto">Solo un administrador puede crear o editar empleados. Puedes ver el directorio, pero no modificarlo.</p>
 
-      <details class="card control-nuevo" id="nuevoEmpleadoDetails">
-        <summary>+ Nuevo empleado</summary>
-        <form class="pqr-form" id="nuevoEmpleadoForm">
-          <label for="nombre">Nombre</label>
-          <input type="text" id="nombre" required maxlength="120">
+      <button type="button" class="control-btn-mini" id="nuevoEmpleadoBtn">+ Nuevo empleado</button>
 
-          <label for="email">Correo (debe coincidir con la cuenta de Firebase Auth ya creada)</label>
-          <input type="email" id="email" required maxlength="160">
-
-          <label for="cargo">Cargo (opcional — aparece en la firma de ofertas)</label>
-          <input type="text" id="cargo" maxlength="120" placeholder="Ej. Gerente General">
-
-          <label for="rol">Rol</label>
-          <select id="rol" required>
-            <option value="empleado">Empleado</option>
-            <option value="apoyo">Apoyo</option>
-            <option value="coadmin">Coadministrador</option>
-            <option value="admin">Administrador</option>
-          </select>
-          <p class="text-muted control-rol-ayuda" id="rolAyuda"></p>
-
-          <div id="camposPermisoContainer" class="control-campos-permiso oculto">
-            <label id="camposPermisoLabel"></label>
-            <div class="control-campos-permiso-lista" id="camposPermisoLista"></div>
-          </div>
-
-          <label class="control-check-inline">
-            <input type="checkbox" id="autorizadoOfertas">
-            Autorizado para presentar y firmar ofertas comerciales
-          </label>
-
-          <label class="control-check-inline">
-            <input type="checkbox" id="gestionaDocumentos">
-            Gestiona el Listado Maestro de Documentos (crear/editar formatos y su código)
-          </label>
-
-          <label class="control-check-inline">
-            <input type="checkbox" id="aprobadorContratos">
-            Debe leer y aprobar cada contrato nuevo (ej. Administradora, Gerente)
-          </label>
-
-          <button type="submit" class="btn" id="crearEmpleadoBtn">Crear empleado</button>
-          <div class="form-alert" id="crearEmpleadoAlert"></div>
-        </form>
-      </details>
+      <div class="modal-backdrop" id="nuevoEmpleadoBackdrop">
+        <div class="modal modal-ancho">
+          <h2>Nuevo empleado</h2>
+          <form class="modal-form-grid" id="nuevoEmpleadoForm">
+            <div>
+              <label for="nombre">Nombre</label>
+              <input type="text" id="nombre" required maxlength="120">
+            </div>
+            <div>
+              <label for="email">Correo (debe coincidir con la cuenta de Firebase Auth ya creada)</label>
+              <input type="email" id="email" required maxlength="160">
+            </div>
+            <div>
+              <label for="cargo">Cargo (opcional — aparece en la firma de ofertas)</label>
+              <input type="text" id="cargo" maxlength="120" placeholder="Ej. Gerente General">
+            </div>
+            <div>
+              <label for="rol">Rol</label>
+              <select id="rol" required>
+                <option value="empleado">Empleado</option>
+                <option value="apoyo">Apoyo</option>
+                <option value="coadmin">Coadministrador</option>
+                <option value="admin">Administrador</option>
+              </select>
+              <p class="text-muted control-rol-ayuda" id="rolAyuda"></p>
+            </div>
+            <div id="camposPermisoContainer" class="control-campos-permiso oculto campo-ancho">
+              <label id="camposPermisoLabel"></label>
+              <div class="control-campos-permiso-lista" id="camposPermisoLista"></div>
+            </div>
+            <div class="campo-ancho">
+              <label class="control-check-inline">
+                <input type="checkbox" id="autorizadoOfertas">
+                Autorizado para presentar y firmar ofertas comerciales
+              </label>
+              <label class="control-check-inline">
+                <input type="checkbox" id="gestionaDocumentos">
+                Gestiona el Listado Maestro de Documentos (crear/editar formatos y su código)
+              </label>
+              <label class="control-check-inline">
+                <input type="checkbox" id="aprobadorContratos">
+                Debe leer y aprobar cada contrato nuevo (ej. Administradora, Gerente)
+              </label>
+            </div>
+            <div class="campo-ancho control-edicion-botones">
+              <button type="submit" class="btn" id="crearEmpleadoBtn">Crear empleado</button>
+              <button type="button" class="control-btn-mini" id="cancelarEmpleadoBtn">Cancelar</button>
+            </div>
+            <div class="form-alert campo-ancho" id="crearEmpleadoAlert"></div>
+          </form>
+        </div>
+      </div>
 
       <div class="control-tabla-wrap">
         <table class="control-tabla-documentos">

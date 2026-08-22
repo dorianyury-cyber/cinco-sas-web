@@ -973,7 +973,7 @@ form.modal-form-grid label {
   color: var(--text-muted);
   margin: 10px 0 4px;
 }
-form.modal-form-grid input,
+form.modal-form-grid input:not([type="checkbox"]),
 form.modal-form-grid select {
   width: 100%;
   padding: 7px 10px;
@@ -984,6 +984,12 @@ form.modal-form-grid select {
   font-size: 12.5px;
   font-family: inherit;
 }
+/* Casillas (Estado/Fecha/... y los checks de permisos/roles): sin esto,
+   heredaban width:100% de la regla de arriba y se veían enormes, empujando
+   el texto de su propia etiqueta lejos a la derecha en vez de al lado. */
+form.modal-form-grid input[type="checkbox"] { width: auto; }
+form.modal-form-grid .control-input-unidad input { padding-left: 26px; }
+form.modal-form-grid .control-input-unidad span { font-size: 12.5px; left: 10px; }
 form.modal-form-grid input:focus,
 form.modal-form-grid select:focus {
   outline: none;
@@ -992,6 +998,15 @@ form.modal-form-grid select:focus {
 }
 form.modal-form-grid .control-edicion-botones { margin-top: 14px; gap: 8px; }
 form.modal-form-grid .control-edicion-botones button { width: auto; margin-top: 0; }
+/* El display:block de "form.modal-form-grid label" de arriba es para las
+   etiquetas normales (encima de un input) — pisaba el display:flex que
+   .control-check-inline y .control-campos-permiso-lista necesitan para
+   alinear el checkbox junto a su texto (ej. en el modal de "Nuevo
+   empleado"), dejando el cuadrito arriba y el texto debajo. Se reafirma acá. */
+form.modal-form-grid .control-check-inline,
+form.modal-form-grid .control-campos-permiso-lista label {
+  display: flex;
+}
 
 /* ---- pie de página multi-columna ---- */
 .site-footer {
