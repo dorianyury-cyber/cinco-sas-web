@@ -853,10 +853,17 @@ requireAuth(async (user) => {
     return btn;
   }
 
+  // Numeración pedida por el usuario para las "carpetas" del contrato: los
+  // 3 CAMPOS dinámicos (1/2/4 — Equipo asignado ocupa el 3, ver más abajo),
+  // las fases de Actividades como 4.1/4.2/4.3, y Equipo/Informes/Documentos
+  // fijos en el HTML (contrato.html) como 3/5/6.
+  const NUMERO_CAMPO = { servicio_cliente: "1", talento_humano: "2", actividades: "4" };
+
+  let detalleActividades = null;
   CAMPOS.forEach((c) => {
     const detalle = campo("details", { class: "card control-campo" });
     const resumen = document.createElement("summary");
-    resumen.appendChild(campo("span", { text: c.nombre }));
+    resumen.appendChild(campo("span", { text: `${NUMERO_CAMPO[c.clave]}. ${c.nombre}` }));
     const badge = campo("span", { class: "control-badge" });
     badges[c.clave] = badge;
     resumen.appendChild(badge);
@@ -865,12 +872,13 @@ requireAuth(async (user) => {
     const itemsDelCampo = items.filter((i) => i.campo === c.clave);
 
     if (c.clave === "actividades") {
-      FASES.forEach((f) => {
+      detalleActividades = detalle;
+      FASES.forEach((f, idxFase) => {
         const itemsFase = itemsDelCampo.filter((i) => i.fase === f.clave);
         if (!itemsFase.length) return;
         const detalleFase = campo("details", { class: "control-fase" });
         const resumenFase = document.createElement("summary");
-        resumenFase.appendChild(campo("span", { text: f.nombre }));
+        resumenFase.appendChild(campo("span", { text: `4.${idxFase + 1} ${f.nombre}` }));
         const badgeFase = campo("span", { class: "control-badge" });
         badges.actividades_fases[f.clave] = badgeFase;
         resumenFase.appendChild(badgeFase);
@@ -893,6 +901,16 @@ requireAuth(async (user) => {
 
     contenedor.appendChild(detalle);
   });
+
+  // "Equipo asignado" (3.) vive como <details> estático en contrato.html,
+  // fuera de camposContainer — se reubica acá para que quede entre Talento
+  // Humano (2.) y Actividades (4.), como pidió el usuario. cargarEquipo()
+  // ya cableó sus listeners sobre ese mismo nodo antes de este punto, así
+  // que moverlo con insertBefore no los pierde.
+  const equipoDetails = document.getElementById("equipoDetails");
+  if (equipoDetails && detalleActividades) {
+    contenedor.insertBefore(equipoDetails, detalleActividades);
+  }
 
   recalcularAvances();
 });
