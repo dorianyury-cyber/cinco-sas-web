@@ -572,10 +572,15 @@ function cargarDocumentosContrato(contratoId, contrato, esEmpleado, puedeArchiva
       const tdAccion = document.createElement("td");
       tdAccion.className = "control-tabla-acciones";
       if (puedeVer) {
+        // Fila delgada de una sola línea (mismo criterio que la tabla de
+        // Activos en Copropiedad Saludable): ícono con title en vez de
+        // botón de texto, para que "Ver/Editar/Borrar" quepan siempre en
+        // una sola línea de la celda de acciones.
         const ver = document.createElement("a");
         ver.href = enlaceDocumento(d);
-        ver.className = "control-btn-mini";
-        ver.textContent = "Ver";
+        ver.className = "icon-btn";
+        ver.title = "Ver";
+        ver.textContent = "👁️";
         if (d.origen === "manual") ver.target = "_blank";
         tdAccion.appendChild(ver);
       }
@@ -586,16 +591,18 @@ function cargarDocumentosContrato(contratoId, contrato, esEmpleado, puedeArchiva
       if (esGestor && d.origen === "manual") {
         const editar = document.createElement("button");
         editar.type = "button";
-        editar.className = "control-btn-mini";
-        editar.textContent = "Editar";
+        editar.className = "icon-btn";
+        editar.title = "Editar";
+        editar.textContent = "✏️";
         editar.addEventListener("click", () => editarDocumento(docSnap.id, d));
         tdAccion.appendChild(editar);
       }
       if (puedeArchivar && d.origen === "manual") {
         const borrar = document.createElement("button");
         borrar.type = "button";
-        borrar.className = "control-btn-danger";
-        borrar.textContent = "Borrar";
+        borrar.className = "icon-btn danger";
+        borrar.title = "Borrar";
+        borrar.textContent = "🗑️";
         borrar.addEventListener("click", async () => {
           const confirmado = window.confirm(`¿Seguro que quieres borrar "${d.nombre}" de los documentos del contrato?\n\nEsta acción no se puede deshacer.`);
           if (!confirmado) return;

@@ -1323,12 +1323,25 @@ table.control-tabla-documentos th,
 table.control-tabla-documentos td,
 table.control-tabla-cambios th,
 table.control-tabla-cambios td {
-  padding: 10px 14px;
   text-align: left;
   border-bottom: 1px solid var(--border);
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
+}
+table.control-tabla-cambios th,
+table.control-tabla-cambios td {
+  padding: 10px 14px;
+}
+/* Fila delgada de una sola línea (mismo criterio que .tabla-densa en
+   Copropiedad Saludable/inventario.html): letra y relleno más chicos, y
+   los botones de "Ver/Editar/Borrar" pasan de texto a solo ícono
+   (.icon-btn) para que las tres acciones quepan siempre en una línea en
+   vez de partirse en dos dentro de la celda. */
+table.control-tabla-documentos th,
+table.control-tabla-documentos td {
+  padding: 5px 10px;
+  font-size: 12.5px;
 }
 table.control-tabla-cambios td:nth-child(3) { white-space: normal; }
 table.control-tabla-documentos th,
@@ -1347,9 +1360,26 @@ table.control-tabla-documentos td.control-tabla-acciones {
   white-space: nowrap;
   overflow: visible;
   display: flex;
-  flex-wrap: wrap;
-  gap: 6px;
+  flex-wrap: nowrap;
+  gap: 2px;
 }
+
+/* Botón de solo ícono (sin texto, con title como tooltip) — mismo patrón
+   que .icon-btn en Copropiedad Saludable/inventario.html, portado acá para
+   que "Ver/Editar/Borrar" quepan en una fila delgada. */
+.icon-btn {
+  border: none;
+  background: none;
+  cursor: pointer;
+  padding: 4px 7px;
+  border-radius: 6px;
+  font-size: 14px;
+  color: var(--text);
+}
+.icon-btn:hover { background: rgba(0, 0, 0, 0.06); }
+@media (prefers-color-scheme: dark) { .icon-btn:hover { background: rgba(255, 255, 255, 0.08); } }
+.icon-btn.danger { color: #b23434; }
+@media (prefers-color-scheme: dark) { .icon-btn.danger { color: #ff8a8a; } }
 tr.control-fila-doc { cursor: pointer; }
 tr.control-fila-doc:hover { background: rgba(254, 178, 9, 0.08); }
 tr.control-fila-doc td:first-child { font-weight: 700; color: var(--cinco-amber-dark); }
