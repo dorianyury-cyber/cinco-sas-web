@@ -46,6 +46,14 @@ function formatearFechaHora(valor) {
   return fecha.toLocaleString("es-CO", { dateStyle: "short", timeStyle: "short" });
 }
 
+// Fecha corta "DD/MM/AAAA" para un string plano "YYYY-MM-DD" (docFecha del
+// formulario "Agregar documento manual") — distinto de formatearFechaHora,
+// que espera un Timestamp de Firestore.
+function formatearFechaCorta(fechaISO) {
+  if (!fechaISO) return "";
+  return new Date(fechaISO + "T12:00:00").toLocaleDateString("es-CO");
+}
+
 // ¿Ya está completa (o no aplica) toda una fase de Actividades? Se usa para
 // la alerta suave de "la fase anterior no ha terminado" — no bloquea, solo
 // avisa, porque en la práctica sí hay excepciones válidas.
@@ -515,6 +523,7 @@ function cargarDocumentosContrato(contratoId, contrato, esEmpleado, puedeArchiva
     idEnEdicionInput.value = docId;
     document.getElementById("docNombre").value = d.nombre || "";
     document.getElementById("docTipo").value = d.tipo || "interno";
+    document.getElementById("docFecha").value = d.fecha || "";
     document.getElementById("docEnlace").value = d.origen === "manual" ? (d.enlace || "") : "";
     document.getElementById("docMes").value = d.mes || "";
     btn.textContent = "Guardar cambios";
@@ -530,13 +539,24 @@ function cargarDocumentosContrato(contratoId, contrato, esEmpleado, puedeArchiva
     return d.enlace || "#";
   };
 
-  const q = query(collection(db, "contratos", contratoId, "documentos"), orderBy("creadoEn", "desc"));
+  // Sin orderBy en la consulta: el orden ya no es por creadoEn (cuándo se
+  // subió) sino por la fecha real de la actuación contractual (docFecha del
+  // formulario) — pedido del usuario para que la tabla siga el orden
+  // cronológico de los hechos, no el de cuándo alguien tuvo tiempo de
+  // subir el archivo. Se ordena en el cliente porque hay que mezclar dos
+  // campos distintos (fecha manual vs. creadoEn de respaldo para los
+  // documentos que vienen de Informes/Correspondencia, que no tienen
+  // fecha manual) — con pocos documentos por contrato, ordenar acá no
+  // tiene costo real.
+  const fechaEfectiva = (d) => (d.fecha ? new Date(d.fecha + "T12:00:00") : (d.creadoEn?.toDate() || new Date(0)));
+  const q = query(collection(db, "contratos", contratoId, "documentos"));
   onSnapshot(q, (snapshot) => {
     badge.textContent = String(snapshot.size);
     tbody.innerHTML = "";
     sinDocs.classList.toggle("oculto", !snapshot.empty);
     renderInformesMensuales(contrato, snapshot.docs.map((d) => d.data()).filter((d) => d.mes));
-    snapshot.forEach((docSnap) => {
+    const docsOrdenados = [...snapshot.docs].sort((a, b) => fechaEfectiva(b.data()) - fechaEfectiva(a.data()));
+    docsOrdenados.forEach((docSnap) => {
       const d = docSnap.data();
       const fila = document.createElement("tr");
       // El documento del contrato es de origen externo (lo redacta el
@@ -548,7 +568,7 @@ function cargarDocumentosContrato(contratoId, contrato, esEmpleado, puedeArchiva
       fila.appendChild(campo("td", { text: codigoMostrado || "—" }));
       fila.appendChild(campo("td", { text: d.nombre || "" }));
       fila.appendChild(campo("td", { text: TIPO_DOC_LABEL[d.tipo] || d.tipo }));
-      fila.appendChild(campo("td", { text: d.creadoEn ? formatearFechaHora(d.creadoEn) : "" }));
+      fila.appendChild(campo("td", { text: d.fecha ? formatearFechaCorta(d.fecha) : (d.creadoEn ? formatearFechaHora(d.creadoEn) : "") }));
       const tdAccion = document.createElement("td");
       tdAccion.className = "control-tabla-acciones";
       if (puedeVer) {
@@ -624,11 +644,13 @@ function cargarDocumentosContrato(contratoId, contrato, esEmpleado, puedeArchiva
         enlace = await getDownloadURL(archivoRef);
       }
 
+      const fecha = document.getElementById("docFecha").value;
       const datos = {
         nombre: document.getElementById("docNombre").value,
         tipo: document.getElementById("docTipo").value,
         enlace,
-        ...(mes ? { mes } : {})
+        ...(mes ? { mes } : {}),
+        ...(fecha ? { fecha } : {})
       };
 
       if (idEnEdicion) {
