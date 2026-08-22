@@ -142,38 +142,53 @@
         </div>
         <p id="sinDocumentosContrato" class="text-muted oculto">Todavía no hay documentos archivados en este contrato.</p>
 
-        <details class="control-nuevo">
-          <summary>+ Agregar documento manual</summary>
-          <form class="pqr-form" id="nuevoDocumentoManualForm">
-            <input type="hidden" id="docIdEnEdicion">
-            <label for="docNombre">Nombre</label>
-            <input type="text" id="docNombre" required maxlength="160">
-
-            <label for="docTipo">Tipo</label>
-            <select id="docTipo" required>
-              <option value="contrato">Contrato</option>
-              <option value="interno">Interno</option>
-              <option value="externo">Externo</option>
-            </select>
-
-            <label for="docFecha">Fecha del documento (la de la actuación contractual, no la de subida)</label>
-            <input type="date" id="docFecha">
-
-            <label for="docEnlace">Enlace (ej. a la carpeta en OneDrive)</label>
-            <input type="url" id="docEnlace" maxlength="500">
-
-            <label for="docArchivoPdf">O sube aquí el archivo final (PDF o Word — para poder verlo antes de descargarlo, PDF es lo que mejor funciona)</label>
-            <input type="file" id="docArchivoPdf" accept="application/pdf,.doc,.docx">
-
-            <label for="docMes">Mes del informe (solo si es un informe mensual)</label>
-            <input type="month" id="docMes">
-
-            <button type="submit" class="btn" id="agregarDocumentoBtn">Agregar</button>
-            <button type="button" class="control-btn-mini oculto" id="cancelarEdicionDocumentoBtn">Cancelar edición</button>
-            <div class="form-alert" id="nuevoDocumentoManualAlert"></div>
-          </form>
-        </details>
+        <button type="button" class="control-btn-mini" id="agregarDocumentoManualBtn">+ Agregar documento manual</button>
       </details>
+
+      <!-- Agregar/editar documento manual: ventana en vez del <details> que
+           antes empujaba toda la página hacia abajo — dos columnas y letra
+           más chica para los campos cortos (pedido del usuario). -->
+      <div class="modal-backdrop" id="modalDocumentoBackdrop">
+        <div class="modal modal-ancho">
+          <h2 id="modalDocumentoTitulo">Agregar documento</h2>
+          <form class="modal-form-grid" id="nuevoDocumentoManualForm">
+            <input type="hidden" id="docIdEnEdicion">
+            <div>
+              <label for="docNombre">Nombre</label>
+              <input type="text" id="docNombre" required maxlength="160">
+            </div>
+            <div>
+              <label for="docTipo">Tipo</label>
+              <select id="docTipo" required>
+                <option value="contrato">Contrato</option>
+                <option value="interno">Interno</option>
+                <option value="externo">Externo</option>
+              </select>
+            </div>
+            <div>
+              <label for="docFecha">Fecha del documento</label>
+              <input type="date" id="docFecha">
+            </div>
+            <div>
+              <label for="docMes">Mes (solo si es informe mensual)</label>
+              <input type="month" id="docMes">
+            </div>
+            <div class="campo-ancho">
+              <label for="docEnlace">Enlace (ej. a la carpeta en OneDrive)</label>
+              <input type="url" id="docEnlace" maxlength="500">
+            </div>
+            <div class="campo-ancho">
+              <label for="docArchivoPdf">O sube aquí el archivo final (PDF o Word — PDF es lo que mejor funciona para verlo antes de descargarlo)</label>
+              <input type="file" id="docArchivoPdf" accept="application/pdf,.doc,.docx">
+            </div>
+            <div class="campo-ancho control-edicion-botones">
+              <button type="submit" class="btn" id="agregarDocumentoBtn">Agregar</button>
+              <button type="button" class="control-btn-mini" id="cancelarDocumentoBtn">Cancelar</button>
+            </div>
+            <div class="form-alert campo-ancho" id="nuevoDocumentoManualAlert"></div>
+          </form>
+        </div>
+      </div>
 
       <details class="card control-campo" open>
         <summary><span>Aprobación del contrato</span><span class="control-badge" id="aprobacionBadge"></span></summary>

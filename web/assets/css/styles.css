@@ -925,6 +925,74 @@ form.pqr-form button { margin-top: 20px; width: 100%; }
 .form-alert.ok { background: rgba(46, 158, 91, 0.14); color: #1f7a41; }
 .form-alert.error { background: rgba(214, 69, 69, 0.14); color: #b23434; }
 
+/* ---- Modal genérico (mismo patrón que Copropiedad Saludable/LBDC Neiva:
+   .modal-backdrop + .modal) — no existía todavía en este repo. Se agrega acá
+   para el formulario de "Agregar/editar documento" del contrato, que antes
+   era un <details> inline que crecía dentro de la página en vez de flotar
+   encima — pedido del usuario tras verlo "grande y feo". ---- */
+.modal-backdrop {
+  position: fixed;
+  inset: 0;
+  background: rgba(0, 0, 0, 0.45);
+  display: none;
+  align-items: center;
+  justify-content: center;
+  z-index: 50;
+  padding: 20px;
+}
+.modal-backdrop.open { display: flex; }
+.modal {
+  background: var(--card-bg);
+  border-radius: var(--radius);
+  padding: 24px;
+  width: 100%;
+  max-width: 460px;
+  max-height: 90vh;
+  overflow-y: auto;
+}
+.modal h2 { margin-top: 0; font-size: 18px; color: var(--text); }
+/* Más ancho que el modal genérico para poder acomodar el formulario en dos
+   columnas en vez de un solo listado vertical largo. */
+.modal-ancho { max-width: 640px; }
+
+/* Formulario compacto en dos columnas — letra y relleno bastante más chicos
+   que .pqr-form (pensado para formularios cortos de una sola columna), para
+   que quepan varios campos por línea dentro de una ventana modal en vez de
+   una página completa. Los campos que sí necesitan todo el ancho (enlace,
+   archivo, botones) llevan la clase "campo-ancho". */
+form.modal-form-grid {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 0 16px;
+}
+form.modal-form-grid .campo-ancho { grid-column: 1 / -1; }
+form.modal-form-grid label {
+  display: block;
+  font-weight: 600;
+  font-size: 11.5px;
+  color: var(--text-muted);
+  margin: 10px 0 4px;
+}
+form.modal-form-grid input,
+form.modal-form-grid select {
+  width: 100%;
+  padding: 7px 10px;
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  background: var(--card-bg);
+  color: var(--text);
+  font-size: 12.5px;
+  font-family: inherit;
+}
+form.modal-form-grid input:focus,
+form.modal-form-grid select:focus {
+  outline: none;
+  border-color: var(--cinco-amber-dark);
+  box-shadow: 0 0 0 3px rgba(254, 178, 9, 0.2);
+}
+form.modal-form-grid .control-edicion-botones { margin-top: 14px; gap: 8px; }
+form.modal-form-grid .control-edicion-botones button { width: auto; margin-top: 0; }
+
 /* ---- pie de página multi-columna ---- */
 .site-footer {
   background: var(--cinco-navy-dark);

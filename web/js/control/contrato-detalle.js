@@ -505,17 +505,31 @@ function cargarDocumentosContrato(contratoId, contrato, esEmpleado, puedeArchiva
   const alertBox = document.getElementById("nuevoDocumentoManualAlert");
   const btn = document.getElementById("agregarDocumentoBtn");
   const idEnEdicionInput = document.getElementById("docIdEnEdicion");
-  const cancelarEdicionBtn = document.getElementById("cancelarEdicionDocumentoBtn");
+  const abrirBtn = document.getElementById("agregarDocumentoManualBtn");
+  const cancelarBtn = document.getElementById("cancelarDocumentoBtn");
+  const modalBackdrop = document.getElementById("modalDocumentoBackdrop");
+  const modalTitulo = document.getElementById("modalDocumentoTitulo");
 
-  if (esEmpleado) form.closest("details").classList.add("oculto");
+  if (esEmpleado) abrirBtn.classList.add("oculto");
 
-  function salirDeEdicion() {
+  // Cerrar la ventana sirve tanto de "Cancelar" (al agregar) como de salir
+  // de edición sin guardar — antes eran dos botones/estados separados
+  // dentro del <details> inline; con la ventana modal, cerrarla ya cubre
+  // ambos casos.
+  function cerrarModal() {
     idEnEdicionInput.value = "";
     form.reset();
     btn.textContent = "Agregar";
-    cancelarEdicionBtn.classList.add("oculto");
+    alertBox.className = "form-alert";
+    modalBackdrop.classList.remove("open");
   }
-  cancelarEdicionBtn.addEventListener("click", salirDeEdicion);
+  cancelarBtn.addEventListener("click", cerrarModal);
+
+  abrirBtn.addEventListener("click", () => {
+    cerrarModal();
+    modalTitulo.textContent = "Agregar documento";
+    modalBackdrop.classList.add("open");
+  });
 
   // Solo admin/coadmin cambian un documento ya archivado (pedido explícito
   // del usuario) — apoyo puede archivar/borrar pero no editar lo ya subido.
@@ -527,10 +541,8 @@ function cargarDocumentosContrato(contratoId, contrato, esEmpleado, puedeArchiva
     document.getElementById("docEnlace").value = d.origen === "manual" ? (d.enlace || "") : "";
     document.getElementById("docMes").value = d.mes || "";
     btn.textContent = "Guardar cambios";
-    cancelarEdicionBtn.classList.remove("oculto");
-    const detalle = form.closest("details");
-    detalle.open = true;
-    detalle.scrollIntoView({ behavior: "smooth" });
+    modalTitulo.textContent = "Editar documento";
+    modalBackdrop.classList.add("open");
   }
 
   const enlaceDocumento = (d) => {
@@ -674,10 +686,7 @@ function cargarDocumentosContrato(contratoId, contrato, esEmpleado, puedeArchiva
           creadoEn: serverTimestamp()
         });
       }
-      salirDeEdicion();
-      form.closest("details").open = false;
-      alertBox.textContent = idEnEdicion ? "Documento actualizado." : "Documento agregado.";
-      alertBox.className = "form-alert show ok";
+      cerrarModal();
     } catch (err) {
       alertBox.textContent = err.message || "No se pudo guardar el documento.";
       alertBox.className = "form-alert show error";
