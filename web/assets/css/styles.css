@@ -1160,6 +1160,11 @@ form.pqr-form .control-edicion-botones button { width: auto; margin-top: 0; whit
 button.control-mes-pill.pendiente { cursor: pointer; }
 button.control-mes-pill.pendiente:hover { border-color: var(--cinco-amber-dark); color: var(--cinco-amber-dark); }
 .control-check-inline { display: flex; align-items: center; gap: 6px; font-weight: 400; margin: 14px 0 6px; }
+/* Fila de una celda de tabla con más de un control (ej. casilla "Autorizado"
+   + botón de firma en Empleados > Ofertas) — todo en línea, nunca apilado,
+   para que la fila no crezca de alto por culpa de una sola celda. */
+.control-celda-inline { display: flex; align-items: center; gap: 6px; flex-wrap: nowrap; }
+.control-celda-inline .control-check-inline { margin: 0; white-space: nowrap; }
 .control-campos-permiso { margin-top: 14px; }
 .control-campos-permiso-lista { display: flex; gap: 16px; flex-wrap: wrap; margin-top: 6px; }
 .control-campos-permiso-lista label {

@@ -139,6 +139,12 @@ function celdaCampos(empleado, esAdmin) {
 // un documento.
 function celdaOfertas(empleado, esAdmin) {
   const td = celda("td");
+  // Casilla + botón de firma en una sola fila (no apilados) — con los dos
+  // como bloques sueltos, la celda se partía en dos líneas y hacía la fila
+  // más alta de lo necesario (queja del usuario: "que no se recorte" / que
+  // todo quede uno al lado del otro).
+  const fila = document.createElement("div");
+  fila.className = "control-celda-inline";
 
   const label = document.createElement("label");
   label.className = "control-check-inline";
@@ -151,13 +157,16 @@ function celdaOfertas(empleado, esAdmin) {
   });
   label.appendChild(check);
   label.appendChild(document.createTextNode("Autorizado"));
-  td.appendChild(label);
+  fila.appendChild(label);
 
   if (esAdmin) {
+    // Ícono en vez de botón de texto ("Cambiar firma"/"Subir firma") — el
+    // texto era lo que más ensanchaba esta columna.
     const btnFirma = document.createElement("button");
     btnFirma.type = "button";
-    btnFirma.className = "control-btn-mini";
-    btnFirma.textContent = empleado.firmaUrl ? "Cambiar firma" : "Subir firma";
+    btnFirma.className = "icon-btn";
+    btnFirma.title = empleado.firmaUrl ? "Cambiar firma" : "Subir firma";
+    btnFirma.textContent = "🖊️";
     const inputFirma = document.createElement("input");
     inputFirma.type = "file";
     inputFirma.accept = "image/*";
@@ -167,7 +176,7 @@ function celdaOfertas(empleado, esAdmin) {
       const archivo = inputFirma.files[0];
       if (!archivo) return;
       btnFirma.disabled = true;
-      btnFirma.textContent = "Subiendo...";
+      btnFirma.title = "Subiendo...";
       try {
         const ext = archivo.name.includes(".") ? archivo.name.split(".").pop() : "png";
         const archivoRef = ref(storage, `empleados/${empleado.id}/firma.${ext}`);
@@ -178,13 +187,14 @@ function celdaOfertas(empleado, esAdmin) {
         window.alert(err.message || "No se pudo subir la firma.");
       } finally {
         btnFirma.disabled = false;
-        btnFirma.textContent = empleado.firmaUrl ? "Cambiar firma" : "Subir firma";
+        btnFirma.title = empleado.firmaUrl ? "Cambiar firma" : "Subir firma";
         inputFirma.value = "";
       }
     });
-    td.append(btnFirma, inputFirma);
+    fila.append(btnFirma, inputFirma);
   }
 
+  td.appendChild(fila);
   return td;
 }
 
