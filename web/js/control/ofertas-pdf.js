@@ -291,6 +291,16 @@ export async function generarOfertaPDF(oferta) {
         sangriaItem = 0;
         enIndentInicial = true;
         lineaNueva = true;
+        // Se antepone la misma sangría de 4 espacios que trae una viñeta
+        // real de nivel 1 (ver caminarItemLista en texto-rico.js) — si no,
+        // esta viñeta manual arranca pegada al margen mientras las viñetas
+        // creadas con el botón quedan más adentro, y la lista se ve
+        // "corrida"/desalineada entre un ítem y el siguiente.
+        const indent = { texto: "    ", negrita: token.negrita, cursiva: token.cursiva, color: token.color };
+        const anchoIndent = medirToken(indent);
+        linea.push(indent);
+        anchoLinea += anchoIndent;
+        sangriaItem = anchoLinea;
       }
 
       const ancho = medirToken(token);
