@@ -148,7 +148,7 @@ export function crearCampoTextoRico({ valor, placeholder, onInput }) {
 // criterio que ya se usaba tecleando a mano "·" / "o" en los informes.
 // Se evitan glifos "○"/"▪": la fuente helvetica estándar de jsPDF (WinAnsi)
 // no los tiene y saldrían en blanco en el PDF.
-const MARCADORES_VINETA = ["•", "o", "-"];
+export const MARCADORES_VINETA = ["•", "o", "-"];
 
 export function parsearHtmlARuns(html) {
   if (!html) return [];

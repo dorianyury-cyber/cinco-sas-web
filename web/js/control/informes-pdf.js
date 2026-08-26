@@ -14,7 +14,7 @@
 // (jsPDF corre el resto del documento hacia adelante solo) y se dibujan
 // ahí, ya con el número de página real (anotado + el corrimiento).
 
-import { parsearHtmlARuns } from "./texto-rico.js";
+import { parsearHtmlARuns, MARCADORES_VINETA } from "./texto-rico.js";
 import {
   normalizarMerges, celdaCombinada, normalizarCentrados, celdaCentrada,
   normalizarNegritas, celdaNegrita, normalizarColoresCelda, colorCelda,
@@ -188,22 +188,40 @@ function calcularAnchosColumna(doc, filas, anchoUtil, merges = []) {
     return deseados.map((a) => a * factor);
   }
 
-  // No cabe todo: cada columna se queda con al menos su propio mínimo (el
-  // general, o el de su palabra más ancha si pide más), y el resto del
-  // ancho de la página se reparte entre las columnas según cuánto pedían
-  // de más sobre ese mínimo — así una columna angosta (ej. "Nivel") no se
-  // encoge solo porque otra (ej. "Notas") pedía mucho espacio.
-  const totalMin = anchoMinPorColumna.reduce((a, b) => a + b, 0);
-  const espacioLibre = anchoUtil - totalMin;
-  const extra = deseados.map((d, c) => Math.max(0, d - anchoMinPorColumna[c]));
-  const totalExtra = extra.reduce((a, b) => a + b, 0);
-  if (espacioLibre <= 0 || totalExtra === 0) {
-    // Demasiadas columnas para el mínimo de todas — repartir parejo es lo
-    // mejor que se puede hacer (puede seguir apretando alguna palabra
-    // suelta, pero ya no hay espacio ni para los mínimos).
+  // No cabe todo: se concede su ancho COMPLETO a las columnas que menos
+  // piden primero (si les alcanza con un reparto parejo del espacio que va
+  // quedando, se les da lo que pidieron y salen del reparto) — así una
+  // columna angosta de contenido corto (ej. "Valor total": "$ 8.403.361")
+  // no se encoge solo porque otra columna de texto libre (ej.
+  // "Descripción") pida mucho más espacio; el recorte de verdad lo
+  // absorben solo las columnas que de verdad compiten por ese espacio.
+  // (El reparto anterior encogía TODAS las columnas por igual según cuánto
+  // excedían su mínimo, lo que podía apretar una columna angosta por
+  // debajo de lo que su propio contenido necesitaba en una sola línea.)
+  const orden = deseados.map((_, i) => i).sort((a, b) => deseados[a] - deseados[b]);
+  const anchos = new Array(numCols).fill(0);
+  let restante = anchoUtil;
+  let pendientes = numCols;
+  for (let k = 0; k < numCols; k++) {
+    const i = orden[k];
+    const parejo = restante / pendientes;
+    if (deseados[i] <= parejo) {
+      anchos[i] = deseados[i];
+      restante -= anchos[i];
+      pendientes -= 1;
+    } else {
+      for (let j = k; j < numCols; j++) anchos[orden[j]] = restante / pendientes;
+      break;
+    }
+  }
+  // Salvavidas: si aun así alguna columna quedó por debajo de su propio
+  // mínimo (varias columnas de texto libre compitiendo a la vez por muy
+  // poca página), repartir parejo es lo mejor que se puede hacer — mismo
+  // último recurso que antes de este ajuste.
+  if (anchos.some((a, c) => a < anchoMinPorColumna[c] - 0.01)) {
     return deseados.map(() => anchoUtil / numCols);
   }
-  return deseados.map((d, c) => anchoMinPorColumna[c] + (extra[c] / totalExtra) * espacioLibre);
+  return anchos;
 }
 
 // Suma "cantidad" valores consecutivos de un arreglo desde "inicio" — para
@@ -349,11 +367,23 @@ export async function generarInformePDF(informe) {
 
     let linea = [];
     let anchoLinea = 0;
+    // Sangría francesa: si el ítem con viñeta se parte en más de una línea
+    // por ancho, las líneas de ajuste deben alinearse debajo del texto (no
+    // debajo de la viñeta ni del margen) — sangriaItem guarda cuánto medía
+    // la viñeta + su indentación en la primera línea del ítem actual.
+    let sangriaItem = 0;
+    let esPrimeraLineaDeItem = true;
+    // Solo se acumula sangriaItem mientras estemos viendo indentación/viñeta
+    // de arranque — se apaga para siempre en la primera palabra "de verdad"
+    // del ítem, para no seguir recalculándola con cada espacio del resto del
+    // párrafo (eso indentaría todo un párrafo normal a donde cayó su primer
+    // salto de línea).
+    let enIndentInicial = true;
     function trazarLinea() {
       if (!linea.length) { y += lineHeight; return; }
       saltoSiNoCabe(lineHeight);
       paginasConContenido.add(doc.internal.getNumberOfPages());
-      let x = margenX;
+      let x = margenX + (esPrimeraLineaDeItem ? 0 : sangriaItem);
       linea.forEach((token) => {
         doc.setFont("helvetica", estiloFuente(token.negrita, token.cursiva));
         doc.setTextColor(...(token.color || COLOR_PARRAFO));
@@ -363,6 +393,7 @@ export async function generarInformePDF(informe) {
       y += lineHeight;
       linea = [];
       anchoLinea = 0;
+      esPrimeraLineaDeItem = false;
     }
 
     // lineaNueva: true justo tras un salto explícito (fin de línea/viñeta en
@@ -372,14 +403,47 @@ export async function generarInformePDF(informe) {
     // suelto.
     let lineaNueva = true;
     tokens.forEach((token) => {
-      if (token.salto) { trazarLinea(); y += lineHeight * 0.3; lineaNueva = true; return; }
+      if (token.salto) {
+        trazarLinea();
+        y += lineHeight * 0.3;
+        lineaNueva = true;
+        esPrimeraLineaDeItem = true;
+        sangriaItem = 0;
+        enIndentInicial = true;
+        return;
+      }
+
+      // Viñeta "•" escrita a mano dentro del propio texto del párrafo (sin
+      // pasar por el botón "Viñeta", que sí crea <li> con su propio salto):
+      // si ya hay algo en la línea actual, se fuerza el salto + espaciado
+      // antes de ella — así "Etiqueta: • primer punto • segundo punto..."
+      // baja cada punto como renglón aparte y espaciado, en vez de quedar
+      // todo pegado en el mismo párrafo. Solo "•": "-"/"o" también son
+      // palabras normales del idioma y darían falsos positivos. El "!
+      // enIndentInicial" evita que esto dispare con la propia viñeta de
+      // arranque de un <li> real (que llega precedida solo de sus espacios
+      // de sangría, no de una palabra real todavía).
+      if (token.texto === "•" && linea.length && !enIndentInicial) {
+        trazarLinea();
+        y += lineHeight * 0.3;
+        esPrimeraLineaDeItem = true;
+        sangriaItem = 0;
+        enIndentInicial = true;
+        lineaNueva = true;
+      }
+
       const ancho = medirToken(token);
       const esEspacio = /^\s+$/.test(token.texto);
       if (esEspacio && !linea.length && !lineaNueva) return; // no arrancar una línea de ajuste con espacio
-      if (!esEspacio && anchoLinea + ancho > anchoUtil && linea.length) trazarLinea();
+      const anchoDisponible = anchoUtil - (esPrimeraLineaDeItem ? 0 : sangriaItem);
+      if (!esEspacio && anchoLinea + ancho > anchoDisponible && linea.length) trazarLinea();
       linea.push(token);
       anchoLinea += ancho;
       lineaNueva = false;
+      if (enIndentInicial) {
+        if (esEspacio || MARCADORES_VINETA.includes(token.texto)) sangriaItem = anchoLinea;
+        else enIndentInicial = false;
+      }
     });
     trazarLinea();
     y += lineHeight * 0.5;
