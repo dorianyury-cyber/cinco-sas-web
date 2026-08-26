@@ -440,15 +440,10 @@ export async function generarInformePDF(informe) {
       // tabla) — la Lista de gráficos del índice usa este mismo texto.
       const numero = graficosEntradas.length + 1;
       const nombre = `Figura ${numero}. ${bloque.nombre || ""}`.trim();
-      saltoSiNoCabe(lineHeight * 2);
       doc.setFont("helvetica", "bold");
       doc.setFontSize(9.5);
-      doc.setTextColor(...NAVY);
       const lineasNombre = doc.splitTextToSize(nombre, anchoUtil);
-      doc.text(lineasNombre, anchoPagina / 2, y, { align: "center" });
-      paginasConContenido.add(doc.internal.getNumberOfPages());
-      y += lineasNombre.length * lineHeight;
-      graficosEntradas.push({ texto: bloque.nombre || `Figura ${numero}`, pagina: doc.internal.getNumberOfPages() });
+      const altoNombre = lineasNombre.length * lineHeight;
 
       // "Tamaño en el informe" del editor (30–100% del ancho útil, 85% si
       // el bloque es de antes de que existiera el control) — el tope de
@@ -460,20 +455,45 @@ export async function generarInformePDF(informe) {
       let alto = ancho * (img.alto / img.ancho);
       const altoMaximo = Math.max(60, margenInferior - margenSuperior - 20);
       if (alto > altoMaximo) { alto = altoMaximo; ancho = alto * (img.ancho / img.alto); }
-      saltoSiNoCabe(alto + 10);
+
+      // Pie de foto (si hay) se mide antes del salto de página, por el
+      // mismo motivo que el nombre: para reservarle su alto junto con el
+      // resto y que no quede huérfano al final de la página anterior.
+      let lineasPie = [];
+      if (bloque.pieDeFoto) {
+        doc.setFont("helvetica", "italic");
+        doc.setFontSize(9);
+        lineasPie = doc.splitTextToSize(bloque.pieDeFoto, anchoUtil);
+      }
+      const altoPie = lineasPie.length ? lineasPie.length * 4.5 : 0;
+
+      // El nombre de la figura y la imagen deben quedar siempre en la misma
+      // página: se reserva de una vez el alto del nombre + la imagen + el
+      // pie de foto (antes el salto solo miraba si cabían las 2 líneas del
+      // nombre, así que una imagen que no cupiera detrás dejaba el nombre
+      // huérfano al final de la página anterior).
+      saltoSiNoCabe(altoNombre + alto + 10 + altoPie);
+
+      doc.setFont("helvetica", "bold");
+      doc.setFontSize(9.5);
+      doc.setTextColor(...NAVY);
+      doc.text(lineasNombre, anchoPagina / 2, y, { align: "center" });
+      paginasConContenido.add(doc.internal.getNumberOfPages());
+      y += altoNombre;
+      graficosEntradas.push({ texto: bloque.nombre || `Figura ${numero}`, pagina: doc.internal.getNumberOfPages() });
+
       const x = margenX + (anchoUtil - ancho) / 2;
       doc.addImage(img.dataUrl, "JPEG", x, y, ancho, alto);
       paginasConContenido.add(doc.internal.getNumberOfPages());
       y += alto + 3;
 
       // Pie de página de la gráfica, abajo a la derecha.
-      if (bloque.pieDeFoto) {
+      if (lineasPie.length) {
         doc.setFont("helvetica", "italic");
         doc.setFontSize(9);
         doc.setTextColor(...TEXT_MUTED);
-        const lineasPie = doc.splitTextToSize(bloque.pieDeFoto, anchoUtil);
         doc.text(lineasPie, anchoPagina - margenX, y, { align: "right" });
-        y += lineasPie.length * 4.5;
+        y += altoPie;
       }
       y += 6;
     } catch (e) {
@@ -498,16 +518,6 @@ export async function generarInformePDF(informe) {
     const filas = filasCrudas.map((f) => (Array.isArray(f) ? f : f.celdas || []));
     const numero = tablasEntradas.length + 1;
     const tituloTexto = `Tabla ${numero}. ${bloque.titulo || ""}`.trim();
-
-    saltoSiNoCabe(lineHeight * 2);
-    doc.setFont("helvetica", "bold");
-    doc.setFontSize(9.5);
-    doc.setTextColor(...NAVY);
-    const lineasTitulo = doc.splitTextToSize(tituloTexto, anchoUtil);
-    doc.text(lineasTitulo, anchoPagina / 2, y, { align: "center" });
-    paginasConContenido.add(doc.internal.getNumberOfPages());
-    y += lineasTitulo.length * lineHeight;
-    tablasEntradas.push({ texto: bloque.titulo || `Tabla ${numero}`, pagina: doc.internal.getNumberOfPages() });
 
     const padding = 2.2;
     doc.setFont("helvetica", "normal");
@@ -564,6 +574,23 @@ export async function generarInformePDF(informe) {
         for (let r = m.fila; r < m.fila + m.filas; r++) alturaFilas[r] += extra;
       }
     });
+
+    // El título de la tabla y su encabezado deben quedar en la misma
+    // página: se mide el título y se calcula el alto real de las filas de
+    // encabezado ANTES del salto de página (antes el salto solo miraba si
+    // cabían las 2 líneas del título, así que un encabezado que no cupiera
+    // detrás dejaba el título huérfano al final de la página anterior).
+    doc.setFont("helvetica", "bold");
+    doc.setFontSize(9.5);
+    const lineasTitulo = doc.splitTextToSize(tituloTexto, anchoUtil);
+    const altoTitulo = lineasTitulo.length * lineHeight;
+    const altoEncabezado = sumaRango(alturaFilas, 0, filasEncabezado);
+    saltoSiNoCabe(altoTitulo + altoEncabezado);
+    doc.setTextColor(...NAVY);
+    doc.text(lineasTitulo, anchoPagina / 2, y, { align: "center" });
+    paginasConContenido.add(doc.internal.getNumberOfPages());
+    y += altoTitulo;
+    tablasEntradas.push({ texto: bloque.titulo || `Tabla ${numero}`, pagina: doc.internal.getNumberOfPages() });
 
     // Dibuja una fila completa (fondo/bordes + texto) en la posición yPos —
     // se usa tanto para el recorrido normal de filas como para repetir el
@@ -937,15 +964,32 @@ export async function generarInformePDF(informe) {
     doc.setDrawColor(...AMBER);
     doc.setLineWidth(0.6);
     doc.line(margenX, 16, anchoPagina - margenX, 16);
+    let anchoLogo = 0;
     if (logo) {
       const altoLogo = 8;
-      const anchoLogo = altoLogo * (logo.ancho / logo.alto);
+      anchoLogo = altoLogo * (logo.ancho / logo.alto);
       doc.addImage(logo.dataUrl, "PNG", margenX, 6, anchoLogo, altoLogo);
     }
+    // El título puede ser largo — se ajusta al espacio real que queda a la
+    // derecha del logo (no una sola línea fija) partiéndolo en hasta 2
+    // líneas y, si aún así no cabe, reduciendo el tamaño de letra, para que
+    // nunca quede montado sobre el logo.
     doc.setFont("helvetica", "normal");
-    doc.setFontSize(8);
     doc.setTextColor(...TEXT_MUTED);
-    doc.text(informe.titulo || "", anchoPagina - margenX, 11, { align: "right" });
+    const anchoDisponibleTitulo = anchoPagina - margenX - (margenX + anchoLogo + 4);
+    let tamanoTitulo = 8;
+    let lineasTitulo = doc.splitTextToSize(informe.titulo || "", anchoDisponibleTitulo);
+    while (lineasTitulo.length > 2 && tamanoTitulo > 6) {
+      tamanoTitulo -= 0.5;
+      doc.setFontSize(tamanoTitulo);
+      lineasTitulo = doc.splitTextToSize(informe.titulo || "", anchoDisponibleTitulo);
+    }
+    doc.setFontSize(tamanoTitulo);
+    if (lineasTitulo.length > 2) lineasTitulo = [lineasTitulo[0], lineasTitulo[1].replace(/.{3}$/, "...")];
+    const yInicioTitulo = lineasTitulo.length > 1 ? 8 : 11;
+    lineasTitulo.slice(0, 2).forEach((linea, i) => {
+      doc.text(linea, anchoPagina - margenX, yInicioTitulo + i * 3.6, { align: "right" });
+    });
 
     doc.setFillColor(...GRIS_CLARO);
     doc.rect(0, altoPagina - 14, anchoPagina, 14, "F");
