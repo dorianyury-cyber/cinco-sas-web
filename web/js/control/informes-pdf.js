@@ -957,7 +957,11 @@ export async function generarInformePDF(informe) {
   filaPortada("Cliente:", informe.contratoCliente);
   filaPortada("Supervisor:", informe.contratoSupervisor);
   if (informe.contratoFechaInicio) filaPortada("Vigencia:", `${formatearFecha(informe.contratoFechaInicio)} — ${informe.contratoFechaFin ? formatearFecha(informe.contratoFechaFin) : "en curso"}`);
-  filaPortada("Elaborado por:", informe.firmaNombre ? `${informe.firmaNombre}${informe.firmaCargo ? " — " + informe.firmaCargo : ""}` : null);
+  // El cargo va en su(s) propio(s) renglón(es) debajo del nombre (no pegado
+  // con un guion) — así un cargo de varias líneas (ej. título + rol actual)
+  // siempre se lee como bloque propio, sin importar si la primera línea es
+  // corta y cabría junto al nombre.
+  filaPortada("Elaborado por:", informe.firmaNombre ? `${informe.firmaNombre}${informe.firmaCargo ? "\n" + informe.firmaCargo : ""}` : null);
 
   doc.setFont("helvetica", "bold");
   doc.setFontSize(11);
