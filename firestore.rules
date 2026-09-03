@@ -72,6 +72,17 @@ service cloud.firestore {
       return despues.diff(antes).affectedKeys().hasOnly([request.auth.token.email]);
     }
 
+    // Permiso aparte del rol de contratos: quién puede crear Y VER Órdenes
+    // de Trabajo (web/control/ordenes-trabajo.html) — a diferencia del
+    // resto de módulos de esta suite (correspondencia/informes/ofertas),
+    // aquí ni siquiera la lectura queda abierta a todo autenticado, porque
+    // el usuario pidió que el acceso completo (no solo crear) quede
+    // restringido a quien la gerencia autorice puntualmente
+    // (empleados/{email}.autorizadoOrdenesTrabajo).
+    function autorizadoOrdenesTrabajo() {
+      return esAdmin() || (esEmpleadoActivo() && empleadoDoc().get('autorizadoOrdenesTrabajo', false) == true);
+    }
+
     // Directorio de empleados: cualquier autenticado lo lee (para elegir a
     // quién asignar a un contrato), solo un admin lo administra —
     // coadmin/apoyo/empleado no pueden cambiar roles ni de sí mismos ni
@@ -176,6 +187,52 @@ service cloud.firestore {
     match /ofertas/{ofertaId} {
       allow read: if request.auth != null;
       allow write: if esGestor();
+    }
+
+    // Un empleado (cualquier rol, no hace falta autorizadoOrdenesTrabajo)
+    // que sea el responsable o esté en el personal adicional de ESTA orden
+    // puntual — para que pueda entrar con su propia cuenta y llenar su
+    // parte desde el celular (a partir de "Trabajo de alto riesgo" en
+    // adelante), sin ver ni poder tocar las demás órdenes. Requiere
+    // "personalEmails" en el documento (arreglo plano de correos — las
+    // Rules no pueden buscar un correo adentro de un arreglo de mapas como
+    // "personalAdicional").
+    function esParticipanteDeOrden(datosOrden) {
+      return esEmpleadoActivo() && (request.auth.token.email in datosOrden.get('personalEmails', []));
+    }
+
+    // Órdenes de Trabajo (web/control/ordenes-trabajo.html) — usa
+    // "contadores" (doc "ordenTrabajo", ver autorizadoOrdenesTrabajo()
+    // arriba). Lectura Y escritura de punta a punta restringidas a quien
+    // la gerencia autorice; el responsable/personal asignado de una orden
+    // puntual solo puede ACTUALIZAR (nunca crear ni borrar) los campos que
+    // le corresponde llenar desde el celular.
+    match /ordenesTrabajo/{ordenId} {
+      allow read: if autorizadoOrdenesTrabajo() || esParticipanteDeOrden(resource.data);
+      allow create, delete: if autorizadoOrdenesTrabajo();
+      allow update: if autorizadoOrdenesTrabajo() || (
+        esParticipanteDeOrden(resource.data) &&
+        request.resource.data.diff(resource.data).affectedKeys()
+          .hasOnly(['altoRiesgo', 'pesv', 'preoperacionales', 'cierre', 'estado', 'actualizadoEn', 'actualizadoPor'])
+      );
+    }
+
+    // Placas de vehículos de la empresa, para el desplegable de "Recursos"
+    // en Orden de Trabajo (con opción "Otro" para vehículos que no son de
+    // la empresa) — mismo permiso que las órdenes, no hace falta uno aparte
+    // para una lista tan chica.
+    match /vehiculos/{vehiculoId} {
+      allow read, write: if autorizadoOrdenesTrabajo();
+    }
+
+    // Copia de solo lectura del directorio de empleados de Cinco Conecta
+    // (otro proyecto Firebase), para poder asignarlos en una Orden de
+    // Trabajo — la mantiene al día la Cloud Function recibirStaffConecta
+    // (Admin SDK, ignora estas reglas); el cliente nunca escribe acá
+    // directo.
+    match /empleadosConecta/{uid} {
+      allow read: if autorizadoOrdenesTrabajo();
+      allow write: if false;
     }
   }
 }

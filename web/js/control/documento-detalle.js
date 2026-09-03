@@ -36,6 +36,7 @@ requireAuth(async (user) => {
   const perfil = await obtenerPerfil(user.email);
   const puedeGestionar = perfil?.estado === "activo" && (perfil?.rol === "admin" || perfil?.gestionaDocumentos === true);
   if (!puedeGestionar) document.getElementById("soloGestorAviso").classList.remove("oculto");
+  document.getElementById("navOrdenesTrabajo")?.classList.toggle("oculto", !(perfil?.estado === "activo" && (perfil?.rol === "admin" || perfil?.autorizadoOrdenesTrabajo === true)));
 
   document.getElementById("documentoCodigo").textContent = documento.codigo;
   document.getElementById("documentoNombre").textContent = documento.nombre;

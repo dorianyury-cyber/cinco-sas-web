@@ -79,16 +79,66 @@ function formatearFecha(fechaISO) {
   return new Date(fechaISO + "T12:00:00").toLocaleDateString("es-CO", { day: "numeric", month: "long", year: "numeric" });
 }
 
+// Reparte "total" entre columnas garantizando primero el mínimo de cada una
+// (mins[i]) y creciendo desde ahí hacia lo que pidió (deseos[i]) en rondas
+// — cada ronda reparte el espacio que sobra por igual entre las columnas
+// que todavía no llegaron a su deseo; la que sí llega sale del reparto y su
+// sobrante pasa a las demás (reparto "max-min fair share", igual que el
+// ancho de banda entre conexiones que compiten por un enlace). A
+// diferencia de un reparto proporcional simple, esto nunca deja una
+// columna por debajo de su propio mínimo mientras la suma de mínimos quepa
+// en total — solo si ni siquiera los mínimos caben (demasiadas columnas
+// para el ancho disponible) se rinde y reparte proporcional a los mínimos,
+// que sigue siendo mejor que partir palabras al azar.
+function repartirConMinimos(mins, deseos, total) {
+  const n = mins.length;
+  const sumaMin = mins.reduce((a, b) => a + b, 0);
+  if (sumaMin >= total) return mins.map((m) => m * (total / sumaMin));
+
+  const anchos = mins.slice();
+  const pendientes = deseos.map((d, i) => Math.max(d - mins[i], 0));
+  const activos = pendientes.map((p) => p > 1e-9);
+  let restante = total - sumaMin;
+  while (restante > 1e-6 && activos.some(Boolean)) {
+    const nActivos = activos.filter(Boolean).length;
+    const cuota = restante / nActivos;
+    let usado = 0;
+    for (let i = 0; i < n; i++) {
+      if (!activos[i]) continue;
+      if (pendientes[i] <= cuota) {
+        anchos[i] += pendientes[i];
+        usado += pendientes[i];
+        pendientes[i] = 0;
+        activos[i] = false;
+      } else {
+        anchos[i] += cuota;
+        pendientes[i] -= cuota;
+        usado += cuota;
+      }
+    }
+    restante -= usado;
+  }
+  // Si todas las columnas ya llegaron a lo que pidieron y aún sobra espacio
+  // (tabla con pocas columnas cortas en una página ancha), se reparte lo
+  // que queda proporcional a lo ya asignado para que la tabla llene el
+  // ancho completo en vez de quedar angosta con un vacío a la derecha.
+  if (restante > 0.5) {
+    const usado = anchos.reduce((a, b) => a + b, 0);
+    for (let i = 0; i < n; i++) anchos[i] += restante * (anchos[i] / usado);
+  }
+  return anchos;
+}
+
 // Anchos de columna proporcionales al contenido real (encabezado + celdas),
-// no partes iguales — respetando un mínimo por columna, mismo criterio que
-// el resto de la suite (ver calcularAnchosColumna en pdf.js de LBDC
-// Neiva), con una corrección importante: si hay muchas columnas o alguna
-// pide mucho ancho, la normalización proporcional simple podía encoger
-// TODAS las columnas por debajo de ese mínimo (una tabla con varias
-// columnas angostas + una de texto largo terminaba con celdas tan
-// estrechas que el texto se salía de su celda) — aquí cada columna se
-// garantiza su mínimo primero, y el espacio que sobra se reparte solo
-// entre las que pidieron más.
+// no partes iguales, respetando un mínimo por columna (nunca más angosta
+// que su propia palabra más larga, para no partirla letra por letra) —
+// mismo criterio que calcularAnchosColumna en pdf.js de LBDC Neiva, con el
+// reparto final resuelto por repartirConMinimos (ver arriba) en vez de una
+// normalización proporcional simple, que con muchas columnas angostas
+// compitiendo contra una de texto libre podía encoger TODAS por debajo de
+// su mínimo. Devuelve { anchos, cabe }: cabe=false avisa a quien llama que
+// ni los mínimos entraron en la página a este tamaño de fuente — dibujarTabla
+// lo usa para reintentar con una fuente más pequeña antes de resignarse.
 function calcularAnchosColumna(doc, filas, anchoUtil, merges = []) {
   // No todas las filas tienen necesariamente el mismo número de celdas
   // (ej. tablas importadas de Word con celdas combinadas) — se usa el
@@ -180,48 +230,8 @@ function calcularAnchosColumna(doc, filas, anchoUtil, merges = []) {
 
   for (let c = 0; c < numCols; c++) deseados[c] = Math.min(Math.max(deseados[c] + 6, anchoMinPorColumna[c]), anchoMax);
 
-  const totalDeseado = deseados.reduce((a, b) => a + b, 0);
-  if (totalDeseado <= anchoUtil) {
-    // Cabe todo con el ancho que cada columna pidió — se reparte el
-    // sobrante proporcionalmente, en vez de dejar espacio muerto sin usar.
-    const factor = anchoUtil / totalDeseado;
-    return deseados.map((a) => a * factor);
-  }
-
-  // No cabe todo: se concede su ancho COMPLETO a las columnas que menos
-  // piden primero (si les alcanza con un reparto parejo del espacio que va
-  // quedando, se les da lo que pidieron y salen del reparto) — así una
-  // columna angosta de contenido corto (ej. "Valor total": "$ 8.403.361")
-  // no se encoge solo porque otra columna de texto libre (ej.
-  // "Descripción") pida mucho más espacio; el recorte de verdad lo
-  // absorben solo las columnas que de verdad compiten por ese espacio.
-  // (El reparto anterior encogía TODAS las columnas por igual según cuánto
-  // excedían su mínimo, lo que podía apretar una columna angosta por
-  // debajo de lo que su propio contenido necesitaba en una sola línea.)
-  const orden = deseados.map((_, i) => i).sort((a, b) => deseados[a] - deseados[b]);
-  const anchos = new Array(numCols).fill(0);
-  let restante = anchoUtil;
-  let pendientes = numCols;
-  for (let k = 0; k < numCols; k++) {
-    const i = orden[k];
-    const parejo = restante / pendientes;
-    if (deseados[i] <= parejo) {
-      anchos[i] = deseados[i];
-      restante -= anchos[i];
-      pendientes -= 1;
-    } else {
-      for (let j = k; j < numCols; j++) anchos[orden[j]] = restante / pendientes;
-      break;
-    }
-  }
-  // Salvavidas: si aun así alguna columna quedó por debajo de su propio
-  // mínimo (varias columnas de texto libre compitiendo a la vez por muy
-  // poca página), repartir parejo es lo mejor que se puede hacer — mismo
-  // último recurso que antes de este ajuste.
-  if (anchos.some((a, c) => a < anchoMinPorColumna[c] - 0.01)) {
-    return deseados.map(() => anchoUtil / numCols);
-  }
-  return anchos;
+  const sumaMin = anchoMinPorColumna.reduce((a, b) => a + b, 0);
+  return { anchos: repartirConMinimos(anchoMinPorColumna, deseados, anchoUtil), cabe: sumaMin <= anchoUtil };
 }
 
 // Suma "cantidad" valores consecutivos de un arreglo desde "inicio" — para
@@ -352,6 +362,44 @@ export async function generarInformePDF(informe) {
     doc.setFont("helvetica", estiloFuente(token.negrita, token.cursiva));
     return doc.getTextWidth(token.texto);
   }
+  // Dibuja UNA línea ya armada. "esUltima" decide si se estira con
+  // justificado — la última línea de un párrafo/ítem nunca se estira
+  // (convención tipográfica igual que Word). Como una línea solo se sabe
+  // "última" cuando ya se está armando la SIGUIENTE (o se acabó el texto),
+  // dibujarParrafo dibuja con un renglón de retraso (ver "pendiente" ahí
+  // abajo) — acá solo se dibuja lo que ya llega resuelto.
+  function dibujarLineaParrafo(pendiente, esUltima) {
+    const { tokens: lineaTokens, sangria, esPrimeraLineaDeItem, alineacion } = pendiente;
+    if (!lineaTokens.length) { y += lineHeight; return; }
+    saltoSiNoCabe(lineHeight);
+    paginasConContenido.add(doc.internal.getNumberOfPages());
+    const anchoDisponible = anchoUtil - (esPrimeraLineaDeItem ? 0 : sangria);
+    const xBase = margenX + (esPrimeraLineaDeItem ? 0 : sangria);
+
+    let anchoTokens = 0;
+    lineaTokens.forEach((t) => { anchoTokens += medirToken(t); });
+    const huecos = lineaTokens.filter((t) => /^\s+$/.test(t.texto)).length;
+
+    let extraPorHueco = 0;
+    let x = xBase;
+    if (alineacion === "justify" && !esUltima && huecos > 0 && anchoTokens < anchoDisponible) {
+      extraPorHueco = (anchoDisponible - anchoTokens) / huecos;
+    } else if (alineacion === "center" && anchoTokens < anchoDisponible) {
+      x = xBase + (anchoDisponible - anchoTokens) / 2;
+    } else if (alineacion === "right" && anchoTokens < anchoDisponible) {
+      x = xBase + (anchoDisponible - anchoTokens);
+    }
+
+    lineaTokens.forEach((token) => {
+      const ancho = medirToken(token);
+      doc.setFont("helvetica", estiloFuente(token.negrita, token.cursiva));
+      doc.setTextColor(...(token.color || COLOR_PARRAFO));
+      doc.text(token.texto, x, y);
+      x += ancho + (/^\s+$/.test(token.texto) ? extraPorHueco : 0);
+    });
+    y += lineHeight;
+  }
+
   function dibujarParrafo(html) {
     doc.setFontSize(10.5);
     const runs = parsearHtmlARuns(html);
@@ -361,9 +409,19 @@ export async function generarInformePDF(informe) {
     runs.forEach((run) => {
       if (run.salto) { tokens.push({ salto: true }); return; }
       run.texto.split(/(\s+)/).filter((p) => p !== "").forEach((palabra) => {
-        tokens.push({ texto: palabra, negrita: run.negrita, cursiva: run.cursiva, color: run.color });
+        tokens.push({ texto: palabra, negrita: run.negrita, cursiva: run.cursiva, color: run.color, alineacion: run.alineacion });
       });
     });
+
+    let pendiente = null;
+    function emitir(lineaObj) {
+      if (pendiente) dibujarLineaParrafo(pendiente, false);
+      pendiente = lineaObj;
+    }
+    function cerrarItem() {
+      if (pendiente) dibujarLineaParrafo(pendiente, true);
+      pendiente = null;
+    }
 
     let linea = [];
     let anchoLinea = 0;
@@ -373,24 +431,15 @@ export async function generarInformePDF(informe) {
     // la viñeta + su indentación en la primera línea del ítem actual.
     let sangriaItem = 0;
     let esPrimeraLineaDeItem = true;
+    let alineacionItem = "left";
     // Solo se acumula sangriaItem mientras estemos viendo indentación/viñeta
     // de arranque — se apaga para siempre en la primera palabra "de verdad"
     // del ítem, para no seguir recalculándola con cada espacio del resto del
     // párrafo (eso indentaría todo un párrafo normal a donde cayó su primer
     // salto de línea).
     let enIndentInicial = true;
-    function trazarLinea() {
-      if (!linea.length) { y += lineHeight; return; }
-      saltoSiNoCabe(lineHeight);
-      paginasConContenido.add(doc.internal.getNumberOfPages());
-      let x = margenX + (esPrimeraLineaDeItem ? 0 : sangriaItem);
-      linea.forEach((token) => {
-        doc.setFont("helvetica", estiloFuente(token.negrita, token.cursiva));
-        doc.setTextColor(...(token.color || COLOR_PARRAFO));
-        doc.text(token.texto, x, y);
-        x += medirToken(token);
-      });
-      y += lineHeight;
+    function emitirLineaActual() {
+      emitir({ tokens: linea, sangria: sangriaItem, esPrimeraLineaDeItem, alineacion: alineacionItem });
       linea = [];
       anchoLinea = 0;
       esPrimeraLineaDeItem = false;
@@ -404,14 +453,17 @@ export async function generarInformePDF(informe) {
     let lineaNueva = true;
     tokens.forEach((token) => {
       if (token.salto) {
-        trazarLinea();
+        emitirLineaActual();
+        cerrarItem();
         y += lineHeight * 0.3;
         lineaNueva = true;
         esPrimeraLineaDeItem = true;
         sangriaItem = 0;
         enIndentInicial = true;
+        alineacionItem = "left";
         return;
       }
+      if (alineacionItem === "left" && token.alineacion) alineacionItem = token.alineacion;
 
       // Viñeta "•" escrita a mano dentro del propio texto del párrafo (sin
       // pasar por el botón "Viñeta", que sí crea <li> con su propio salto):
@@ -424,7 +476,8 @@ export async function generarInformePDF(informe) {
       // arranque de un <li> real (que llega precedida solo de sus espacios
       // de sangría, no de una palabra real todavía).
       if (token.texto === "•" && linea.length && !enIndentInicial) {
-        trazarLinea();
+        emitirLineaActual();
+        cerrarItem();
         y += lineHeight * 0.3;
         esPrimeraLineaDeItem = true;
         sangriaItem = 0;
@@ -446,7 +499,7 @@ export async function generarInformePDF(informe) {
       const esEspacio = /^\s+$/.test(token.texto);
       if (esEspacio && !linea.length && !lineaNueva) return; // no arrancar una línea de ajuste con espacio
       const anchoDisponible = anchoUtil - (esPrimeraLineaDeItem ? 0 : sangriaItem);
-      if (!esEspacio && anchoLinea + ancho > anchoDisponible && linea.length) trazarLinea();
+      if (!esEspacio && anchoLinea + ancho > anchoDisponible && linea.length) emitirLineaActual();
       linea.push(token);
       anchoLinea += ancho;
       lineaNueva = false;
@@ -455,7 +508,8 @@ export async function generarInformePDF(informe) {
         else enIndentInicial = false;
       }
     });
-    trazarLinea();
+    emitirLineaActual();
+    cerrarItem();
     y += lineHeight * 0.5;
   }
 
@@ -593,9 +647,7 @@ export async function generarInformePDF(informe) {
     const numero = tablasEntradas.length + 1;
     const tituloTexto = `Tabla ${numero}. ${bloque.titulo || ""}`.trim();
 
-    const padding = 2.2;
-    doc.setFont("helvetica", "normal");
-    doc.setFontSize(8.5);
+    const padding = 1.8;
     const numFilas = filas.length;
     const numCols = Math.max(...filas.map((f) => f.length));
     // Combinar celdas, ver web/js/control/tabla-celdas.js — el texto de
@@ -615,7 +667,31 @@ export async function generarInformePDF(informe) {
     const centrados = normalizarCentrados(bloque.centrados || [], numFilas, numCols);
     const negritas = normalizarNegritas(bloque.negritas || [], numFilas, numCols);
     const coloresCelda = normalizarColoresCelda(bloque.coloresCelda || [], numFilas, numCols);
-    const anchos = calcularAnchosColumna(doc, filas, anchoUtil, merges);
+
+    // Fuente de partida 8pt — mismo tamaño que usa calcularAnchosColumna en
+    // pdf.js de LBDC Neiva (antes 8.5), para que las tablas con muchas
+    // filas no se vean tan aparatosas ni con tanto espacio muerto entre
+    // líneas. Si la tabla trae muchas columnas y ni el mínimo de cada una
+    // (nunca partir su palabra más larga) cabe en la página a este tamaño,
+    // se reintenta con la fuente un poco más chica — hasta un piso de 6pt —
+    // en vez de partir palabras letra por letra (ver calcularAnchosColumna/
+    // repartirConMinimos más arriba).
+    let fontSize = 8;
+    let resultadoAnchos;
+    for (;;) {
+      doc.setFont("helvetica", "normal");
+      doc.setFontSize(fontSize);
+      resultadoAnchos = calcularAnchosColumna(doc, filas, anchoUtil, merges);
+      if (resultadoAnchos.cabe || fontSize <= 6) break;
+      fontSize -= 0.5;
+    }
+    const anchos = resultadoAnchos.anchos;
+    // Alto de línea y línea base del texto dentro de la celda, en la misma
+    // proporción que se usaba a 8.5pt/4.2mm/3.2mm — escalados al tamaño de
+    // fuente que de verdad se usó (que puede haber bajado de 8 si la tabla
+    // tiene muchas columnas).
+    const pasoLinea = fontSize * 0.5;
+    const offsetBase = fontSize * 0.375;
 
     // Alto de cada fila, en dos pasadas: primero cada celda "propia" de esa
     // fila (normal, o ancla de un merge que no combina filas hacia abajo);
@@ -632,16 +708,16 @@ export async function generarInformePDF(informe) {
         if (info && info.merge.filas > 1) continue;
         const ancho = info ? sumaRango(anchos, ci, info.merge.cols) : anchos[ci];
         const lineas = doc.splitTextToSize(String(fila[ci] || ""), ancho - padding * 2);
-        const alto = lineas.length * 4.2 + padding * 2;
+        const alto = lineas.length * pasoLinea + padding * 2;
         if (alto > alturaFilas[fi]) alturaFilas[fi] = alto;
       }
     });
-    for (let fi = 0; fi < numFilas; fi++) if (!alturaFilas[fi]) alturaFilas[fi] = 4.2 + padding * 2;
+    for (let fi = 0; fi < numFilas; fi++) if (!alturaFilas[fi]) alturaFilas[fi] = pasoLinea + padding * 2;
     merges.filter((m) => m.filas > 1).forEach((m) => {
       doc.setFont("helvetica", m.fila === 0 ? "bold" : "normal");
       const ancho = sumaRango(anchos, m.col, m.cols);
       const lineas = doc.splitTextToSize(String(filas[m.fila][m.col] || ""), ancho - padding * 2);
-      const altoNecesario = lineas.length * 4.2 + padding * 2;
+      const altoNecesario = lineas.length * pasoLinea + padding * 2;
       const altoActual = sumaRango(alturaFilas, m.fila, m.filas);
       if (altoNecesario > altoActual) {
         const extra = (altoNecesario - altoActual) / m.filas;
@@ -665,6 +741,13 @@ export async function generarInformePDF(informe) {
     paginasConContenido.add(doc.internal.getNumberOfPages());
     y += altoTitulo;
     tablasEntradas.push({ texto: bloque.titulo || `Tabla ${numero}`, pagina: doc.internal.getNumberOfPages() });
+    // El título se dibujó en negrilla a 9.5pt — sin este reset, las celdas
+    // se dibujaban con ese mismo tamaño heredado (dibujarFila nunca llama
+    // setFontSize, solo setFont para negrita/normal), aunque los anchos de
+    // columna se habían calculado para el tamaño de la tabla (fontSize):
+    // el texto quedaba más ancho que la celda que se le midió, partiendo
+    // palabras o invadiendo la celda vecina.
+    doc.setFontSize(fontSize);
 
     // Dibuja una fila completa (fondo/bordes + texto) en la posición yPos —
     // se usa tanto para el recorrido normal de filas como para repetir el
@@ -695,8 +778,8 @@ export async function generarInformePDF(informe) {
           doc.setFont("helvetica", esNegrita ? "bold" : "normal");
           doc.setTextColor(...color);
           const lineas = doc.splitTextToSize(String(fila[ci] || ""), ancho - padding * 2);
-          if (celdaCentrada(centrados, fi, ci)) doc.text(lineas, x + ancho / 2, yPos + padding + 3.2, { align: "center" });
-          else doc.text(lineas, x + padding, yPos + padding + 3.2);
+          if (celdaCentrada(centrados, fi, ci)) doc.text(lineas, x + ancho / 2, yPos + padding + offsetBase, { align: "center" });
+          else doc.text(lineas, x + padding, yPos + padding + offsetBase);
         }
         x += anchos[ci];
       }

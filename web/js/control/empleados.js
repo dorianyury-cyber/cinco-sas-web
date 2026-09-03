@@ -239,6 +239,47 @@ function celdaAprobacion(empleado, esAdmin) {
   return td;
 }
 
+// Checkbox de autorización para Órdenes de Trabajo — mismo patrón que
+// celdaDocumentos. Solo quienes la gerencia marque aquí pueden crear/ver
+// esas órdenes (ver firestore.rules: autorizadoOrdenesTrabajo()).
+function celdaOrdenesTrabajo(empleado, esAdmin) {
+  const td = celda("td");
+  const label = document.createElement("label");
+  label.className = "control-check-inline";
+  const check = document.createElement("input");
+  check.type = "checkbox";
+  check.checked = !!empleado.autorizadoOrdenesTrabajo;
+  check.disabled = !esAdmin;
+  check.addEventListener("change", () => {
+    updateDoc(doc(db, "empleados", empleado.id), { autorizadoOrdenesTrabajo: check.checked, actualizadoEn: serverTimestamp() });
+  });
+  label.appendChild(check);
+  label.appendChild(document.createTextNode("Autorizado"));
+  td.appendChild(label);
+  return td;
+}
+
+// Celda de texto editable (código o cédula), autoguardado al perder el
+// foco — mismo espíritu de autoguardado que las casillas de arriba, pero
+// para texto libre. No hay modal de "editar datos personales" en este
+// módulo (a diferencia de otros de la suite), así que estas dos columnas
+// son la única forma de completar el dato en empleados creados antes de
+// que existiera el campo — nuevas altas también lo traen desde el
+// formulario (ver el submit handler más abajo).
+function celdaTexto(empleado, esAdmin, campo, ancho) {
+  const td = celda("td");
+  const input = document.createElement("input");
+  input.type = "text";
+  input.style.width = ancho;
+  input.value = empleado[campo] || "";
+  input.disabled = !esAdmin;
+  input.addEventListener("change", () => {
+    updateDoc(doc(db, "empleados", empleado.id), { [campo]: input.value.trim(), actualizadoEn: serverTimestamp() });
+  });
+  td.appendChild(input);
+  return td;
+}
+
 function renderTabla(empleados, esAdmin) {
   tbody.innerHTML = "";
   sinEmpleados.classList.toggle("oculto", empleados.length > 0);
@@ -248,6 +289,9 @@ function renderTabla(empleados, esAdmin) {
     fila.appendChild(celda("td", e.nombre));
     fila.appendChild(celda("td", e.email));
     fila.appendChild(celda("td", e.cargo || "—"));
+    fila.appendChild(celdaTexto(e, esAdmin, "codigo", "60px"));
+    fila.appendChild(celdaTexto(e, esAdmin, "cedula", "90px"));
+    fila.appendChild(celdaTexto(e, esAdmin, "telefono", "90px"));
 
     const tdRol = celda("td");
     const selectRol = document.createElement("select");
@@ -284,6 +328,7 @@ function renderTabla(empleados, esAdmin) {
     fila.appendChild(celdaOfertas(e, esAdmin));
     fila.appendChild(celdaDocumentos(e, esAdmin));
     fila.appendChild(celdaAprobacion(e, esAdmin));
+    fila.appendChild(celdaOrdenesTrabajo(e, esAdmin));
 
     tbody.appendChild(fila);
   });
@@ -299,6 +344,7 @@ requireAuth(async (user) => {
     document.getElementById("nuevoEmpleadoBtn").classList.add("oculto");
     document.getElementById("soloAdminAviso").classList.remove("oculto");
   }
+  document.getElementById("navOrdenesTrabajo")?.classList.toggle("oculto", !(esAdmin || (perfil?.estado === "activo" && perfil?.autorizadoOrdenesTrabajo === true)));
 
   const q = query(collection(db, "empleados"), orderBy("nombre"));
   onSnapshot(q, (snapshot) => {
@@ -314,9 +360,13 @@ requireAuth(async (user) => {
     const nombre = document.getElementById("nombre").value.trim();
     const email = document.getElementById("email").value.trim().toLowerCase();
     const cargo = document.getElementById("cargo").value.trim();
+    const codigo = document.getElementById("codigo").value.trim();
+    const cedula = document.getElementById("cedula").value.trim();
+    const telefono = document.getElementById("telefono").value.trim();
     const autorizadoOfertas = document.getElementById("autorizadoOfertas").checked;
     const gestionaDocumentos = document.getElementById("gestionaDocumentos").checked;
     const aprobadorContratos = document.getElementById("aprobadorContratos").checked;
+    const autorizadoOrdenesTrabajo = document.getElementById("autorizadoOrdenesTrabajo").checked;
     const rol = selectRolNuevo.value;
     const campo = campoDeRol(rol);
     const seleccionadas = [...camposLista.querySelectorAll(".campo-permiso-check:checked")].map((c) => c.value);
@@ -328,7 +378,8 @@ requireAuth(async (user) => {
         throw new Error("Ya existe un empleado registrado con ese correo.");
       }
       await setDoc(empleadoRef, {
-        nombre, email, cargo, rol, estado: "activo", autorizadoOfertas, gestionaDocumentos, aprobadorContratos,
+        nombre, email, cargo, codigo, cedula, telefono, rol, estado: "activo",
+        autorizadoOfertas, gestionaDocumentos, aprobadorContratos, autorizadoOrdenesTrabajo,
         ...(campo ? { [campo]: seleccionadas } : {}),
         creadoPor: user.email, creadoEn: serverTimestamp(),
         actualizadoEn: serverTimestamp()

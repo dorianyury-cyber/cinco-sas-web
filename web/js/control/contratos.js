@@ -102,6 +102,10 @@ requireAuth(async (user) => {
   const perfil = await obtenerPerfil(user.email);
   const esGestor = perfil?.estado === "activo" && (perfil?.rol === "admin" || perfil?.rol === "coadmin");
   if (!esGestor) document.getElementById("nuevoContratoBtn").classList.add("oculto");
+  // Enlace "Orden de Trabajo": oculto salvo a quien la gerencia autorice
+  // puntualmente (empleados/{email}.autorizadoOrdenesTrabajo) — a
+  // diferencia del resto del menú, que nunca se oculta por rol.
+  document.getElementById("navOrdenesTrabajo")?.classList.toggle("oculto", !(perfil?.estado === "activo" && (perfil?.rol === "admin" || perfil?.autorizadoOrdenesTrabajo === true)));
 
   const empleadosSnap = await getDocs(collection(db, "empleados"));
   const totalAprobadores = empleadosSnap.docs

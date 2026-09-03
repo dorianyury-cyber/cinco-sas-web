@@ -1,0 +1,243 @@
+<!doctype html>
+<html lang="es">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<meta name="robots" content="noindex, nofollow">
+<title>Órdenes de Trabajo — Control de Contratos — Cinco S.A.S.</title>
+<link rel="icon" href="../assets/img/logo-compacto.png">
+<link rel="stylesheet" href="../assets/css/styles.css">
+</head>
+<body>
+  <header class="site-header">
+    <div class="container">
+      <a class="brand" href="../conecta.html">
+        <img src="../assets/img/logo.png" alt="Cinco S.A.S.">
+        <span class="brand-tagline">Hacerlo mejor es nuestro reto.</span>
+      </a>
+      <div class="control-userbar">
+        <span id="userEmail"></span>
+        <a href="contratos.html" class="control-userbar-link">Contratos</a>
+        <a href="documentos.html" class="control-userbar-link">Documentos</a>
+        <a href="correspondencia.html" class="control-userbar-link">Correspondencia</a>
+        <a href="informes.html" class="control-userbar-link">Informes</a>
+        <a href="ofertas.html" class="control-userbar-link">Ofertas</a>
+        <a href="ordenes-trabajo.html" class="control-userbar-link" id="navOrdenesTrabajo">Orden de Trabajo</a>
+        <a href="empleados.html" class="control-userbar-link">Empleados</a>
+        <a href="cambiar-clave.html" class="control-userbar-link">Cambiar clave</a>
+        <button id="logoutBtn" class="btn-outline">Cerrar sesión</button>
+      </div>
+    </div>
+  </header>
+
+  <div class="page-banner">
+    <div class="container">
+      <span class="eyebrow">Uso interno · Acceso restringido</span>
+      <h1>Órdenes de Trabajo</h1>
+      <p>Formato CAL-FOR-001 — asignación de labores, riesgos y requerimientos preoperacionales.</p>
+    </div>
+  </div>
+
+  <section class="section">
+    <div class="container">
+      <p id="sinPermisoAviso" class="text-muted oculto">No tienes autorización para ver ni crear Órdenes de Trabajo. Si la necesitas, pídele a un administrador que te la habilite desde Empleados.</p>
+
+      <!-- Vista del responsable/personal asignado (sin autorizadoOrdenesTrabajo):
+           solo ve las órdenes donde está asignado, y solo puede completar de
+           "Trabajo de alto riesgo" en adelante — reutiliza el mismo modal
+           #ordenForm de abajo, con las secciones del jefe ocultas
+           (ver #otSeccionesJefe) en vez de duplicar el formulario entero. -->
+      <div id="contenidoParticipante" class="oculto">
+        <p class="text-muted">Estas son las órdenes de trabajo donde estás asignado como responsable o personal de apoyo — complétalas desde "Trabajo de alto riesgo" en adelante.</p>
+        <div class="control-tabla-wrap">
+          <table class="control-tabla-documentos">
+            <colgroup>
+              <col class="w-100">
+              <col class="w-100">
+              <col>
+              <col class="w-150">
+            </colgroup>
+            <thead>
+              <tr>
+                <th>Orden</th>
+                <th>Estado</th>
+                <th>Descripción</th>
+                <th></th>
+              </tr>
+            </thead>
+            <tbody id="listaOrdenesParticipante"></tbody>
+          </table>
+        </div>
+        <p id="sinOrdenesParticipante" class="text-muted oculto">No tienes ninguna orden de trabajo asignada por ahora.</p>
+      </div>
+
+      <div id="contenidoOrdenes">
+        <button type="button" class="control-btn-mini" id="nuevaOrdenBtn">+ Nueva orden de trabajo</button>
+
+        <div class="modal-backdrop" id="nuevaOrdenBackdrop">
+          <div class="modal modal-ancho">
+            <h2 id="tituloModalOrden">Nueva orden de trabajo</h2>
+            <form class="modal-form-grid" id="ordenForm">
+
+              <div id="otResumenParticipante" class="campo-ancho oculto"></div>
+
+              <div id="otSeccionesJefe">
+              <div class="campo-ancho control-ot-seccion"><strong>Datos generales</strong></div>
+              <div>
+                <label for="otContrato">Contrato número</label>
+                <select id="otContrato" required></select>
+              </div>
+              <div>
+                <label for="otMunicipio">Municipio</label>
+                <input type="text" id="otMunicipio" required maxlength="80" value="Neiva">
+              </div>
+              <div>
+                <label for="otSector">Sector</label>
+                <select id="otSector">
+                  <option value="U">Urbano</option>
+                  <option value="R">Rural</option>
+                </select>
+              </div>
+              <div>
+                <label for="otFechaInicio">Fecha y hora de inicio</label>
+                <input type="datetime-local" id="otFechaInicio" required>
+              </div>
+              <div>
+                <label for="otFechaTerminacion">Fecha y hora de terminación</label>
+                <input type="datetime-local" id="otFechaTerminacion" required>
+              </div>
+
+              <div class="campo-ancho control-ot-seccion"><strong>Responsable de los trabajos</strong></div>
+              <div class="campo-ancho">
+                <label for="otResponsable">Empleado responsable</label>
+                <select id="otResponsable" required><option value="">Selecciona un empleado…</option></select>
+              </div>
+
+              <div class="campo-ancho control-ot-seccion"><strong>Descripción</strong></div>
+              <div class="campo-ancho">
+                <label for="otDescripcion">Detalle de los trabajos a realizar</label>
+                <textarea id="otDescripcion" rows="3" required maxlength="1000"></textarea>
+              </div>
+
+              <div class="campo-ancho control-ot-seccion"><strong>Recursos</strong></div>
+              <div class="campo-ancho">
+                <label for="otVehiculo">Vehículo</label>
+                <select id="otVehiculo"><option value="">Selecciona un vehículo…</option></select>
+              </div>
+              <div id="otVehiculoOtroFila" class="campo-ancho oculto">
+                <div class="control-ot-vehiculo-otro">
+                  <div>
+                    <label for="otVehiculoTipo">Tipo de vehículo</label>
+                    <input type="text" id="otVehiculoTipo" maxlength="60" placeholder="Ej. Motocicleta, Camioneta">
+                  </div>
+                  <div>
+                    <label for="otVehiculoPlaca">Placa de vehículo</label>
+                    <input type="text" id="otVehiculoPlaca" maxlength="10">
+                  </div>
+                </div>
+              </div>
+              <div class="campo-ancho control-ot-vehiculo-nuevo">
+                <input type="text" id="otVehiculoNuevoPlaca" maxlength="10" placeholder="Placa (ej. Z9G82F)">
+                <input type="text" id="otVehiculoNuevoTipo" maxlength="60" placeholder="Tipo (ej. Motocicleta)">
+                <button type="button" class="control-btn-mini" id="otAgregarVehiculoBtn">+ Agregar a la lista de la empresa</button>
+              </div>
+
+              <div class="campo-ancho">
+                <label>Personal adicional (opcional)</label>
+                <div id="otPersonalLista" class="control-ot-personal-lista"></div>
+                <button type="button" class="control-btn-mini" id="otAgregarPersonaBtn">+ Agregar persona</button>
+              </div>
+              </div><!-- /otSeccionesJefe -->
+
+              <div class="campo-ancho control-ot-seccion"><strong>Trabajo de alto riesgo</strong></div>
+              <div class="campo-ancho control-ot-riesgos" id="otRiesgosLista"></div>
+
+              <div class="campo-ancho control-ot-seccion"><strong>Información PESV</strong></div>
+              <p class="text-muted campo-ancho">El responsable de los trabajos, con el fin de dar cumplimiento a las acciones y estrategias en seguridad vial estipuladas en la Resolución 40595 de 2022, relaciona lo siguiente:</p>
+              <div>
+                <label for="otOrigen">Origen</label>
+                <input type="text" id="otOrigen" maxlength="80" value="Neiva">
+              </div>
+              <div>
+                <label for="otDestino">Destino</label>
+                <input type="text" id="otDestino" maxlength="80" value="Neiva">
+              </div>
+              <div class="campo-ancho">
+                <label for="otDescripcionRuta">Descripción de la ruta</label>
+                <input type="text" id="otDescripcionRuta" maxlength="200">
+              </div>
+              <div class="campo-ancho">
+                <label for="otPausasActivas">Descripción de pausas activas</label>
+                <input type="text" id="otPausasActivas" maxlength="200">
+              </div>
+
+              <div class="campo-ancho control-ot-seccion"><strong>Requerimientos preoperacionales</strong></div>
+              <p class="text-muted campo-ancho">El responsable de los trabajos manifiesta que ha inspeccionado y garantiza la utilización de los siguientes elementos de trabajo:</p>
+              <div class="campo-ancho control-ot-preoperacionales" id="otPreoperacionalesLista"></div>
+
+              <div class="campo-ancho control-ot-seccion"><strong>Cierre</strong> <span class="text-muted">(se completa cuando termine el trabajo — al guardar con fecha de cierre, la orden pasa a CERRADA)</span></div>
+              <div class="campo-ancho">
+                <label for="otObservaciones">Observaciones</label>
+                <textarea id="otObservaciones" rows="2" maxlength="600"></textarea>
+              </div>
+              <div>
+                <label for="otFechaCierre">Fecha y hora de cierre</label>
+                <input type="datetime-local" id="otFechaCierre">
+              </div>
+              <div>
+                <label for="otHorasAdicionales">Horas adicionales</label>
+                <input type="text" id="otHorasAdicionales" maxlength="20">
+              </div>
+              <div>
+                <label for="otValesAlimentacion">Vales de alimentación</label>
+                <input type="text" id="otValesAlimentacion" maxlength="20">
+              </div>
+              <div>
+                <label for="otPernoctada">Pernoctada</label>
+                <select id="otPernoctada">
+                  <option value="NO">No</option>
+                  <option value="SI">Sí</option>
+                </select>
+              </div>
+
+              <div class="campo-ancho control-edicion-botones">
+                <button type="submit" class="btn" id="guardarOrdenBtn">Guardar</button>
+                <button type="button" class="control-btn-mini" id="cancelarOrdenBtn">Cancelar</button>
+              </div>
+              <div class="form-alert campo-ancho" id="ordenAlert"></div>
+            </form>
+          </div>
+        </div>
+
+        <div class="control-tabla-wrap">
+          <table class="control-tabla-documentos">
+            <colgroup>
+              <col class="w-100">
+              <col class="w-100">
+              <col class="w-130">
+              <col>
+              <col class="w-190">
+              <col class="w-260">
+            </colgroup>
+            <thead>
+              <tr>
+                <th>Orden</th>
+                <th>Estado</th>
+                <th>Contrato</th>
+                <th>Responsable / descripción</th>
+                <th>Inicio</th>
+                <th></th>
+              </tr>
+            </thead>
+            <tbody id="listaOrdenes"></tbody>
+          </table>
+        </div>
+        <p id="sinOrdenes" class="text-muted oculto">Todavía no hay órdenes de trabajo registradas.</p>
+      </div>
+    </div>
+  </section>
+
+  <script src="../js/vendor/jspdf.umd.min.js"></script>
+  <script type="module" src="../js/control/ordenes-trabajo.js"></script>
+</body>
+</html>

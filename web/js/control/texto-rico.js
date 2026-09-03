@@ -62,6 +62,26 @@ export function crearCampoTextoRico({ valor, placeholder, onInput }) {
   btnTabulador.title = "Sangría / sub-viñeta (Tab dentro del texto hace lo mismo, Shift+Tab quita sangría)";
   btnTabulador.textContent = "⇥";
 
+  // Alineación — separada en su propio grupo con dataset.align (en vez de
+  // dataset.cmd) porque cada botón necesita marcar cuál quedó activa (ver
+  // actualizarEstadoBotones), cosa que negrilla/cursiva/viñeta no
+  // necesitan mostrar de la misma forma.
+  const ALINEACIONES = [
+    ["justifyLeft", "⬅", "Alinear a la izquierda"],
+    ["justifyCenter", "↔", "Centrar"],
+    ["justifyRight", "➡", "Alinear a la derecha"],
+    ["justifyFull", "☰", "Justificar (alinea ambos márgenes, como en Word)"]
+  ];
+  const botonesAlineacion = ALINEACIONES.map(([cmd, texto, titulo]) => {
+    const btn = document.createElement("button");
+    btn.type = "button";
+    btn.className = "control-rich-btn";
+    btn.dataset.align = cmd;
+    btn.title = titulo;
+    btn.textContent = texto;
+    return btn;
+  });
+
   const inputColor = document.createElement("input");
   inputColor.type = "color";
   inputColor.className = "control-rich-color";
@@ -69,7 +89,7 @@ export function crearCampoTextoRico({ valor, placeholder, onInput }) {
   inputColor.title = "Color de letra";
   inputColor.value = "#1a1a1a";
 
-  toolbar.append(btnNegrita, btnCursiva, btnVineta, btnTabulador, inputColor);
+  toolbar.append(btnNegrita, btnCursiva, btnVineta, btnTabulador, ...botonesAlineacion, inputColor);
 
   const editable = document.createElement("div");
   editable.className = "control-rich-editable";
@@ -108,6 +128,18 @@ export function crearCampoTextoRico({ valor, placeholder, onInput }) {
   function guardarSeleccion() {
     const sel = window.getSelection();
     if (sel && sel.rangeCount > 0) ultimaSeleccion = sel.getRangeAt(0).cloneRange();
+    actualizarEstadoBotones();
+  }
+
+  // Resalta con fondo activo el botón de alineación que corresponde a
+  // donde está el cursor ahora mismo — mismo criterio visual que Word/
+  // Excel, para saber de un vistazo cómo quedó el párrafo actual.
+  function actualizarEstadoBotones() {
+    botonesAlineacion.forEach((btn) => {
+      let activo = false;
+      try { activo = document.queryCommandState(btn.dataset.align); } catch (e) { activo = false; }
+      btn.classList.toggle("activo", activo);
+    });
   }
 
   toolbar.addEventListener("mousedown", (e) => {
@@ -118,8 +150,9 @@ export function crearCampoTextoRico({ valor, placeholder, onInput }) {
     if (!btn) return;
     if (btn === btnTabulador) { sangrar(false); return; }
     editable.focus();
-    document.execCommand(btn.dataset.cmd, false, null);
+    document.execCommand(btn.dataset.cmd || btn.dataset.align, false, null);
     onInput?.(editable.innerHTML);
+    actualizarEstadoBotones();
   });
   inputColor.addEventListener("input", () => {
     editable.focus();
@@ -162,7 +195,9 @@ export function parsearHtmlARuns(html) {
       return;
     }
     if (nodo.nodeType !== Node.ELEMENT_NODE) return;
-    if (nodo.tagName === "BR") { runs.push({ salto: true }); return; }
+    // Un <br> se dibuja dentro del párrafo que lo contiene, así que hereda
+    // la alineación de ESE párrafo (estilo.alineacion), no la trae propia.
+    if (nodo.tagName === "BR") { runs.push({ salto: true, alineacion: estilo.alineacion }); return; }
 
     // Las listas (creadas con los botones "•"/"⇥" o Tab dentro del campo
     // rico) se aplanan a texto plano con el marcador + sangría ya puestos,
@@ -188,6 +223,12 @@ export function parsearHtmlARuns(html) {
       const color = rgbDesdeCss(colorCss);
       if (color) nuevoEstilo.color = color;
     }
+    // Igual que el color: execCommand("justify...") deja el text-align en
+    // el bloque (DIV/P) donde estaba el cursor — se hereda hacia los runs
+    // de adentro (incluidos los <br> de esa misma línea/párrafo) vía
+    // estilo, el mismo mecanismo que ya usan negrita/cursiva/color.
+    const alineacionCss = nodo.style && nodo.style.textAlign;
+    if (alineacionCss) nuevoEstilo.alineacion = alineacionCss;
 
     nodo.childNodes.forEach((hijo) => caminar(hijo, nuevoEstilo, nivel));
     // Si el último hijo ya era un <br> (ej. "<div><br></div>", una línea en
@@ -195,7 +236,7 @@ export function parsearHtmlARuns(html) {
     // esta línea — no agregar un segundo por el cierre del propio div/p, o
     // una sola línea en blanco terminaría ocupando el doble en el PDF/Word.
     if ((nodo.tagName === "DIV" || nodo.tagName === "P") && !(runs.length && runs[runs.length - 1].salto)) {
-      runs.push({ salto: true });
+      runs.push({ salto: true, alineacion: nuevoEstilo.alineacion });
     }
   }
 
@@ -210,7 +251,7 @@ export function parsearHtmlARuns(html) {
     hijos.forEach((hijo) => {
       // Chrome anida "indent" dentro de una viñeta como <ul> hijo del <li>.
       if (hijo.nodeType === Node.ELEMENT_NODE && (hijo.tagName === "UL" || hijo.tagName === "OL")) {
-        runs.push({ salto: true });
+        runs.push({ salto: true, alineacion: estilo.alineacion });
         hijo.childNodes.forEach((nieto) => {
           if (nieto.nodeType === Node.ELEMENT_NODE && nieto.tagName === "LI") caminarItemLista(nieto, estilo, nivel + 1);
         });
@@ -223,7 +264,7 @@ export function parsearHtmlARuns(html) {
     // del siguiente ítem del nivel superior).
     const ultimo = hijos[hijos.length - 1];
     const terminaEnSublista = ultimo?.nodeType === Node.ELEMENT_NODE && (ultimo.tagName === "UL" || ultimo.tagName === "OL");
-    if (!terminaEnSublista) runs.push({ salto: true });
+    if (!terminaEnSublista) runs.push({ salto: true, alineacion: estilo.alineacion });
   }
 
   raiz.childNodes.forEach((hijo) => caminar(hijo, {}, 0));

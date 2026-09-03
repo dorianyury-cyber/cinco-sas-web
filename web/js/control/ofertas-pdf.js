@@ -214,6 +214,43 @@ export async function generarOfertaPDF(oferta) {
     doc.setFont("helvetica", estiloFuente(token.negrita, token.cursiva));
     return doc.getTextWidth(token.texto);
   }
+  // Dibuja UNA línea ya armada. "esUltima" decide si se estira con
+  // justificado — la última línea de un párrafo/ítem nunca se estira
+  // (convención tipográfica igual que Word). Como una línea solo se sabe
+  // "última" cuando ya se está armando la SIGUIENTE (o se acabó el texto),
+  // dibujarParrafo dibuja con un renglón de retraso (ver "pendiente" ahí
+  // abajo) — acá solo se dibuja lo que ya llega resuelto.
+  function dibujarLineaParrafo(pendiente, esUltima) {
+    const { tokens: lineaTokens, sangria, esPrimeraLineaDeItem, alineacion } = pendiente;
+    if (!lineaTokens.length) { y += lineHeight; return; }
+    saltoSiNoCabe(lineHeight);
+    const anchoDisponible = anchoUtil - (esPrimeraLineaDeItem ? 0 : sangria);
+    const xBase = margenX + (esPrimeraLineaDeItem ? 0 : sangria);
+
+    let anchoTokens = 0;
+    lineaTokens.forEach((t) => { anchoTokens += medirToken(t); });
+    const huecos = lineaTokens.filter((t) => /^\s+$/.test(t.texto)).length;
+
+    let extraPorHueco = 0;
+    let x = xBase;
+    if (alineacion === "justify" && !esUltima && huecos > 0 && anchoTokens < anchoDisponible) {
+      extraPorHueco = (anchoDisponible - anchoTokens) / huecos;
+    } else if (alineacion === "center" && anchoTokens < anchoDisponible) {
+      x = xBase + (anchoDisponible - anchoTokens) / 2;
+    } else if (alineacion === "right" && anchoTokens < anchoDisponible) {
+      x = xBase + (anchoDisponible - anchoTokens);
+    }
+
+    lineaTokens.forEach((token) => {
+      const ancho = medirToken(token);
+      doc.setFont("helvetica", estiloFuente(token.negrita, token.cursiva));
+      doc.setTextColor(...(token.color || COLOR_PARRAFO));
+      doc.text(token.texto, x, y);
+      x += ancho + (/^\s+$/.test(token.texto) ? extraPorHueco : 0);
+    });
+    y += lineHeight;
+  }
+
   function dibujarParrafo(html) {
     doc.setFontSize(10.5);
     const runs = parsearHtmlARuns(html);
@@ -223,9 +260,19 @@ export async function generarOfertaPDF(oferta) {
     runs.forEach((run) => {
       if (run.salto) { tokens.push({ salto: true }); return; }
       run.texto.split(/(\s+)/).filter((p) => p !== "").forEach((palabra) => {
-        tokens.push({ texto: palabra, negrita: run.negrita, cursiva: run.cursiva, color: run.color });
+        tokens.push({ texto: palabra, negrita: run.negrita, cursiva: run.cursiva, color: run.color, alineacion: run.alineacion });
       });
     });
+
+    let pendiente = null;
+    function emitir(lineaObj) {
+      if (pendiente) dibujarLineaParrafo(pendiente, false);
+      pendiente = lineaObj;
+    }
+    function cerrarItem() {
+      if (pendiente) dibujarLineaParrafo(pendiente, true);
+      pendiente = null;
+    }
 
     let linea = [];
     let anchoLinea = 0;
@@ -235,23 +282,15 @@ export async function generarOfertaPDF(oferta) {
     // la viñeta + su indentación en la primera línea del ítem actual.
     let sangriaItem = 0;
     let esPrimeraLineaDeItem = true;
+    let alineacionItem = "left";
     // Solo se acumula sangriaItem mientras estemos viendo indentación/viñeta
     // de arranque — se apaga para siempre en la primera palabra "de verdad"
     // del ítem, para no seguir recalculándola con cada espacio del resto del
     // párrafo (eso indentaría todo un párrafo normal a donde cayó su primer
     // salto de línea).
     let enIndentInicial = true;
-    function trazarLinea() {
-      if (!linea.length) { y += lineHeight; return; }
-      saltoSiNoCabe(lineHeight);
-      let x = margenX + (esPrimeraLineaDeItem ? 0 : sangriaItem);
-      linea.forEach((token) => {
-        doc.setFont("helvetica", estiloFuente(token.negrita, token.cursiva));
-        doc.setTextColor(...(token.color || COLOR_PARRAFO));
-        doc.text(token.texto, x, y);
-        x += medirToken(token);
-      });
-      y += lineHeight;
+    function emitirLineaActual() {
+      emitir({ tokens: linea, sangria: sangriaItem, esPrimeraLineaDeItem, alineacion: alineacionItem });
       linea = [];
       anchoLinea = 0;
       esPrimeraLineaDeItem = false;
@@ -265,14 +304,17 @@ export async function generarOfertaPDF(oferta) {
     let lineaNueva = true;
     tokens.forEach((token) => {
       if (token.salto) {
-        trazarLinea();
+        emitirLineaActual();
+        cerrarItem();
         y += lineHeight * 0.3;
         lineaNueva = true;
         esPrimeraLineaDeItem = true;
         sangriaItem = 0;
         enIndentInicial = true;
+        alineacionItem = "left";
         return;
       }
+      if (alineacionItem === "left" && token.alineacion) alineacionItem = token.alineacion;
 
       // Viñeta "•" escrita a mano dentro del propio texto del párrafo (sin
       // pasar por el botón "Viñeta", que sí crea <li> con su propio salto):
@@ -285,7 +327,8 @@ export async function generarOfertaPDF(oferta) {
       // arranque de un <li> real (que llega precedida solo de sus espacios
       // de sangría, no de una palabra real todavía).
       if (token.texto === "•" && linea.length && !enIndentInicial) {
-        trazarLinea();
+        emitirLineaActual();
+        cerrarItem();
         y += lineHeight * 0.3;
         esPrimeraLineaDeItem = true;
         sangriaItem = 0;
@@ -307,7 +350,7 @@ export async function generarOfertaPDF(oferta) {
       const esEspacio = /^\s+$/.test(token.texto);
       if (esEspacio && !linea.length && !lineaNueva) return;
       const anchoDisponible = anchoUtil - (esPrimeraLineaDeItem ? 0 : sangriaItem);
-      if (!esEspacio && anchoLinea + ancho > anchoDisponible && linea.length) trazarLinea();
+      if (!esEspacio && anchoLinea + ancho > anchoDisponible && linea.length) emitirLineaActual();
       linea.push(token);
       anchoLinea += ancho;
       lineaNueva = false;
@@ -320,7 +363,8 @@ export async function generarOfertaPDF(oferta) {
         else enIndentInicial = false;
       }
     });
-    trazarLinea();
+    emitirLineaActual();
+    cerrarItem();
     y += lineHeight * 0.5;
   }
 

@@ -1100,6 +1100,7 @@ form.modal-form-grid .control-campos-permiso-lista label {
 .control-form-sin-margen { margin-bottom: 0; }
 .w-60 { width: 60px; }
 .w-70 { width: 70px; }
+.w-90 { width: 90px; }
 .w-100 { width: 100px; }
 .w-110 { width: 110px; }
 .w-120 { width: 120px; }
@@ -1171,6 +1172,60 @@ button.control-mes-pill.pendiente:hover { border-color: var(--cinco-amber-dark);
   display: flex; align-items: center; gap: 6px;
   font-weight: 400; font-size: 13.5px; margin: 0;
 }
+
+/* Envuelve las secciones "de jefe" del formulario de Orden de Trabajo para
+   poder ocultarlas de un tirón en la vista del responsable/personal (ver
+   #otSeccionesJefe en ordenes-trabajo.js) — display:contents saca el <div>
+   mismo del árbol de layout sin sacar a sus hijos, que si no dejarían de
+   participar en el grid de 2 columnas del formulario (quedarían todos
+   amontonados en una sola celda). Se apaga solo cuando trae .oculto. */
+#otSeccionesJefe:not(.oculto) { display: contents; }
+
+/* Orden de Trabajo: separador de sección dentro del formulario largo (Datos
+   generales/Recursos/Riesgos/PESV/...) — una línea + título, para que un
+   formulario de más de 40 campos no se lea como un solo bloque continuo. */
+.control-ot-seccion {
+  margin: 18px 0 4px;
+  padding-top: 10px;
+  border-top: 1px solid var(--border);
+  font-size: 13px;
+}
+.control-ot-seccion:first-child { margin-top: 0; padding-top: 0; border-top: none; }
+
+/* Checklists de "Trabajo de alto riesgo" y "Requerimientos
+   preoperacionales": en 2-3 columnas según el ancho disponible, en vez de
+   una sola columna angosta con mucho espacio muerto a la derecha (misma
+   razón que las tablas de informes: no desperdiciar ancho). */
+.control-ot-riesgos, .control-ot-preoperacionales {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(190px, 1fr));
+  gap: 8px 14px;
+  margin-top: 6px;
+}
+.control-ot-item {
+  display: flex; align-items: center; justify-content: space-between; gap: 8px;
+}
+.control-ot-item span { font-size: 12.5px; }
+.control-ot-item select { width: 84px; padding: 4px 6px; font-size: 12px; }
+
+/* Recursos > Vehículo: fila tipo/placa cuando se elige "Otro" (no es de la
+   empresa) — dos columnas, mismo look que el resto del formulario. Y la
+   mini-fila para dar de alta un vehículo nuevo de la empresa, sin abrir un
+   modal aparte para algo tan chico (placa + tipo + botón, en línea). */
+.control-ot-vehiculo-otro { display: grid; grid-template-columns: 1fr 1fr; gap: 0 16px; }
+.control-ot-vehiculo-nuevo {
+  display: flex; align-items: center; gap: 8px; margin: 4px 0 10px;
+  padding: 8px; border: 1px dashed var(--border); border-radius: 8px;
+}
+.control-ot-vehiculo-nuevo input { flex: 1; padding: 6px 8px; border: 1px solid var(--border); border-radius: 6px; font-size: 12.5px; }
+.control-ot-vehiculo-nuevo button { width: auto; flex: none; }
+
+/* Filas dinámicas de "Personal adicional" (código/nombre/cédula por
+   persona, "+ agregar persona" en vez de las 4 filas fijas del papel). */
+.control-ot-personal-lista { display: flex; flex-direction: column; gap: 6px; margin: 6px 0; }
+.control-ot-personal-fila { display: flex; align-items: center; gap: 8px; }
+.control-ot-personal-fila select { flex: 1; }
+.control-ot-personal-fila button { width: auto; flex: none; }
 .control-campos-fila { display: flex; gap: 14px; flex-wrap: wrap; align-items: center; padding: 10px 0; border-top: 1px dashed var(--border); }
 .control-campos-resumen { font-size: 12.5px; color: var(--text-muted); }
 .control-cabecera-datos label { display: flex; align-items: center; gap: 6px; }
@@ -1553,7 +1608,7 @@ form.pqr-form .control-3botones button:disabled { opacity: 0.5; cursor: not-allo
 /* Campo de párrafo con formato (negrilla/cursiva/color) — ver
    web/js/control/texto-rico.js. Mismo lenguaje visual que el resto de los
    campos del editor de bloques, con la mini barra pegada arriba. */
-.control-rich-toolbar { display: flex; gap: 4px; margin-bottom: 6px; }
+.control-rich-toolbar { display: flex; gap: 4px; margin-bottom: 6px; flex-wrap: wrap; }
 .control-rich-btn, .control-rich-color {
   width: 26px; height: 26px; border-radius: 6px;
   border: 1px solid var(--border); background: var(--card-bg);
@@ -1561,7 +1616,21 @@ form.pqr-form .control-3botones button:disabled { opacity: 0.5; cursor: not-allo
 }
 .control-rich-btn { font-size: 13px; color: var(--text); display: inline-flex; align-items: center; justify-content: center; }
 .control-rich-btn:hover, .control-rich-color:hover { border-color: var(--cinco-amber); }
+.control-rich-btn.activo { border-color: var(--cinco-amber); background: rgba(254, 178, 9, 0.18); }
 .control-rich-color { padding: 2px; }
+/* Dos reglas genéricas de más arriba en este archivo le ganan por
+   especificidad a este componente y lo desconfiguran dentro de
+   Ofertas/Informes/Correspondencia (los tres formularios con class
+   "pqr-form"): "form.pqr-form button { width:100%; margin-top:20px }"
+   (botones grandes de acción) estira cada botón de la barra (Negrilla,
+   Cursiva, viñeta, alineación) a lo ancho del formulario, y
+   "form.pqr-form input { width:100%; padding:12px 14px }" (campos de
+   texto) hace lo mismo con el selector de color. Resultado sin esto: la
+   barra compacta de íconos se ve como una pila de filas sueltas. Mismo
+   arreglo que ya tienen los otros grupos de botones chicos del formulario
+   (.control-bloques-header, .control-bloque-gap, etc.) más abajo. */
+form.pqr-form .control-rich-btn, form.pqr-form .control-rich-color { width: 26px; margin-top: 0; }
+form.pqr-form .control-rich-color { padding: 2px; border-radius: 6px; }
 .control-rich-editable {
   width: 100%; min-height: 70px; padding: 10px 12px;
   border: 1px solid var(--border); border-radius: 8px; font-size: 13.5px;
@@ -1627,7 +1696,7 @@ form.pqr-form .control-3botones button:disabled { opacity: 0.5; cursor: not-allo
   font-size: 12.5px;
 }
 .control-tabla-grid { display: grid; gap: 4px; overflow-x: auto; }
-.control-tabla-grid input, .control-tabla-grid select {
+.control-tabla-grid input, .control-tabla-grid select, .control-tabla-grid textarea {
   min-width: 90px;
   width: 100%;
   padding: 6px 8px;
@@ -1637,12 +1706,38 @@ form.pqr-form .control-3botones button:disabled { opacity: 0.5; cursor: not-allo
   color: var(--text);
   font-size: 12.5px;
 }
+/* La celda es un <textarea> (para que un salto de línea se quede dentro de
+   la misma celda en vez de saltar a la de abajo) pero debe verse y
+   comportarse como el <input> de una sola línea que era antes — sin barra
+   de redimensionar a mano ni scrollbar propia; el alto real lo ajusta JS
+   (ver "autoAltura" en renderTablaEditor) según el contenido. */
+.control-tabla-grid textarea {
+  resize: none;
+  overflow: hidden;
+  font-family: inherit;
+  line-height: 1.35;
+}
 /* Resalta el rango de celdas seleccionado por arrastre, antes de combinar
    o separar — mismo acento ámbar que el resto de la suite. */
-.control-tabla-grid input.control-celda-sel, .control-tabla-grid select.control-celda-sel {
+.control-tabla-grid input.control-celda-sel, .control-tabla-grid select.control-celda-sel, .control-tabla-grid textarea.control-celda-sel {
   border-color: var(--cinco-amber);
   box-shadow: 0 0 0 2px rgba(254, 178, 9, 0.35);
   background: rgba(254, 178, 9, 0.1);
+}
+/* Mini-barra flotante que aparece pegada a la última celda seleccionada
+   (ver actualizarResaltado en renderTablaEditor) — mismas acciones más
+   usadas que la barra fija de abajo, para no tener que bajar hasta allá
+   cada vez, como en Excel. */
+.control-tabla-flotante {
+  position: absolute;
+  display: flex;
+  gap: 4px;
+  background: var(--card-bg);
+  border: 1px solid var(--cinco-amber);
+  border-radius: 8px;
+  padding: 4px;
+  box-shadow: 0 4px 14px rgba(0, 0, 0, 0.2);
+  z-index: 20;
 }
 .control-tabla-botones { display: flex; gap: 8px; align-items: center; flex-wrap: wrap; }
 .control-tabla-color {

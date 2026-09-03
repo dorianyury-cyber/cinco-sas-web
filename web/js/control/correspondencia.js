@@ -389,6 +389,7 @@ requireAuth(async (user) => {
     document.getElementById("nuevaCartaDetails").classList.add("oculto");
     document.getElementById("soloGestorAviso")?.classList.remove("oculto");
   }
+  document.getElementById("navOrdenesTrabajo")?.classList.toggle("oculto", !(perfil?.estado === "activo" && (perfil?.rol === "admin" || perfil?.autorizadoOrdenesTrabajo === true)));
 
   const q = query(collection(db, "correspondencia"), orderBy("creadoEn", "desc"));
   onSnapshot(q, (snapshot) => {

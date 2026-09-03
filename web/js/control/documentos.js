@@ -148,6 +148,7 @@ requireAuth(async (user) => {
     document.getElementById("nuevoDocumentoBtn").classList.add("oculto");
     document.getElementById("soloGestorAviso").classList.remove("oculto");
   }
+  document.getElementById("navOrdenesTrabajo")?.classList.toggle("oculto", !(perfil?.estado === "activo" && (perfil?.rol === "admin" || perfil?.autorizadoOrdenesTrabajo === true)));
 
   const q = query(collection(db, "documentos"), orderBy("codigo"));
   onSnapshot(q, (snapshot) => {

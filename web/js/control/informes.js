@@ -647,17 +647,35 @@ function renderTablaEditor(bloque) {
   const pesosCol = anchosColumnaEditor(bloque.filas, bloque.merges, numFilas, numCols);
   grid.style.gridTemplateColumns = pesosCol.map((p) => `minmax(90px, ${p}fr)`).join(" ");
 
+  // Barra flotante — aparece pegada a la última celda seleccionada con las
+  // acciones más usadas (negrilla, alinear, combinar), para no tener que
+  // bajar hasta la barra fija de abajo cada vez ("así como en Excel"). Sus
+  // botones se llenan más abajo, una vez que negritaBtn/combinarBtn/etc. ya
+  // existen — solo repiten el clic de esos mismos botones.
+  const flotante = document.createElement("div");
+  flotante.className = "control-tabla-flotante hidden";
+  cont.style.position = "relative";
+  cont.appendChild(flotante);
+
   // Pinta el rango [bloque._selA.._selB] (si hay uno activo) como
   // seleccionado — se llama tras cada clic/arrastre sin re-renderizar toda
   // la cuadrícula, para no perder el foco mientras se arrastra.
   function actualizarResaltado() {
     const rango = bloque._selA && bloque._selB ? rangoOrdenado(bloque._selA, bloque._selB) : null;
-    grid.querySelectorAll("input, select").forEach((campo) => {
+    grid.querySelectorAll("input, select, textarea").forEach((campo) => {
       const fi = Number(campo.dataset.fi);
       const ci = Number(campo.dataset.ci);
       const sel = !!rango && fi >= rango.fMin && fi <= rango.fMax && ci >= rango.cMin && ci <= rango.cMax;
       campo.classList.toggle("control-celda-sel", sel);
     });
+    if (!rango) { flotante.classList.add("hidden"); return; }
+    const celdaB = bloque._selB && grid.querySelector(`[data-fi="${bloque._selB.fi}"][data-ci="${bloque._selB.ci}"]`);
+    if (!celdaB) { flotante.classList.add("hidden"); return; }
+    flotante.classList.remove("hidden");
+    const rectCelda = celdaB.getBoundingClientRect();
+    const rectCont = cont.getBoundingClientRect();
+    flotante.style.top = `${rectCelda.bottom - rectCont.top + 4}px`;
+    flotante.style.left = `${Math.max(0, rectCelda.left - rectCont.left)}px`;
   }
 
   bloque.filas.forEach((fila, fi) => {
@@ -669,7 +687,7 @@ function renderTablaEditor(bloque) {
       // con un <select> en el cuerpo — la fila 0 (encabezado) siempre es
       // texto libre, aunque su columna tenga opciones.
       const opciones = fi > 0 ? bloque.opcionesColumna[ci] : null;
-      const celdaInput = document.createElement(opciones ? "select" : "input");
+      const celdaInput = document.createElement(opciones ? "select" : "textarea");
       if (opciones) {
         [["", "—"], ...opciones.map((o) => [o, o])].forEach(([valor, texto]) => {
           const opt = document.createElement("option");
@@ -680,17 +698,23 @@ function renderTablaEditor(bloque) {
         celdaInput.value = celda;
         celdaInput.addEventListener("change", () => { bloque.filas[fi][ci] = celdaInput.value; });
       } else {
-        celdaInput.type = "text";
+        celdaInput.rows = 1;
         celdaInput.maxLength = 300;
         celdaInput.value = celda;
         celdaInput.placeholder = fi === 0 ? `Columna ${ci + 1}` : "";
-        celdaInput.addEventListener("input", () => { bloque.filas[fi][ci] = celdaInput.value; });
-        // Pegado directo de Excel/Word: si trae varias celdas (tabulador o
-        // salto de línea) se reparte por la cuadrícula; si es una sola celda
-        // se deja el pegado normal del navegador.
+        const autoAltura = () => { celdaInput.style.height = "auto"; celdaInput.style.height = `${celdaInput.scrollHeight}px`; };
+        celdaInput.addEventListener("input", () => { bloque.filas[fi][ci] = celdaInput.value; autoAltura(); });
+        setTimeout(autoAltura, 0);
+        // Un salto de línea escrito o pegado DENTRO de una celda se queda en
+        // esa misma celda (el textarea ya lo permite de por sí) — solo un
+        // TAB en el texto pegado señala de verdad un rango de Excel de
+        // varias columnas, así que solo ESE caso se reparte en celdas
+        // nuevas. Antes cualquier salto de línea pegado (ej. un párrafo
+        // copiado de Word) se repartía como si fueran filas nuevas, sin
+        // forma de pegarlo tal cual en una sola celda.
         celdaInput.addEventListener("paste", (e) => {
           const texto = e.clipboardData?.getData("text/plain") ?? "";
-          if (/\t|\n/.test(texto)) { e.preventDefault(); pegarEnTabla(bloque, fi, ci, texto); }
+          if (texto.includes("\t")) { e.preventDefault(); pegarEnTabla(bloque, fi, ci, texto); }
         });
       }
       celdaInput.dataset.fi = fi;
@@ -724,6 +748,26 @@ function renderTablaEditor(bloque) {
   });
   cont.appendChild(grid);
   actualizarResaltado();
+
+  // Suprimir/Retroceso con varias celdas seleccionadas (arrastrando, como
+  // en Excel) borra el texto de TODAS las celdas de ese rango de una vez —
+  // si el rango es una sola celda, se deja el comportamiento normal de la
+  // tecla (borrar un carácter) sin interceptarla.
+  grid.addEventListener("keydown", (e) => {
+    if (e.key !== "Delete" && e.key !== "Backspace") return;
+    const rango = bloque._selA && bloque._selB ? rangoOrdenado(bloque._selA, bloque._selB) : null;
+    if (!rango || (rango.fMin === rango.fMax && rango.cMin === rango.cMax)) return;
+    e.preventDefault();
+    guardarHistorialBloques();
+    for (let fi = rango.fMin; fi <= rango.fMax; fi++) {
+      for (let ci = rango.cMin; ci <= rango.cMax; ci++) {
+        const info = celdaCombinada(bloque.merges, fi, ci);
+        if (info && !info.esAncla) continue;
+        bloque.filas[fi][ci] = "";
+      }
+    }
+    renderBloques();
+  });
 
   const botones = document.createElement("div");
   botones.className = "control-tabla-botones";
@@ -784,6 +828,25 @@ function renderTablaEditor(bloque) {
   quitarCol.disabled = numCols <= 1;
   quitarCol.addEventListener("click", () => {
     if (numCols > 1) { guardarHistorialBloques(); bloque.filas.forEach((fila) => fila.pop()); renderBloques(); }
+  });
+  const vaciarBtn = document.createElement("button");
+  vaciarBtn.type = "button";
+  vaciarBtn.className = "control-btn-mini";
+  vaciarBtn.textContent = "🧹 Vaciar tabla";
+  vaciarBtn.title = "Borra todas las filas/columnas y combinaciones para empezar una tabla nueva — el título de la tabla (arriba) NO se borra";
+  vaciarBtn.addEventListener("click", () => {
+    if (!confirm("¿Vaciar esta tabla? Se borra todo su contenido (filas, columnas, combinaciones) para empezar de cero. El título de la tabla no se borra.")) return;
+    guardarHistorialBloques();
+    bloque.filas = [["", ""], ["", ""]];
+    bloque.merges = [];
+    bloque.centrados = [];
+    bloque.negritas = [];
+    bloque.coloresCelda = [];
+    bloque.opcionesColumna = {};
+    bloque.filasEncabezado = 1;
+    bloque._selA = null;
+    bloque._selB = null;
+    renderBloques();
   });
   const pegarBtn = document.createElement("button");
   pegarBtn.type = "button";
@@ -955,7 +1018,7 @@ function renderTablaEditor(bloque) {
     renderBloques();
   });
   botones.append(
-    agregarFilaArriba, agregarFilaAbajo, quitarFila, agregarCol, quitarCol, pegarBtn, combinarBtn, separarBtn,
+    agregarFilaArriba, agregarFilaAbajo, quitarFila, agregarCol, quitarCol, vaciarBtn, pegarBtn, combinarBtn, separarBtn,
     centrarBtn, izquierdaBtn, negritaBtn, colorInput, colorQuitarBtn, opcionesBtn
   );
   cont.appendChild(botones);
@@ -967,6 +1030,26 @@ function renderTablaEditor(bloque) {
   notaInput.value = bloque.nota || "";
   notaInput.addEventListener("input", () => { bloque.nota = notaInput.value; });
   cont.appendChild(notaInput);
+
+  // Botones de la barra flotante — cada uno solo repite el clic del botón
+  // fijo correspondiente (misma lógica, sin duplicarla), para poder usar la
+  // acción sin bajar hasta la barra de abajo.
+  [
+    [negritaBtn, "N", "Negrilla"],
+    [centrarBtn, "↔", "Centrar"],
+    [izquierdaBtn, "⇤", "Izquierda"],
+    [combinarBtn, "🔗", "Combinar celdas"],
+    [separarBtn, "✂", "Separar celdas"]
+  ].forEach(([btnOriginal, texto, titulo]) => {
+    const mini = document.createElement("button");
+    mini.type = "button";
+    mini.className = "control-btn-mini";
+    mini.textContent = texto;
+    mini.title = titulo;
+    mini.addEventListener("mousedown", (e) => e.preventDefault()); // no perder la selección de celdas al hacer clic
+    mini.addEventListener("click", () => btnOriginal.click());
+    flotante.appendChild(mini);
+  });
 
   return cont;
 }
@@ -1355,6 +1438,7 @@ requireAuth(async (user) => {
     document.getElementById("nuevoInformeDetails").classList.add("oculto");
     document.getElementById("soloGestorAviso")?.classList.remove("oculto");
   }
+  document.getElementById("navOrdenesTrabajo")?.classList.toggle("oculto", !(perfil?.estado === "activo" && (perfil?.rol === "admin" || perfil?.autorizadoOrdenesTrabajo === true)));
 
   const q = query(collection(db, "informes"), orderBy("creadoEn", "desc"));
   onSnapshot(q, (snapshot) => {

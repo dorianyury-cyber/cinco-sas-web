@@ -710,6 +710,7 @@ requireAuth(async (user) => {
   const perfilActivo = perfil?.estado === "activo";
   const esAdmin = perfilActivo && perfil?.rol === "admin";
   const esCoadmin = perfilActivo && perfil?.rol === "coadmin";
+  document.getElementById("navOrdenesTrabajo")?.classList.toggle("oculto", !(esAdmin || (perfilActivo && perfil?.autorizadoOrdenesTrabajo === true)));
   // "Gestor" = admin o coadministrador: edita todo el contrato salvo
   // borrarlo (esAdmin-only) y tocar empleados/roles (siempre esAdmin-only).
   const esGestor = esAdmin || esCoadmin;
