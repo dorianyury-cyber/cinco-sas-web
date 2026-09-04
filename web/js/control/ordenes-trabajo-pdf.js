@@ -43,7 +43,6 @@ const MAPA_RUTAS_URL = "../assets/img/mapa-rutas-pesv.svg";
 // queda "suelto" hasta que alguien lo registre ahí manualmente.
 const CODIGO_FORMATO = "CAL-FOR-001";
 const VERSION_FORMATO = "1";
-const FECHA_APROBACION = "02-09-2026";
 
 function cargarImagenComoDataURL(url, colorFondo = "#ffffff") {
   return new Promise((resolve, reject) => {
@@ -134,10 +133,9 @@ export async function generarOrdenTrabajoPDF(orden) {
     y += 4.6 + 1.3;
   }
 
-  // ---- encabezado: logo + título del proceso + caja código/versión/fecha,
-  // igual disposición que la plantilla en papel (caja arriba a la derecha).
-  const altoCajaEncabezado = 5.8;
-  const anchoCajaEncabezado = 40;
+  // ---- encabezado: logo + título — mismo formato que Informes/
+  // Correspondencia (código/versión quedan solo en el pie de página, sin
+  // cajas aparte arriba junto al título). ----
   try {
     const logo = await cargarImagenComoDataURL(LOGO_URL, "#ffffff");
     const altoLogo = 10;
@@ -146,21 +144,10 @@ export async function generarOrdenTrabajoPDF(orden) {
   } catch (e) { /* se genera igual sin logo */ }
 
   doc.setFont("helvetica", "bold");
-  doc.setFontSize(10.5);
-  doc.setTextColor(...NAVY);
-  doc.text("PROCESO DE DIRECCIONAMIENTO", anchoPagina / 2, y + 4, { align: "center" });
   doc.setFontSize(11.5);
-  doc.text("ORDEN DE TRABAJO", anchoPagina / 2, y + 9, { align: "center" });
-
-  const xCajaEncabezado = anchoPagina - margenX - anchoCajaEncabezado;
-  [
-    ["Código", CODIGO_FORMATO],
-    ["Versión", VERSION_FORMATO],
-    ["Fecha aprobación", FECHA_APROBACION]
-  ].forEach(([etq, val], i) => {
-    caja(xCajaEncabezado, y + i * altoCajaEncabezado, anchoCajaEncabezado, altoCajaEncabezado, etq, val, { fontSize: 6.6, maxLineas: 1 });
-  });
-  y += Math.max(11, altoCajaEncabezado * 3) + 2;
+  doc.setTextColor(...NAVY);
+  doc.text("ORDEN DE TRABAJO", anchoPagina / 2, y + 6.5, { align: "center" });
+  y += 12;
 
   // ---- datos generales ----
   filaCajas([
@@ -178,9 +165,8 @@ export async function generarOrdenTrabajoPDF(orden) {
 
   tituloSeccion("Responsable de los trabajos");
   filaCajas([
-    { etiqueta: "Código", valor: orden.responsable?.codigo, frac: 0.15 },
-    { etiqueta: "Nombre", valor: orden.responsable?.nombre, frac: 0.55 },
-    { etiqueta: "Cédula", valor: orden.responsable?.cedula, frac: 0.30 }
+    { etiqueta: "Nombre", valor: orden.responsable?.nombre, frac: 0.65 },
+    { etiqueta: "Cédula", valor: orden.responsable?.cedula, frac: 0.35 }
   ]);
 
   tituloSeccion("Descripción");
@@ -193,9 +179,8 @@ export async function generarOrdenTrabajoPDF(orden) {
   ], 7.5);
   (orden.personalAdicional || []).forEach((p) => {
     filaCajas([
-      { etiqueta: "Código", valor: p.codigo, frac: 0.15 },
-      { etiqueta: "Nombre", valor: p.nombre, frac: 0.55 },
-      { etiqueta: "Cédula", valor: p.cedula, frac: 0.30 }
+      { etiqueta: "Nombre", valor: p.nombre, frac: 0.65 },
+      { etiqueta: "Cédula", valor: p.cedula, frac: 0.35 }
     ], 6.5);
   });
 

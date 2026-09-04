@@ -37,6 +37,20 @@ let ordenIdEnEdicion = null;
 let usuarioActual = null;
 let perfilActual = null;
 
+// Orden puntual a abrir de un tirón al entrar (ver enlaceWhatsApp): el
+// enlace que se manda al responsable trae "?id=" para que no tenga que
+// buscarla a mano entre las suyas — se consume una sola vez (el flag
+// abajo), así que cerrar el modal y volver a la lista no la vuelve a abrir.
+const idDesdeUrl = new URLSearchParams(window.location.search).get("id");
+let ordenDesdeUrlYaAbierta = false;
+function abrirOrdenDesdeUrlSiHaceFalta(ordenes, abrir) {
+  if (ordenDesdeUrlYaAbierta || !idDesdeUrl) return;
+  const orden = ordenes.find((o) => o.id === idDesdeUrl);
+  if (!orden) return;
+  ordenDesdeUrlYaAbierta = true;
+  abrir(orden);
+}
+
 const VALOR_VEHICULO_OTRO = "__otro__";
 function actualizarVisibilidadVehiculoOtro() {
   vehiculoOtroFila.classList.toggle("oculto", selectVehiculo.value !== VALOR_VEHICULO_OTRO);
@@ -276,7 +290,10 @@ const URL_APP = "https://cinco-sas.web.app/control/ordenes-trabajo.html";
 function enlaceWhatsApp(orden) {
   const digitos = String(orden.responsable.telefono || "").replace(/\D/g, "");
   const numero = digitos.length === 10 ? `57${digitos}` : digitos;
-  const mensaje = `Hola ${orden.responsable.nombre || ""}, te asignaron la Orden de Trabajo N.° ${orden.numero} (${orden.descripcion || "sin descripción"}). Ingresa a ${URL_APP} con tu cuenta para completar el trabajo de alto riesgo, PESV, preoperacionales y cierre.`;
+  // "?id=" para que el enlace abra directo esa orden puntual (ver
+  // abrirOrdenDesdeUrl más abajo) — antes llevaba a la pantalla general y
+  // el responsable tenía que buscarla a mano entre las suyas.
+  const mensaje = `Hola ${orden.responsable.nombre || ""}, te asignaron la Orden de Trabajo N.° ${orden.numero} (${orden.descripcion || "sin descripción"}). Ingresa a ${URL_APP}?id=${orden.id} con tu cuenta para completar el trabajo de alto riesgo, PESV, preoperacionales y cierre.`;
   return `https://wa.me/${numero}?text=${encodeURIComponent(mensaje)}`;
 }
 
@@ -381,6 +398,7 @@ requireAuth(async (user) => {
     contenidoParticipante.classList.remove("oculto");
     onSnapshot(query(collection(db, "ordenesTrabajo"), where("personalEmails", "array-contains", user.email)), (snapshot) => {
       const misOrdenes = snapshot.docs.map((d) => ({ id: d.id, ...d.data() }));
+      abrirOrdenDesdeUrlSiHaceFalta(misOrdenes, abrirModalCompletar);
       tbodyParticipante.innerHTML = "";
       sinOrdenesParticipante.classList.toggle("oculto", misOrdenes.length > 0);
       misOrdenes.forEach((o) => {
@@ -480,7 +498,9 @@ requireAuth(async (user) => {
 
   const q = query(collection(db, "ordenesTrabajo"), orderBy("numero", "desc"));
   onSnapshot(q, (snapshot) => {
-    renderTabla(snapshot.docs.map((d) => ({ id: d.id, ...d.data() })), autorizado);
+    const listaOrdenes = snapshot.docs.map((d) => ({ id: d.id, ...d.data() }));
+    renderTabla(listaOrdenes, autorizado);
+    abrirOrdenDesdeUrlSiHaceFalta(listaOrdenes, abrirModalEditar);
   });
 
   // Vehículos de la empresa — en vivo, para que uno agregado por otra
@@ -578,9 +598,15 @@ requireAuth(async (user) => {
           const contadorSnap = await tx.get(contadorRef);
           numero = contadorSnap.exists() ? contadorSnap.data().siguiente : 18235;
           tx.set(contadorRef, { siguiente: numero + 1 });
+          // La cédula de quien elabora sale primero de su propio perfil en
+          // Cinco SAS control; si no la tiene ahí, se busca en
+          // "empleadosActivos" (que ya trae mezclados los sincronizados de
+          // Cinco Conecta — ver más abajo) por si su cédula solo está
+          // registrada del lado de Conecta.
+          const cedulaElaboraPor = perfilActual?.cedula || empleadosActivos.find((e) => e.email === user.email)?.cedula || "";
           tx.set(ordenRef, {
             ...datos, numero,
-            elaboradoPor: { email: user.email, nombre: perfilActual?.nombre || user.email, cedula: perfilActual?.cedula || "" },
+            elaboradoPor: { email: user.email, nombre: perfilActual?.nombre || user.email, cedula: cedulaElaboraPor },
             creadoPor: user.email, creadoEn: serverTimestamp()
           });
         });

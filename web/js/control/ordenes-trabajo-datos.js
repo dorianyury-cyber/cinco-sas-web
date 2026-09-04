@@ -40,7 +40,7 @@ export const PREOPERACIONALES = [
 // carácter mal codificado ("desinfecciónA³n"), corregido acá a
 // "desinfección".
 export const RECOMENDACIONES_SSTA = [
-  "Dar cumplimiento a la política de seguridad vial y las otras políticas de HSEQ de CINCO LTDA.",
+  "Dar cumplimiento a la política de seguridad vial y las otras políticas de HSEQ de CINCO S.A.S.",
   "Realizar el análisis de riesgos laborales y impactos ambientales antes, durante y después de la operación en terreno y aplicar los controles necesarios.",
   "Cumplir con las recomendaciones de SSTA mencionadas en el procedimiento misional que le aplique.",
   "Realizar Inspección de herramienta, equipo y vehículo antes de salir al sitio asignado para ejecutar las actividades.",
