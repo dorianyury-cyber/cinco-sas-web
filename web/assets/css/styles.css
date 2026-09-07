@@ -152,6 +152,13 @@ img { max-width: 100%; display: block; }
 @media (max-width: 720px) {
   .brand-tagline { display: none; }
 }
+/* En las páginas de Control de Contratos el menú (.control-userbar) es
+   mucho más ancho que el nav público (varios enlaces + correo + botón de
+   cerrar sesión) — el eslogan cursivo, puramente decorativo, no cabe ahí
+   sin desbordarse sobre el correo del usuario (se veían encimados). Se
+   oculta apenas el encabezado tenga un .control-userbar, sin tocar el
+   sitio público. */
+.site-header:has(.control-userbar) .brand-tagline { display: none; }
 .login-tagline {
   font-family: "Alex Brush", cursive;
   font-size: 27px;
