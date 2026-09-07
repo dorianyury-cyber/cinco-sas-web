@@ -149,6 +149,7 @@
               </div>
               </div><!-- /otSeccionesJefe -->
 
+              <div id="otSeccionAlistamiento">
               <div class="campo-ancho control-ot-seccion"><strong>Trabajo de alto riesgo</strong></div>
               <div class="campo-ancho control-ot-riesgos" id="otRiesgosLista"></div>
 
@@ -174,8 +175,10 @@
               <div class="campo-ancho control-ot-seccion"><strong>Requerimientos preoperacionales</strong></div>
               <p class="text-muted campo-ancho">El responsable de los trabajos manifiesta que ha inspeccionado y garantiza la utilización de los siguientes elementos de trabajo:</p>
               <div class="campo-ancho control-ot-preoperacionales" id="otPreoperacionalesLista"></div>
+              </div><!-- /otSeccionAlistamiento -->
 
-              <div class="campo-ancho control-ot-seccion"><strong>Cierre</strong> <span class="text-muted">(se completa cuando termine el trabajo — al guardar con fecha de cierre, la orden pasa a CERRADA)</span></div>
+              <div id="otSeccionCierre">
+              <div class="campo-ancho control-ot-seccion"><strong>Cierre</strong> <span class="text-muted">(al guardar con fecha de cierre y firma, la orden pasa a CERRADA)</span></div>
               <div class="campo-ancho">
                 <label for="otObservaciones">Observaciones</label>
                 <textarea id="otObservaciones" rows="2" maxlength="600"></textarea>
@@ -199,6 +202,15 @@
                   <option value="SI">Sí</option>
                 </select>
               </div>
+              <div class="campo-ancho">
+                <label>Firma de quien ejecuta los trabajos</label>
+                <div class="control-firma-wrap">
+                  <canvas id="otFirmaCanvas" width="600" height="180"></canvas>
+                  <p class="text-muted control-firma-ayuda">Firma con el dedo o el mouse sobre el recuadro.</p>
+                </div>
+                <button type="button" class="control-btn-mini" id="otLimpiarFirmaBtn">Limpiar firma</button>
+              </div>
+              </div><!-- /otSeccionCierre -->
 
               <div class="campo-ancho control-edicion-botones">
                 <button type="submit" class="btn" id="guardarOrdenBtn">Guardar</button>
@@ -206,6 +218,13 @@
               </div>
               <div class="form-alert campo-ancho" id="ordenAlert"></div>
             </form>
+
+            <div id="otConfirmacionCreada" class="oculto">
+              <p>✅ Orden <strong id="otConfirmacionNumero"></strong> guardada.</p>
+              <p class="text-muted" id="otConfirmacionSinTelefono">Este empleado no tiene teléfono registrado — agrégaselo en Empleados para poder avisarle por WhatsApp.</p>
+              <button type="button" class="control-btn-mini" id="otEnviarWhatsappBtn">📱 Enviar por WhatsApp al responsable</button>
+              <button type="button" class="control-btn-mini" id="otCerrarConfirmacionBtn">Cerrar</button>
+            </div>
           </div>
         </div>
 

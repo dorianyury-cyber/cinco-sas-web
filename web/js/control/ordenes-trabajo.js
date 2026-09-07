@@ -21,7 +21,12 @@ const alertBox = document.getElementById("ordenAlert");
 const guardarBtn = document.getElementById("guardarOrdenBtn");
 const tituloModal = document.getElementById("tituloModalOrden");
 const seccionesJefe = document.getElementById("otSeccionesJefe");
+const seccionAlistamiento = document.getElementById("otSeccionAlistamiento");
+const seccionCierre = document.getElementById("otSeccionCierre");
 const resumenParticipante = document.getElementById("otResumenParticipante");
+const confirmacionCreada = document.getElementById("otConfirmacionCreada");
+const confirmacionNumero = document.getElementById("otConfirmacionNumero");
+const confirmacionSinTelefono = document.getElementById("otConfirmacionSinTelefono");
 
 const selectContrato = document.getElementById("otContrato");
 const selectResponsable = document.getElementById("otResponsable");
@@ -36,6 +41,82 @@ let vehiculosPorId = {};
 let ordenIdEnEdicion = null;
 let usuarioActual = null;
 let perfilActual = null;
+
+// "jefe": crear/editar completo (abrirModalNueva/abrirModalEditar).
+// "riesgos": el responsable diligencia alto riesgo/PESV/preoperacionales
+// por primera vez (Paso 3). "cierre": el responsable cierra la orden con
+// firma (Paso 4). El submit (más abajo) guarda un subconjunto de campos
+// distinto según este modo — así el responsable nunca puede pisar sin
+// querer los datos generales/contrato/vehículo que diligenció el jefe.
+let modoFormulario = "jefe";
+
+// En qué paso está una orden para el responsable: si "altoRiesgo" nunca se
+// guardó todavía, le falta el Paso 3 completo; si ya se guardó pero la
+// orden sigue ACTIVA, le falta el Paso 4 (cerrarla con firma); si ya está
+// CERRADA, no le queda nada pendiente.
+function faseDeOrden(orden) {
+  if (!orden.alistamientoCompletado) return "riesgos";
+  if (orden.estado !== "CERRADA") return "cierre";
+  return "cerrada";
+}
+
+// ---- firma dibujada a mano (Paso 4, cierre de la orden) ----
+// Pointer Events cubre mouse/touch/lápiz con el mismo código — no hace
+// falta una librería aparte para algo tan simple como un trazo libre.
+const canvasFirma = document.getElementById("otFirmaCanvas");
+const ctxFirma = canvasFirma.getContext("2d");
+ctxFirma.lineWidth = 2.4;
+ctxFirma.lineCap = "round";
+ctxFirma.strokeStyle = "#1f2732";
+let dibujandoFirma = false;
+let firmaTieneTrazo = false;
+// Firma que ya traía la orden al abrir el modal (si la tenía) — para no
+// borrarla sin querer al guardar cuando nadie tocó el lienzo de nuevo
+// (firmaTieneTrazo solo se pone en true con un trazo dibujado a mano en
+// ESTA sesión del formulario, cargarFirmaEnCanvas no cuenta).
+let firmaExistente = null;
+
+function posicionEnCanvas(e) {
+  const rect = canvasFirma.getBoundingClientRect();
+  return {
+    x: (e.clientX - rect.left) * (canvasFirma.width / rect.width),
+    y: (e.clientY - rect.top) * (canvasFirma.height / rect.height)
+  };
+}
+canvasFirma.addEventListener("pointerdown", (e) => {
+  if (canvasFirma.dataset.soloLectura === "1") return;
+  e.preventDefault();
+  dibujandoFirma = true;
+  const { x, y } = posicionEnCanvas(e);
+  ctxFirma.beginPath();
+  ctxFirma.moveTo(x, y);
+});
+canvasFirma.addEventListener("pointermove", (e) => {
+  if (!dibujandoFirma) return;
+  e.preventDefault();
+  const { x, y } = posicionEnCanvas(e);
+  ctxFirma.lineTo(x, y);
+  ctxFirma.stroke();
+  firmaTieneTrazo = true;
+});
+window.addEventListener("pointerup", () => { dibujandoFirma = false; });
+
+function limpiarCanvasFirma() {
+  ctxFirma.clearRect(0, 0, canvasFirma.width, canvasFirma.height);
+  firmaTieneTrazo = false;
+}
+document.getElementById("otLimpiarFirmaBtn").addEventListener("click", limpiarCanvasFirma);
+
+// Dibuja una firma ya guardada (para revisar una orden ya cerrada) — no
+// cuenta como "trazo nuevo" (firmaTieneTrazo sigue en false) para no
+// reescribir por accidente la misma firma tal cual al guardar.
+function cargarFirmaEnCanvas(dataUrl) {
+  limpiarCanvasFirma();
+  if (!dataUrl) return;
+  const img = new Image();
+  img.onload = () => ctxFirma.drawImage(img, 0, 0, canvasFirma.width, canvasFirma.height);
+  img.src = dataUrl;
+}
 
 // Orden puntual a abrir de un tirón al entrar (ver enlaceWhatsApp): el
 // enlace que se manda al responsable trae "?id=" para que no tenga que
@@ -172,23 +253,54 @@ document.getElementById("otAgregarPersonaBtn").addEventListener("click", () => {
   personalLista.appendChild(nuevaFilaPersonal());
 });
 
+// Deja los tres bloques del formulario (Datos generales.../Alto
+// riesgo+PESV+Preoperacionales/Cierre) mostrando solo los que aplican al
+// paso actual, y el formulario visible en vez de la confirmación de
+// "orden creada" (ver mostrarConfirmacionCreada más abajo).
+function mostrarPaso({ jefe = false, alistamiento = false, cierre = false }) {
+  seccionesJefe.classList.toggle("oculto", !jefe);
+  seccionAlistamiento.classList.toggle("oculto", !alistamiento);
+  seccionCierre.classList.toggle("oculto", !cierre);
+  form.classList.remove("oculto");
+  confirmacionCreada.classList.add("oculto");
+}
+
+function habilitarCamposCierre(habilitado) {
+  ["otObservaciones", "otFechaCierre", "otHorasAdicionales", "otValesAlimentacion", "otPernoctada"]
+    .forEach((id) => { document.getElementById(id).disabled = !habilitado; });
+  canvasFirma.dataset.soloLectura = habilitado ? "0" : "1";
+  document.getElementById("otLimpiarFirmaBtn").classList.toggle("oculto", !habilitado);
+  guardarBtn.classList.toggle("oculto", !habilitado);
+}
+
+// ---- Paso 1: el jefe crea la orden (Datos generales, Responsable,
+// Descripción, Recursos) — nada de Alto riesgo/PESV/Preoperacionales/
+// Cierre todavía, eso lo diligencia el responsable en los pasos 3 y 4. ----
 function abrirModalNueva() {
+  modoFormulario = "jefe";
   ordenIdEnEdicion = null;
-  seccionesJefe.classList.remove("oculto");
+  mostrarPaso({ jefe: true });
   resumenParticipante.classList.add("oculto");
-  tituloModal.textContent = "Nueva orden de trabajo";
+  tituloModal.textContent = "Nueva orden de trabajo (Paso 1 de 4)";
   form.reset();
   personalLista.innerHTML = "";
   renderChecklist(riesgosLista, RIESGOS, ["NO", "SI"]);
   renderChecklist(preoperacionalesLista, PREOPERACIONALES, ["NO", "SI", "N/A"]);
   repoblarSelectVehiculo("");
-  guardarBtn.textContent = "Guardar";
+  habilitarCamposCierre(true);
+  firmaExistente = null;
+  limpiarCanvasFirma();
+  guardarBtn.textContent = "Guardar y continuar";
   alertBox.className = "form-alert";
 }
 
+// Edición completa (botón "Editar" del jefe/administrador en la tabla
+// principal) — a diferencia del flujo guiado, acá se ve y se puede
+// corregir todo de una vez, por si algo quedó mal diligenciado.
 function abrirModalEditar(orden) {
+  modoFormulario = "jefe";
   ordenIdEnEdicion = orden.id;
-  seccionesJefe.classList.remove("oculto");
+  mostrarPaso({ jefe: true, alistamiento: true, cierre: true });
   resumenParticipante.classList.add("oculto");
   tituloModal.textContent = `Editar orden ${orden.numero}`;
   form.reset();
@@ -226,24 +338,26 @@ function abrirModalEditar(orden) {
   document.getElementById("otHorasAdicionales").value = orden.cierre?.horasAdicionales || "";
   document.getElementById("otValesAlimentacion").value = orden.cierre?.valesAlimentacion || "";
   document.getElementById("otPernoctada").value = orden.cierre?.pernoctada || "NO";
+  habilitarCamposCierre(true);
+  firmaExistente = orden.cierre?.firmaDataUrl || null;
+  cargarFirmaEnCanvas(firmaExistente);
 
   guardarBtn.textContent = "Guardar cambios";
   alertBox.className = "form-alert";
   nuevaOrdenBackdrop.classList.add("open");
 }
 
-// Vista reducida para el responsable/personal asignado (sin
-// autorizadoOrdenesTrabajo): mismo modal que abrirModalEditar, pero
-// oculta "Datos generales/Responsable/Descripción/Recursos" (los llenó el
-// jefe al crearla) detrás de un resumen de solo lectura, y deja editables
-// nada más las secciones que le corresponden — Alto riesgo en adelante.
-// El submit (ver más abajo) respeta esto mandando solo esos campos.
+// Vista del responsable/personal asignado (sin autorizadoOrdenesTrabajo):
+// mismo modal, pero solo ve "Datos generales/Responsable/Descripción/
+// Recursos" como resumen de solo lectura (eso lo diligenció el jefe), y
+// entra en el paso que le toque según faseDeOrden — nunca los dos al
+// tiempo, para que a alguien completando el Paso 3 desde el celular no le
+// aparezcan de una vez los campos de cierre que todavía no le corresponden.
 function abrirModalCompletar(orden) {
+  modoFormulario = faseDeOrden(orden) === "riesgos" ? "riesgos" : "cierre";
   ordenIdEnEdicion = orden.id;
-  tituloModal.textContent = `Completar orden ${orden.numero}`;
   form.reset();
 
-  seccionesJefe.classList.add("oculto");
   resumenParticipante.classList.remove("oculto");
   resumenParticipante.innerHTML = "";
   [
@@ -269,7 +383,23 @@ function abrirModalCompletar(orden) {
   document.getElementById("otValesAlimentacion").value = orden.cierre?.valesAlimentacion || "";
   document.getElementById("otPernoctada").value = orden.cierre?.pernoctada || "NO";
 
-  guardarBtn.textContent = "Guardar";
+  if (modoFormulario === "riesgos") {
+    // Paso 3: alto riesgo + PESV + preoperacionales, todavía nada de cierre.
+    mostrarPaso({ alistamiento: true });
+    tituloModal.textContent = `Orden ${orden.numero} — Paso 3 de 4: antes de iniciar`;
+    guardarBtn.textContent = "Guardar";
+  } else {
+    // Paso 4: cerrar la orden con firma — si ya estaba cerrada, se abre en
+    // solo lectura (para verla, no para volver a firmarla encima).
+    const yaCerrada = orden.estado === "CERRADA";
+    mostrarPaso({ cierre: true });
+    tituloModal.textContent = yaCerrada ? `Orden ${orden.numero} — cerrada` : `Orden ${orden.numero} — Paso 4 de 4: cerrar orden`;
+    habilitarCamposCierre(!yaCerrada);
+    firmaExistente = orden.cierre?.firmaDataUrl || null;
+    cargarFirmaEnCanvas(firmaExistente);
+    guardarBtn.textContent = "Cerrar orden";
+  }
+
   alertBox.className = "form-alert";
   nuevaOrdenBackdrop.classList.add("open");
 }
@@ -296,6 +426,24 @@ function enlaceWhatsApp(orden) {
   const mensaje = `Hola ${orden.responsable.nombre || ""}, te asignaron la Orden de Trabajo N.° ${orden.numero} (${orden.descripcion || "sin descripción"}). Ingresa a ${URL_APP}?id=${orden.id} con tu cuenta para completar el trabajo de alto riesgo, PESV, preoperacionales y cierre.`;
   return `https://wa.me/${numero}?text=${encodeURIComponent(mensaje)}`;
 }
+
+// Paso 2 (justo después de guardar el Paso 1): reemplaza el formulario por
+// una confirmación con el botón de WhatsApp listo, en vez de dejar que el
+// jefe tenga que cerrar el modal y buscar la fila de la orden recién
+// creada en la tabla para encontrar ese mismo botón.
+function mostrarConfirmacionCreada(orden) {
+  form.classList.add("oculto");
+  confirmacionCreada.classList.remove("oculto");
+  confirmacionNumero.textContent = orden.numero;
+  const btnWhatsApp = document.getElementById("otEnviarWhatsappBtn");
+  const tieneTelefono = !!orden.responsable?.telefono;
+  btnWhatsApp.classList.toggle("oculto", !tieneTelefono);
+  confirmacionSinTelefono.classList.toggle("oculto", tieneTelefono);
+  btnWhatsApp.onclick = () => window.open(enlaceWhatsApp(orden), "_blank");
+}
+document.getElementById("otCerrarConfirmacionBtn").addEventListener("click", () => {
+  nuevaOrdenBackdrop.classList.remove("open");
+});
 
 function renderTabla(ordenes, autorizado) {
   tbody.innerHTML = "";
@@ -410,7 +558,8 @@ requireAuth(async (user) => {
         const btnCompletar = document.createElement("button");
         btnCompletar.type = "button";
         btnCompletar.className = "control-btn-mini";
-        btnCompletar.textContent = "Completar";
+        const fase = faseDeOrden(o);
+        btnCompletar.textContent = fase === "riesgos" ? "Completar" : fase === "cierre" ? "Cerrar orden" : "Ver";
         btnCompletar.addEventListener("click", () => abrirModalCompletar(o));
         tdAccion.appendChild(btnCompletar);
         fila.appendChild(tdAccion);
@@ -424,41 +573,65 @@ requireAuth(async (user) => {
     // renderChecklist no depende de más datos). Los desplegables de
     // contrato/responsable/vehículo del jefe quedan vacíos, pero están
     // ocultos (#otSeccionesJefe) así que no importa.
+    // Paso 3 (alistamientoCompletado:true la primera vez) o Paso 4 (cierre
+    // + firma) según en qué fase haya abierto abrirModalCompletar — nunca
+    // se manda contrato/responsable/vehículo, que son del jefe y acá ni
+    // siquiera están rellenos (los <select> quedan en su opción vacía).
     form.addEventListener("submit", async (e) => {
       e.preventDefault();
+      alertBox.className = "form-alert";
+
+      if (modoFormulario === "cierre") {
+        if (!document.getElementById("otFechaCierre").value) {
+          mostrarAlerta("Escribe la fecha y hora de cierre.", "error");
+          return;
+        }
+        if (!firmaTieneTrazo) {
+          mostrarAlerta("Falta la firma de quien ejecutó los trabajos.", "error");
+          return;
+        }
+      }
+
       guardarBtn.disabled = true;
       guardarBtn.textContent = "Guardando...";
-      alertBox.className = "form-alert";
-      const fechaHoraCierreP = document.getElementById("otFechaCierre").value;
-      const datosParticipante = {
-        altoRiesgo: leerChecklist(riesgosLista),
-        pesv: {
-          origen: document.getElementById("otOrigen").value.trim(),
-          destino: document.getElementById("otDestino").value.trim(),
-          descripcionRuta: document.getElementById("otDescripcionRuta").value.trim(),
-          descripcionPausasActivas: document.getElementById("otPausasActivas").value.trim()
-        },
-        preoperacionales: leerChecklist(preoperacionalesLista),
-        cierre: {
-          observaciones: document.getElementById("otObservaciones").value.trim(),
-          fechaHoraCierre: fechaHoraCierreP,
-          horasAdicionales: document.getElementById("otHorasAdicionales").value.trim(),
-          valesAlimentacion: document.getElementById("otValesAlimentacion").value.trim(),
-          pernoctada: document.getElementById("otPernoctada").value
-        },
-        estado: fechaHoraCierreP ? "CERRADA" : "ACTIVA",
-        actualizadoEn: serverTimestamp(),
-        actualizadoPor: user.email
-      };
       try {
-        await updateDoc(doc(db, "ordenesTrabajo", ordenIdEnEdicion), datosParticipante);
-        mostrarAlerta("Guardado.", "ok");
+        if (modoFormulario === "riesgos") {
+          await updateDoc(doc(db, "ordenesTrabajo", ordenIdEnEdicion), {
+            altoRiesgo: leerChecklist(riesgosLista),
+            pesv: {
+              origen: document.getElementById("otOrigen").value.trim(),
+              destino: document.getElementById("otDestino").value.trim(),
+              descripcionRuta: document.getElementById("otDescripcionRuta").value.trim(),
+              descripcionPausasActivas: document.getElementById("otPausasActivas").value.trim()
+            },
+            preoperacionales: leerChecklist(preoperacionalesLista),
+            alistamientoCompletado: true,
+            actualizadoEn: serverTimestamp(),
+            actualizadoPor: user.email
+          });
+          mostrarAlerta("Guardado. Cuando termines el trabajo, vuelve a entrar a esta orden para cerrarla con tu firma.", "ok");
+        } else {
+          await updateDoc(doc(db, "ordenesTrabajo", ordenIdEnEdicion), {
+            cierre: {
+              observaciones: document.getElementById("otObservaciones").value.trim(),
+              fechaHoraCierre: document.getElementById("otFechaCierre").value,
+              horasAdicionales: document.getElementById("otHorasAdicionales").value.trim(),
+              valesAlimentacion: document.getElementById("otValesAlimentacion").value.trim(),
+              pernoctada: document.getElementById("otPernoctada").value,
+              firmaDataUrl: canvasFirma.toDataURL("image/png")
+            },
+            estado: "CERRADA",
+            actualizadoEn: serverTimestamp(),
+            actualizadoPor: user.email
+          });
+          mostrarAlerta("Orden cerrada.", "ok");
+        }
         nuevaOrdenBackdrop.classList.remove("open");
       } catch (err) {
         mostrarAlerta(err.message || "No se pudo guardar.", "error");
       } finally {
         guardarBtn.disabled = false;
-        guardarBtn.textContent = "Guardar";
+        guardarBtn.textContent = modoFormulario === "riesgos" ? "Guardar" : "Cerrar orden";
       }
     });
     document.getElementById("cancelarOrdenBtn").addEventListener("click", () => nuevaOrdenBackdrop.classList.remove("open"));
@@ -572,7 +745,8 @@ requireAuth(async (user) => {
         fechaHoraCierre,
         horasAdicionales: document.getElementById("otHorasAdicionales").value.trim(),
         valesAlimentacion: document.getElementById("otValesAlimentacion").value.trim(),
-        pernoctada: document.getElementById("otPernoctada").value
+        pernoctada: document.getElementById("otPernoctada").value,
+        firmaDataUrl: firmaTieneTrazo ? canvasFirma.toDataURL("image/png") : firmaExistente
       },
       // La orden pasa sola a CERRADA en cuanto se guarda con fecha y hora
       // de cierre diligenciada — a pedido del usuario, sin botón aparte.
@@ -585,6 +759,7 @@ requireAuth(async (user) => {
       if (ordenIdEnEdicion) {
         await updateDoc(doc(db, "ordenesTrabajo", ordenIdEnEdicion), datos);
         mostrarAlerta("Orden de trabajo actualizada.", "ok");
+        nuevaOrdenBackdrop.classList.remove("open");
       } else {
         // Mismo patrón transaccional de correspondencia.js/contratos.js,
         // pero con un único contador global sin prefijo ni año (el
@@ -619,9 +794,12 @@ requireAuth(async (user) => {
             creadoPor: user.email, creadoEn: serverTimestamp()
           });
         });
-        mostrarAlerta(`Orden de trabajo ${numero} guardada.`, "ok");
+        // Paso 2: en vez de cerrar el modal de una vez, se ofrece mandar
+        // el enlace por WhatsApp al responsable ahí mismo — sin tener que
+        // buscar la orden recién creada en la tabla para dar clic en su
+        // botón "WhatsApp" aparte.
+        mostrarConfirmacionCreada({ id: ordenRef.id, numero, responsable, descripcion: datos.descripcion });
       }
-      nuevaOrdenBackdrop.classList.remove("open");
     } catch (err) {
       mostrarAlerta(err.message || "No se pudo guardar la orden.", "error");
     } finally {

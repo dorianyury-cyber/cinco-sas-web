@@ -1189,15 +1189,60 @@ button.control-mes-pill.pendiente:hover { border-color: var(--cinco-amber-dark);
 #otSeccionesJefe:not(.oculto) { display: contents; }
 
 /* Orden de Trabajo: separador de sección dentro del formulario largo (Datos
-   generales/Recursos/Riesgos/PESV/...) — una línea + título, para que un
-   formulario de más de 40 campos no se lea como un solo bloque continuo. */
+   generales/Recursos/Riesgos/PESV/...) — una línea ámbar + título en el
+   navy de marca (en vez de negro plano), para que un formulario de más de
+   40 campos se lea por bloques de un vistazo en vez de un solo párrafo
+   continuo — y en mayúscula/tamaño chico para no competir con los valores
+   que sí importa leer. */
 .control-ot-seccion {
-  margin: 18px 0 4px;
-  padding-top: 10px;
-  border-top: 1px solid var(--border);
-  font-size: 13px;
+  margin: 16px 0 4px;
+  padding-top: 8px;
+  border-top: 2px solid var(--cinco-amber);
+  font-size: 11px;
+  text-transform: uppercase;
+  letter-spacing: 0.4px;
+  color: var(--cinco-navy);
 }
+@media (prefers-color-scheme: dark) { .control-ot-seccion { color: var(--cinco-amber); } }
 .control-ot-seccion:first-child { margin-top: 0; padding-top: 0; border-top: none; }
+.control-ot-seccion .text-muted { text-transform: none; letter-spacing: normal; font-size: 11px; }
+
+/* Firma dibujada a mano (responsable de los trabajos, al cerrar la orden):
+   recuadro claro con trazo punteado — mismo lenguaje visual que
+   .control-ot-vehiculo-nuevo para "zona donde se hace algo distinto a
+   escribir en un campo". El canvas se dibuja con JS (ver
+   ordenes-trabajo.js); acá solo el marco. */
+.control-firma-wrap {
+  border: 1px dashed var(--border);
+  border-radius: 8px;
+  padding: 6px;
+  background: #fff;
+}
+#otFirmaCanvas {
+  display: block;
+  width: 100%;
+  height: 110px;
+  touch-action: none;
+  cursor: crosshair;
+  border-radius: 6px;
+}
+.control-firma-ayuda { font-size: 10.5px; margin: 4px 2px 0; }
+
+/* Orden de Trabajo tiene, de lejos, el formulario más largo de Control de
+   Contratos (Datos generales + Recursos + Riesgos + PESV + Preoperacionales
+   + Cierre) — se reduce la letra un poco más que el resto de modales
+   (que ya son compactos, ver form.modal-form-grid arriba) solo acá, sin
+   tocar los demás formularios del sitio, para aprovechar mejor el alto de
+   la ventana emergente. */
+#ordenForm label { font-size: 10.5px; margin: 8px 0 3px; }
+#ordenForm input:not([type="checkbox"]),
+#ordenForm select,
+#ordenForm textarea { padding: 6px 8px; font-size: 11.5px; }
+#ordenForm textarea { resize: vertical; }
+
+#otConfirmacionCreada { padding: 4px 0 0; }
+#otConfirmacionCreada button { margin-right: 8px; }
+#otConfirmacionSinTelefono { font-size: 11.5px; }
 
 /* Checklists de "Trabajo de alto riesgo" y "Requerimientos
    preoperacionales": en 2-3 columnas según el ancho disponible, en vez de

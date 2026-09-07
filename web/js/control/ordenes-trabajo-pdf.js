@@ -344,27 +344,39 @@ export async function generarOrdenTrabajoPDF(orden) {
   ]);
 
   // ---- firmas: Elaboró (quien diligenció) + Responsable (quien ejecuta) ----
+  // El responsable firma con el dedo en el celular al cerrar la orden (ver
+  // #otFirmaCanvas en ordenes-trabajo.js, 600x180 — misma proporción 10:3
+  // usada abajo para no deformarla); si esa orden todavía no se cerró (o es
+  // vieja, de antes de que existiera la firma dibujada), queda solo el
+  // nombre impreso sobre la línea, como ya era.
   const anchoFirma = (anchoUtil - 6) / 2;
+  const altoImgFirma = 8;
   [
-    { x: margenX, nombre: orden.elaboradoPor?.nombre, cc: orden.elaboradoPor?.cedula },
-    { x: margenX + anchoFirma + 6, nombre: orden.responsable?.nombre, cc: orden.responsable?.cedula }
-  ].forEach(({ x, nombre, cc }) => {
+    { x: margenX, nombre: orden.elaboradoPor?.nombre, cc: orden.elaboradoPor?.cedula, firma: null },
+    { x: margenX + anchoFirma + 6, nombre: orden.responsable?.nombre, cc: orden.responsable?.cedula, firma: orden.cierre?.firmaDataUrl }
+  ].forEach(({ x, nombre, cc, firma }) => {
+    if (firma) {
+      try {
+        const anchoImg = Math.min(altoImgFirma * (600 / 180), anchoFirma);
+        doc.addImage(firma, "PNG", x, y, anchoImg, altoImgFirma);
+      } catch (e) { /* si la firma no carga, queda el nombre impreso igual */ }
+    }
     doc.setDrawColor(120, 126, 134);
-    doc.line(x, y + 3.6, x + anchoFirma, y + 3.6);
+    doc.line(x, y + altoImgFirma, x + anchoFirma, y + altoImgFirma);
     doc.setFont("helvetica", "bold");
     doc.setFontSize(7.2);
     doc.setTextColor(20, 22, 26);
-    doc.text(nombre || "—", x, y + 5.9);
+    doc.text(nombre || "—", x, y + altoImgFirma + 2.3);
     doc.setFont("helvetica", "normal");
     doc.setFontSize(6.2);
     doc.setTextColor(...TEXT_MUTED);
     // 3.1mm de por medio entre la línea base del nombre y la de la
     // cédula (a 7.2pt, el nombre mide ~2mm de alto) — antes iban a solo
     // 2.3mm y la cédula terminaba tocando el propio nombre por encima.
-    doc.text(`C.C. ${cc || "—"}`, x, y + 9);
+    doc.text(`C.C. ${cc || "—"}`, x, y + altoImgFirma + 5.4);
     doc.setTextColor(0, 0, 0);
   });
-  y += 10.5;
+  y += altoImgFirma + 6.9;
 
   // ---- pie de página: franja ámbar + gris clara con código/versión —
   // mismo esquema que el pie de Informes/Correspondencia (acá en una sola

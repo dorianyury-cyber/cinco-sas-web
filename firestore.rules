@@ -213,7 +213,7 @@ service cloud.firestore {
       allow update: if autorizadoOrdenesTrabajo() || (
         esParticipanteDeOrden(resource.data) &&
         request.resource.data.diff(resource.data).affectedKeys()
-          .hasOnly(['altoRiesgo', 'pesv', 'preoperacionales', 'cierre', 'estado', 'actualizadoEn', 'actualizadoPor'])
+          .hasOnly(['altoRiesgo', 'pesv', 'preoperacionales', 'alistamientoCompletado', 'cierre', 'estado', 'actualizadoEn', 'actualizadoPor'])
       );
     }
 
