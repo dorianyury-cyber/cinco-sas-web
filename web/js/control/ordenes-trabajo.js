@@ -598,12 +598,21 @@ requireAuth(async (user) => {
           const contadorSnap = await tx.get(contadorRef);
           numero = contadorSnap.exists() ? contadorSnap.data().siguiente : 18235;
           tx.set(contadorRef, { siguiente: numero + 1 });
-          // La cédula de quien elabora sale primero de su propio perfil en
-          // Cinco SAS control; si no la tiene ahí, se busca en
-          // "empleadosActivos" (que ya trae mezclados los sincronizados de
-          // Cinco Conecta — ver más abajo) por si su cédula solo está
-          // registrada del lado de Conecta.
-          const cedulaElaboraPor = perfilActual?.cedula || empleadosActivos.find((e) => e.email === user.email)?.cedula || "";
+          // La cédula de quien elabora sale de Cinco Conecta (fuente
+          // autorizada) si esa persona está sincronizada ahí; si no, se cae
+          // a la cédula digitada a mano en su perfil de Cinco SAS control
+          // ("empleados", campo opcional). OJO: si la misma persona existe
+          // en ambas colecciones con el mismo correo, empleadosActivos trae
+          // las DOS entradas (propios primero, luego Conecta) — un simple
+          // .find() por correo se hubiera quedado con la de "propios" (con
+          // cédula casi siempre vacía) sin llegar nunca a mirar la de
+          // Conecta. Por eso acá se filtran todas las coincidencias y se
+          // busca explícitamente la de origen "conecta" primero.
+          const coincidencias = empleadosActivos.filter((e) => e.email === user.email);
+          const cedulaElaboraPor = coincidencias.find((e) => e.origen === "conecta" && e.cedula)?.cedula
+            || perfilActual?.cedula
+            || coincidencias.find((e) => e.cedula)?.cedula
+            || "";
           tx.set(ordenRef, {
             ...datos, numero,
             elaboradoPor: { email: user.email, nombre: perfilActual?.nombre || user.email, cedula: cedulaElaboraPor },

@@ -20,6 +20,8 @@
 import { RIESGOS, PREOPERACIONALES, RECOMENDACIONES_SSTA } from "./ordenes-trabajo-datos.js";
 
 const NAVY = [31, 39, 50];
+const AMBER = [254, 178, 9];
+const GRIS_CLARO = [245, 246, 248];
 const TEXT_MUTED = [92, 101, 112];
 // El logo.png normal trae el texto "CINCO S.A.S." en blanco (pensado para
 // el fondo navy del sitio) — invisible sobre esta plantilla, que es de
@@ -133,9 +135,12 @@ export async function generarOrdenTrabajoPDF(orden) {
     y += 4.6 + 1.3;
   }
 
-  // ---- encabezado: logo + título — mismo formato que Informes/
-  // Correspondencia (código/versión quedan solo en el pie de página, sin
-  // cajas aparte arriba junto al título). ----
+  // ---- encabezado: logo + título + línea ámbar — mismo esquema que el
+  // encabezado de página de Informes (informes-pdf.js: logo a la
+  // izquierda, línea ámbar debajo a lo ancho de la página); acá no hacía
+  // falta esa línea y por eso el encabezado no se veía igual al estándar
+  // de los demás formatos. Código/versión quedan solo en el pie de
+  // página, igual que allá. ----
   try {
     const logo = await cargarImagenComoDataURL(LOGO_URL, "#ffffff");
     const altoLogo = 10;
@@ -147,7 +152,12 @@ export async function generarOrdenTrabajoPDF(orden) {
   doc.setFontSize(11.5);
   doc.setTextColor(...NAVY);
   doc.text("ORDEN DE TRABAJO", anchoPagina / 2, y + 6.5, { align: "center" });
-  y += 12;
+  y += 11;
+  doc.setDrawColor(...AMBER);
+  doc.setLineWidth(0.6);
+  doc.line(margenX, y, anchoPagina - margenX, y);
+  doc.setTextColor(0, 0, 0);
+  y += 2;
 
   // ---- datos generales ----
   filaCajas([
@@ -356,12 +366,21 @@ export async function generarOrdenTrabajoPDF(orden) {
   });
   y += 10.5;
 
-  // ---- pie de página ----
-  doc.setFont("helvetica", "italic");
+  // ---- pie de página: franja ámbar + gris clara con código/versión —
+  // mismo esquema que el pie de Informes/Correspondencia (acá en una sola
+  // línea de alto, sin la segunda línea de dirección/paginación que sí
+  // llevan esos formatos multipágina). ----
+  const altoPie = 6;
+  const yPie = altoPagina - altoPie;
+  doc.setFillColor(...AMBER);
+  doc.rect(0, yPie - 0.8, anchoPagina, 0.8, "F");
+  doc.setFillColor(...GRIS_CLARO);
+  doc.rect(0, yPie, anchoPagina, altoPie, "F");
+  doc.setFont("helvetica", "normal");
   doc.setFontSize(6.5);
   doc.setTextColor(...TEXT_MUTED);
-  doc.text(`${CODIGO_FORMATO} · Versión ${VERSION_FORMATO}`, margenX, altoPagina - 6);
-  doc.text(`Orden ${orden.numero}`, anchoPagina - margenX, altoPagina - 6, { align: "right" });
+  doc.text(`Código: ${CODIGO_FORMATO} · Versión: ${VERSION_FORMATO}`, margenX, yPie + altoPie / 2 + 1);
+  doc.text(`Orden ${orden.numero}`, anchoPagina - margenX, yPie + altoPie / 2 + 1, { align: "right" });
   doc.setTextColor(0, 0, 0);
 
   // Si a pesar de todo esto algún contenido genuinamente largo (ej. una
