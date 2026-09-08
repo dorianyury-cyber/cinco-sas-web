@@ -182,18 +182,17 @@ function mostrarAlerta(texto, tipo) {
 }
 
 // <option> de un empleado activo: mismo criterio que ofertas.js (nombre —
-// cargo), con el código/cédula guardados en dataset para no tener que
-// volver a buscar el empleado al leer el formulario. Los que vienen
-// sincronizados de Cinco Conecta (ver más abajo) llevan "(Conecta)" al
-// final para distinguirlos — normalmente no tienen código/cédula todavía,
-// porque ese dato solo existe en Cinco SAS control.
+// cargo), con la cédula guardada en dataset para no tener que volver a
+// buscar el empleado al leer el formulario — es lo que identifica al
+// empleado en la Orden de Trabajo (ya no un "código" aparte). Los que
+// vienen sincronizados de Cinco Conecta (ver más abajo) llevan "(Conecta)"
+// al final para distinguirlos.
 function opcionEmpleado(e) {
   const opt = document.createElement("option");
   opt.value = e.email;
   const etiquetaOrigen = e.origen === "conecta" ? " (Conecta)" : "";
   opt.textContent = (e.cargo ? `${e.nombre} — ${e.cargo}` : e.nombre) + etiquetaOrigen;
   opt.dataset.nombre = e.nombre;
-  opt.dataset.codigo = e.codigo || "";
   opt.dataset.cedula = e.cedula || "";
   opt.dataset.telefono = e.telefono || "";
   return opt;
@@ -202,7 +201,7 @@ function opcionEmpleado(e) {
 function datosDeOpcion(select) {
   const opt = select.selectedOptions[0];
   if (!opt || !opt.value) return null;
-  return { email: opt.value, nombre: opt.dataset.nombre, codigo: opt.dataset.codigo, cedula: opt.dataset.cedula, telefono: opt.dataset.telefono };
+  return { email: opt.value, nombre: opt.dataset.nombre, cedula: opt.dataset.cedula, telefono: opt.dataset.telefono };
 }
 
 function nuevaFilaPersonal(persona) {
@@ -655,8 +654,8 @@ requireAuth(async (user) => {
   // estado activo en el cliente). Se suman los de Cinco Conecta
   // ("empleadosConecta", mantenida al día por la Cloud Function
   // recibirStaffConecta — ver firestore.rules) normalizados a la misma
-  // forma {nombre, email, cargo, codigo, cedula}, marcados con
-  // origen:"conecta" para que opcionEmpleado() les agregue "(Conecta)".
+  // forma {nombre, email, cargo, cedula}, marcados con origen:"conecta"
+  // para que opcionEmpleado() les agregue "(Conecta)".
   const [empleadosSnap, empleadosConectaSnap] = await Promise.all([
     getDocs(query(collection(db, "empleados"), orderBy("nombre"))),
     getDocs(query(collection(db, "empleadosConecta"), orderBy("nombre")))
@@ -665,7 +664,7 @@ requireAuth(async (user) => {
   const deConecta = empleadosConectaSnap.docs
     .map((d) => d.data())
     .filter((e) => e.estado === "activo")
-    .map((e) => ({ nombre: e.nombre, email: e.correo, cargo: e.cargo, codigo: "", cedula: e.cedula || "", telefono: e.telefono || "", origen: "conecta" }));
+    .map((e) => ({ nombre: e.nombre, email: e.correo, cargo: e.cargo, cedula: e.cedula || "", telefono: e.telefono || "", origen: "conecta" }));
   empleadosActivos = [...propios, ...deConecta].sort((a, b) => a.nombre.localeCompare(b.nombre));
   empleadosActivos.forEach((e) => selectResponsable.appendChild(opcionEmpleado(e)));
 

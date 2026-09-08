@@ -289,7 +289,6 @@ function renderTabla(empleados, esAdmin) {
     fila.appendChild(celda("td", e.nombre));
     fila.appendChild(celda("td", e.email));
     fila.appendChild(celda("td", e.cargo || "—"));
-    fila.appendChild(celdaTexto(e, esAdmin, "codigo", "60px"));
     fila.appendChild(celdaTexto(e, esAdmin, "cedula", "90px"));
     fila.appendChild(celdaTexto(e, esAdmin, "telefono", "90px"));
 
@@ -360,7 +359,6 @@ requireAuth(async (user) => {
     const nombre = document.getElementById("nombre").value.trim();
     const email = document.getElementById("email").value.trim().toLowerCase();
     const cargo = document.getElementById("cargo").value.trim();
-    const codigo = document.getElementById("codigo").value.trim();
     const cedula = document.getElementById("cedula").value.trim();
     const telefono = document.getElementById("telefono").value.trim();
     const autorizadoOfertas = document.getElementById("autorizadoOfertas").checked;
@@ -378,7 +376,7 @@ requireAuth(async (user) => {
         throw new Error("Ya existe un empleado registrado con ese correo.");
       }
       await setDoc(empleadoRef, {
-        nombre, email, cargo, codigo, cedula, telefono, rol, estado: "activo",
+        nombre, email, cargo, cedula, telefono, rol, estado: "activo",
         autorizadoOfertas, gestionaDocumentos, aprobadorContratos, autorizadoOrdenesTrabajo,
         ...(campo ? { [campo]: seleccionadas } : {}),
         creadoPor: user.email, creadoEn: serverTimestamp(),
