@@ -158,6 +158,20 @@
                 <div id="otPersonalLista" class="control-ot-personal-lista"></div>
                 <button type="button" class="control-btn-mini" id="otAgregarPersonaBtn">+ Agregar persona</button>
               </div>
+
+              <div class="campo-ancho control-ot-seccion"><strong>Firma de quien genera la orden</strong></div>
+              <div class="campo-ancho">
+                <label>Firma del responsable de la orden de trabajo</label>
+                <div class="control-firma-wrap">
+                  <canvas id="otFirmaElaboraCanvas" width="600" height="180"></canvas>
+                  <p class="text-muted control-firma-ayuda">Firma con el dedo o el mouse sobre el recuadro. Si ya guardaste tu firma antes, aparece sola.</p>
+                </div>
+                <button type="button" class="control-btn-mini" id="otLimpiarFirmaElaboraBtn">Limpiar firma</button>
+                <label class="control-check-inline">
+                  <input type="checkbox" id="otGuardarFirmaCheck">
+                  Guardar esta firma como mi firma digital, para que aparezca sola la próxima vez
+                </label>
+              </div>
               </div><!-- /otSeccionesJefe -->
 
               <div id="otSeccionAlistamiento">

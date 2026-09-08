@@ -89,7 +89,14 @@ service cloud.firestore {
     // de nadie más.
     match /empleados/{email} {
       allow read: if request.auth != null;
-      allow write: if esAdmin();
+      allow create, delete: if esAdmin();
+      // Cualquiera puede guardar SU PROPIA firma digital (Orden de
+      // Trabajo, Paso 1 — ver ordenes-trabajo.js) para que la próxima
+      // orden que genere ya la traiga puesta; nada más de este doc.
+      allow update: if esAdmin() || (
+        request.auth.token.email == email &&
+        request.resource.data.diff(resource.data).affectedKeys().hasOnly(['firmaGuardada'])
+      );
     }
 
     match /contratos/{contratoId} {
@@ -209,13 +216,25 @@ service cloud.firestore {
     // le corresponde llenar desde el celular.
     match /ordenesTrabajo/{ordenId} {
       allow read: if autorizadoOrdenesTrabajo() || esParticipanteDeOrden(resource.data);
-      allow create, delete: if autorizadoOrdenesTrabajo();
+      // "elaboradoPor" (responsable de la orden de trabajo, con su propia
+      // firma desde el Paso 1) solo puede ser quien la está creando — nadie
+      // puede quedar registrado como "quien elaboró" sin ser quien de
+      // verdad inició la sesión que la generó.
+      allow create: if autorizadoOrdenesTrabajo()
+        && request.resource.data.elaboradoPor.email == request.auth.token.email;
+      allow delete: if autorizadoOrdenesTrabajo();
       // La descripción de los trabajos solo la puede cambiar quien generó
       // la orden ("creadoPor") — otro admin/autorizado puede seguir
       // editando el resto del formulario (contrato, fechas, vehículo,
       // personal, etc.), pero no le puede tocar a otro lo que va a hacer.
+      // "elaboradoPor" (identidad + firma de quien la generó) nunca se
+      // puede tocar en una actualización, ni siquiera por quien la creó:
+      // queda fijo desde el momento de crearla, para que el responsable de
+      // los trabajos y el responsable de la orden nunca puedan pisarse el
+      // dato ni la firma del otro en ningún paso del diligenciamiento.
       allow update: if (
         autorizadoOrdenesTrabajo() &&
+        !request.resource.data.diff(resource.data).affectedKeys().hasAny(['elaboradoPor']) &&
         (request.auth.token.email == resource.data.creadoPor ||
           !request.resource.data.diff(resource.data).affectedKeys().hasAny(['descripcion']))
       ) || (

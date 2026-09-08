@@ -1,6 +1,6 @@
 import { signOut } from "https://www.gstatic.com/firebasejs/10.7.1/firebase-auth.js";
 import {
-  collection, doc, addDoc, deleteDoc, getDocs, runTransaction, updateDoc, serverTimestamp,
+  collection, doc, addDoc, deleteDoc, getDocs, runTransaction, updateDoc, setDoc, serverTimestamp,
   onSnapshot, query, orderBy, where
 } from "https://www.gstatic.com/firebasejs/10.7.1/firebase-firestore.js";
 import { auth, db, requireAuth, obtenerPerfil } from "./firebase-control.js";
@@ -64,63 +64,82 @@ function faseDeOrden(orden) {
   return "cerrada";
 }
 
-// ---- firma dibujada a mano (Paso 4, cierre de la orden) ----
-// Pointer Events cubre mouse/touch/lápiz con el mismo código — no hace
-// falta una librería aparte para algo tan simple como un trazo libre.
-const canvasFirma = document.getElementById("otFirmaCanvas");
-const ctxFirma = canvasFirma.getContext("2d");
-ctxFirma.lineWidth = 2.4;
-ctxFirma.lineCap = "round";
-ctxFirma.strokeStyle = "#1f2732";
-let dibujandoFirma = false;
-let firmaTieneTrazo = false;
-// Firma que ya traía la orden al abrir el modal (si la tenía) — para no
-// borrarla sin querer al guardar cuando nadie tocó el lienzo de nuevo
-// (firmaTieneTrazo solo se pone en true con un trazo dibujado a mano en
-// ESTA sesión del formulario, cargarFirmaEnCanvas no cuenta).
-let firmaExistente = null;
+// ---- firma dibujada a mano — fábrica reutilizable. Pointer Events cubre
+// mouse/touch/lápiz con el mismo código, no hace falta una librería
+// aparte para un trazo libre. Antes solo existía para el cierre (Paso 4,
+// quien ejecuta los trabajos); ahora también hace falta para quien genera
+// la orden (Paso 1) — cada una con su propio lienzo y estado, para que
+// firmar una nunca pueda tocar ni borrar la otra (ver garantía de roles
+// más abajo, y firmaCierre/firmaElabora donde se instancian).
+function crearFirma(canvas) {
+  const ctx = canvas.getContext("2d");
+  ctx.lineWidth = 2.4;
+  ctx.lineCap = "round";
+  ctx.strokeStyle = "#1f2732";
+  let dibujando = false;
+  let tieneTrazoNuevo = false;
+  // Firma que ya traía la orden (o la firma guardada del perfil) al cargar
+  // el lienzo — para no perderla sin querer al guardar si nadie dibujó
+  // encima (tieneTrazoNuevo solo pasa a true con un trazo hecho a mano en
+  // ESTA sesión del formulario; cargar() no cuenta).
+  let existente = null;
 
-function posicionEnCanvas(e) {
-  const rect = canvasFirma.getBoundingClientRect();
+  function posicion(e) {
+    const rect = canvas.getBoundingClientRect();
+    return {
+      x: (e.clientX - rect.left) * (canvas.width / rect.width),
+      y: (e.clientY - rect.top) * (canvas.height / rect.height)
+    };
+  }
+  canvas.addEventListener("pointerdown", (e) => {
+    if (canvas.dataset.soloLectura === "1") return;
+    e.preventDefault();
+    dibujando = true;
+    const { x, y } = posicion(e);
+    ctx.beginPath();
+    ctx.moveTo(x, y);
+  });
+  canvas.addEventListener("pointermove", (e) => {
+    if (!dibujando) return;
+    e.preventDefault();
+    const { x, y } = posicion(e);
+    ctx.lineTo(x, y);
+    ctx.stroke();
+    tieneTrazoNuevo = true;
+  });
+  window.addEventListener("pointerup", () => { dibujando = false; });
+
+  function limpiar() {
+    ctx.clearRect(0, 0, canvas.width, canvas.height);
+    tieneTrazoNuevo = false;
+    existente = null;
+  }
+  // Dibuja una firma ya guardada (de una orden ya diligenciada, o la firma
+  // digital guardada en el perfil) — no cuenta como "trazo nuevo".
+  function cargar(dataUrl) {
+    ctx.clearRect(0, 0, canvas.width, canvas.height);
+    tieneTrazoNuevo = false;
+    existente = dataUrl || null;
+    if (!dataUrl) return;
+    const img = new Image();
+    img.onload = () => ctx.drawImage(img, 0, 0, canvas.width, canvas.height);
+    img.src = dataUrl;
+  }
   return {
-    x: (e.clientX - rect.left) * (canvasFirma.width / rect.width),
-    y: (e.clientY - rect.top) * (canvasFirma.height / rect.height)
+    canvas,
+    limpiar,
+    cargar,
+    get tieneTrazoNuevo() { return tieneTrazoNuevo; },
+    dataUrl() { return tieneTrazoNuevo ? canvas.toDataURL("image/png") : existente; }
   };
 }
-canvasFirma.addEventListener("pointerdown", (e) => {
-  if (canvasFirma.dataset.soloLectura === "1") return;
-  e.preventDefault();
-  dibujandoFirma = true;
-  const { x, y } = posicionEnCanvas(e);
-  ctxFirma.beginPath();
-  ctxFirma.moveTo(x, y);
-});
-canvasFirma.addEventListener("pointermove", (e) => {
-  if (!dibujandoFirma) return;
-  e.preventDefault();
-  const { x, y } = posicionEnCanvas(e);
-  ctxFirma.lineTo(x, y);
-  ctxFirma.stroke();
-  firmaTieneTrazo = true;
-});
-window.addEventListener("pointerup", () => { dibujandoFirma = false; });
 
-function limpiarCanvasFirma() {
-  ctxFirma.clearRect(0, 0, canvasFirma.width, canvasFirma.height);
-  firmaTieneTrazo = false;
-}
-document.getElementById("otLimpiarFirmaBtn").addEventListener("click", limpiarCanvasFirma);
+const firmaCierre = crearFirma(document.getElementById("otFirmaCanvas"));
+document.getElementById("otLimpiarFirmaBtn").addEventListener("click", firmaCierre.limpiar);
 
-// Dibuja una firma ya guardada (para revisar una orden ya cerrada) — no
-// cuenta como "trazo nuevo" (firmaTieneTrazo sigue en false) para no
-// reescribir por accidente la misma firma tal cual al guardar.
-function cargarFirmaEnCanvas(dataUrl) {
-  limpiarCanvasFirma();
-  if (!dataUrl) return;
-  const img = new Image();
-  img.onload = () => ctxFirma.drawImage(img, 0, 0, canvasFirma.width, canvasFirma.height);
-  img.src = dataUrl;
-}
+const firmaElabora = crearFirma(document.getElementById("otFirmaElaboraCanvas"));
+document.getElementById("otLimpiarFirmaElaboraBtn").addEventListener("click", firmaElabora.limpiar);
+const guardarFirmaCheck = document.getElementById("otGuardarFirmaCheck");
 
 // Orden puntual a abrir de un tirón al entrar (ver enlaceWhatsApp): el
 // enlace que se manda al responsable trae "?id=" para que no tenga que
@@ -303,7 +322,7 @@ function mostrarPaso({ jefe = false, alistamiento = false, cierre = false }) {
 function habilitarCamposCierre(habilitado) {
   ["otObservaciones", "otFechaCierre", "otHorasAdicionales", "otValesAlimentacion", "otPernoctada"]
     .forEach((id) => { document.getElementById(id).disabled = !habilitado; });
-  canvasFirma.dataset.soloLectura = habilitado ? "0" : "1";
+  firmaCierre.canvas.dataset.soloLectura = habilitado ? "0" : "1";
   document.getElementById("otLimpiarFirmaBtn").classList.toggle("oculto", !habilitado);
   guardarBtn.classList.toggle("oculto", !habilitado);
 }
@@ -323,8 +342,7 @@ function abrirModalNueva() {
   renderChecklist(preoperacionalesLista, PREOPERACIONALES, ["NO", "SI", "N/A"]);
   repoblarSelectVehiculo("");
   habilitarCamposCierre(true);
-  firmaExistente = null;
-  limpiarCanvasFirma();
+  firmaCierre.limpiar();
   guardarBtn.textContent = "Guardar y continuar";
   alertBox.className = "form-alert";
 
@@ -335,6 +353,19 @@ function abrirModalNueva() {
   pintarIdentidad(responsableIdentidadEl, "", "");
   descripcionEl.readOnly = false;
   descripcionBloqueadaAviso.classList.add("oculto");
+
+  // Firma de quien genera la orden: se pide desde ya, en este mismo Paso
+  // 1 (no hay que esperar al cierre) — si ya guardó una firma digital en
+  // su perfil, aparece sola; si no, queda el lienzo listo para dibujarla.
+  firmaElabora.canvas.dataset.soloLectura = "0";
+  firmaElabora.cargar(perfilActual?.firmaGuardada || null);
+  document.getElementById("otLimpiarFirmaElaboraBtn").classList.remove("oculto");
+  guardarFirmaCheck.checked = false;
+  // Guardarla solo es posible con un perfil ya existente en "empleados"
+  // (ver firestore.rules: la actualización propia de "firmaGuardada"
+  // necesita el doc ya creado) — sin uno, se oculta en vez de ofrecer algo
+  // que fallaría en silencio.
+  guardarFirmaCheck.closest("label").classList.toggle("oculto", !perfilActual);
 }
 
 // Edición completa (botón "Editar" del jefe/administrador en la tabla
@@ -395,8 +426,16 @@ function abrirModalEditar(orden) {
   document.getElementById("otValesAlimentacion").value = orden.cierre?.valesAlimentacion || "";
   document.getElementById("otPernoctada").value = orden.cierre?.pernoctada || "NO";
   habilitarCamposCierre(true);
-  firmaExistente = orden.cierre?.firmaDataUrl || null;
-  cargarFirmaEnCanvas(firmaExistente);
+  firmaCierre.cargar(orden.cierre?.firmaDataUrl || null);
+
+  // La firma de quien elabora quedó fija desde que se creó la orden (ver
+  // identidadElaborador/elaboradoPor) — al editar se muestra tal cual,
+  // siempre de solo lectura: nadie, ni siquiera quien la generó, puede
+  // reescribirla encima desde este formulario.
+  firmaElabora.canvas.dataset.soloLectura = "1";
+  firmaElabora.cargar(orden.elaboradoPor?.firmaDataUrl || null);
+  document.getElementById("otLimpiarFirmaElaboraBtn").classList.add("oculto");
+  guardarFirmaCheck.closest("label").classList.add("oculto");
 
   guardarBtn.textContent = "Guardar cambios";
   alertBox.className = "form-alert";
@@ -451,8 +490,7 @@ function abrirModalCompletar(orden) {
     mostrarPaso({ cierre: true });
     tituloModal.textContent = yaCerrada ? `Orden ${orden.numero} — cerrada` : `Orden ${orden.numero} — Paso 4 de 4: cerrar orden`;
     habilitarCamposCierre(!yaCerrada);
-    firmaExistente = orden.cierre?.firmaDataUrl || null;
-    cargarFirmaEnCanvas(firmaExistente);
+    firmaCierre.cargar(orden.cierre?.firmaDataUrl || null);
     guardarBtn.textContent = "Cerrar orden";
   }
 
@@ -483,6 +521,19 @@ function enlaceWhatsApp(orden) {
   return `https://wa.me/${numero}?text=${encodeURIComponent(mensaje)}`;
 }
 
+// Abre el enlace y deja constancia en Firestore de que ya se mandó (al
+// menos una vez) el aviso — a pedido del usuario, el botón NUNCA se quita
+// después de usarlo (ni en la tabla ni en esta confirmación): solo cambia
+// de "WhatsApp"/"Enviar por WhatsApp" a "Enviar nuevamente", para poder
+// reenviarlo las veces que haga falta. Si falla el guardado del aviso no
+// importa — el enlace ya se abrió igual, es solo un dato informativo.
+async function abrirWhatsAppYMarcar(orden) {
+  window.open(enlaceWhatsApp(orden), "_blank");
+  try {
+    await updateDoc(doc(db, "ordenesTrabajo", orden.id), { whatsappEnviadoEn: serverTimestamp() });
+  } catch (err) { /* no crítico */ }
+}
+
 // Paso 2 (justo después de guardar el Paso 1): reemplaza el formulario por
 // una confirmación con el botón de WhatsApp listo, en vez de dejar que el
 // jefe tenga que cerrar el modal y buscar la fila de la orden recién
@@ -494,8 +545,12 @@ function mostrarConfirmacionCreada(orden) {
   const btnWhatsApp = document.getElementById("otEnviarWhatsappBtn");
   const tieneTelefono = !!orden.responsable?.telefono;
   btnWhatsApp.classList.toggle("oculto", !tieneTelefono);
+  btnWhatsApp.textContent = "📱 Enviar por WhatsApp al responsable";
   confirmacionSinTelefono.classList.toggle("oculto", tieneTelefono);
-  btnWhatsApp.onclick = () => window.open(enlaceWhatsApp(orden), "_blank");
+  btnWhatsApp.onclick = () => {
+    abrirWhatsAppYMarcar(orden);
+    btnWhatsApp.textContent = "📱 Enviar nuevamente por WhatsApp";
+  };
 }
 document.getElementById("otCerrarConfirmacionBtn").addEventListener("click", () => {
   nuevaOrdenBackdrop.classList.remove("open");
@@ -551,8 +606,11 @@ function renderTabla(ordenes, autorizado) {
         const btnWhatsApp = document.createElement("button");
         btnWhatsApp.type = "button";
         btnWhatsApp.className = "control-btn-mini";
-        btnWhatsApp.textContent = "WhatsApp";
-        btnWhatsApp.addEventListener("click", () => window.open(enlaceWhatsApp(o), "_blank"));
+        btnWhatsApp.textContent = o.whatsappEnviadoEn ? "Enviar nuevamente" : "WhatsApp";
+        btnWhatsApp.addEventListener("click", () => {
+          abrirWhatsAppYMarcar(o);
+          btnWhatsApp.textContent = "Enviar nuevamente";
+        });
         tdAccion.appendChild(btnWhatsApp);
       }
 
@@ -642,7 +700,7 @@ requireAuth(async (user) => {
           mostrarAlerta("Escribe la fecha y hora de cierre.", "error");
           return;
         }
-        if (!firmaTieneTrazo) {
+        if (!firmaCierre.tieneTrazoNuevo) {
           mostrarAlerta("Falta la firma de quien ejecutó los trabajos.", "error");
           return;
         }
@@ -674,7 +732,7 @@ requireAuth(async (user) => {
               horasAdicionales: document.getElementById("otHorasAdicionales").value.trim(),
               valesAlimentacion: document.getElementById("otValesAlimentacion").value.trim(),
               pernoctada: document.getElementById("otPernoctada").value,
-              firmaDataUrl: canvasFirma.toDataURL("image/png")
+              firmaDataUrl: firmaCierre.dataUrl()
             },
             estado: "CERRADA",
             actualizadoEn: serverTimestamp(),
@@ -785,6 +843,15 @@ requireAuth(async (user) => {
       guardarBtn.textContent = ordenIdEnEdicion ? "Guardar cambios" : "Guardar";
       return;
     }
+    // La firma de quien genera la orden solo se pide (y solo existe el
+    // lienzo habilitado) al crearla — al editar queda de solo lectura, ver
+    // abrirModalEditar.
+    if (!ordenIdEnEdicion && !firmaElabora.dataUrl()) {
+      mostrarAlerta("Falta tu firma como responsable de la orden de trabajo.", "error");
+      guardarBtn.disabled = false;
+      guardarBtn.textContent = "Guardar";
+      return;
+    }
 
     const contratoId = selectContrato.value;
     const contratoNumero = contratoId === "ADMON" ? "ADMON" : (contratosPorId[contratoId]?.numero || contratosPorId[contratoId]?.codigo || "");
@@ -833,7 +900,7 @@ requireAuth(async (user) => {
         horasAdicionales: document.getElementById("otHorasAdicionales").value.trim(),
         valesAlimentacion: document.getElementById("otValesAlimentacion").value.trim(),
         pernoctada: document.getElementById("otPernoctada").value,
-        firmaDataUrl: firmaTieneTrazo ? canvasFirma.toDataURL("image/png") : firmaExistente
+        firmaDataUrl: firmaCierre.dataUrl()
       },
       // La orden pasa sola a CERRADA en cuanto se guarda con fecha y hora
       // de cierre diligenciada — a pedido del usuario, sin botón aparte.
@@ -863,10 +930,20 @@ requireAuth(async (user) => {
           const elaborador = identidadElaborador();
           tx.set(ordenRef, {
             ...datos, numero,
-            elaboradoPor: { email: user.email, nombre: elaborador.nombre, cedula: elaborador.cedula },
+            elaboradoPor: { email: user.email, nombre: elaborador.nombre, cedula: elaborador.cedula, firmaDataUrl: firmaElabora.dataUrl() },
             creadoPor: user.email, creadoEn: serverTimestamp()
           });
         });
+        // "Guardar esta firma como mi firma digital": queda en el propio
+        // perfil (empleados/{email}, campo suelto — ver firestore.rules)
+        // para que la próxima orden que genere ya la traiga puesta sola.
+        // No es crítico si falla (ej. sin perfil en "empleados" todavía);
+        // la orden ya quedó guardada con su firma de todos modos.
+        if (guardarFirmaCheck.checked) {
+          try {
+            await setDoc(doc(db, "empleados", user.email), { firmaGuardada: firmaElabora.dataUrl() }, { merge: true });
+          } catch (err) { /* no crítico */ }
+        }
         // Paso 2: en vez de cerrar el modal de una vez, se ofrece mandar
         // el enlace por WhatsApp al responsable ahí mismo — sin tener que
         // buscar la orden recién creada en la tabla para dar clic en su

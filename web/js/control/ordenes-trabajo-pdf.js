@@ -350,16 +350,17 @@ export async function generarOrdenTrabajoPDF(orden) {
     { etiqueta: "Pernoctada", valor: orden.cierre?.pernoctada === "SI" ? "Sí" : "No", frac: 0.24 }
   ]);
 
-  // ---- firmas: Elaboró (quien diligenció) + Responsable (quien ejecuta) ----
-  // El responsable firma con el dedo en el celular al cerrar la orden (ver
-  // #otFirmaCanvas en ordenes-trabajo.js, 600x180 — misma proporción 10:3
-  // usada abajo para no deformarla); si esa orden todavía no se cerró (o es
-  // vieja, de antes de que existiera la firma dibujada), queda solo el
-  // nombre impreso sobre la línea, como ya era.
+  // ---- firmas: Elaboró (quien genera la orden) + Responsable (quien
+  // ejecuta) — ambas dibujadas a mano con el mismo lienzo (ver
+  // crearFirma() en ordenes-trabajo.js, 600x180 — misma proporción 10:3
+  // usada abajo para no deformarlas): la de quien elabora se pide ya en el
+  // Paso 1, al crear la orden; la del responsable, al cerrarla (Paso 4).
+  // Una orden vieja (de antes de que existiera alguna de las dos firmas)
+  // deja solo el nombre impreso sobre la línea, como ya era.
   const anchoFirma = (anchoUtil - 6) / 2;
   const altoImgFirma = 8;
   [
-    { x: margenX, nombre: orden.elaboradoPor?.nombre, cc: orden.elaboradoPor?.cedula, firma: null },
+    { x: margenX, nombre: orden.elaboradoPor?.nombre, cc: orden.elaboradoPor?.cedula, firma: orden.elaboradoPor?.firmaDataUrl },
     { x: margenX + anchoFirma + 6, nombre: orden.responsable?.nombre, cc: orden.responsable?.cedula, firma: orden.cierre?.firmaDataUrl }
   ].forEach(({ x, nombre, cc, firma }) => {
     if (firma) {
