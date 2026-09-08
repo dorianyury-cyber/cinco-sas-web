@@ -1265,6 +1265,16 @@ button.control-mes-pill.pendiente:hover { border-color: var(--cinco-amber-dark);
    mini-fila para dar de alta un vehículo nuevo de la empresa, sin abrir un
    modal aparte para algo tan chico (placa + tipo + botón, en línea). */
 .control-ot-vehiculo-otro { display: grid; grid-template-columns: 1fr 1fr; gap: 0 16px; }
+
+/* Fila inferior del bloque de Responsables: nombre + cédula de quien
+   genera la orden (automático, según quién inició sesión) y de quien
+   ejecuta los trabajos (según el empleado elegido arriba) — de solo
+   lectura, para verificar de una vez que ambas identidades quedaron bien
+   vinculadas antes de guardar, en vez de descubrirlo recién en el PDF. */
+.control-ot-identidad { margin: 0; padding: 6px 8px; border: 1px solid var(--border); border-radius: 6px; background: var(--bg); font-size: 12.5px; font-weight: 600; }
+.control-ot-identidad.sin-cedula { color: #b23434; }
+@media (prefers-color-scheme: dark) { .control-ot-identidad.sin-cedula { color: #ff8a8a; } }
+#otDescripcion[readonly] { background: var(--bg); opacity: 0.85; cursor: default; }
 .control-ot-vehiculo-nuevo {
   display: flex; align-items: center; gap: 8px; margin: 4px 0 10px;
   padding: 8px; border: 1px dashed var(--border); border-radius: 8px;

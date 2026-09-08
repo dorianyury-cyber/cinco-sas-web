@@ -107,16 +107,27 @@
                 <input type="datetime-local" id="otFechaTerminacion" required>
               </div>
 
-              <div class="campo-ancho control-ot-seccion"><strong>Responsable de los trabajos</strong></div>
+              <div class="campo-ancho control-ot-seccion"><strong>Responsables</strong></div>
               <div class="campo-ancho">
-                <label for="otResponsable">Empleado responsable</label>
+                <label for="otResponsable">Empleado responsable de los trabajos</label>
                 <select id="otResponsable" required><option value="">Selecciona un empleado…</option></select>
+              </div>
+              <div class="campo-ancho control-ot-vehiculo-otro">
+                <div>
+                  <label>Responsable de orden de trabajo</label>
+                  <p class="control-ot-identidad" id="otElaboraIdentidad">—</p>
+                </div>
+                <div>
+                  <label>Responsable de los trabajos</label>
+                  <p class="control-ot-identidad" id="otResponsableIdentidad">—</p>
+                </div>
               </div>
 
               <div class="campo-ancho control-ot-seccion"><strong>Descripción</strong></div>
               <div class="campo-ancho">
                 <label for="otDescripcion">Detalle de los trabajos a realizar</label>
                 <textarea id="otDescripcion" rows="3" required maxlength="1000"></textarea>
+                <p class="text-muted oculto" id="otDescripcionBloqueadaAviso">Solo quien generó esta orden puede editar la descripción.</p>
               </div>
 
               <div class="campo-ancho control-ot-seccion"><strong>Recursos</strong></div>

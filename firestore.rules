@@ -210,7 +210,15 @@ service cloud.firestore {
     match /ordenesTrabajo/{ordenId} {
       allow read: if autorizadoOrdenesTrabajo() || esParticipanteDeOrden(resource.data);
       allow create, delete: if autorizadoOrdenesTrabajo();
-      allow update: if autorizadoOrdenesTrabajo() || (
+      // La descripción de los trabajos solo la puede cambiar quien generó
+      // la orden ("creadoPor") — otro admin/autorizado puede seguir
+      // editando el resto del formulario (contrato, fechas, vehículo,
+      // personal, etc.), pero no le puede tocar a otro lo que va a hacer.
+      allow update: if (
+        autorizadoOrdenesTrabajo() &&
+        (request.auth.token.email == resource.data.creadoPor ||
+          !request.resource.data.diff(resource.data).affectedKeys().hasAny(['descripcion']))
+      ) || (
         esParticipanteDeOrden(resource.data) &&
         request.resource.data.diff(resource.data).affectedKeys()
           .hasOnly(['altoRiesgo', 'pesv', 'preoperacionales', 'alistamientoCompletado', 'cierre', 'estado', 'actualizadoEn', 'actualizadoPor'])

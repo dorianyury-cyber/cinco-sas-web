@@ -35,6 +35,10 @@ const riesgosLista = document.getElementById("otRiesgosLista");
 const preoperacionalesLista = document.getElementById("otPreoperacionalesLista");
 const selectVehiculo = document.getElementById("otVehiculo");
 const vehiculoOtroFila = document.getElementById("otVehiculoOtroFila");
+const elaboraIdentidadEl = document.getElementById("otElaboraIdentidad");
+const responsableIdentidadEl = document.getElementById("otResponsableIdentidad");
+const descripcionEl = document.getElementById("otDescripcion");
+const descripcionBloqueadaAviso = document.getElementById("otDescripcionBloqueadaAviso");
 
 let empleadosActivos = [];
 let vehiculosPorId = {};
@@ -204,6 +208,38 @@ function datosDeOpcion(select) {
   return { email: opt.value, nombre: opt.dataset.nombre, cedula: opt.dataset.cedula, telefono: opt.dataset.telefono };
 }
 
+// Pinta "Nombre — C.C. ###" en la fila inferior del bloque de
+// Responsables, para verificar de una vez (antes de guardar) que la
+// cédula sí quedó bien vinculada — en vez de descubrir recién en el PDF
+// que llegó vacía. Sin nombre todavía (nada seleccionado) queda en "—".
+function pintarIdentidad(el, nombre, cedula) {
+  el.textContent = nombre ? `${nombre} — C.C. ${cedula || "sin cédula registrada"}` : "—";
+  el.classList.toggle("sin-cedula", Boolean(nombre) && !cedula);
+}
+
+// Quien elabora la orden es siempre quien inició sesión (no se elige a
+// mano) — su cédula sale de Cinco Conecta (fuente autorizada) si está
+// sincronizado ahí; si no, de la cédula digitada a mano en su perfil de
+// Cinco SAS control ("empleados"). Si la misma persona existe en ambas
+// colecciones con el mismo correo, empleadosActivos trae las DOS entradas
+// (propios primero, luego Conecta) — por eso se buscan TODAS las
+// coincidencias y se prioriza la de origen "conecta", en vez de un
+// .find() simple que se quedaría con la de "propios" (cédula casi
+// siempre vacía) sin llegar nunca a mirar la de Conecta.
+function identidadElaborador() {
+  const coincidencias = empleadosActivos.filter((e) => e.email === usuarioActual?.email);
+  const cedula = coincidencias.find((e) => e.origen === "conecta" && e.cedula)?.cedula
+    || perfilActual?.cedula
+    || coincidencias.find((e) => e.cedula)?.cedula
+    || "";
+  return { nombre: perfilActual?.nombre || usuarioActual?.email || "", cedula };
+}
+
+selectResponsable.addEventListener("change", () => {
+  const datos = datosDeOpcion(selectResponsable);
+  pintarIdentidad(responsableIdentidadEl, datos?.nombre, datos?.cedula);
+});
+
 function nuevaFilaPersonal(persona) {
   const fila = document.createElement("div");
   fila.className = "control-ot-personal-fila";
@@ -291,6 +327,14 @@ function abrirModalNueva() {
   limpiarCanvasFirma();
   guardarBtn.textContent = "Guardar y continuar";
   alertBox.className = "form-alert";
+
+  // Nueva orden: quien la genera es siempre quien inició sesión (recién
+  // se sabrá al guardar), y la descripción siempre es editable para él.
+  const elaborador = identidadElaborador();
+  pintarIdentidad(elaboraIdentidadEl, elaborador.nombre, elaborador.cedula);
+  pintarIdentidad(responsableIdentidadEl, "", "");
+  descripcionEl.readOnly = false;
+  descripcionBloqueadaAviso.classList.add("oculto");
 }
 
 // Edición completa (botón "Editar" del jefe/administrador en la tabla
@@ -310,7 +354,20 @@ function abrirModalEditar(orden) {
   document.getElementById("otFechaInicio").value = orden.fechaHoraInicio || "";
   document.getElementById("otFechaTerminacion").value = orden.fechaHoraTerminacion || "";
   selectResponsable.value = orden.responsable?.email || "";
-  document.getElementById("otDescripcion").value = orden.descripcion || "";
+  descripcionEl.value = orden.descripcion || "";
+
+  // Quien elabora quedó fijo desde que se creó la orden (no se recalcula
+  // al editar); se muestra tal cual se guardó. La descripción solo la
+  // puede tocar quien generó la orden — cualquier otra persona autorizada
+  // a editar (otro admin, otro con permiso de OT) la ve pero no la toca,
+  // para que nadie más le cambie a otro lo que va a hacer.
+  pintarIdentidad(elaboraIdentidadEl, orden.elaboradoPor?.nombre, orden.elaboradoPor?.cedula);
+  pintarIdentidad(responsableIdentidadEl, orden.responsable?.nombre, orden.responsable?.cedula);
+  // Mismo criterio que la Rule de Firestore (ver firestore.rules,
+  // match /ordenesTrabajo/): sin coincidencia exacta de correo, bloqueada.
+  const puedeEditarDescripcion = orden.creadoPor === usuarioActual?.email;
+  descripcionEl.readOnly = !puedeEditarDescripcion;
+  descripcionBloqueadaAviso.classList.toggle("oculto", puedeEditarDescripcion);
 
   // Si el vehículo guardado sigue en el registro de la empresa (mismo id),
   // se selecciona ese; si no (vehículo "Otro" de cuando se creó la orden,
@@ -722,7 +779,7 @@ requireAuth(async (user) => {
       // un hasAny/in directo. Se recalcula completo en cada guardado, no
       // hay que mantenerla a mano.
       personalEmails: [responsable.email, ...personalAdicional.map((p) => p.email)],
-      descripcion: document.getElementById("otDescripcion").value.trim(),
+      descripcion: descripcionEl.value.trim(),
       vehiculo: selectVehiculo.value && selectVehiculo.value !== VALOR_VEHICULO_OTRO
         ? { vehiculoId: selectVehiculo.value, tipo: vehiculosPorId[selectVehiculo.value]?.tipo || "", placa: vehiculosPorId[selectVehiculo.value]?.placa || "" }
         : {
@@ -772,24 +829,10 @@ requireAuth(async (user) => {
           const contadorSnap = await tx.get(contadorRef);
           numero = contadorSnap.exists() ? contadorSnap.data().siguiente : 18235;
           tx.set(contadorRef, { siguiente: numero + 1 });
-          // La cédula de quien elabora sale de Cinco Conecta (fuente
-          // autorizada) si esa persona está sincronizada ahí; si no, se cae
-          // a la cédula digitada a mano en su perfil de Cinco SAS control
-          // ("empleados", campo opcional). OJO: si la misma persona existe
-          // en ambas colecciones con el mismo correo, empleadosActivos trae
-          // las DOS entradas (propios primero, luego Conecta) — un simple
-          // .find() por correo se hubiera quedado con la de "propios" (con
-          // cédula casi siempre vacía) sin llegar nunca a mirar la de
-          // Conecta. Por eso acá se filtran todas las coincidencias y se
-          // busca explícitamente la de origen "conecta" primero.
-          const coincidencias = empleadosActivos.filter((e) => e.email === user.email);
-          const cedulaElaboraPor = coincidencias.find((e) => e.origen === "conecta" && e.cedula)?.cedula
-            || perfilActual?.cedula
-            || coincidencias.find((e) => e.cedula)?.cedula
-            || "";
+          const elaborador = identidadElaborador();
           tx.set(ordenRef, {
             ...datos, numero,
-            elaboradoPor: { email: user.email, nombre: perfilActual?.nombre || user.email, cedula: cedulaElaboraPor },
+            elaboradoPor: { email: user.email, nombre: elaborador.nombre, cedula: elaborador.cedula },
             creadoPor: user.email, creadoEn: serverTimestamp()
           });
         });
