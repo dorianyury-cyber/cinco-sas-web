@@ -722,7 +722,38 @@ requireAuth(async (user) => {
     .map((d) => d.data())
     .filter((e) => e.estado === "activo")
     .map((e) => ({ nombre: e.nombre, email: e.correo, cargo: e.cargo, cedula: e.cedula || "", telefono: e.telefono || "", origen: "conecta" }));
-  empleadosActivos = [...propios, ...deConecta].sort((a, b) => a.nombre.localeCompare(b.nombre));
+
+  // Si la misma persona está en las dos colecciones con el mismo correo,
+  // antes quedaban DOS opciones idénticas en el desplegable — si alguien
+  // elegía por error la de "propios" (con cédula casi siempre vacía, ese
+  // dato lo mantiene Conecta) la orden se guardaba sin cédula aunque la
+  // persona sí la tuviera registrada en Conecta. Se combinan en una sola
+  // entrada por correo, priorizando la cédula/teléfono de Conecta (fuente
+  // autorizada) y completando con lo de "propios" solo si a Conecta le
+  // falta.
+  const porCorreo = new Map();
+  [...propios, ...deConecta].forEach((e) => {
+    const correo = (e.email || "").toLowerCase();
+    if (!correo) return;
+    const previo = porCorreo.get(correo);
+    if (!previo) { porCorreo.set(correo, e); return; }
+    const conecta = e.origen === "conecta" ? e : previo.origen === "conecta" ? previo : null;
+    const otro = conecta === e ? previo : e;
+    porCorreo.set(correo, {
+      nombre: conecta?.nombre || otro.nombre,
+      // Se conserva el correo tal cual venía (no forzado a minúsculas) —
+      // es el mismo valor que queda guardado en la orden y con el que se
+      // compara al reabrirla para editar (selectResponsable.value); forzar
+      // minúsculas acá rompería esa coincidencia en órdenes ya guardadas
+      // con el correo en otra escritura.
+      email: conecta?.email || otro.email,
+      cargo: conecta?.cargo || otro.cargo,
+      cedula: conecta?.cedula || otro.cedula || "",
+      telefono: conecta?.telefono || otro.telefono || "",
+      origen: conecta ? "conecta" : otro.origen
+    });
+  });
+  empleadosActivos = [...porCorreo.values()].sort((a, b) => a.nombre.localeCompare(b.nombre));
   empleadosActivos.forEach((e) => selectResponsable.appendChild(opcionEmpleado(e)));
 
   const q = query(collection(db, "ordenesTrabajo"), orderBy("numero", "desc"));

@@ -173,10 +173,17 @@ export async function generarOrdenTrabajoPDF(orden) {
     { etiqueta: "Fecha y hora de terminación", valor: formatearFechaHora(orden.fechaHoraTerminacion), frac: 1 / 3 }
   ]);
 
-  tituloSeccion("Responsable de los trabajos");
+  // Responsable de orden de trabajo (quien la elaboró) + Responsable de
+  // los trabajos (quien los ejecuta), en la misma fila — mismo alto y
+  // formato de caja que el resto del formulario, solo repartido a la
+  // mitad entre los dos (0.325/0.175 en vez de 0.65/0.35) para no sumar
+  // una fila más al presupuesto de una sola página.
+  tituloSeccion("Responsables");
   filaCajas([
-    { etiqueta: "Nombre", valor: orden.responsable?.nombre, frac: 0.65 },
-    { etiqueta: "Cédula", valor: orden.responsable?.cedula, frac: 0.35 }
+    { etiqueta: "Responsable de orden de trabajo", valor: orden.elaboradoPor?.nombre, frac: 0.325 },
+    { etiqueta: "Cédula", valor: orden.elaboradoPor?.cedula, frac: 0.175 },
+    { etiqueta: "Responsable de los trabajos", valor: orden.responsable?.nombre, frac: 0.325 },
+    { etiqueta: "Cédula", valor: orden.responsable?.cedula, frac: 0.175 }
   ]);
 
   tituloSeccion("Descripción");
