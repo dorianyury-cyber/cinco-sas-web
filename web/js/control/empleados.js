@@ -84,17 +84,20 @@ function celda(tag, texto) {
   return el;
 }
 
-// Celda "Campos": para admin/coadmin no aplica (ven y editan todo el
-// checklist). Para apoyo/empleado, un resumen + un <details> con las
-// casillas para ajustar qué columnas puede tocar/ver, que guardan solas
-// al marcarlas (mismo patrón de autoguardado que Rol/Estado en esta tabla).
-function celdaCampos(empleado, esAdmin) {
-  const td = celda("td");
+// ---- controles editables (autoguardado al cambiar) — antes vivían cada
+// uno en su propia columna de la tabla; ahora se reubican en el panel de
+// vista previa (fila = solo lo justo para escanear y elegir), mismo
+// patrón que Contratos/Correspondencia/Órdenes de Trabajo. Cada función
+// devuelve el control suelto (no un <td>); quien pinta el panel lo envuelve
+// con campoEditable()/grupoEl() para el mismo formato de caja que las
+// otras listas. ----
+
+// Columnas del checklist que puede tocar/ver: admin/coadmin no aplica (ven
+// y editan todo). Para apoyo/empleado, un resumen + las casillas para
+// ajustarlas, autoguardado igual que el resto.
+function controlCampos(empleado, esAdmin) {
   const campo = campoDeRol(empleado.rol);
-  if (!campo) {
-    td.textContent = "—";
-    return td;
-  }
+  if (!campo) return celda("span", "—");
 
   const actuales = new Set(empleado[campo] || []);
   const detalle = document.createElement("details");
@@ -128,21 +131,12 @@ function celdaCampos(empleado, esAdmin) {
     fila.appendChild(label);
   });
   detalle.appendChild(fila);
-  td.appendChild(detalle);
-  return td;
+  return detalle;
 }
 
-// Checkbox de autorización (autoguardado, igual patrón que Rol/Estado) +
-// botón para subir/cambiar la imagen de la firma de esa persona — la
-// firma se sube UNA vez aquí y se reusa en cada oferta que esa persona
-// firme (Ofertas comerciales), en vez de subirla cada vez que se genera
-// un documento.
-function celdaOfertas(empleado, esAdmin) {
-  const td = celda("td");
-  // Casilla + botón de firma en una sola fila (no apilados) — con los dos
-  // como bloques sueltos, la celda se partía en dos líneas y hacía la fila
-  // más alta de lo necesario (queja del usuario: "que no se recorte" / que
-  // todo quede uno al lado del otro).
+// Checkbox de autorización + botón para subir/cambiar la firma de esa
+// persona — se sube UNA vez aquí y se reusa en cada oferta que firme.
+function controlOfertas(empleado, esAdmin) {
   const fila = document.createElement("div");
   fila.className = "control-celda-inline";
 
@@ -160,8 +154,6 @@ function celdaOfertas(empleado, esAdmin) {
   fila.appendChild(label);
 
   if (esAdmin) {
-    // Ícono en vez de botón de texto ("Cambiar firma"/"Subir firma") — el
-    // texto era lo que más ensanchaba esta columna.
     const btnFirma = document.createElement("button");
     btnFirma.type = "button";
     btnFirma.className = "icon-btn";
@@ -193,144 +185,208 @@ function celdaOfertas(empleado, esAdmin) {
     });
     fila.append(btnFirma, inputFirma);
   }
-
-  td.appendChild(fila);
-  return td;
+  return fila;
 }
 
-// Checkbox de autorización para el Listado Maestro de Documentos —
-// autoguardado, mismo patrón que celdaOfertas pero sin la parte de firma.
-function celdaDocumentos(empleado, esAdmin) {
-  const td = celda("td");
+function controlCheckboxSimple(empleado, esAdmin, campo, etiqueta) {
   const label = document.createElement("label");
   label.className = "control-check-inline";
   const check = document.createElement("input");
   check.type = "checkbox";
-  check.checked = !!empleado.gestionaDocumentos;
+  check.checked = !!empleado[campo];
   check.disabled = !esAdmin;
   check.addEventListener("change", () => {
-    updateDoc(doc(db, "empleados", empleado.id), { gestionaDocumentos: check.checked, actualizadoEn: serverTimestamp() });
+    updateDoc(doc(db, "empleados", empleado.id), { [campo]: check.checked, actualizadoEn: serverTimestamp() });
   });
   label.appendChild(check);
-  label.appendChild(document.createTextNode("Autorizado"));
-  td.appendChild(label);
-  return td;
+  label.appendChild(document.createTextNode(etiqueta));
+  return label;
 }
 
-// Checkbox que marca a esta persona como aprobadora obligatoria de todo
-// contrato nuevo (Administradora, Gerente...) — autoguardado, mismo patrón
-// que celdaDocumentos. Ver "Aprobación del contrato" en contrato-detalle.js:
-// cada contrato debe quedar aprobado por TODOS los empleados activos que
-// tengan esto marcado.
-function celdaAprobacion(empleado, esAdmin) {
-  const td = celda("td");
-  const label = document.createElement("label");
-  label.className = "control-check-inline";
-  const check = document.createElement("input");
-  check.type = "checkbox";
-  check.checked = !!empleado.aprobadorContratos;
-  check.disabled = !esAdmin;
-  check.addEventListener("change", () => {
-    updateDoc(doc(db, "empleados", empleado.id), { aprobadorContratos: check.checked, actualizadoEn: serverTimestamp() });
-  });
-  label.appendChild(check);
-  label.appendChild(document.createTextNode("Requerido"));
-  td.appendChild(label);
-  return td;
-}
-
-// Checkbox de autorización para Órdenes de Trabajo — mismo patrón que
-// celdaDocumentos. Solo quienes la gerencia marque aquí pueden crear/ver
-// esas órdenes (ver firestore.rules: autorizadoOrdenesTrabajo()).
-function celdaOrdenesTrabajo(empleado, esAdmin) {
-  const td = celda("td");
-  const label = document.createElement("label");
-  label.className = "control-check-inline";
-  const check = document.createElement("input");
-  check.type = "checkbox";
-  check.checked = !!empleado.autorizadoOrdenesTrabajo;
-  check.disabled = !esAdmin;
-  check.addEventListener("change", () => {
-    updateDoc(doc(db, "empleados", empleado.id), { autorizadoOrdenesTrabajo: check.checked, actualizadoEn: serverTimestamp() });
-  });
-  label.appendChild(check);
-  label.appendChild(document.createTextNode("Autorizado"));
-  td.appendChild(label);
-  return td;
-}
-
-// Celda de texto editable (código o cédula), autoguardado al perder el
-// foco — mismo espíritu de autoguardado que las casillas de arriba, pero
-// para texto libre. No hay modal de "editar datos personales" en este
-// módulo (a diferencia de otros de la suite), así que estas dos columnas
-// son la única forma de completar el dato en empleados creados antes de
-// que existiera el campo — nuevas altas también lo traen desde el
-// formulario (ver el submit handler más abajo).
-function celdaTexto(empleado, esAdmin, campo, ancho) {
-  const td = celda("td");
+// Texto libre (cédula/teléfono), autoguardado al perder el foco. No hay
+// modal de "editar datos" en este módulo — el panel es la única forma de
+// completar el dato en empleados creados antes de que existiera el campo.
+function controlTexto(empleado, esAdmin, campo, placeholder) {
   const input = document.createElement("input");
   input.type = "text";
-  input.style.width = ancho;
   input.value = empleado[campo] || "";
+  input.placeholder = placeholder || "";
   input.disabled = !esAdmin;
   input.addEventListener("change", () => {
     updateDoc(doc(db, "empleados", empleado.id), { [campo]: input.value.trim(), actualizadoEn: serverTimestamp() });
   });
-  td.appendChild(input);
-  return td;
+  return input;
 }
 
-function renderTabla(empleados, esAdmin) {
-  tbody.innerHTML = "";
-  sinEmpleados.classList.toggle("oculto", empleados.length > 0);
+function controlRol(empleado, esAdmin) {
+  const select = document.createElement("select");
+  ROLES.forEach((valor) => {
+    const opt = celda("option", ROL_LABEL[valor]);
+    opt.value = valor;
+    if (valor === empleado.rol) opt.selected = true;
+    select.appendChild(opt);
+  });
+  select.disabled = !esAdmin;
+  select.addEventListener("change", () => {
+    updateDoc(doc(db, "empleados", empleado.id), { rol: select.value, actualizadoEn: serverTimestamp() });
+  });
+  return select;
+}
 
-  empleados.forEach((e) => {
+function controlEstado(empleado, esAdmin) {
+  const select = document.createElement("select");
+  [["activo", "Activo"], ["inactivo", "Inactivo"]].forEach(([valor, label]) => {
+    const opt = celda("option", label);
+    opt.value = valor;
+    if (valor === empleado.estado) opt.selected = true;
+    select.appendChild(opt);
+  });
+  select.disabled = !esAdmin;
+  select.addEventListener("change", () => {
+    updateDoc(doc(db, "empleados", empleado.id), { estado: select.value, actualizadoEn: serverTimestamp() });
+  });
+  return select;
+}
+
+// ---- fila compacta + panel de vista previa (mismo patrón que Contratos/
+// Correspondencia/Órdenes de Trabajo): la fila es solo lo justo para
+// escanear y elegir; todos los controles editables de arriba viven en el
+// panel de la persona fijada. ----
+const vistaPreviaEl = document.getElementById("empleadoVistaPrevia");
+const filtroInput = document.getElementById("filtroEmpleado");
+const filtroRolSelect = document.getElementById("filtroEmpleadoRol");
+const filtroEstadoSelect = document.getElementById("filtroEmpleadoEstado");
+let empleadosListaCompleta = [];
+let empleadosListaActual = [];
+let esAdminActual = false;
+let empleadoSeleccionadoId = null;
+
+function renderTabla(empleados, esAdmin) {
+  empleadosListaCompleta = empleados;
+  esAdminActual = esAdmin;
+  aplicarFiltroEmpleados();
+}
+
+function aplicarFiltroEmpleados() {
+  const texto = filtroInput.value.trim().toLowerCase();
+  const rol = filtroRolSelect.value;
+  const estado = filtroEstadoSelect.value;
+  empleadosListaActual = empleadosListaCompleta.filter((e) => {
+    if (rol && e.rol !== rol) return false;
+    if (estado && e.estado !== estado) return false;
+    if (!texto) return true;
+    return `${e.nombre || ""} ${e.email || ""} ${e.cargo || ""}`.toLowerCase().includes(texto);
+  });
+
+  tbody.innerHTML = "";
+  sinEmpleados.textContent = empleadosListaCompleta.length === 0
+    ? "Todavía no hay empleados registrados."
+    : "Ningún empleado coincide con el filtro.";
+  sinEmpleados.classList.toggle("oculto", empleadosListaActual.length > 0);
+
+  if (empleadosListaActual.length === 0) {
+    empleadoSeleccionadoId = null;
+    pintarVistaPreviaEmpleado();
+    return;
+  }
+  if (!empleadoSeleccionadoId || !empleadosListaActual.some((e) => e.id === empleadoSeleccionadoId)) {
+    empleadoSeleccionadoId = empleadosListaActual[0].id;
+  }
+
+  empleadosListaActual.forEach((e) => {
     const fila = document.createElement("tr");
+    fila.dataset.id = e.id;
     fila.appendChild(celda("td", e.nombre));
     fila.appendChild(celda("td", e.email));
     fila.appendChild(celda("td", e.cargo || "—"));
-    fila.appendChild(celdaTexto(e, esAdmin, "cedula", "90px"));
-    fila.appendChild(celdaTexto(e, esAdmin, "telefono", "90px"));
-
-    const tdRol = celda("td");
-    const selectRol = document.createElement("select");
-    ROLES.forEach((valor) => {
-      const opt = celda("option", ROL_LABEL[valor]);
-      opt.value = valor;
-      if (valor === e.rol) opt.selected = true;
-      selectRol.appendChild(opt);
-    });
-    selectRol.disabled = !esAdmin;
-    selectRol.addEventListener("change", () => {
-      updateDoc(doc(db, "empleados", e.id), { rol: selectRol.value, actualizadoEn: serverTimestamp() });
-    });
-    tdRol.appendChild(selectRol);
-    fila.appendChild(tdRol);
-
-    fila.appendChild(celdaCampos(e, esAdmin));
-
-    const tdEstado = celda("td");
-    const selectEstado = document.createElement("select");
-    [["activo", "Activo"], ["inactivo", "Inactivo"]].forEach(([valor, label]) => {
-      const opt = celda("option", label);
-      opt.value = valor;
-      if (valor === e.estado) opt.selected = true;
-      selectEstado.appendChild(opt);
-    });
-    selectEstado.disabled = !esAdmin;
-    selectEstado.addEventListener("change", () => {
-      updateDoc(doc(db, "empleados", e.id), { estado: selectEstado.value, actualizadoEn: serverTimestamp() });
-    });
-    tdEstado.appendChild(selectEstado);
+    fila.appendChild(celda("td", ROL_LABEL[e.rol] || e.rol));
+    const tdEstado = celda("td", e.estado === "activo" ? "Activo" : "Inactivo");
+    tdEstado.className = e.estado === "activo" ? "" : "text-muted";
     fila.appendChild(tdEstado);
-
-    fila.appendChild(celdaOfertas(e, esAdmin));
-    fila.appendChild(celdaDocumentos(e, esAdmin));
-    fila.appendChild(celdaAprobacion(e, esAdmin));
-    fila.appendChild(celdaOrdenesTrabajo(e, esAdmin));
-
+    fila.addEventListener("click", () => {
+      empleadoSeleccionadoId = e.id;
+      actualizarResaltadoEmpleado();
+      pintarVistaPreviaEmpleado();
+    });
     tbody.appendChild(fila);
   });
+  actualizarResaltadoEmpleado();
+  pintarVistaPreviaEmpleado();
+}
+filtroInput.addEventListener("input", aplicarFiltroEmpleados);
+filtroRolSelect.addEventListener("change", aplicarFiltroEmpleados);
+filtroEstadoSelect.addEventListener("change", aplicarFiltroEmpleados);
+
+function actualizarResaltadoEmpleado() {
+  tbody.querySelectorAll("tr[data-id]").forEach((tr) => {
+    tr.classList.toggle("control-fila-fijada", tr.dataset.id === empleadoSeleccionadoId);
+  });
+}
+
+function campoEditable(etiqueta, controlEl) {
+  const div = document.createElement("div");
+  div.className = "control-vp-campo";
+  const lbl = document.createElement("span");
+  lbl.className = "control-vp-etiqueta";
+  lbl.textContent = etiqueta;
+  div.append(lbl, controlEl);
+  return div;
+}
+
+function grupoEl(titulo, hijos) {
+  const div = document.createElement("div");
+  div.className = "control-vp-grupo";
+  const t = document.createElement("div");
+  t.className = "control-vp-grupo-titulo";
+  t.textContent = titulo;
+  const campos = document.createElement("div");
+  campos.className = "control-vp-grupo-campos";
+  hijos.forEach((h) => campos.appendChild(h));
+  div.append(t, campos);
+  return div;
+}
+
+function pintarVistaPreviaEmpleado() {
+  const e = empleadosListaActual.find((x) => x.id === empleadoSeleccionadoId);
+  if (!e) {
+    vistaPreviaEl.innerHTML = `<p class="text-muted" style="margin:0;">${empleadosListaCompleta.length === 0 ? "Todavía no hay empleados registrados." : "Ningún empleado coincide con el filtro."}</p>`;
+    return;
+  }
+
+  vistaPreviaEl.innerHTML = "";
+  const encabezado = document.createElement("div");
+  encabezado.className = "control-vp-encabezado";
+  const titulo = document.createElement("span");
+  titulo.className = "control-vp-titulo";
+  titulo.textContent = `${e.nombre} — ${e.email}`;
+  encabezado.appendChild(titulo);
+  vistaPreviaEl.appendChild(encabezado);
+
+  const grupos = document.createElement("div");
+  grupos.className = "control-vp-grupos";
+
+  grupos.appendChild(grupoEl("Datos", [
+    campoEditable("Cédula", controlTexto(e, esAdminActual, "cedula", "Ej. 1075320443")),
+    campoEditable("Teléfono", controlTexto(e, esAdminActual, "telefono", "Ej. 3101234567"))
+  ]));
+
+  grupos.appendChild(grupoEl("Acceso", [
+    campoEditable("Rol", controlRol(e, esAdminActual)),
+    campoEditable("Estado", controlEstado(e, esAdminActual))
+  ]));
+
+  if (campoDeRol(e.rol)) {
+    grupos.appendChild(grupoEl(e.rol === "apoyo" ? "Columnas que puede editar" : "Columnas que puede ver", [controlCampos(e, esAdminActual)]));
+  }
+
+  grupos.appendChild(grupoEl("Permisos", [
+    campoEditable("Ofertas comerciales", controlOfertas(e, esAdminActual)),
+    campoEditable("Listado Maestro de Documentos", controlCheckboxSimple(e, esAdminActual, "gestionaDocumentos", "Autorizado")),
+    campoEditable("Aprobación de contratos", controlCheckboxSimple(e, esAdminActual, "aprobadorContratos", "Requerido")),
+    campoEditable("Órdenes de Trabajo", controlCheckboxSimple(e, esAdminActual, "autorizadoOrdenesTrabajo", "Autorizado"))
+  ]));
+
+  vistaPreviaEl.appendChild(grupos);
 }
 
 requireAuth(async (user) => {

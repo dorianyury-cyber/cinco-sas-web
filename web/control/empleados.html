@@ -108,36 +108,42 @@
         </div>
       </div>
 
+      <div class="control-filtros-lista">
+        <input type="text" id="filtroEmpleado" placeholder="Buscar por nombre, correo o cargo...">
+        <select id="filtroEmpleadoRol">
+          <option value="">Todos los roles</option>
+          <option value="admin">Administrador</option>
+          <option value="coadmin">Coadministrador</option>
+          <option value="apoyo">Apoyo</option>
+          <option value="empleado">Empleado</option>
+        </select>
+        <select id="filtroEmpleadoEstado">
+          <option value="">Todos los estados</option>
+          <option value="activo">Activos</option>
+          <option value="inactivo">Inactivos</option>
+        </select>
+      </div>
+
+      <div class="control-vista-previa" id="empleadoVistaPrevia">
+        <p class="text-muted" style="margin:0;">Cargando...</p>
+      </div>
+
       <div class="control-tabla-wrap">
-        <table class="control-tabla-documentos">
+        <table class="control-tabla-documentos control-tabla-seleccionable">
           <colgroup>
             <col>
-            <col class="w-190">
-            <col class="w-120">
-            <col class="w-110">
-            <col class="w-110">
+            <col class="w-220">
             <col class="w-150">
-            <col class="w-190">
+            <col class="w-130">
             <col class="w-100">
-            <col class="w-130">
-            <col class="w-110">
-            <col class="w-150">
-            <col class="w-130">
           </colgroup>
           <thead>
             <tr>
               <th>Nombre</th>
               <th>Correo</th>
               <th>Cargo</th>
-              <th>Cédula</th>
-              <th>Teléfono</th>
               <th>Rol</th>
-              <th>Campos</th>
               <th>Estado</th>
-              <th>Ofertas</th>
-              <th>Documentos</th>
-              <th>Aprueba contratos</th>
-              <th>Órdenes de trabajo</th>
             </tr>
           </thead>
           <tbody id="listaEmpleados"></tbody>
