@@ -85,8 +85,13 @@
         </form>
       </details>
 
-      <div class="control-filtros">
+      <div class="control-filtros-lista">
         <input type="text" id="filtroCorrespondencia" placeholder="Buscar por radicado, destinatario o asunto...">
+        <select id="filtroCorrespondenciaContrato"><option value="">Todos los contratos</option></select>
+        <span class="control-filtros-fecha">
+          Desde <input type="date" id="filtroCorrespondenciaDesde">
+          Hasta <input type="date" id="filtroCorrespondenciaHasta">
+        </span>
       </div>
 
       <div class="control-vista-previa" id="cartaVistaPrevia">

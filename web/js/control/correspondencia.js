@@ -258,6 +258,9 @@ function escapeHtml(texto) {
 
 const vistaPreviaCartaEl = document.getElementById("cartaVistaPrevia");
 const filtroInput = document.getElementById("filtroCorrespondencia");
+const filtroContratoSelect = document.getElementById("filtroCorrespondenciaContrato");
+const filtroDesdeInput = document.getElementById("filtroCorrespondenciaDesde");
+const filtroHastaInput = document.getElementById("filtroCorrespondenciaHasta");
 
 // Deep-link desde "Documentos del contrato" (contrato.html) — esa vista
 // solo puede enlazar a esta página en general (no hay contrato.html?id=
@@ -266,6 +269,7 @@ const filtroInput = document.getElementById("filtroCorrespondencia");
 const idDestacar = new URLSearchParams(window.location.search).get("id");
 let yaScrolleadoAIdDestacado = false;
 
+let contratosPorId = {};
 let cartasListaCompleta = [];
 let cartasListaFiltrada = [];
 let esGestorActual = false;
@@ -283,12 +287,18 @@ function renderTabla(cartas, esGestor) {
 
 function aplicarFiltroCorrespondencia() {
   const texto = filtroInput.value.trim().toLowerCase();
-  cartasListaFiltrada = !texto
-    ? cartasListaCompleta
-    : cartasListaCompleta.filter((c) =>
-        (c.radicado || "").toLowerCase().includes(texto) ||
-        (c.destinatario || "").toLowerCase().includes(texto) ||
-        (c.asunto || "").toLowerCase().includes(texto));
+  const contratoId = filtroContratoSelect.value;
+  const desde = filtroDesdeInput.value;
+  const hasta = filtroHastaInput.value;
+  cartasListaFiltrada = cartasListaCompleta.filter((c) => {
+    if (contratoId && c.contratoId !== contratoId) return false;
+    if (desde && (!c.fecha || c.fecha < desde)) return false;
+    if (hasta && (!c.fecha || c.fecha > hasta)) return false;
+    if (!texto) return true;
+    return (c.radicado || "").toLowerCase().includes(texto) ||
+      (c.destinatario || "").toLowerCase().includes(texto) ||
+      (c.asunto || "").toLowerCase().includes(texto);
+  });
 
   tbody.innerHTML = "";
   sinCartas.textContent = cartasListaCompleta.length === 0
@@ -331,6 +341,9 @@ function aplicarFiltroCorrespondencia() {
   }
 }
 filtroInput.addEventListener("input", aplicarFiltroCorrespondencia);
+filtroContratoSelect.addEventListener("change", aplicarFiltroCorrespondencia);
+filtroDesdeInput.addEventListener("change", aplicarFiltroCorrespondencia);
+filtroHastaInput.addEventListener("change", aplicarFiltroCorrespondencia);
 
 function actualizarResaltadoCarta() {
   tbody.querySelectorAll("tr[data-id]").forEach((tr) => {
@@ -367,6 +380,7 @@ function pintarVistaPreviaCarta() {
         ${campo("Ciudad", c.ciudad)}
       `)}
       ${grupo("Contenido", campo("Asunto", c.asunto))}
+      ${c.contratoId ? grupo("Contrato relacionado", campo("Contrato", contratosPorId[c.contratoId] ? `${contratosPorId[c.contratoId].codigo || "(sin código)"} — ${contratosPorId[c.contratoId].nombre || ""}` : "")) : ""}
       ${grupo("Firma", `
         ${campo("Nombre", c.firmaNombre)}
         ${campo("Cargo", c.firmaCargo)}
@@ -490,10 +504,13 @@ requireAuth(async (user) => {
   const contratosSnap = await getDocs(query(collection(db, "contratos"), orderBy("creadoEn", "desc")));
   contratosSnap.forEach((docSnap) => {
     const c = docSnap.data();
+    contratosPorId[docSnap.id] = c;
+    const etiqueta = `${c.codigo || "(sin código)"} — ${truncar(c.nombre)}`;
     const opt = document.createElement("option");
     opt.value = docSnap.id;
-    opt.textContent = `${c.codigo || "(sin código)"} — ${truncar(c.nombre)}`;
+    opt.textContent = etiqueta;
     selectContrato.appendChild(opt);
+    filtroContratoSelect.appendChild(new Option(etiqueta, docSnap.id));
   });
 
   form.addEventListener("submit", async (e) => {
@@ -541,7 +558,11 @@ requireAuth(async (user) => {
 
         tx.set(contadorRef, { siguiente: siguiente + 1 });
         tx.set(cartaRef, {
-          ...datosBase, bloques: bloquesFinal, radicado, anio, consecutivo: siguiente,
+          // contratoId también queda en la carta misma (antes solo se
+          // usaba para la referencia cruzada en contratos/{id}/documentos,
+          // más abajo) — así se puede filtrar el listado por contrato sin
+          // tener que ir a buscarlo ahí.
+          ...datosBase, bloques: bloquesFinal, radicado, anio, consecutivo: siguiente, contratoId: contratoId || null,
           creadoPor: user.email, creadoEn: serverTimestamp(),
           actualizadoEn: serverTimestamp(), actualizadoPor: user.email
         });
