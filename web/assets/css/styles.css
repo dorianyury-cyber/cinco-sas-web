@@ -1590,6 +1590,38 @@ tr.control-fila-doc:hover { background: rgba(254, 178, 9, 0.08); }
 tr.control-fila-doc td:first-child { font-weight: 700; color: var(--cinco-amber-dark); }
 tr.control-fila-destacada { background: rgba(254, 178, 9, 0.25); transition: background 0.4s ease; }
 
+/* ---- Lista + panel de detalle (mismo patrón que Empleados en Cinco
+   Conecta y Activos/Usuarios en Copropiedad Saludable): la tabla queda
+   angosta, una sola línea por fila, sin columna de acciones — todo el
+   detalle completo, incluidas las acciones, vive en el panel fijo de
+   arriba (.control-vp-*). Clic en una fila la deja fijada en el panel
+   hasta hacer clic en otra; al entrar o cambiar de filtro se fija sola la
+   primera fila, para que el panel nunca arranque vacío. Evita que listas
+   con muchas columnas obliguen a correr una barra horizontal para ver la
+   última columna o las acciones. */
+.control-tabla-seleccionable tbody tr { cursor: pointer; }
+.control-tabla-seleccionable tr.control-fila-fijada { background: rgba(254, 178, 9, 0.16); }
+.control-tabla-seleccionable tr.control-fila-fijada:hover { background: rgba(254, 178, 9, 0.24); }
+
+.control-vista-previa {
+  display: flex; flex-direction: column; gap: 10px;
+  padding: 14px 16px; margin-bottom: 14px;
+  background: var(--card-bg); border-radius: var(--radius); box-shadow: var(--shadow);
+}
+.control-vista-previa .control-vp-encabezado { display: flex; align-items: center; justify-content: space-between; flex-wrap: wrap; gap: 10px; }
+.control-vista-previa .control-vp-titulo { font-size: 16px; font-weight: 800; color: var(--text); }
+.control-vista-previa .control-vp-acciones { display: flex; flex-wrap: wrap; gap: 8px; }
+.control-vista-previa .control-vp-grupos { display: flex; flex-wrap: wrap; gap: 8px; }
+.control-vista-previa .control-vp-grupo { flex: 1 1 200px; min-width: 180px; padding: 7px 10px 8px; border-radius: 8px; background: var(--bg); }
+.control-vista-previa .control-vp-grupo-titulo { font-size: 10.5px; font-weight: 800; text-transform: uppercase; letter-spacing: 0.4px; color: var(--text-muted); border-bottom: 1px solid var(--border); padding-bottom: 4px; margin-bottom: 6px; }
+.control-vista-previa .control-vp-grupo-campos { display: flex; flex-direction: column; }
+.control-vista-previa .control-vp-campo { padding: 5px 0; border-bottom: 1px solid var(--border); }
+.control-vista-previa .control-vp-campo:last-child { border-bottom: none; padding-bottom: 0; }
+.control-vista-previa .control-vp-campo:first-child { padding-top: 0; }
+.control-vista-previa .control-vp-etiqueta { display: block; font-size: 9px; font-weight: 700; text-transform: uppercase; letter-spacing: 0.3px; color: var(--text-muted); }
+.control-vista-previa .control-vp-valor { display: block; position: relative; padding-left: 13px; font-size: 12.5px; font-weight: 700; color: var(--cinco-amber-dark); white-space: normal; word-break: break-word; }
+.control-vista-previa .control-vp-valor::before { content: "•"; position: absolute; left: 0; top: 0; color: var(--cinco-amber-dark); }
+
 /* ---- Equipo asignado (web/control/contrato.html) ---- */
 .control-equipo-lista { display: flex; flex-direction: column; gap: 8px; margin-bottom: 14px; }
 .control-equipo-fila {

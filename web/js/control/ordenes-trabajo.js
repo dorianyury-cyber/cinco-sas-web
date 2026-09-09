@@ -14,6 +14,7 @@ const navLink = document.getElementById("navOrdenesTrabajo");
 
 const tbody = document.getElementById("listaOrdenes");
 const sinOrdenes = document.getElementById("sinOrdenes");
+const vistaPreviaOrdenEl = document.getElementById("otVistaPrevia");
 const tbodyParticipante = document.getElementById("listaOrdenesParticipante");
 const sinOrdenesParticipante = document.getElementById("sinOrdenesParticipante");
 const form = document.getElementById("ordenForm");
@@ -504,6 +505,10 @@ function celda(texto) {
   return td;
 }
 
+function escapeHtml(texto) {
+  return String(texto ?? "").replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;");
+}
+
 const URL_APP = "https://cinco-sas.web.app/control/ordenes-trabajo.html";
 
 // Link de wa.me: abre WhatsApp con el número del responsable y un mensaje
@@ -556,12 +561,33 @@ document.getElementById("otCerrarConfirmacionBtn").addEventListener("click", () 
   nuevaOrdenBackdrop.classList.remove("open");
 });
 
+// Fila = solo lo justo para escanear y elegir (una sola línea, sin
+// acciones) — mismo patrón que Empleados en Cinco Conecta y
+// Activos/Usuarios en Copropiedad Saludable: todo el detalle completo,
+// incluidas las acciones, vive en el panel de vista previa de arriba
+// (evita la barra horizontal que salía con la columna de acciones).
+let ordenesListaActual = [];
+let autorizadoListaActual = false;
+let ordenSeleccionadaId = null;
+
 function renderTabla(ordenes, autorizado) {
+  ordenesListaActual = ordenes;
+  autorizadoListaActual = autorizado;
   tbody.innerHTML = "";
   sinOrdenes.classList.toggle("oculto", ordenes.length > 0);
 
+  if (ordenes.length === 0) {
+    ordenSeleccionadaId = null;
+    pintarVistaPreviaOrden();
+    return;
+  }
+  if (!ordenSeleccionadaId || !ordenes.some((o) => o.id === ordenSeleccionadaId)) {
+    ordenSeleccionadaId = ordenes[0].id;
+  }
+
   ordenes.forEach((o) => {
     const fila = document.createElement("tr");
+    fila.dataset.id = o.id;
     fila.appendChild(celda(String(o.numero ?? "—")));
 
     const tdEstado = celda(o.estado || "ACTIVA");
@@ -572,69 +598,119 @@ function renderTabla(ordenes, autorizado) {
     fila.appendChild(celda(`${o.responsable?.nombre || "—"} · ${o.descripcion || ""}`.slice(0, 90)));
     fila.appendChild(celda((o.fechaHoraInicio || "").replace("T", " ")));
 
-    const tdAccion = document.createElement("td");
-    tdAccion.className = "control-tabla-acciones";
-
-    const btnPdf = document.createElement("button");
-    btnPdf.type = "button";
-    btnPdf.className = "control-btn-mini";
-    btnPdf.textContent = "PDF";
-    btnPdf.addEventListener("click", async () => {
-      btnPdf.disabled = true;
-      try {
-        const pdf = await generarOrdenTrabajoPDF(o);
-        pdf.save(`orden-trabajo-${o.numero}.pdf`);
-      } finally {
-        btnPdf.disabled = false;
-      }
+    fila.addEventListener("click", () => {
+      ordenSeleccionadaId = o.id;
+      actualizarResaltadoOrden();
+      pintarVistaPreviaOrden();
     });
-    tdAccion.appendChild(btnPdf);
-
-    if (autorizado) {
-      const btnEditar = document.createElement("button");
-      btnEditar.type = "button";
-      btnEditar.className = "control-btn-mini";
-      btnEditar.textContent = "Editar";
-      btnEditar.addEventListener("click", () => abrirModalEditar(o));
-      tdAccion.appendChild(btnEditar);
-
-      // Abre WhatsApp Web/app del que genera la orden (con SU propia
-      // sesión ya iniciada) con el mensaje y el número del responsable
-      // pre-rellenados — nada se envía automático, hay que darle "Enviar"
-      // del lado de WhatsApp. No requiere ninguna API de WhatsApp Business.
-      if (o.responsable?.telefono) {
-        const btnWhatsApp = document.createElement("button");
-        btnWhatsApp.type = "button";
-        btnWhatsApp.className = "control-btn-mini";
-        btnWhatsApp.textContent = o.whatsappEnviadoEn ? "Enviar nuevamente" : "WhatsApp";
-        btnWhatsApp.addEventListener("click", () => {
-          abrirWhatsAppYMarcar(o);
-          btnWhatsApp.textContent = "Enviar nuevamente";
-        });
-        tdAccion.appendChild(btnWhatsApp);
-      }
-
-      const btnBorrar = document.createElement("button");
-      btnBorrar.type = "button";
-      btnBorrar.className = "control-btn-danger";
-      btnBorrar.textContent = "Borrar";
-      btnBorrar.addEventListener("click", async () => {
-        const confirmado = window.confirm(`¿Seguro que quieres borrar la orden ${o.numero}?\n\nEsta acción no se puede deshacer.`);
-        if (!confirmado) return;
-        btnBorrar.disabled = true;
-        try {
-          await deleteDoc(doc(db, "ordenesTrabajo", o.id));
-        } catch (err) {
-          mostrarAlerta(err.message || "No se pudo borrar la orden.", "error");
-          btnBorrar.disabled = false;
-        }
-      });
-      tdAccion.appendChild(btnBorrar);
-    }
-
-    fila.appendChild(tdAccion);
     tbody.appendChild(fila);
   });
+  actualizarResaltadoOrden();
+  pintarVistaPreviaOrden();
+}
+
+function actualizarResaltadoOrden() {
+  tbody.querySelectorAll("tr[data-id]").forEach((tr) => {
+    tr.classList.toggle("control-fila-fijada", tr.dataset.id === ordenSeleccionadaId);
+  });
+}
+
+function pintarVistaPreviaOrden() {
+  const o = ordenesListaActual.find((x) => x.id === ordenSeleccionadaId);
+  if (!o) {
+    vistaPreviaOrdenEl.innerHTML = '<p class="text-muted" style="margin:0;">Todavía no hay órdenes de trabajo registradas.</p>';
+    return;
+  }
+
+  const campo = (etiqueta, valor) => `
+    <div class="control-vp-campo">
+      <span class="control-vp-etiqueta">${etiqueta}</span>
+      <span class="control-vp-valor">${escapeHtml(valor || "-")}</span>
+    </div>`;
+  const grupo = (titulo, camposHtml) => `
+    <div class="control-vp-grupo">
+      <div class="control-vp-grupo-titulo">${titulo}</div>
+      <div class="control-vp-grupo-campos">${camposHtml}</div>
+    </div>`;
+
+  vistaPreviaOrdenEl.innerHTML = `
+    <div class="control-vp-encabezado">
+      <span class="control-vp-titulo">Orden ${escapeHtml(String(o.numero ?? "—"))} — ${escapeHtml(o.estado || "ACTIVA")}</span>
+      <div class="control-vp-acciones" id="otVpAcciones"></div>
+    </div>
+    <div class="control-vp-grupos">
+      ${grupo("Datos generales", `
+        ${campo("Contrato", o.contratoNumero)}
+        ${campo("Municipio", `${o.municipio || "-"} (${o.sector === "R" ? "Rural" : "Urbano"})`)}
+        ${campo("Inicio", (o.fechaHoraInicio || "-").replace("T", " "))}
+        ${campo("Terminación", (o.fechaHoraTerminacion || "-").replace("T", " "))}
+      `)}
+      ${grupo("Responsable de los trabajos", `
+        ${campo("Nombre", o.responsable?.nombre)}
+        ${campo("Teléfono", o.responsable?.telefono)}
+      `)}
+      ${grupo("Descripción", campo("Detalle", o.descripcion))}
+    </div>
+  `;
+
+  const accionesEl = document.getElementById("otVpAcciones");
+
+  const btnPdf = document.createElement("button");
+  btnPdf.type = "button";
+  btnPdf.className = "control-btn-mini";
+  btnPdf.textContent = "PDF";
+  btnPdf.addEventListener("click", async () => {
+    btnPdf.disabled = true;
+    try {
+      const pdf = await generarOrdenTrabajoPDF(o);
+      pdf.save(`orden-trabajo-${o.numero}.pdf`);
+    } finally {
+      btnPdf.disabled = false;
+    }
+  });
+  accionesEl.appendChild(btnPdf);
+
+  if (!autorizadoListaActual) return;
+
+  const btnEditar = document.createElement("button");
+  btnEditar.type = "button";
+  btnEditar.className = "control-btn-mini";
+  btnEditar.textContent = "Editar";
+  btnEditar.addEventListener("click", () => abrirModalEditar(o));
+  accionesEl.appendChild(btnEditar);
+
+  // Abre WhatsApp Web/app del que genera la orden (con SU propia sesión
+  // ya iniciada) con el mensaje y el número del responsable
+  // pre-rellenados — nada se envía automático, hay que darle "Enviar" del
+  // lado de WhatsApp. No requiere ninguna API de WhatsApp Business.
+  if (o.responsable?.telefono) {
+    const btnWhatsApp = document.createElement("button");
+    btnWhatsApp.type = "button";
+    btnWhatsApp.className = "control-btn-mini";
+    btnWhatsApp.textContent = o.whatsappEnviadoEn ? "Enviar nuevamente" : "WhatsApp";
+    btnWhatsApp.addEventListener("click", () => {
+      abrirWhatsAppYMarcar(o);
+      btnWhatsApp.textContent = "Enviar nuevamente";
+    });
+    accionesEl.appendChild(btnWhatsApp);
+  }
+
+  const btnBorrar = document.createElement("button");
+  btnBorrar.type = "button";
+  btnBorrar.className = "control-btn-danger";
+  btnBorrar.textContent = "Borrar";
+  btnBorrar.addEventListener("click", async () => {
+    const confirmado = window.confirm(`¿Seguro que quieres borrar la orden ${o.numero}?\n\nEsta acción no se puede deshacer.`);
+    if (!confirmado) return;
+    btnBorrar.disabled = true;
+    try {
+      await deleteDoc(doc(db, "ordenesTrabajo", o.id));
+    } catch (err) {
+      mostrarAlerta(err.message || "No se pudo borrar la orden.", "error");
+      btnBorrar.disabled = false;
+    }
+  });
+  accionesEl.appendChild(btnBorrar);
 }
 
 requireAuth(async (user) => {
