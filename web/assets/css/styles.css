@@ -1138,11 +1138,6 @@ form.modal-form-grid .control-campos-permiso-lista label {
 .control-nuevo form { margin-top: 4px; }
 
 .control-lista { margin-top: 28px; }
-a.control-contrato-card { display: block; color: inherit; text-decoration: none; transition: transform 0.2s ease, box-shadow 0.2s ease; }
-a.control-contrato-card:hover { transform: translateY(-4px); box-shadow: var(--shadow-lg); text-decoration: none; }
-.control-contrato-card h3 { font-size: 16px; color: var(--cinco-navy); margin: 12px 0 6px; }
-@media (prefers-color-scheme: dark) { .control-contrato-card h3 { color: #fff; } }
-.control-contrato-card p { font-size: 13px; margin: 0 0 4px; }
 
 .control-cabecera {
   display: flex;

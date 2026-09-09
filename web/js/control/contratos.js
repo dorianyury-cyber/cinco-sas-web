@@ -57,41 +57,128 @@ function elemento(tag, opts = {}) {
   return el;
 }
 
-// Se construye con la API del DOM (no innerHTML) porque nombre/cliente/
-// número los escribe el usuario al crear el contrato.
+function escapeHtml(texto) {
+  return String(texto ?? "").replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;");
+}
+
+const vistaPreviaEl = document.getElementById("contratoVistaPrevia");
+let contratosListaActual = [];
+let totalAprobadoresActual = 0;
+let contratoSeleccionadoId = null;
+
+function celda(texto) {
+  const td = document.createElement("td");
+  td.textContent = texto;
+  return td;
+}
+
+// Fila = solo lo justo para escanear y elegir (una sola línea, sin
+// tarjetas) — mismo patrón que Órdenes de Trabajo/Empleados (Cinco
+// Conecta) y Activos/Usuarios (Copropiedad Saludable): el detalle
+// completo vive en el panel de vista previa de arriba, con el enlace a
+// la ficha completa del contrato como su acción principal.
 //
 // totalAprobadores > 0: hay gente marcada en Empleados como aprobadora
-// obligatoria de contratos — se agrega un badge de un vistazo (sin tener
-// que entrar a cada ficha) para que quien aprueba encuentre rápido los
-// contratos que todavía le faltan.
+// obligatoria de contratos — se muestra ese avance en el panel para que
+// quien aprueba encuentre rápido los contratos que todavía le faltan.
 function renderContratos(snapshot, totalAprobadores) {
+  contratosListaActual = snapshot.docs.map((d) => ({ id: d.id, ...d.data() }));
+  totalAprobadoresActual = totalAprobadores;
   lista.innerHTML = "";
   sinContratos.classList.toggle("oculto", !snapshot.empty);
-  snapshot.forEach((docSnap) => {
-    const c = docSnap.data();
-    const card = document.createElement("a");
-    card.className = "card control-contrato-card";
-    card.href = `contrato.html?id=${docSnap.id}`;
-    if (c.codigo) card.appendChild(elemento("span", { class: "control-badge", text: c.codigo }));
-    card.appendChild(elemento("span", { class: "pill", text: TIPO_LABEL[c.tipo] || c.tipo }));
-    if (totalAprobadores > 0) {
-      const aprobados = Object.keys(c.aprobaciones || {}).length;
-      card.appendChild(elemento("span", {
-        class: `control-badge${aprobados >= totalAprobadores ? " completo" : ""}`,
-        text: aprobados >= totalAprobadores ? "✅ Aprobado" : `⏳ Aprobación ${aprobados}/${totalAprobadores}`
-      }));
-    }
-    card.appendChild(elemento("h3", { text: c.nombre }));
-    card.appendChild(elemento("p", { text: c.cliente + (c.numero ? " · " + c.numero : "") }));
-    card.appendChild(elemento("p", {
-      class: "text-muted",
-      text: `Inicio: ${c.fechaInicio || "—"}${c.fechaFin ? " · Fin: " + c.fechaFin : ""} · ${c.estado === "cerrado" ? "Cerrado" : "Activo"}`
-    }));
-    if (c.valorContrato) {
-      card.appendChild(elemento("p", { class: "text-muted", text: formatoMoneda.format(c.valorContrato) }));
-    }
-    lista.appendChild(card);
+
+  if (contratosListaActual.length === 0) {
+    contratoSeleccionadoId = null;
+    pintarVistaPreviaContrato();
+    return;
+  }
+  if (!contratoSeleccionadoId || !contratosListaActual.some((c) => c.id === contratoSeleccionadoId)) {
+    contratoSeleccionadoId = contratosListaActual[0].id;
+  }
+
+  contratosListaActual.forEach((c) => {
+    const fila = document.createElement("tr");
+    fila.dataset.id = c.id;
+    fila.appendChild(celda(c.codigo || "—"));
+    fila.appendChild(celda(c.nombre || "—"));
+    fila.appendChild(celda(c.cliente || "—"));
+    fila.appendChild(celda(TIPO_LABEL[c.tipo] || c.tipo || "—"));
+    const tdEstado = celda(c.estado === "cerrado" ? "Cerrado" : "Activo");
+    tdEstado.className = c.estado === "cerrado" ? "text-muted" : "";
+    fila.appendChild(tdEstado);
+    fila.addEventListener("click", () => {
+      contratoSeleccionadoId = c.id;
+      actualizarResaltadoContrato();
+      pintarVistaPreviaContrato();
+    });
+    lista.appendChild(fila);
   });
+  actualizarResaltadoContrato();
+  pintarVistaPreviaContrato();
+}
+
+function actualizarResaltadoContrato() {
+  lista.querySelectorAll("tr[data-id]").forEach((tr) => {
+    tr.classList.toggle("control-fila-fijada", tr.dataset.id === contratoSeleccionadoId);
+  });
+}
+
+function pintarVistaPreviaContrato() {
+  const c = contratosListaActual.find((x) => x.id === contratoSeleccionadoId);
+  if (!c) {
+    vistaPreviaEl.innerHTML = '<p class="text-muted" style="margin:0;">Todavía no hay contratos registrados.</p>';
+    return;
+  }
+
+  const campo = (etiqueta, valor) => `
+    <div class="control-vp-campo">
+      <span class="control-vp-etiqueta">${etiqueta}</span>
+      <span class="control-vp-valor">${escapeHtml(valor || "-")}</span>
+    </div>`;
+  const grupo = (titulo, camposHtml) => `
+    <div class="control-vp-grupo">
+      <div class="control-vp-grupo-titulo">${titulo}</div>
+      <div class="control-vp-grupo-campos">${camposHtml}</div>
+    </div>`;
+
+  const aprobacionHtml = totalAprobadoresActual > 0
+    ? (() => {
+        const aprobados = Object.keys(c.aprobaciones || {}).length;
+        return grupo("Aprobación", campo("Avance", aprobados >= totalAprobadoresActual ? "✅ Aprobado" : `⏳ ${aprobados}/${totalAprobadoresActual}`));
+      })()
+    : "";
+
+  vistaPreviaEl.innerHTML = `
+    <div class="control-vp-encabezado">
+      <span class="control-vp-titulo">${escapeHtml(c.codigo || "")} — ${escapeHtml(c.nombre || "-")}</span>
+      <div class="control-vp-acciones" id="contratoVpAcciones"></div>
+    </div>
+    <div class="control-vp-grupos">
+      ${grupo("Contrato", `
+        ${campo("Tipo", TIPO_LABEL[c.tipo] || c.tipo)}
+        ${campo("Línea de servicio", c.lineaServicio)}
+        ${campo("Número", c.numero)}
+        ${campo("Estado", c.estado === "cerrado" ? "Cerrado" : "Activo")}
+      `)}
+      ${grupo("Cliente", `
+        ${campo("Cliente", c.cliente)}
+        ${campo("Supervisor/Interventor", c.supervisor)}
+      `)}
+      ${grupo("Fechas y valor", `
+        ${campo("Inicio", c.fechaInicio)}
+        ${campo("Finalización", c.fechaFin)}
+        ${campo("Valor", c.valorContrato ? formatoMoneda.format(c.valorContrato) : "")}
+      `)}
+      ${aprobacionHtml}
+    </div>
+  `;
+
+  const accionesEl = document.getElementById("contratoVpAcciones");
+  const btnAbrir = document.createElement("a");
+  btnAbrir.className = "control-btn-mini";
+  btnAbrir.href = `contrato.html?id=${c.id}`;
+  btnAbrir.textContent = "Abrir contrato →";
+  accionesEl.appendChild(btnAbrir);
 }
 
 requireAuth(async (user) => {

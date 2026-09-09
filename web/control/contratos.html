@@ -41,7 +41,31 @@
     <div class="container">
       <button type="button" class="control-btn-mini" id="nuevoContratoBtn">+ Nuevo contrato</button>
 
-      <div id="listaContratos" class="grid-cards grid-cards-wide control-lista"></div>
+      <div class="control-vista-previa control-lista" id="contratoVistaPrevia">
+        <p class="text-muted" style="margin:0;">Cargando...</p>
+      </div>
+
+      <div class="control-tabla-wrap">
+        <table class="control-tabla-documentos control-tabla-seleccionable">
+          <colgroup>
+            <col class="w-100">
+            <col>
+            <col class="w-190">
+            <col class="w-100">
+            <col class="w-150">
+          </colgroup>
+          <thead>
+            <tr>
+              <th>Código</th>
+              <th>Contrato</th>
+              <th>Cliente</th>
+              <th>Tipo</th>
+              <th>Estado</th>
+            </tr>
+          </thead>
+          <tbody id="listaContratos"></tbody>
+        </table>
+      </div>
       <p id="sinContratos" class="text-muted oculto">Todavía no hay contratos registrados.</p>
     </div>
   </section>
