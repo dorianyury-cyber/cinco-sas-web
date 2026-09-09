@@ -42,6 +42,9 @@ function actualizarDescargarBtn() {
 }
 const selectContrato = document.getElementById("contratoRelacionado");
 const selectLinea = document.getElementById("lineaServicio");
+const filtroOfertaInput = document.getElementById("filtroOferta");
+const filtroOfertaLineaSelect = document.getElementById("filtroOfertaLinea");
+const filtroOfertaContratoSelect = document.getElementById("filtroOfertaContrato");
 const selectTipo = document.getElementById("tipo");
 const selectFirma = document.getElementById("firmaEmail");
 const bloquesEditor = document.getElementById("bloquesEditor");
@@ -67,6 +70,7 @@ LINEAS_SERVICIO.forEach((l) => {
   opt.value = l.clave;
   opt.textContent = l.nombre;
   selectLinea.appendChild(opt);
+  filtroOfertaLineaSelect.appendChild(new Option(l.nombre, l.clave));
 });
 
 // Firestore no permite arrays anidados — mismo problema y misma solución
@@ -837,6 +841,16 @@ function celda(texto) {
   return td;
 }
 
+function escapeHtml(texto) {
+  return String(texto ?? "").replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;");
+}
+
+const vistaPreviaOfertaEl = document.getElementById("ofertaVistaPrevia");
+let ofertasListaCompleta = [];
+let ofertasListaActual = [];
+let esGestorOfertasActual = false;
+let ofertaSeleccionadaId = null;
+
 // paraEditar=true: guarda sobre la misma oferta (mismo radicado).
 // paraEditar=false ("Duplicar"): parte de sus datos/bloques/ítems ya
 // digitados pero al guardar genera un radicado nuevo.
@@ -898,75 +912,167 @@ function cargarEnFormulario(oferta, paraEditar) {
   document.getElementById("nuevaOfertaDetails").scrollIntoView({ behavior: "smooth" });
 }
 
+// Fila = solo lo justo para escanear y elegir (una sola línea, sin
+// acciones) — mismo patrón que Contratos/Correspondencia/Órdenes de
+// Trabajo/Empleados: el detalle completo, incluidas las acciones
+// (PDF/Editar/Duplicar/Borrar), vive en el panel de vista previa de arriba.
 function renderTabla(ofertas, esGestor) {
-  tbody.innerHTML = "";
-  sinOfertas.classList.toggle("oculto", ofertas.length > 0);
+  ofertasListaCompleta = ofertas;
+  esGestorOfertasActual = esGestor;
+  aplicarFiltroOfertas();
+}
 
-  ofertas.forEach((of) => {
+function aplicarFiltroOfertas() {
+  const texto = filtroOfertaInput.value.trim().toLowerCase();
+  const linea = filtroOfertaLineaSelect.value;
+  const contratoId = filtroOfertaContratoSelect.value;
+  ofertasListaActual = ofertasListaCompleta.filter((of) => {
+    if (linea && of.lineaServicio !== linea) return false;
+    if (contratoId && of.contratoId !== contratoId) return false;
+    if (!texto) return true;
+    return `${of.radicado || ""} ${of.titulo || ""} ${of.cliente || ""}`.toLowerCase().includes(texto);
+  });
+
+  tbody.innerHTML = "";
+  sinOfertas.textContent = ofertasListaCompleta.length === 0
+    ? "Todavía no hay ofertas registradas."
+    : "Ninguna oferta coincide con el filtro.";
+  sinOfertas.classList.toggle("oculto", ofertasListaActual.length > 0);
+
+  if (ofertasListaActual.length === 0) {
+    ofertaSeleccionadaId = null;
+    pintarVistaPreviaOferta();
+    return;
+  }
+  if (!ofertaSeleccionadaId || !ofertasListaActual.some((of) => of.id === ofertaSeleccionadaId)) {
+    ofertaSeleccionadaId = ofertasListaActual[0].id;
+  }
+
+  ofertasListaActual.forEach((of) => {
     const fila = document.createElement("tr");
+    fila.dataset.id = of.id;
     fila.appendChild(celda(of.radicado));
     fila.appendChild(celda(of.titulo));
     fila.appendChild(celda(of.cliente || "—"));
     fila.appendChild(celda(of.lineaServicio || "—"));
     fila.appendChild(celda(of.creadoEn ? of.creadoEn.toDate().toLocaleDateString("es-CO") : ""));
-
-    const tdAccion = document.createElement("td");
-    tdAccion.className = "control-tabla-acciones";
-
-    const btnPdf = document.createElement("button");
-    btnPdf.type = "button";
-    btnPdf.className = "control-btn-mini";
-    btnPdf.textContent = "PDF";
-    btnPdf.addEventListener("click", async () => {
-      btnPdf.disabled = true;
-      try {
-        const pdf = await generarOfertaPDF(of);
-        pdf.save(`${of.radicado}.pdf`);
-      } finally {
-        btnPdf.disabled = false;
-      }
+    fila.addEventListener("click", () => {
+      ofertaSeleccionadaId = of.id;
+      actualizarResaltadoOferta();
+      pintarVistaPreviaOferta();
     });
-
-    tdAccion.append(btnPdf);
-
-    if (esGestor) {
-      const btnEditar = document.createElement("button");
-      btnEditar.type = "button";
-      btnEditar.className = "control-btn-mini";
-      btnEditar.textContent = "Editar";
-      btnEditar.addEventListener("click", () => cargarEnFormulario(of, true));
-
-      const btnDuplicar = document.createElement("button");
-      btnDuplicar.type = "button";
-      btnDuplicar.className = "control-btn-mini";
-      btnDuplicar.textContent = "Duplicar";
-      btnDuplicar.title = "Partir de esta oferta para una nueva (otro cliente u otra cotización), con radicado propio";
-      btnDuplicar.addEventListener("click", () => cargarEnFormulario(of, false));
-
-      const btnBorrar = document.createElement("button");
-      btnBorrar.type = "button";
-      btnBorrar.className = "control-btn-danger";
-      btnBorrar.textContent = "Borrar";
-      btnBorrar.addEventListener("click", async () => {
-        const confirmado = window.confirm(
-          `¿Seguro que quieres borrar la oferta ${of.radicado} (${of.titulo})?\n\nEsta acción no se puede deshacer. El radicado no se vuelve a usar para otra oferta.`
-        );
-        if (!confirmado) return;
-        btnBorrar.disabled = true;
-        try {
-          await deleteDoc(doc(db, "ofertas", of.id));
-        } catch (err) {
-          mostrarAlerta(err.message || "No se pudo borrar la oferta.", "error");
-          btnBorrar.disabled = false;
-        }
-      });
-
-      tdAccion.append(btnEditar, btnDuplicar, btnBorrar);
-    }
-
-    fila.appendChild(tdAccion);
     tbody.appendChild(fila);
   });
+  actualizarResaltadoOferta();
+  pintarVistaPreviaOferta();
+}
+filtroOfertaInput.addEventListener("input", aplicarFiltroOfertas);
+filtroOfertaLineaSelect.addEventListener("change", aplicarFiltroOfertas);
+filtroOfertaContratoSelect.addEventListener("change", aplicarFiltroOfertas);
+
+function actualizarResaltadoOferta() {
+  tbody.querySelectorAll("tr[data-id]").forEach((tr) => {
+    tr.classList.toggle("control-fila-fijada", tr.dataset.id === ofertaSeleccionadaId);
+  });
+}
+
+function pintarVistaPreviaOferta() {
+  const of = ofertasListaActual.find((x) => x.id === ofertaSeleccionadaId);
+  if (!of) {
+    vistaPreviaOfertaEl.innerHTML = `<p class="text-muted" style="margin:0;">${ofertasListaCompleta.length === 0 ? "Todavía no hay ofertas registradas." : "Ninguna oferta coincide con el filtro."}</p>`;
+    return;
+  }
+
+  const campo = (etiqueta, valor) => `
+    <div class="control-vp-campo">
+      <span class="control-vp-etiqueta">${etiqueta}</span>
+      <span class="control-vp-valor">${escapeHtml(valor || "-")}</span>
+    </div>`;
+  const grupo = (titulo, camposHtml) => `
+    <div class="control-vp-grupo">
+      <div class="control-vp-grupo-titulo">${titulo}</div>
+      <div class="control-vp-grupo-campos">${camposHtml}</div>
+    </div>`;
+
+  vistaPreviaOfertaEl.innerHTML = `
+    <div class="control-vp-encabezado">
+      <span class="control-vp-titulo">${escapeHtml(of.radicado)} — ${escapeHtml(of.titulo)}</span>
+      <div class="control-vp-acciones" id="ofertaVpAcciones"></div>
+    </div>
+    <div class="control-vp-grupos">
+      ${grupo("Oferta", `
+        ${campo("Línea de servicio", of.lineaServicio)}
+        ${campo("Tipo", of.tipo === "obra" ? "Obra (con AIU)" : "Servicio")}
+        ${campo("Fecha", of.creadoEn ? of.creadoEn.toDate().toLocaleDateString("es-CO") : "")}
+      `)}
+      ${grupo("Cliente", `
+        ${campo("Cliente", of.cliente)}
+        ${campo("Contrato relacionado", of.contratoCodigo ? `${of.contratoCodigo} — ${of.contratoNombre || ""}` : "")}
+      `)}
+      ${grupo("Condiciones", `
+        ${campo("Anticipo", of.condiciones?.porcentajeAnticipo ? `${of.condiciones.porcentajeAnticipo}%` : "")}
+        ${campo("Validez", of.condiciones?.validezDias ? `${of.condiciones.validezDias} días` : "")}
+        ${campo("Forma de pago", of.condiciones?.formaPago)}
+      `)}
+      ${grupo("Firma", `
+        ${campo("Nombre", of.firmaNombre)}
+        ${campo("Cargo", of.firmaCargo)}
+      `)}
+    </div>
+  `;
+
+  const accionesEl = document.getElementById("ofertaVpAcciones");
+
+  const btnPdf = document.createElement("button");
+  btnPdf.type = "button";
+  btnPdf.className = "control-btn-mini";
+  btnPdf.textContent = "PDF";
+  btnPdf.addEventListener("click", async () => {
+    btnPdf.disabled = true;
+    try {
+      const pdf = await generarOfertaPDF(of);
+      pdf.save(`${of.radicado}.pdf`);
+    } finally {
+      btnPdf.disabled = false;
+    }
+  });
+  accionesEl.appendChild(btnPdf);
+
+  if (!esGestorOfertasActual) return;
+
+  const btnEditar = document.createElement("button");
+  btnEditar.type = "button";
+  btnEditar.className = "control-btn-mini";
+  btnEditar.textContent = "Editar";
+  btnEditar.addEventListener("click", () => cargarEnFormulario(of, true));
+  accionesEl.appendChild(btnEditar);
+
+  const btnDuplicar = document.createElement("button");
+  btnDuplicar.type = "button";
+  btnDuplicar.className = "control-btn-mini";
+  btnDuplicar.textContent = "Duplicar";
+  btnDuplicar.title = "Partir de esta oferta para una nueva (otro cliente u otra cotización), con radicado propio";
+  btnDuplicar.addEventListener("click", () => cargarEnFormulario(of, false));
+  accionesEl.appendChild(btnDuplicar);
+
+  const btnBorrar = document.createElement("button");
+  btnBorrar.type = "button";
+  btnBorrar.className = "control-btn-danger";
+  btnBorrar.textContent = "Borrar";
+  btnBorrar.addEventListener("click", async () => {
+    const confirmado = window.confirm(
+      `¿Seguro que quieres borrar la oferta ${of.radicado} (${of.titulo})?\n\nEsta acción no se puede deshacer. El radicado no se vuelve a usar para otra oferta.`
+    );
+    if (!confirmado) return;
+    btnBorrar.disabled = true;
+    try {
+      await deleteDoc(doc(db, "ofertas", of.id));
+    } catch (err) {
+      mostrarAlerta(err.message || "No se pudo borrar la oferta.", "error");
+      btnBorrar.disabled = false;
+    }
+  });
+  accionesEl.appendChild(btnBorrar);
 }
 
 requireAuth(async (user) => {
@@ -996,10 +1102,12 @@ requireAuth(async (user) => {
   contratosSnap.forEach((docSnap) => {
     const c = docSnap.data();
     contratosPorId[docSnap.id] = c;
+    const etiqueta = `${c.codigo || "(sin código)"} — ${truncar(c.nombre)}`;
     const opt = document.createElement("option");
     opt.value = docSnap.id;
-    opt.textContent = `${c.codigo || "(sin código)"} — ${truncar(c.nombre)}`;
+    opt.textContent = etiqueta;
     selectContrato.appendChild(opt);
+    filtroOfertaContratoSelect.appendChild(new Option(etiqueta, docSnap.id));
   });
   selectContrato.addEventListener("change", () => {
     const c = contratosPorId[selectContrato.value];
