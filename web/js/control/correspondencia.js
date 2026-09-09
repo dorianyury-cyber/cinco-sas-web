@@ -252,107 +252,195 @@ function celda(texto) {
   return td;
 }
 
+function escapeHtml(texto) {
+  return String(texto ?? "").replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;");
+}
+
+const vistaPreviaCartaEl = document.getElementById("cartaVistaPrevia");
+const filtroInput = document.getElementById("filtroCorrespondencia");
+
 // Deep-link desde "Documentos del contrato" (contrato.html) — esa vista
 // solo puede enlazar a esta página en general (no hay contrato.html?id=
-// por carta), así que aquí se resalta y hace scroll a la fila pedida.
+// por carta), así que aquí se selecciona y se deja fijada en el panel la
+// carta pedida.
 const idDestacar = new URLSearchParams(window.location.search).get("id");
-let yaDestacado = false;
+let yaScrolleadoAIdDestacado = false;
 
+let cartasListaCompleta = [];
+let cartasListaFiltrada = [];
+let esGestorActual = false;
+let cartaSeleccionadaId = idDestacar || null;
+
+// Fila = solo lo justo para escanear y elegir (una sola línea, sin
+// acciones) — mismo patrón que Órdenes de Trabajo/Contratos: el detalle
+// completo, incluidas las acciones (PDF/Word/Cargar Word editado/Borrar),
+// vive en el panel de vista previa de arriba.
 function renderTabla(cartas, esGestor) {
-  tbody.innerHTML = "";
-  sinCartas.classList.toggle("oculto", cartas.length > 0);
+  cartasListaCompleta = cartas;
+  esGestorActual = esGestor;
+  aplicarFiltroCorrespondencia();
+}
 
-  cartas.forEach((c) => {
+function aplicarFiltroCorrespondencia() {
+  const texto = filtroInput.value.trim().toLowerCase();
+  cartasListaFiltrada = !texto
+    ? cartasListaCompleta
+    : cartasListaCompleta.filter((c) =>
+        (c.radicado || "").toLowerCase().includes(texto) ||
+        (c.destinatario || "").toLowerCase().includes(texto) ||
+        (c.asunto || "").toLowerCase().includes(texto));
+
+  tbody.innerHTML = "";
+  sinCartas.textContent = cartasListaCompleta.length === 0
+    ? "Todavía no hay cartas registradas."
+    : "Ninguna carta coincide con el filtro.";
+  sinCartas.classList.toggle("oculto", cartasListaFiltrada.length > 0);
+
+  if (cartasListaFiltrada.length === 0) {
+    cartaSeleccionadaId = null;
+    pintarVistaPreviaCarta();
+    return;
+  }
+  if (!cartaSeleccionadaId || !cartasListaFiltrada.some((c) => c.id === cartaSeleccionadaId)) {
+    cartaSeleccionadaId = cartasListaFiltrada[0].id;
+  }
+
+  cartasListaFiltrada.forEach((c) => {
     const fila = document.createElement("tr");
     fila.dataset.id = c.id;
     fila.appendChild(celda(c.radicado));
     fila.appendChild(celda(c.fecha || ""));
     fila.appendChild(celda(c.destinatario || ""));
     fila.appendChild(celda(c.asunto || ""));
-
-    const tdAccion = document.createElement("td");
-    tdAccion.className = "control-tabla-acciones";
-
-    const btnPdf = document.createElement("button");
-    btnPdf.type = "button";
-    btnPdf.className = "control-btn-mini";
-    btnPdf.textContent = "PDF";
-    btnPdf.addEventListener("click", async () => {
-      btnPdf.disabled = true;
-      try {
-        const pdf = await generarCartaPDF(c);
-        pdf.save(`${c.radicado}.pdf`);
-      } finally {
-        btnPdf.disabled = false;
-      }
+    fila.addEventListener("click", () => {
+      cartaSeleccionadaId = c.id;
+      actualizarResaltadoCarta();
+      pintarVistaPreviaCarta();
     });
-
-    const btnWord = document.createElement("button");
-    btnWord.type = "button";
-    btnWord.className = "control-btn-mini";
-    btnWord.textContent = c.wordFinalUrl ? "Word ✓" : "Word";
-    btnWord.title = c.wordFinalUrl ? "Descarga la versión editada a mano que subieron" : "Genera el Word automático";
-    btnWord.addEventListener("click", async () => {
-      btnWord.disabled = true;
-      try {
-        if (c.wordFinalUrl) {
-          window.open(c.wordFinalUrl, "_blank");
-        } else {
-          await descargarCartaDocx(c);
-        }
-      } finally {
-        btnWord.disabled = false;
-      }
-    });
-
-    tdAccion.append(btnPdf, btnWord);
-
-    if (esGestor) {
-      const btnSubirWord = document.createElement("button");
-      btnSubirWord.type = "button";
-      btnSubirWord.className = "control-btn-mini";
-      btnSubirWord.textContent = "Cargar Word editado";
-      btnSubirWord.title = "Sube el .docx ya ajustado a mano (ej. imagen centrada) para que quede como la versión oficial de esta carta";
-      btnSubirWord.addEventListener("click", () => {
-        cartaIdParaSubirWord = c.id;
-        inputWordFinal.click();
-      });
-
-      const btnBorrar = document.createElement("button");
-      btnBorrar.type = "button";
-      btnBorrar.className = "control-btn-danger";
-      btnBorrar.textContent = "Borrar";
-      btnBorrar.addEventListener("click", async () => {
-        const confirmado = window.confirm(
-          `¿Seguro que quieres borrar la carta ${c.radicado} (${c.asunto || "sin asunto"})?\n\nEsta acción no se puede deshacer. El radicado no se vuelve a usar para otra carta.`
-        );
-        if (!confirmado) return;
-        btnBorrar.disabled = true;
-        try {
-          await deleteDoc(doc(db, "correspondencia", c.id));
-        } catch (err) {
-          mostrarAlerta(err.message || "No se pudo borrar la carta.", "error");
-          btnBorrar.disabled = false;
-        }
-      });
-
-      tdAccion.append(btnSubirWord, btnBorrar);
-    }
-
-    fila.appendChild(tdAccion);
-
     tbody.appendChild(fila);
   });
+  actualizarResaltadoCarta();
+  pintarVistaPreviaCarta();
 
-  if (idDestacar && !yaDestacado) {
+  if (idDestacar && !yaScrolleadoAIdDestacado) {
     const fila = tbody.querySelector(`tr[data-id="${idDestacar}"]`);
     if (fila) {
-      yaDestacado = true;
+      yaScrolleadoAIdDestacado = true;
       fila.scrollIntoView({ behavior: "smooth", block: "center" });
-      fila.classList.add("control-fila-destacada");
-      setTimeout(() => fila.classList.remove("control-fila-destacada"), 3000);
     }
   }
+}
+filtroInput.addEventListener("input", aplicarFiltroCorrespondencia);
+
+function actualizarResaltadoCarta() {
+  tbody.querySelectorAll("tr[data-id]").forEach((tr) => {
+    tr.classList.toggle("control-fila-fijada", tr.dataset.id === cartaSeleccionadaId);
+  });
+}
+
+function pintarVistaPreviaCarta() {
+  const c = cartasListaFiltrada.find((x) => x.id === cartaSeleccionadaId);
+  if (!c) {
+    vistaPreviaCartaEl.innerHTML = `<p class="text-muted" style="margin:0;">${cartasListaCompleta.length === 0 ? "Todavía no hay cartas registradas." : "Ninguna carta coincide con el filtro."}</p>`;
+    return;
+  }
+
+  const campo = (etiqueta, valor) => `
+    <div class="control-vp-campo">
+      <span class="control-vp-etiqueta">${etiqueta}</span>
+      <span class="control-vp-valor">${escapeHtml(valor || "-")}</span>
+    </div>`;
+  const grupo = (titulo, camposHtml) => `
+    <div class="control-vp-grupo">
+      <div class="control-vp-grupo-titulo">${titulo}</div>
+      <div class="control-vp-grupo-campos">${camposHtml}</div>
+    </div>`;
+
+  vistaPreviaCartaEl.innerHTML = `
+    <div class="control-vp-encabezado">
+      <span class="control-vp-titulo">${escapeHtml(c.radicado)} — ${escapeHtml(c.fecha || "")}</span>
+      <div class="control-vp-acciones" id="cartaVpAcciones"></div>
+    </div>
+    <div class="control-vp-grupos">
+      ${grupo("Destinatario", `
+        ${campo("Destinatario", c.destinatario)}
+        ${campo("Ciudad", c.ciudad)}
+      `)}
+      ${grupo("Contenido", campo("Asunto", c.asunto))}
+      ${grupo("Firma", `
+        ${campo("Nombre", c.firmaNombre)}
+        ${campo("Cargo", c.firmaCargo)}
+      `)}
+    </div>
+  `;
+
+  const accionesEl = document.getElementById("cartaVpAcciones");
+
+  const btnPdf = document.createElement("button");
+  btnPdf.type = "button";
+  btnPdf.className = "control-btn-mini";
+  btnPdf.textContent = "PDF";
+  btnPdf.addEventListener("click", async () => {
+    btnPdf.disabled = true;
+    try {
+      const pdf = await generarCartaPDF(c);
+      pdf.save(`${c.radicado}.pdf`);
+    } finally {
+      btnPdf.disabled = false;
+    }
+  });
+  accionesEl.appendChild(btnPdf);
+
+  const btnWord = document.createElement("button");
+  btnWord.type = "button";
+  btnWord.className = "control-btn-mini";
+  btnWord.textContent = c.wordFinalUrl ? "Word ✓" : "Word";
+  btnWord.title = c.wordFinalUrl ? "Descarga la versión editada a mano que subieron" : "Genera el Word automático";
+  btnWord.addEventListener("click", async () => {
+    btnWord.disabled = true;
+    try {
+      if (c.wordFinalUrl) {
+        window.open(c.wordFinalUrl, "_blank");
+      } else {
+        await descargarCartaDocx(c);
+      }
+    } finally {
+      btnWord.disabled = false;
+    }
+  });
+  accionesEl.appendChild(btnWord);
+
+  if (!esGestorActual) return;
+
+  const btnSubirWord = document.createElement("button");
+  btnSubirWord.type = "button";
+  btnSubirWord.className = "control-btn-mini";
+  btnSubirWord.textContent = "Cargar Word editado";
+  btnSubirWord.title = "Sube el .docx ya ajustado a mano (ej. imagen centrada) para que quede como la versión oficial de esta carta";
+  btnSubirWord.addEventListener("click", () => {
+    cartaIdParaSubirWord = c.id;
+    inputWordFinal.click();
+  });
+  accionesEl.appendChild(btnSubirWord);
+
+  const btnBorrar = document.createElement("button");
+  btnBorrar.type = "button";
+  btnBorrar.className = "control-btn-danger";
+  btnBorrar.textContent = "Borrar";
+  btnBorrar.addEventListener("click", async () => {
+    const confirmado = window.confirm(
+      `¿Seguro que quieres borrar la carta ${c.radicado} (${c.asunto || "sin asunto"})?\n\nEsta acción no se puede deshacer. El radicado no se vuelve a usar para otra carta.`
+    );
+    if (!confirmado) return;
+    btnBorrar.disabled = true;
+    try {
+      await deleteDoc(doc(db, "correspondencia", c.id));
+    } catch (err) {
+      mostrarAlerta(err.message || "No se pudo borrar la carta.", "error");
+      btnBorrar.disabled = false;
+    }
+  });
+  accionesEl.appendChild(btnBorrar);
 }
 
 inputWordFinal.addEventListener("change", async () => {

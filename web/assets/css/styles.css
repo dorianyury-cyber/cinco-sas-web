@@ -1583,7 +1583,6 @@ table.control-tabla-documentos td.control-tabla-acciones {
 tr.control-fila-doc { cursor: pointer; }
 tr.control-fila-doc:hover { background: rgba(254, 178, 9, 0.08); }
 tr.control-fila-doc td:first-child { font-weight: 700; color: var(--cinco-amber-dark); }
-tr.control-fila-destacada { background: rgba(254, 178, 9, 0.25); transition: background 0.4s ease; }
 
 /* ---- Lista + panel de detalle (mismo patrón que Empleados en Cinco
    Conecta y Activos/Usuarios en Copropiedad Saludable): la tabla queda
@@ -1616,6 +1615,19 @@ tr.control-fila-destacada { background: rgba(254, 178, 9, 0.25); transition: bac
 .control-vista-previa .control-vp-etiqueta { display: block; font-size: 9px; font-weight: 700; text-transform: uppercase; letter-spacing: 0.3px; color: var(--text-muted); }
 .control-vista-previa .control-vp-valor { display: block; position: relative; padding-left: 13px; font-size: 12.5px; font-weight: 700; color: var(--cinco-amber-dark); white-space: normal; word-break: break-word; }
 .control-vista-previa .control-vp-valor::before { content: "•"; position: absolute; left: 0; top: 0; color: var(--cinco-amber-dark); }
+
+/* Barra de filtros sobre una lista fila+panel — texto libre y/o
+   desplegables (área, contrato, estado, etc.), en una sola fila que se
+   envuelve si no cabe. Filtra en el cliente sobre lo que ya está cargado,
+   sin ir a Firestore por cada cambio. */
+.control-filtros { display: flex; flex-wrap: wrap; gap: 8px; margin: 14px 0; }
+.control-filtros input[type="text"] { flex: 1 1 220px; min-width: 160px; }
+.control-filtros input[type="text"],
+.control-filtros select {
+  padding: 7px 10px; border: 1px solid var(--border); border-radius: 8px;
+  background: var(--card-bg); color: var(--text); font-size: 12.5px;
+}
+.control-filtros select { flex: 0 1 200px; }
 
 /* ---- Equipo asignado (web/control/contrato.html) ---- */
 .control-equipo-lista { display: flex; flex-direction: column; gap: 8px; margin-bottom: 14px; }

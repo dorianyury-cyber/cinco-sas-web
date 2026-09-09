@@ -566,26 +566,54 @@ document.getElementById("otCerrarConfirmacionBtn").addEventListener("click", () 
 // Activos/Usuarios en Copropiedad Saludable: todo el detalle completo,
 // incluidas las acciones, vive en el panel de vista previa de arriba
 // (evita la barra horizontal que salía con la columna de acciones).
+let ordenesListaCompleta = [];
 let ordenesListaActual = [];
 let autorizadoListaActual = false;
 let ordenSeleccionadaId = null;
 
-function renderTabla(ordenes, autorizado) {
-  ordenesListaActual = ordenes;
-  autorizadoListaActual = autorizado;
-  tbody.innerHTML = "";
-  sinOrdenes.classList.toggle("oculto", ordenes.length > 0);
+const otFiltroTexto = document.getElementById("otFiltroTexto");
+const otFiltroContrato = document.getElementById("otFiltroContrato");
+const otFiltroEstado = document.getElementById("otFiltroEstado");
+otFiltroTexto.addEventListener("input", () => aplicarFiltroOrdenes());
+otFiltroContrato.addEventListener("change", () => aplicarFiltroOrdenes());
+otFiltroEstado.addEventListener("change", () => aplicarFiltroOrdenes());
 
-  if (ordenes.length === 0) {
+function renderTabla(ordenes, autorizado) {
+  ordenesListaCompleta = ordenes;
+  autorizadoListaActual = autorizado;
+  aplicarFiltroOrdenes();
+}
+
+// Filtros de texto (responsable/descripción) + contrato + estado, todos
+// sobre lo que ya está cargado — pedido del usuario para encontrar rápido,
+// por ejemplo, todas las órdenes de un contrato puntual.
+function aplicarFiltroOrdenes() {
+  const texto = otFiltroTexto.value.trim().toLowerCase();
+  const contratoId = otFiltroContrato.value;
+  const estado = otFiltroEstado.value;
+  ordenesListaActual = ordenesListaCompleta.filter((o) => {
+    if (estado && (o.estado || "ACTIVA") !== estado) return false;
+    if (contratoId && o.contratoId !== (contratoId === "ADMON" ? null : contratoId)) return false;
+    if (!texto) return true;
+    return `${o.responsable?.nombre || ""} ${o.descripcion || ""}`.toLowerCase().includes(texto);
+  });
+
+  tbody.innerHTML = "";
+  sinOrdenes.textContent = ordenesListaCompleta.length === 0
+    ? "Todavía no hay órdenes de trabajo registradas."
+    : "Ninguna orden coincide con el filtro.";
+  sinOrdenes.classList.toggle("oculto", ordenesListaActual.length > 0);
+
+  if (ordenesListaActual.length === 0) {
     ordenSeleccionadaId = null;
     pintarVistaPreviaOrden();
     return;
   }
-  if (!ordenSeleccionadaId || !ordenes.some((o) => o.id === ordenSeleccionadaId)) {
-    ordenSeleccionadaId = ordenes[0].id;
+  if (!ordenSeleccionadaId || !ordenesListaActual.some((o) => o.id === ordenSeleccionadaId)) {
+    ordenSeleccionadaId = ordenesListaActual[0].id;
   }
 
-  ordenes.forEach((o) => {
+  ordenesListaActual.forEach((o) => {
     const fila = document.createElement("tr");
     fila.dataset.id = o.id;
     fila.appendChild(celda(String(o.numero ?? "—")));
@@ -618,7 +646,7 @@ function actualizarResaltadoOrden() {
 function pintarVistaPreviaOrden() {
   const o = ordenesListaActual.find((x) => x.id === ordenSeleccionadaId);
   if (!o) {
-    vistaPreviaOrdenEl.innerHTML = '<p class="text-muted" style="margin:0;">Todavía no hay órdenes de trabajo registradas.</p>';
+    vistaPreviaOrdenEl.innerHTML = `<p class="text-muted" style="margin:0;">${ordenesListaCompleta.length === 0 ? "Todavía no hay órdenes de trabajo registradas." : "Ninguna orden coincide con el filtro."}</p>`;
     return;
   }
 
@@ -831,13 +859,15 @@ requireAuth(async (user) => {
   // Contratos (opción fija "Administrativo" primero, para trabajos que no
   // son de un contrato puntual — ver Tabla de contratos en contratos.js).
   selectContrato.appendChild(new Option("Administrativo (ADMON)", "ADMON"));
+  otFiltroContrato.appendChild(new Option("Administrativo (ADMON)", "ADMON"));
   const contratosSnap = await getDocs(query(collection(db, "contratos"), orderBy("creadoEn", "desc")));
   const contratosPorId = {};
   contratosSnap.forEach((docSnap) => {
     const c = docSnap.data();
     contratosPorId[docSnap.id] = c;
-    const opt = new Option(`${c.numero || c.codigo || "(sin número)"} — ${c.cliente || ""}`, docSnap.id);
-    selectContrato.appendChild(opt);
+    const etiqueta = `${c.numero || c.codigo || "(sin número)"} — ${c.cliente || ""}`;
+    selectContrato.appendChild(new Option(etiqueta, docSnap.id));
+    otFiltroContrato.appendChild(new Option(etiqueta, docSnap.id));
   });
 
   // Empleados activos, para el responsable y las filas de personal

@@ -62,6 +62,10 @@ function escapeHtml(texto) {
 }
 
 const vistaPreviaEl = document.getElementById("contratoVistaPrevia");
+const filtroInput = document.getElementById("filtroContrato");
+const filtroEstadoSelect = document.getElementById("filtroContratoEstado");
+const filtroTipoSelect = document.getElementById("filtroContratoTipo");
+let contratosListaCompleta = [];
 let contratosListaActual = [];
 let totalAprobadoresActual = 0;
 let contratoSeleccionadoId = null;
@@ -82,10 +86,30 @@ function celda(texto) {
 // obligatoria de contratos — se muestra ese avance en el panel para que
 // quien aprueba encuentre rápido los contratos que todavía le faltan.
 function renderContratos(snapshot, totalAprobadores) {
-  contratosListaActual = snapshot.docs.map((d) => ({ id: d.id, ...d.data() }));
+  contratosListaCompleta = snapshot.docs.map((d) => ({ id: d.id, ...d.data() }));
   totalAprobadoresActual = totalAprobadores;
+  aplicarFiltroContratos();
+}
+
+// Filtros de texto (código/contrato/cliente) + estado + tipo, todos sobre
+// lo que ya está cargado — pedido del usuario para poder ver rápido, por
+// ejemplo, "los contratos con un cliente" sin tener que buscarlos a ojo.
+function aplicarFiltroContratos() {
+  const texto = filtroInput.value.trim().toLowerCase();
+  const estado = filtroEstadoSelect.value;
+  const tipo = filtroTipoSelect.value;
+  contratosListaActual = contratosListaCompleta.filter((c) => {
+    if (estado && c.estado !== estado) return false;
+    if (tipo && c.tipo !== tipo) return false;
+    if (!texto) return true;
+    return `${c.codigo || ""} ${c.nombre || ""} ${c.cliente || ""}`.toLowerCase().includes(texto);
+  });
+
   lista.innerHTML = "";
-  sinContratos.classList.toggle("oculto", !snapshot.empty);
+  sinContratos.textContent = contratosListaCompleta.length === 0
+    ? "Todavía no hay contratos registrados."
+    : "Ningún contrato coincide con el filtro.";
+  sinContratos.classList.toggle("oculto", contratosListaActual.length > 0);
 
   if (contratosListaActual.length === 0) {
     contratoSeleccionadoId = null;
@@ -116,6 +140,9 @@ function renderContratos(snapshot, totalAprobadores) {
   actualizarResaltadoContrato();
   pintarVistaPreviaContrato();
 }
+filtroInput.addEventListener("input", aplicarFiltroContratos);
+filtroEstadoSelect.addEventListener("change", aplicarFiltroContratos);
+filtroTipoSelect.addEventListener("change", aplicarFiltroContratos);
 
 function actualizarResaltadoContrato() {
   lista.querySelectorAll("tr[data-id]").forEach((tr) => {
@@ -126,7 +153,7 @@ function actualizarResaltadoContrato() {
 function pintarVistaPreviaContrato() {
   const c = contratosListaActual.find((x) => x.id === contratoSeleccionadoId);
   if (!c) {
-    vistaPreviaEl.innerHTML = '<p class="text-muted" style="margin:0;">Todavía no hay contratos registrados.</p>';
+    vistaPreviaEl.innerHTML = `<p class="text-muted" style="margin:0;">${contratosListaCompleta.length === 0 ? "Todavía no hay contratos registrados." : "Ningún contrato coincide con el filtro."}</p>`;
     return;
   }
 

@@ -41,6 +41,20 @@
     <div class="container">
       <button type="button" class="control-btn-mini" id="nuevoContratoBtn">+ Nuevo contrato</button>
 
+      <div class="control-filtros">
+        <input type="text" id="filtroContrato" placeholder="Buscar por código, contrato o cliente...">
+        <select id="filtroContratoEstado">
+          <option value="">Todos los estados</option>
+          <option value="activo">Activos</option>
+          <option value="cerrado">Cerrados</option>
+        </select>
+        <select id="filtroContratoTipo">
+          <option value="">Todos los tipos</option>
+          <option value="obra">Obra</option>
+          <option value="servicio">Servicio</option>
+        </select>
+      </div>
+
       <div class="control-vista-previa control-lista" id="contratoVistaPrevia">
         <p class="text-muted" style="margin:0;">Cargando...</p>
       </div>

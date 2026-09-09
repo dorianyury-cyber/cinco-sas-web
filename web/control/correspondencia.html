@@ -85,14 +85,21 @@
         </form>
       </details>
 
+      <div class="control-filtros">
+        <input type="text" id="filtroCorrespondencia" placeholder="Buscar por radicado, destinatario o asunto...">
+      </div>
+
+      <div class="control-vista-previa" id="cartaVistaPrevia">
+        <p class="text-muted" style="margin:0;">Cargando...</p>
+      </div>
+
       <div class="control-tabla-wrap">
-        <table class="control-tabla-documentos">
+        <table class="control-tabla-documentos control-tabla-seleccionable">
           <colgroup>
             <col class="w-130">
             <col class="w-110">
             <col>
             <col>
-            <col class="w-260">
           </colgroup>
           <thead>
             <tr>
@@ -100,7 +107,6 @@
               <th>Fecha</th>
               <th>Destinatario</th>
               <th>Asunto</th>
-              <th></th>
             </tr>
           </thead>
           <tbody id="listaCorrespondencia"></tbody>
