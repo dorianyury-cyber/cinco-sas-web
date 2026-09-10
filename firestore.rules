@@ -218,6 +218,18 @@ service cloud.firestore {
       return request.auth != null && (request.auth.token.email in datosOrden.get('personalEmails', []));
     }
 
+    // El navegador ya exige la firma antes de guardar (ver ordenes-trabajo.js:
+    // firmaCierre.tieneTrazoNuevo), pero esa validación depende del cliente
+    // y puede fallar por cosas fuera de nuestro control (un bug del
+    // navegador, un toque accidental sobre el lienzo al hacer scroll en el
+    // celular, etc.) — así que la Rule vuelve a exigirlo del lado del
+    // servidor: si el cambio deja la orden en CERRADA, "cierre.firmaDataUrl"
+    // tiene que venir con contenido real, no solo el campo presente y vacío.
+    function cierreConFirmaValida() {
+      return request.resource.data.estado != 'CERRADA' ||
+        (request.resource.data.cierre.firmaDataUrl is string && request.resource.data.cierre.firmaDataUrl.size() > 0);
+    }
+
     // Órdenes de Trabajo (web/control/ordenes-trabajo.html) — usa
     // "contadores" (doc "ordenTrabajo", ver autorizadoOrdenesTrabajo()
     // arriba). Lectura Y escritura de punta a punta restringidas a quien
@@ -250,7 +262,8 @@ service cloud.firestore {
       ) || (
         esParticipanteDeOrden(resource.data) &&
         request.resource.data.diff(resource.data).affectedKeys()
-          .hasOnly(['altoRiesgo', 'pesv', 'preoperacionales', 'alistamientoCompletado', 'cierre', 'estado', 'actualizadoEn', 'actualizadoPor'])
+          .hasOnly(['altoRiesgo', 'pesv', 'preoperacionales', 'alistamientoCompletado', 'cierre', 'estado', 'actualizadoEn', 'actualizadoPor']) &&
+        cierreConFirmaValida()
       );
     }
 
