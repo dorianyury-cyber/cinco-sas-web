@@ -192,6 +192,16 @@ document.getElementById("otAgregarVehiculoBtn").addEventListener("click", async 
 });
 
 const nuevaOrdenBackdrop = document.getElementById("nuevaOrdenBackdrop");
+// El modal vive en el HTML anidado dentro de #contenidoOrdenes, que se
+// oculta con display:none para quien no tiene autorizadoOrdenesTrabajo
+// (ver más abajo) — un display:none en un ancestro esconde cualquier
+// descendiente aunque el modal reciba su propia clase .open, así que a un
+// participante sin ese permiso general el botón "Completar" no le abría
+// nada (el modal sí quedaba con .open, pero su contenedor padre seguía
+// oculto). Sacarlo de ese contenedor apenas carga la página lo deja
+// visible para los dos flujos (jefe y participante) sin tocar el resto
+// del HTML.
+document.body.appendChild(nuevaOrdenBackdrop);
 document.getElementById("nuevaOrdenBtn").addEventListener("click", () => {
   abrirModalNueva();
   nuevaOrdenBackdrop.classList.add("open");
