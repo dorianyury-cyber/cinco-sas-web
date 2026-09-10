@@ -1212,6 +1212,23 @@ button.control-mes-pill.pendiente:hover { border-color: var(--cinco-amber-dark);
   border-radius: 8px;
   padding: 6px;
   background: #fff;
+  transition: border-color 0.2s, box-shadow 0.2s;
+}
+.control-campo-obligatorio { font-weight: 400; font-size: 11.5px; color: #b23434; }
+/* Se agrega/quita por JS cuando el envío se bloquea por falta de firma (ver
+   ordenes-trabajo.js) — el recuadro se resalta en rojo y hace un pequeño
+   "shake" para que sea imposible no notar dónde falta actuar, en vez de
+   depender solo del texto de alertBox que puede quedar fuera de la vista. */
+.control-firma-wrap.control-firma-falta {
+  border: 1px solid #d64545;
+  border-style: solid;
+  box-shadow: 0 0 0 3px rgba(214, 69, 69, 0.18);
+  animation: control-firma-shake 0.4s;
+}
+@keyframes control-firma-shake {
+  0%, 100% { transform: translateX(0); }
+  25% { transform: translateX(-6px); }
+  75% { transform: translateX(6px); }
 }
 #otFirmaCanvas {
   display: block;

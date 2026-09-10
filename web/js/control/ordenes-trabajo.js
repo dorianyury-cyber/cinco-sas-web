@@ -138,6 +138,21 @@ function crearFirma(canvas) {
 const firmaCierre = crearFirma(document.getElementById("otFirmaCanvas"));
 document.getElementById("otLimpiarFirmaBtn").addEventListener("click", firmaCierre.limpiar);
 
+// Cuando falta la firma al intentar cerrar, no basta con el mensaje de
+// alertBox (queda al final del formulario, lejos del recuadro y fácil de
+// no notar en un celular) — se salta directo al recuadro de firma y se
+// resalta en rojo con un pequeño "shake" (ver .control-firma-falta en
+// styles.css), para que quede imposible no darse cuenta de dónde falta
+// actuar. El resaltado se quita solo apenas la persona empieza a dibujar.
+const otFirmaWrap = document.getElementById("otFirmaWrap");
+function resaltarFirmaFaltante() {
+  otFirmaWrap.classList.remove("control-firma-falta");
+  void otFirmaWrap.offsetWidth; // fuerza el reflow para que la animación se pueda repetir en intentos seguidos
+  otFirmaWrap.classList.add("control-firma-falta");
+  otFirmaWrap.scrollIntoView({ behavior: "smooth", block: "center" });
+}
+firmaCierre.canvas.addEventListener("pointerdown", () => otFirmaWrap.classList.remove("control-firma-falta"));
+
 const firmaElabora = crearFirma(document.getElementById("otFirmaElaboraCanvas"));
 document.getElementById("otLimpiarFirmaElaboraBtn").addEventListener("click", firmaElabora.limpiar);
 const guardarFirmaCheck = document.getElementById("otGuardarFirmaCheck");
@@ -515,6 +530,7 @@ function abrirModalCompletar(orden) {
     tituloModal.textContent = yaCerrada ? `Orden ${orden.numero} — cerrada` : `Orden ${orden.numero} — Paso 4 de 4: cerrar orden`;
     habilitarCamposCierre(!yaCerrada);
     firmaCierre.cargar(orden.cierre?.firmaDataUrl || null);
+    otFirmaWrap.classList.remove("control-firma-falta");
     guardarBtn.textContent = "Cerrar orden";
   }
 
@@ -828,7 +844,8 @@ requireAuth(async (user) => {
           return;
         }
         if (!firmaCierre.tieneTrazoNuevo) {
-          mostrarAlerta("Falta la firma de quien ejecutó los trabajos.", "error");
+          mostrarAlerta("Falta la firma de quien ejecutó los trabajos — dibújala en el recuadro señalado abajo.", "error");
+          resaltarFirmaFaltante();
           return;
         }
       }

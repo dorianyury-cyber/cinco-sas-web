@@ -230,10 +230,10 @@
                 </select>
               </div>
               <div class="campo-ancho">
-                <label>Firma de quien ejecuta los trabajos</label>
-                <div class="control-firma-wrap">
+                <label>Firma de quien ejecuta los trabajos <span class="control-campo-obligatorio">(obligatoria para cerrar)</span></label>
+                <div class="control-firma-wrap" id="otFirmaWrap">
                   <canvas id="otFirmaCanvas" width="600" height="180"></canvas>
-                  <p class="text-muted control-firma-ayuda">Firma con el dedo o el mouse sobre el recuadro.</p>
+                  <p class="text-muted control-firma-ayuda">Dibuja tu firma con el dedo dentro de este recuadro — sin eso no se puede cerrar la orden.</p>
                 </div>
                 <button type="button" class="control-btn-mini" id="otLimpiarFirmaBtn">Limpiar firma</button>
               </div>
