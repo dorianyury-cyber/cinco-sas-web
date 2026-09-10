@@ -216,10 +216,13 @@ requireAuth(async (user) => {
   const perfil = await obtenerPerfil(user.email);
   const esGestor = perfil?.estado === "activo" && (perfil?.rol === "admin" || perfil?.rol === "coadmin");
   if (!esGestor) document.getElementById("nuevoContratoBtn").classList.add("oculto");
-  // Enlace "Orden de Trabajo": oculto salvo a quien la gerencia autorice
-  // puntualmente (empleados/{email}.autorizadoOrdenesTrabajo) — a
-  // diferencia del resto del menú, que nunca se oculta por rol.
-  document.getElementById("navOrdenesTrabajo")?.classList.toggle("oculto", !(perfil?.estado === "activo" && (perfil?.rol === "admin" || perfil?.autorizadoOrdenesTrabajo === true)));
+  // Enlace "Orden de Trabajo": visible a cualquier empleado activo, no solo
+  // a quien la gerencia autorice puntualmente (autorizadoOrdenesTrabajo) —
+  // aunque no tenga ese permiso general, puede ser responsable/personal
+  // asignado de una orden puntual (ver ordenes-trabajo.js: vista
+  // "participante"), y sin el enlace no tenía cómo llegar hasta ahí desde
+  // el computador (solo por el link de WhatsApp de esa orden).
+  document.getElementById("navOrdenesTrabajo")?.classList.toggle("oculto", perfil?.estado !== "activo");
 
   const empleadosSnap = await getDocs(collection(db, "empleados"));
   const totalAprobadores = empleadosSnap.docs

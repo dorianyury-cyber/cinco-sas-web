@@ -710,7 +710,10 @@ requireAuth(async (user) => {
   const perfilActivo = perfil?.estado === "activo";
   const esAdmin = perfilActivo && perfil?.rol === "admin";
   const esCoadmin = perfilActivo && perfil?.rol === "coadmin";
-  document.getElementById("navOrdenesTrabajo")?.classList.toggle("oculto", !(esAdmin || (perfilActivo && perfil?.autorizadoOrdenesTrabajo === true)));
+  // Visible a cualquier empleado activo (no solo a quien tenga el permiso
+  // general) — puede ser responsable/personal asignado de una orden
+  // puntual sin ser "autorizado" al módulo completo, ver contratos.js.
+  document.getElementById("navOrdenesTrabajo")?.classList.toggle("oculto", !perfilActivo);
   // "Gestor" = admin o coadministrador: edita todo el contrato salvo
   // borrarlo (esAdmin-only) y tocar empleados/roles (siempre esAdmin-only).
   const esGestor = esAdmin || esCoadmin;

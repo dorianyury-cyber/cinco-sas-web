@@ -36,7 +36,10 @@ requireAuth(async (user) => {
   const perfil = await obtenerPerfil(user.email);
   const puedeGestionar = perfil?.estado === "activo" && (perfil?.rol === "admin" || perfil?.gestionaDocumentos === true);
   if (!puedeGestionar) document.getElementById("soloGestorAviso").classList.remove("oculto");
-  document.getElementById("navOrdenesTrabajo")?.classList.toggle("oculto", !(perfil?.estado === "activo" && (perfil?.rol === "admin" || perfil?.autorizadoOrdenesTrabajo === true)));
+  // Visible a cualquier empleado activo (no solo a quien tenga el permiso
+  // general) — puede ser responsable/personal asignado de una orden
+  // puntual sin ser "autorizado" al módulo completo, ver contratos.js.
+  document.getElementById("navOrdenesTrabajo")?.classList.toggle("oculto", perfil?.estado !== "activo");
 
   document.getElementById("documentoCodigo").textContent = documento.codigo;
   document.getElementById("documentoNombre").textContent = documento.nombre;

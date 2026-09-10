@@ -491,7 +491,10 @@ requireAuth(async (user) => {
     document.getElementById("nuevaCartaDetails").classList.add("oculto");
     document.getElementById("soloGestorAviso")?.classList.remove("oculto");
   }
-  document.getElementById("navOrdenesTrabajo")?.classList.toggle("oculto", !(perfil?.estado === "activo" && (perfil?.rol === "admin" || perfil?.autorizadoOrdenesTrabajo === true)));
+  // Visible a cualquier empleado activo (no solo a quien tenga el permiso
+  // general) — puede ser responsable/personal asignado de una orden
+  // puntual sin ser "autorizado" al módulo completo, ver contratos.js.
+  document.getElementById("navOrdenesTrabajo")?.classList.toggle("oculto", perfil?.estado !== "activo");
 
   const q = query(collection(db, "correspondencia"), orderBy("creadoEn", "desc"));
   onSnapshot(q, (snapshot) => {
