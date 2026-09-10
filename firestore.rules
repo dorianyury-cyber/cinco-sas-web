@@ -204,8 +204,18 @@ service cloud.firestore {
     // "personalEmails" en el documento (arreglo plano de correos — las
     // Rules no pueden buscar un correo adentro de un arreglo de mapas como
     // "personalAdicional").
+    //
+    // A propósito SIN esEmpleadoActivo(): el responsable/personal de una
+    // orden puede venir solo de Cinco Conecta (empleadosConecta, ver
+    // ordenes-trabajo.js) sin tener ficha propia en "empleados" de Cinco
+    // SAS control — exigir esEmpleadoActivo() aquí bloqueaba a cualquiera
+    // en ese caso (get() sobre un doc de empleados inexistente hace fallar
+    // toda la regla), dejándolo sin poder ver ni cerrar su propia orden
+    // aunque el correo coincidiera exacto. Basta con que esté autenticado
+    // y su correo aparezca en personalEmails, que ya es quien lo puso ahí
+    // (alguien autorizadoOrdenesTrabajo) lo decidió.
     function esParticipanteDeOrden(datosOrden) {
-      return esEmpleadoActivo() && (request.auth.token.email in datosOrden.get('personalEmails', []));
+      return request.auth != null && (request.auth.token.email in datosOrden.get('personalEmails', []));
     }
 
     // Órdenes de Trabajo (web/control/ordenes-trabajo.html) — usa
