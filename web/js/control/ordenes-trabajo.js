@@ -318,6 +318,18 @@ document.getElementById("otAgregarPersonaBtn").addEventListener("click", () => {
   personalLista.appendChild(nuevaFilaPersonal());
 });
 
+// Campos "required" del Paso 1 (Datos generales/Responsable/Descripción,
+// dentro de #otSeccionesJefe) — el participante (responsable/personal sin
+// autorizadoOrdenesTrabajo) nunca los ve ni los llena, ver
+// abrirModalCompletar(). Aunque la sección quede oculta con display:none,
+// un <select required> sin ninguna opción (nunca se puebla para el
+// participante) puede bloquear el envío nativo del formulario sin avisar
+// nada en pantalla — el botón "Guardar" se queda sin reaccionar porque el
+// navegador ni siquiera deja disparar el evento "submit". Se les quita
+// "required" cuando esa sección no está visible, y se lo devuelve cuando sí
+// (Paso 1 del jefe, o al editar).
+const CAMPOS_REQUERIDOS_JEFE = ["otContrato", "otMunicipio", "otFechaInicio", "otFechaTerminacion", "otResponsable", "otDescripcion"];
+
 // Deja los tres bloques del formulario (Datos generales.../Alto
 // riesgo+PESV+Preoperacionales/Cierre) mostrando solo los que aplican al
 // paso actual, y el formulario visible en vez de la confirmación de
@@ -326,6 +338,7 @@ function mostrarPaso({ jefe = false, alistamiento = false, cierre = false }) {
   seccionesJefe.classList.toggle("oculto", !jefe);
   seccionAlistamiento.classList.toggle("oculto", !alistamiento);
   seccionCierre.classList.toggle("oculto", !cierre);
+  CAMPOS_REQUERIDOS_JEFE.forEach((id) => { document.getElementById(id).required = jefe; });
   form.classList.remove("oculto");
   confirmacionCreada.classList.add("oculto");
 }
