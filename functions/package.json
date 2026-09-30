@@ -2,7 +2,7 @@
   "name": "cinco-sas-functions",
   "description": "Cloud Functions para el sitio de Cinco S.A.S. (formulario PQR)",
   "engines": {
-    "node": "20"
+    "node": "22"
   },
   "main": "index.js",
   "scripts": {
