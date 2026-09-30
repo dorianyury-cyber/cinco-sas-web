@@ -1104,7 +1104,7 @@ function visorPintarLista() {
     ? '<li class="text-muted visor-ofertas-vacio">Ninguna oferta coincide.</li>'
     : lista.map((of) => `
         <li data-id="${of.id}" class="${of.id === visorIdActual ? "activa" : ""}">
-          <strong>${escapeHtml(of.radicado || "")}</strong> · ${escapeHtml(of.lineaServicio || "—")} · ${of.tipo === "obra" ? "Obra" : "Servicio"}
+          <span><strong>${escapeHtml(of.radicado || "")}</strong> · ${escapeHtml(of.lineaServicio || "—")} · ${of.tipo === "obra" ? "Obra" : "Servicio"}</span>
           <span class="visor-ofertas-item-titulo">${escapeHtml(of.titulo || "")}</span>
           <span class="text-muted">${escapeHtml(of.cliente || "—")}${of.creadoEn ? " · " + of.creadoEn.toDate().toLocaleDateString("es-CO") : ""}</span>
         </li>`).join("");
