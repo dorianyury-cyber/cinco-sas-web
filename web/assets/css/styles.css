@@ -2007,3 +2007,75 @@ form.pqr-form .control-rich-color { padding: 2px; border-radius: 6px; }
    más arriba, un elemento con ambas clases (ej. "control-equipo-form
    oculto") se mostraría igual pese a "oculto". */
 .oculto { display: none; }
+
+/* ======================================================================
+   Tipografía moderna del módulo interno (web/control/*, <body
+   class="app-control">). Poppins se veía pesada en tarjetas y tablas
+   densas; aquí se usan dos familias variables autoalojadas (la CSP solo
+   permite font-src 'self'):
+   - Plus Jakarta Sans: títulos, nombres de tarjetas, encabezados de tabla
+     y botones — geométrica y estilizada.
+   - Inter: textos, valores y celdas — muy legible en tamaños chicos.
+   El sitio público (index, servicios...) conserva Poppins de marca.
+   ====================================================================== */
+@font-face {
+  font-family: "Inter";
+  font-style: normal;
+  font-weight: 100 900;
+  font-display: swap;
+  src: url("../fonts/inter-var.woff2") format("woff2-variations"), url("../fonts/inter-var.woff2") format("woff2");
+}
+@font-face {
+  font-family: "Plus Jakarta Sans";
+  font-style: normal;
+  font-weight: 200 800;
+  font-display: swap;
+  src: url("../fonts/plus-jakarta-sans-var.woff2") format("woff2-variations"), url("../fonts/plus-jakarta-sans-var.woff2") format("woff2");
+}
+body.app-control {
+  --fuente-texto: "Inter", "Segoe UI", system-ui, sans-serif;
+  --fuente-titulo: "Plus Jakarta Sans", "Inter", "Segoe UI", system-ui, sans-serif;
+  font-family: var(--fuente-texto);
+  font-feature-settings: "cv11", "ss01";
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
+  letter-spacing: -0.005em;
+}
+body.app-control h1,
+body.app-control h2,
+body.app-control h3,
+body.app-control h4,
+body.app-control .control-vp-titulo,
+body.app-control .control-vp-grupo-titulo,
+body.app-control table.control-tabla-documentos th,
+body.app-control table.control-tabla-cambios th,
+body.app-control .control-btn-mini,
+body.app-control .btn,
+body.app-control .btn-outline,
+body.app-control summary {
+  font-family: var(--fuente-titulo);
+}
+body.app-control h1, body.app-control h2 { font-weight: 700; letter-spacing: -0.02em; }
+body.app-control h3, body.app-control h4 { font-weight: 650; letter-spacing: -0.01em; }
+
+/* Tarjeta de vista previa: título grande más liviano, nombres de tarjeta
+   con más aire entre letras, etiquetas discretas y valores en Inter
+   semibold (antes todo iba en 700-800 y se sentía "gritado"). */
+body.app-control .control-vista-previa .control-vp-titulo { font-weight: 700; font-size: 17px; line-height: 1.35; letter-spacing: -0.015em; }
+body.app-control .control-vista-previa .control-vp-grupo-titulo { font-weight: 700; font-size: 10.5px; letter-spacing: 0.09em; }
+body.app-control .control-vista-previa .control-vp-etiqueta { font-weight: 600; font-size: 9.5px; letter-spacing: 0.06em; }
+body.app-control .control-vista-previa .control-vp-valor { font-weight: 600; font-size: 13px; letter-spacing: -0.005em; }
+
+/* Tablas: encabezados en Jakarta con tracking amplio; celdas en Inter
+   regular, un punto más grandes para que respiren. */
+body.app-control table.control-tabla-documentos th,
+body.app-control table.control-tabla-cambios th { font-weight: 700; font-size: 10.5px; letter-spacing: 0.08em; }
+body.app-control table.control-tabla-documentos td { font-size: 13px; font-weight: 400; }
+
+/* Barra superior, botones y campos. */
+body.app-control .control-userbar { font-weight: 500; }
+body.app-control .control-userbar-link { font-size: 13px; font-weight: 500; text-underline-offset: 3px; text-decoration-thickness: 1px; }
+body.app-control .control-btn-mini { font-weight: 600; font-size: 12px; letter-spacing: 0.005em; }
+body.app-control input,
+body.app-control select,
+body.app-control textarea { font-family: var(--fuente-texto); font-size: 13.5px; }
