@@ -1075,6 +1075,116 @@ function pintarVistaPreviaOferta() {
   accionesEl.appendChild(btnBorrar);
 }
 
+// ---- Visualizador de ofertas: para escoger cuál sirve de base para
+// duplicar y ajustar a otro cliente/servicio sin tener que descargar el PDF
+// de cada una. Parte de la lista ya filtrada de la página (línea/contrato/
+// texto) y deja buscar dentro; muestra el PDF real (generarOfertaPDF, el
+// mismo del botón "PDF") en un visor embebido. Los PDF ya generados se
+// guardan en caché mientras el visor está abierto para que ir y volver
+// entre ofertas sea inmediato.
+const visorBackdrop = document.getElementById("visorOfertasBackdrop");
+const visorLista = document.getElementById("visorOfertasLista");
+const visorBuscar = document.getElementById("visorOfertasBuscar");
+const visorPdf = document.getElementById("visorOfertasPdf");
+const visorTitulo = document.getElementById("visorOfertasTitulo");
+const visorDuplicarBtn = document.getElementById("visorOfertasDuplicarBtn");
+let visorOfertas = [];
+let visorIdActual = null;
+const visorCachePdf = new Map();
+
+function visorFiltradas() {
+  const texto = visorBuscar.value.trim().toLowerCase();
+  if (!texto) return visorOfertas;
+  return visorOfertas.filter((of) => `${of.radicado || ""} ${of.titulo || ""} ${of.cliente || ""}`.toLowerCase().includes(texto));
+}
+
+function visorPintarLista() {
+  const lista = visorFiltradas();
+  visorLista.innerHTML = lista.length === 0
+    ? '<li class="text-muted visor-ofertas-vacio">Ninguna oferta coincide.</li>'
+    : lista.map((of) => `
+        <li data-id="${of.id}" class="${of.id === visorIdActual ? "activa" : ""}">
+          <strong>${escapeHtml(of.radicado || "")}</strong> · ${escapeHtml(of.lineaServicio || "—")} · ${of.tipo === "obra" ? "Obra" : "Servicio"}
+          <span class="visor-ofertas-item-titulo">${escapeHtml(of.titulo || "")}</span>
+          <span class="text-muted">${escapeHtml(of.cliente || "—")}${of.creadoEn ? " · " + of.creadoEn.toDate().toLocaleDateString("es-CO") : ""}</span>
+        </li>`).join("");
+  visorLista.querySelector("li.activa")?.scrollIntoView({ block: "nearest" });
+}
+
+async function visorMostrar(id) {
+  const of = visorOfertas.find((x) => x.id === id);
+  if (!of) return;
+  visorIdActual = id;
+  visorPintarLista();
+  visorTitulo.textContent = `${of.radicado} — ${of.cliente || "sin cliente"}`;
+  visorDuplicarBtn.classList.toggle("oculto", !esGestorOfertasActual);
+  let url = visorCachePdf.get(id);
+  if (!url) {
+    visorPdf.innerHTML = '<p class="text-muted visor-ofertas-cargando">Generando vista previa...</p>';
+    try {
+      const pdf = await generarOfertaPDF(of);
+      url = pdf.output("bloburl");
+      visorCachePdf.set(id, url);
+    } catch (err) {
+      if (visorIdActual === id) visorPdf.innerHTML = `<p class="form-alert error show">No se pudo generar el PDF de esta oferta: ${escapeHtml(err.message || String(err))}</p>`;
+      return;
+    }
+  }
+  // Si mientras se generaba se eligió otra oferta, no pisar la vista.
+  if (visorIdActual !== id) return;
+  visorPdf.innerHTML = `<iframe title="PDF de ${escapeHtml(of.radicado || "")}" src="${url}#view=FitH"></iframe>`;
+}
+
+function visorMover(paso) {
+  const lista = visorFiltradas();
+  if (lista.length === 0) return;
+  const idx = lista.findIndex((of) => of.id === visorIdActual);
+  const siguiente = lista[Math.min(lista.length - 1, Math.max(0, (idx < 0 ? 0 : idx + paso)))];
+  if (siguiente && siguiente.id !== visorIdActual) visorMostrar(siguiente.id);
+}
+
+function visorCerrar() {
+  visorBackdrop.classList.remove("open");
+  visorPdf.innerHTML = "";
+  visorCachePdf.forEach((url) => URL.revokeObjectURL(url));
+  visorCachePdf.clear();
+}
+
+document.getElementById("abrirVisorOfertasBtn").addEventListener("click", () => {
+  visorOfertas = ofertasListaActual.length ? [...ofertasListaActual] : [...ofertasListaCompleta];
+  visorBuscar.value = "";
+  visorBackdrop.classList.add("open");
+  if (visorOfertas.length === 0) {
+    visorLista.innerHTML = '<li class="text-muted visor-ofertas-vacio">Todavía no hay ofertas registradas.</li>';
+    visorPdf.innerHTML = "";
+    visorTitulo.textContent = "";
+    return;
+  }
+  const inicial = visorOfertas.some((of) => of.id === ofertaSeleccionadaId) ? ofertaSeleccionadaId : visorOfertas[0].id;
+  visorMostrar(inicial);
+});
+visorLista.addEventListener("click", (e) => {
+  const li = e.target.closest("li[data-id]");
+  if (li) visorMostrar(li.dataset.id);
+});
+visorBuscar.addEventListener("input", visorPintarLista);
+document.getElementById("visorOfertasAnteriorBtn").addEventListener("click", () => visorMover(-1));
+document.getElementById("visorOfertasSiguienteBtn").addEventListener("click", () => visorMover(1));
+document.getElementById("visorOfertasCerrarBtn").addEventListener("click", visorCerrar);
+visorBackdrop.addEventListener("click", (e) => { if (e.target === visorBackdrop) visorCerrar(); });
+document.addEventListener("keydown", (e) => {
+  if (!visorBackdrop.classList.contains("open") || e.target === visorBuscar) return;
+  if (e.key === "Escape") visorCerrar();
+  else if (e.key === "ArrowDown" || e.key === "ArrowRight") { e.preventDefault(); visorMover(1); }
+  else if (e.key === "ArrowUp" || e.key === "ArrowLeft") { e.preventDefault(); visorMover(-1); }
+});
+visorDuplicarBtn.addEventListener("click", () => {
+  const of = visorOfertas.find((x) => x.id === visorIdActual);
+  if (!of) return;
+  visorCerrar();
+  cargarEnFormulario(of, false);
+});
+
 requireAuth(async (user) => {
   document.getElementById("userEmail").textContent = user.email;
 

@@ -146,6 +146,7 @@
         <input type="text" id="filtroOferta" placeholder="Buscar por radicado, título o cliente...">
         <select id="filtroOfertaLinea"><option value="">Todas las líneas</option></select>
         <select id="filtroOfertaContrato"><option value="">Todos los contratos</option></select>
+        <button type="button" class="control-btn-mini" id="abrirVisorOfertasBtn" title="Ver el PDF de cada oferta, una tras otra, para elegir cuál duplicar">👁 Visualizar ofertas</button>
       </div>
 
       <div class="control-vista-previa" id="ofertaVistaPrevia">
@@ -176,6 +177,31 @@
       <p id="sinOfertas" class="text-muted oculto">Todavía no hay ofertas registradas.</p>
     </div>
   </section>
+
+  <!-- Visualizador de ofertas: lista (con los mismos filtros de la página) a
+       la izquierda y el PDF real de la oferta elegida a la derecha, para
+       comparar y escoger cuál duplicar para otro cliente/servicio. -->
+  <div class="modal-backdrop" id="visorOfertasBackdrop">
+    <div class="modal visor-ofertas">
+      <div class="visor-ofertas-encabezado">
+        <h2>Visualizar ofertas</h2>
+        <input type="text" id="visorOfertasBuscar" placeholder="Buscar por radicado, título o cliente...">
+        <button type="button" class="control-btn-mini" id="visorOfertasCerrarBtn">Cerrar</button>
+      </div>
+      <div class="visor-ofertas-cuerpo">
+        <ul class="visor-ofertas-lista" id="visorOfertasLista"></ul>
+        <div class="visor-ofertas-panel">
+          <div class="visor-ofertas-barra">
+            <button type="button" class="control-btn-mini" id="visorOfertasAnteriorBtn" title="Oferta anterior">◀</button>
+            <span class="visor-ofertas-titulo" id="visorOfertasTitulo"></span>
+            <button type="button" class="control-btn-mini" id="visorOfertasSiguienteBtn" title="Oferta siguiente">▶</button>
+            <button type="button" class="control-btn-mini" id="visorOfertasDuplicarBtn" title="Partir de esta oferta para una nueva, con radicado propio">Duplicar esta oferta</button>
+          </div>
+          <div class="visor-ofertas-pdf" id="visorOfertasPdf"></div>
+        </div>
+      </div>
+    </div>
+  </div>
 
   <script src="../js/vendor/jspdf.umd.min.js"></script>
   <script type="module" src="../js/control/ofertas.js"></script>

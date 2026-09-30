@@ -1633,6 +1633,67 @@ tr.control-fila-doc td:first-child { font-weight: 700; color: var(--cinco-amber-
 .control-vista-previa .control-vp-valor { display: block; position: relative; padding-left: 13px; font-size: 12.5px; font-weight: 700; color: var(--cinco-amber-dark); white-space: normal; word-break: break-word; }
 .control-vista-previa .control-vp-valor::before { content: "•"; position: absolute; left: 0; top: 0; color: var(--cinco-amber-dark); }
 
+/* Ribete de color primario por tarjeta (mismo criterio que las
+   subtarjetas del Bosquejo en LBDC Neiva): azul, rojo, amarillo, verde y
+   vuelve a empezar. El color de cada tarjeta tiñe su ribete izquierdo, su
+   título y la viñeta de sus valores; el fondo pasa a tarjeta blanca con
+   sombra suave para que el ribete resalte. Aplica a todas las vistas
+   previas del módulo (Ofertas, Contratos, Correspondencia, Órdenes de
+   Trabajo, Empleados). */
+.control-vista-previa .control-vp-grupo {
+  --pc: #1f5fbf;
+  background: var(--card-bg);
+  border: 1px solid var(--border);
+  border-left: 6px solid var(--pc);
+  border-radius: 10px;
+  padding: 8px 12px 9px;
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.07);
+}
+.control-vista-previa .control-vp-grupo:nth-child(4n + 2) { --pc: #d93636; }
+.control-vista-previa .control-vp-grupo:nth-child(4n + 3) { --pc: #e0a800; }
+.control-vista-previa .control-vp-grupo:nth-child(4n + 4) { --pc: #1e9e57; }
+.control-vista-previa .control-vp-grupo-titulo { color: var(--pc); }
+.control-vista-previa .control-vp-grupo .control-vp-valor::before { color: var(--pc); }
+
+/* ---- Visualizador de ofertas (ofertas.html): lista a la izquierda con el
+   mismo ribete de color primario, PDF real a la derecha. ---- */
+.modal.visor-ofertas { max-width: 1200px; height: 90vh; max-height: 90vh; display: flex; flex-direction: column; padding: 18px 20px; overflow: hidden; }
+.visor-ofertas-encabezado { display: flex; align-items: center; gap: 12px; margin-bottom: 12px; }
+.visor-ofertas-encabezado h2 { margin: 0; white-space: nowrap; }
+.visor-ofertas-encabezado input { flex: 1; min-width: 0; }
+.visor-ofertas-cuerpo { flex: 1; min-height: 0; display: grid; grid-template-columns: 320px 1fr; gap: 14px; }
+.visor-ofertas-lista { list-style: none; margin: 0; padding: 0 4px 0 0; overflow-y: auto; display: flex; flex-direction: column; gap: 8px; }
+.visor-ofertas-lista li[data-id] {
+  --pc: #1f5fbf;
+  cursor: pointer;
+  display: flex; flex-direction: column; gap: 2px;
+  padding: 8px 10px;
+  font-size: 12.5px;
+  background: var(--card-bg);
+  border: 1px solid var(--border);
+  border-left: 6px solid var(--pc);
+  border-radius: 10px;
+  box-shadow: 0 2px 6px rgba(0, 0, 0, 0.06);
+}
+.visor-ofertas-lista li[data-id]:nth-child(4n + 2) { --pc: #d93636; }
+.visor-ofertas-lista li[data-id]:nth-child(4n + 3) { --pc: #e0a800; }
+.visor-ofertas-lista li[data-id]:nth-child(4n + 4) { --pc: #1e9e57; }
+.visor-ofertas-lista li[data-id] strong { color: var(--pc); }
+.visor-ofertas-lista li[data-id]:hover { border-color: var(--pc); }
+.visor-ofertas-lista li.activa { outline: 2px solid var(--cinco-amber); background: rgba(254, 178, 9, 0.10); }
+.visor-ofertas-item-titulo { font-weight: 600; color: var(--text); display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; overflow: hidden; }
+.visor-ofertas-vacio { padding: 8px; font-size: 13px; }
+.visor-ofertas-panel { display: flex; flex-direction: column; min-height: 0; }
+.visor-ofertas-barra { display: flex; align-items: center; gap: 8px; margin-bottom: 8px; }
+.visor-ofertas-titulo { flex: 1; min-width: 0; font-weight: 700; font-size: 13.5px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.visor-ofertas-pdf { flex: 1; min-height: 0; border: 1px solid var(--border); border-radius: 10px; overflow: hidden; background: var(--bg); }
+.visor-ofertas-pdf iframe { width: 100%; height: 100%; border: 0; }
+.visor-ofertas-cargando { padding: 16px; margin: 0; }
+@media (max-width: 800px) {
+  .visor-ofertas-cuerpo { grid-template-columns: 1fr; grid-template-rows: 180px 1fr; }
+  .visor-ofertas-encabezado { flex-wrap: wrap; }
+}
+
 /* Barra de filtros sobre una lista fila+panel (Contratos/Correspondencia/
    Órdenes de Trabajo) — texto libre y/o desplegables/fechas, en una sola
    fila que se envuelve si no cabe. Filtra en el cliente sobre lo que ya
