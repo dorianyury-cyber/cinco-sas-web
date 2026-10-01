@@ -86,17 +86,33 @@ function armarBarraAcciones(cabecera) {
 
   // Un elemento movido se oculta en la barra si su lugar original quedó
   // dentro de algo oculto, o si lo que sigue (el desplegable) está oculto.
+  //
+  // OJO: classList.toggle(clase, x) con x = undefined NO fuerza nada — se
+  // comporta como un toggle simple (alterna). Eso, dentro del
+  // MutationObserver de abajo, cambiaba la clase en cada llamada y volvía
+  // a disparar el observer sin fin (la página se congelaba). Por eso el
+  // valor se fuerza a booleano y solo se toca la clase si de verdad cambia.
+  function ponerClase(el, clase, activa) {
+    if (el.classList.contains(clase) !== activa) el.classList.toggle(clase, activa);
+  }
   function sincronizarVisibilidad() {
     let visibles = 0;
     movidos.forEach(({ el, marcador, sigue }) => {
-      const oculto = !!marcador.closest(".oculto, [hidden]:not(span)") || (sigue && sigue.classList.contains("oculto"));
-      el.classList.toggle("control-oculto-por-origen", oculto);
+      const oculto = Boolean(marcador.closest(".oculto, [hidden]:not(span)")) || Boolean(sigue && sigue.classList.contains("oculto"));
+      ponerClase(el, "control-oculto-por-origen", oculto);
       if (!oculto && !el.classList.contains("oculto")) visibles++;
     });
-    barra.classList.toggle("oculto", visibles === 0);
+    ponerClase(barra, "oculto", visibles === 0);
   }
   sincronizarVisibilidad();
-  new MutationObserver(sincronizarVisibilidad).observe(document.body, {
+  // Agrupado a un cuadro de pantalla: aunque la página cambie muchas clases
+  // seguidas (pintar la tabla), se revisa una sola vez.
+  let pendiente = false;
+  new MutationObserver(() => {
+    if (pendiente) return;
+    pendiente = true;
+    requestAnimationFrame(() => { pendiente = false; sincronizarVisibilidad(); });
+  }).observe(document.body, {
     attributes: true, attributeFilter: ["class", "hidden"], subtree: true
   });
 }
