@@ -2079,3 +2079,75 @@ body.app-control .control-btn-mini { font-weight: 600; font-size: 12px; letter-s
 body.app-control input,
 body.app-control select,
 body.app-control textarea { font-family: var(--fuente-texto); font-size: 13.5px; }
+
+/* ---- Cabecera fija del módulo interno (js/control/control-ui.js):
+   menú + franja de la página + barra de acciones siempre visibles al
+   bajar. La franja (.page-banner) pasa a ser compacta: título y
+   descripción en una sola línea, para no robar espacio a la lista. ---- */
+body.app-control .control-cabecera-fija {
+  position: sticky;
+  top: 0;
+  z-index: 30;
+  box-shadow: 0 6px 18px rgba(18, 22, 29, 0.10);
+}
+body.app-control .control-cabecera-fija .site-header { position: static; }
+body.app-control .page-banner { padding: 12px 0 13px; text-align: left; }
+body.app-control .page-banner .container {
+  display: flex; flex-wrap: wrap; align-items: baseline; column-gap: 14px; row-gap: 2px;
+}
+body.app-control .page-banner .eyebrow { font-size: 10.5px; letter-spacing: 0.14em; margin: 0; }
+body.app-control .page-banner h1 { font-size: 22px; line-height: 1.2; }
+body.app-control .page-banner p { margin: 0; max-width: none; font-size: 13px; color: #aab2bd; }
+
+/* Barra de acciones: botón "Nuevo" + filtros en una sola fila. */
+body.app-control .control-barra-acciones {
+  background: color-mix(in srgb, var(--bg) 92%, transparent);
+  backdrop-filter: blur(8px);
+  -webkit-backdrop-filter: blur(8px);
+  border-bottom: 1px solid var(--border);
+}
+body.app-control .control-barra-acciones-interior {
+  display: flex; flex-wrap: wrap; align-items: center; gap: 10px 14px;
+  padding-top: 10px; padding-bottom: 10px;
+}
+body.app-control .control-barra-acciones .control-filtros-lista,
+body.app-control .control-barra-acciones .control-filtros { flex: 1 1 520px; margin: 0; }
+body.app-control .control-barra-acciones .control-filtros { gap: 14px; }
+body.app-control .control-oculto-por-origen { display: none !important; }
+/* El primer bloque de la página ya no necesita tanto margen arriba. */
+body.app-control section.section { padding-top: 22px; }
+
+/* Botón "Nuevo…": vistoso pero sobrio — ámbar de marca, texto navy en
+   peso medio, un poco más grande que los botones chicos, sombra suave. */
+body.app-control .control-btn-nuevo {
+  display: inline-flex; align-items: center; gap: 6px;
+  padding: 9px 20px;
+  border: 0;
+  border-radius: 10px;
+  background: linear-gradient(180deg, #ffc23a 0%, var(--cinco-amber) 100%);
+  color: var(--cinco-navy-dark);
+  font-family: var(--fuente-titulo);
+  font-size: 14px;
+  font-weight: 650;
+  letter-spacing: 0.005em;
+  white-space: nowrap;
+  cursor: pointer;
+  box-shadow: 0 1px 0 rgba(255, 255, 255, 0.45) inset, 0 4px 12px rgba(217, 148, 0, 0.28);
+  transition: transform 0.12s ease, box-shadow 0.12s ease, background 0.12s ease;
+}
+body.app-control .control-btn-nuevo:hover {
+  background: linear-gradient(180deg, #ffc94f 0%, #f5a800 100%);
+  transform: translateY(-1px);
+  box-shadow: 0 1px 0 rgba(255, 255, 255, 0.45) inset, 0 6px 16px rgba(217, 148, 0, 0.34);
+}
+body.app-control .control-btn-nuevo:focus-visible { outline: 2px solid var(--cinco-navy); outline-offset: 2px; }
+
+/* Al recorrer la lista con las flechas, o al saltar al formulario de
+   "Nuevo", que lo seleccionado no quede debajo de la cabecera fija. */
+body.app-control table.control-tabla-seleccionable tbody tr { scroll-margin-top: calc(var(--alto-cabecera, 0px) + 40px); scroll-margin-bottom: 16px; }
+body.app-control details.control-nuevo { scroll-margin-top: calc(var(--alto-cabecera, 0px) + 12px); }
+
+@media (max-width: 700px) {
+  body.app-control .page-banner p { display: none; }
+  body.app-control .control-cabecera-fija { position: static; }
+}
