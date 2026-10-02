@@ -61,7 +61,7 @@ async function iniciar({ user, perfil, esGestor, contratos, contrato }) {
         ${fila("Estado", esc(c.estado || "Activo"))}
         ${fila("Equipo", `${(c.miembros || []).length} persona(s)`)}
       </tbody></table>
-      ${esGestor ? `<button type="button" class="btn secondary ip-btn-auto" id="editarActivoBtn">✏️ Editar información del contrato</button>` : ""}
+      ${esGestor ? `<div class="ip-acciones-centro"><button type="button" class="btn secondary ip-btn-auto" id="editarActivoBtn">✏️ Editar información del contrato</button></div>` : ""}
     </div>`;
     document.getElementById("editarActivoBtn")?.addEventListener("click", () => abrirFormulario(contrato));
   }

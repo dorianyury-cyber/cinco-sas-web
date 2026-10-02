@@ -57,7 +57,7 @@ export function fecha(valor) {
 // Formato compacto (dd/mm/aaaa) para celdas de tablas densas de una línea.
 export function fechaCorta(valor) {
   if (!valor) return "-";
-  if (typeof valor === "string" && /^d{4}-d{2}-d{2}$/.test(valor)) {
+  if (typeof valor === "string" && /^\d{4}-\d{2}-\d{2}$/.test(valor)) {
     const [a, m, d] = valor.split("-");
     return `${d}/${m}/${a}`;
   }

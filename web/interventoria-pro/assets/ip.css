@@ -2108,3 +2108,17 @@ html.ip-preparando .main::before {
 :is(.modal, .main) .btn::after { height: 1.5px; }
 .main .btn.ip-btn-mini { padding: 3px 8px; font-size: 9.5px; }
 .ip-btn-nuevo, .ip-btn-excel, .ip-form-acciones .btn { padding: 5px 13px; }
+
+/* Orden y centrado de botones (pedido del usuario): nada pegado a una
+   tabla ni descuadrado — los grupos de acciones van centrados. */
+.ip-acciones-centro { display: flex; justify-content: center; flex-wrap: wrap; gap: 10px; margin-top: 18px; }
+.ip-barra-centro, .ip-barra-informe { justify-content: center; }
+.ip-form-acciones { justify-content: center; align-items: center; margin-top: 22px; }
+.ip-form-acciones .btn.danger, .modal .ip-form-acciones .btn.danger { margin-left: 0; }
+.ip-barra { align-items: center; }
+.ip-barra > * { align-self: center; }
+.tabla-densa td.ip-acciones-celda { text-align: center; }
+.ip-acciones-celda > * { vertical-align: middle; }
+.ip-acciones-celda .badge { margin-right: 4px; }
+.ip-acciones-celda .btn.ip-btn-mini { margin: 0 2px; }
+.ip-visor-barra .btn { align-self: center; }
