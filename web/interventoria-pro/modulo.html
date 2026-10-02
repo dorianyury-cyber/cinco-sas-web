@@ -1,0 +1,47 @@
+<!doctype html>
+<html lang="es" class="ip-preparando">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<meta name="robots" content="noindex, nofollow">
+<title>Interventoría PRO</title>
+<link rel="icon" type="image/png" sizes="32x32" href="../assets/img/favicon-32.png">
+<link rel="stylesheet" href="assets/ip.css">
+</head>
+<body>
+  <div class="app-shell">
+    <aside class="sidebar" id="sidebar"></aside>
+    <main class="main" id="ipContenido">
+      <header id="ipHeader"></header>
+      <p class="text-muted ip-descripcion" id="ipDescripcion"></p>
+      <div id="ipAlertas"></div>
+      <div id="ipResumen"></div>
+      <div class="card ip-barra">
+        <button type="button" class="btn ip-btn-nuevo" id="ipNuevoBtn">+ Nuevo registro</button>
+        <input type="search" id="ipBuscar" placeholder="Buscar…">
+        <span class="text-muted ip-contador" id="ipContador"></span>
+        <button type="button" class="btn secondary ip-btn-excel" id="ipExcelBtn">📊 Exportar Excel</button>
+      </div>
+      <div id="ipLista"><div class="card"><p class="text-muted ip-sin-margen">Cargando…</p></div></div>
+    </main>
+  </div>
+
+  <div class="modal-backdrop" id="ipModal">
+    <div class="modal ip-modal-ancho">
+      <h2 id="ipFormTitulo">Nuevo registro</h2>
+      <form id="ipForm">
+        <div class="ip-form-grid" id="ipFormCampos"></div>
+        <div class="alert" id="ipFormAlerta"></div>
+        <div class="ip-form-acciones">
+          <button type="submit" class="btn" id="ipGuardarBtn">Guardar</button>
+          <button type="button" class="btn secondary" id="ipCancelarBtn">Cancelar</button>
+          <button type="button" class="btn danger hidden" id="ipEliminarBtn">Eliminar</button>
+        </div>
+      </form>
+    </div>
+  </div>
+
+  <script src="../js/vendor/exceljs.min.js"></script>
+  <script type="module" src="js/ip-modulo.js"></script>
+</body>
+</html>

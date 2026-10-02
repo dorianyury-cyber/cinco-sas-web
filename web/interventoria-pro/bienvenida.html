@@ -1,0 +1,42 @@
+<!doctype html>
+<html lang="es" class="ip-preparando">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<meta name="robots" content="noindex, nofollow">
+<title>Bienvenida — Interventoría PRO</title>
+<link rel="icon" type="image/png" sizes="32x32" href="../assets/img/favicon-32.png">
+<link rel="stylesheet" href="assets/ip.css">
+</head>
+<body>
+  <div class="bienvenida-page">
+    <header class="bienvenida-topbar">
+      <a href="bienvenida.html" class="bienvenida-brand">
+        <img src="assets/logo.png" alt="CINCO S.A.S.">
+        <span>Interventoría PRO</span>
+      </a>
+      <div class="ip-topbar-acciones">
+        <a href="../control/cambiar-clave.html" class="ip-user-link">🔒 Cambiar contraseña</a>
+        <button type="button" class="btn secondary ip-btn-auto" id="logoutBtn">Cerrar sesión</button>
+      </div>
+    </header>
+
+    <main class="main">
+      <div class="bienvenida-header">
+        <div class="bienvenida-texto">
+          <h1 id="bienvenidaNombre">Hola</h1>
+          <p class="text-muted">Te damos la bienvenida a Interventoría PRO</p>
+        </div>
+        <div class="ip-selector-contrato ip-selector-bienvenida">
+          <label for="bienvenidaContrato">Contrato</label>
+          <select id="bienvenidaContrato"></select>
+        </div>
+      </div>
+
+      <div class="bienvenida-modulos" id="bienvenidaModulos"></div>
+    </main>
+  </div>
+
+  <script type="module" src="js/ip-bienvenida.js"></script>
+</body>
+</html>

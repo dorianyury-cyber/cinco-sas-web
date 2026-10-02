@@ -284,5 +284,29 @@ service cloud.firestore {
       allow read: if autorizadoOrdenesTrabajo();
       allow write: if false;
     }
+
+    // ---- Interventoría PRO (web/interventoria-pro/*) ----
+    // Gestor = admin o empleado con gestionaInterventoriaPro: ve, crea y
+    // edita todos los contratos y su equipo. Miembro = empleado activo
+    // cuyo correo está en ipContratos/{id}.miembros: ve el contrato y
+    // registra/edita la información de TODOS sus módulos (subcolecciones),
+    // pero no cambia los datos básicos ni el equipo. Borrar un contrato
+    // queda solo para admin.
+    function gestionaInterventoriaPro() {
+      return esAdmin() || (esEmpleadoActivo() && empleadoDoc().get('gestionaInterventoriaPro', false) == true);
+    }
+    function miembroIp(datosContrato) {
+      return esEmpleadoActivo() && request.auth.token.email in datosContrato.get('miembros', []);
+    }
+    match /ipContratos/{contratoId} {
+      allow read: if gestionaInterventoriaPro() || miembroIp(resource.data);
+      allow create, update: if gestionaInterventoriaPro();
+      allow delete: if esAdmin();
+
+      match /{coleccion}/{registroId} {
+        allow read, write: if gestionaInterventoriaPro()
+          || miembroIp(get(/databases/$(database)/documents/ipContratos/$(contratoId)).data);
+      }
+    }
   }
 }

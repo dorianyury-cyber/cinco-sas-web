@@ -1,0 +1,61 @@
+<!doctype html>
+<html lang="es" class="ip-preparando">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<meta name="robots" content="noindex, nofollow">
+<title>Contratos — Interventoría PRO</title>
+<link rel="icon" type="image/png" sizes="32x32" href="../assets/img/favicon-32.png">
+<link rel="stylesheet" href="assets/ip.css">
+</head>
+<body>
+  <div class="app-shell">
+    <aside class="sidebar" id="sidebar"></aside>
+    <main class="main">
+      <header id="ipHeader"></header>
+      <div id="ipFicha"></div>
+      <div class="card ip-barra">
+        <button type="button" class="btn ip-btn-nuevo hidden" id="nuevoContratoBtn">+ Nuevo contrato</button>
+        <span class="text-muted ip-contador" id="contratosContador"></span>
+      </div>
+      <div id="contratosLista"></div>
+    </main>
+  </div>
+
+  <div class="modal-backdrop" id="contratoModal">
+    <div class="modal ip-modal-ancho">
+      <h2 id="contratoFormTitulo">Nuevo contrato</h2>
+      <form id="contratoForm">
+        <div class="ip-form-grid">
+          <div class="ip-campo"><label for="c_numero">Contrato N.º *</label><input type="text" id="c_numero" required placeholder="Ej. 040/2026"></div>
+          <div class="ip-campo"><label for="c_estado">Estado</label>
+            <select id="c_estado"><option>Activo</option><option>Suspendido</option><option>Terminado</option><option>Liquidado</option></select></div>
+          <div class="ip-campo ip-campo-ancho"><label for="c_objeto">Objeto *</label><textarea id="c_objeto" rows="3" required></textarea></div>
+          <div class="ip-campo"><label for="c_contratante">Contratante *</label><input type="text" id="c_contratante" required></div>
+          <div class="ip-campo"><label for="c_contratista">Contratista</label><input type="text" id="c_contratista" placeholder="Ej. CINCO S.A.S."></div>
+          <div class="ip-campo"><label for="c_supervisor">Supervisor</label><input type="text" id="c_supervisor"></div>
+          <div class="ip-campo"><label for="c_director">Director / interventor</label><input type="text" id="c_director"></div>
+          <div class="ip-campo"><label for="c_valorInicial">Valor inicial del contrato</label><input type="number" id="c_valorInicial" min="0" step="1"></div>
+          <div class="ip-campo"><label for="c_anticipoPct">Anticipo (%)</label><input type="number" id="c_anticipoPct" min="0" max="100" step="0.1"></div>
+          <div class="ip-campo"><label for="c_fechaInicio">Fecha de inicio *</label><input type="date" id="c_fechaInicio" required></div>
+          <div class="ip-campo"><label for="c_fechaFin">Fecha de terminación *</label><input type="date" id="c_fechaFin" required></div>
+          <div class="ip-campo"><label for="c_plazo">Plazo (texto)</label><input type="text" id="c_plazo" placeholder="Ej. 10 meses"></div>
+          <div class="ip-campo"><label for="c_smmlv">SMMLV vigente</label><input type="number" id="c_smmlv" min="0" step="1">
+            <p class="text-muted ip-ayuda">Se usa para validar que ningún salario del personal quede por debajo del mínimo.</p></div>
+          <div class="ip-campo ip-campo-ancho"><label>Equipo del contrato (quién puede ver y registrar información)</label>
+            <input type="search" id="c_buscarMiembro" placeholder="Buscar empleado…">
+            <div class="ip-miembros" id="c_miembros"></div></div>
+        </div>
+        <div class="alert" id="contratoAlerta"></div>
+        <div class="ip-form-acciones">
+          <button type="submit" class="btn" id="contratoGuardarBtn">Guardar</button>
+          <button type="button" class="btn secondary" id="contratoCancelarBtn">Cancelar</button>
+          <button type="button" class="btn danger hidden" id="contratoEliminarBtn">Eliminar contrato</button>
+        </div>
+      </form>
+    </div>
+  </div>
+
+  <script type="module" src="js/ip-contratos.js"></script>
+</body>
+</html>
