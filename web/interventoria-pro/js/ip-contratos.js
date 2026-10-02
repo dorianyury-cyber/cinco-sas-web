@@ -72,7 +72,7 @@ async function iniciar({ user, perfil, esGestor, contratos, contrato }) {
       return;
     }
     lista.innerHTML = `<div class="card ip-tabla-card"><div class="tabla-scroll"><table class="tabla-densa ip-tabla">
-      <colgroup><col class="ip-w10"><col class="ip-w18"><col class="ip-w32"><col class="ip-w10"><col class="ip-w10"><col class="ip-w8"><col class="ip-w12"></colgroup>
+      <colgroup><col class="ip-w10"><col class="ip-w18"><col class="ip-w26"><col class="ip-w10"><col class="ip-w10"><col class="ip-w8"><col class="ip-w18"></colgroup>
       <thead><tr><th>Contrato</th><th>Contratante</th><th>Objeto</th><th>Inicio</th><th>Terminación</th><th>Estado</th><th></th></tr></thead>
       <tbody>${contratos.map((c) => `<tr class="${contrato?.id === c.id ? "ip-fila-activa" : ""}">
         <td><strong>${esc(c.numero || "-")}</strong></td><td>${esc(c.contratante || "-")}</td><td>${esc(c.objeto || "-")}</td>
