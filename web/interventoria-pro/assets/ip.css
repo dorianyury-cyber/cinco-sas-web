@@ -2096,3 +2096,15 @@ html.ip-preparando .main::before {
 .ip-visor-pdf { flex: 1; min-height: 0; border: 1px solid var(--border); border-radius: 10px; overflow: hidden; background: var(--bg); }
 .ip-visor-pdf iframe { width: 100%; height: 100%; border: 0; }
 .ip-visor-cargando { padding: 16px; margin: 0; }
+
+/* Botones estilo "frutos" más compactos (~mitad del tamaño anterior, pedido
+   del usuario): menos relleno, letra más chica y sombra más suave. */
+:is(.modal, .main) .btn, :is(.modal, .main) .btn.secondary, :is(.modal, .main) .btn.danger {
+  padding: 5px 13px;
+  font-size: 10.5px;
+  letter-spacing: 0.05em;
+  box-shadow: 0 4px 10px rgba(18, 22, 29, 0.18), inset 0 1px 0 rgba(255, 255, 255, 0.10), inset 0 -2px 4px rgba(0, 0, 0, 0.28);
+}
+:is(.modal, .main) .btn::after { height: 1.5px; }
+.main .btn.ip-btn-mini { padding: 3px 8px; font-size: 9.5px; }
+.ip-btn-nuevo, .ip-btn-excel, .ip-form-acciones .btn { padding: 5px 13px; }
