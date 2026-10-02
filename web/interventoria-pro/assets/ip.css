@@ -1972,13 +1972,32 @@ html.ip-preparando .main::before {
 .sidebar .nav-group-toggle .nav-icon-img { width: 20px; height: 20px; }
 .ip-aviso-bienvenida { margin-top: 22px; font-size: 14px; }
 
-/* Ventanas emergentes: título y nombres de campo en gris carbón con
-   negrilla (pedido del usuario) en vez del naranja de marca. */
-:root { --ip-carbon: #36454f; }
-:root[data-theme="dark"] { --ip-carbon: #c9d1d9; }
-.modal h2 { color: var(--ip-carbon); font-weight: 800; }
-.modal label:not(:has(input)) { color: var(--ip-carbon); font-weight: 700; }
-.modal label:not(:has(input))::before { background: var(--ip-carbon); }
+/* Ventanas emergentes: título y nombres de campo en BLANCO sobre fondo
+   azul marino oscuro (pedido del usuario; antes gris carbón) — misma base
+   navy de los botones "frutos del Espíritu". El título es una franja de
+   lado a lado arriba de la ventana; cada nombre de campo, una etiqueta. */
+:root { --ip-navy: #1f2732; --ip-navy-oscuro: #12161d; }
+.modal > h2 {
+  margin: -28px -26px 18px;
+  padding: 20px 26px 16px;
+  border-radius: 16px 16px 0 0;
+  background: linear-gradient(135deg, var(--ip-navy) 0%, var(--ip-navy-oscuro) 100%);
+  color: #ffffff;
+  font-weight: 800;
+}
+.modal .ip-visor-barra h2 { color: var(--text); }
+.modal label:not(:has(input)) {
+  display: inline-flex;
+  align-items: center;
+  padding: 4px 11px;
+  border-radius: 7px;
+  background: linear-gradient(135deg, var(--ip-navy) 0%, var(--ip-navy-oscuro) 100%);
+  color: #ffffff;
+  font-weight: 700;
+  font-size: 12px;
+  letter-spacing: 0.02em;
+}
+.modal label:not(:has(input))::before { background: #feb209; }
 
 /* Botones (ventanas emergentes y páginas) con la misma apariencia de los
    "frutos del Espíritu" de la página Corporativa (.frutos-banda .fruto en
