@@ -1971,3 +1971,79 @@ html.ip-preparando .main::before {
 .ip-capitulo-foto { width: 40px; height: 40px; border-radius: 50%; object-fit: cover; flex-shrink: 0; }
 .sidebar .nav-group-toggle .nav-icon-img { width: 20px; height: 20px; }
 .ip-aviso-bienvenida { margin-top: 22px; font-size: 14px; }
+
+/* Ventanas emergentes: título y nombres de campo en gris carbón con
+   negrilla (pedido del usuario) en vez del naranja de marca. */
+:root { --ip-carbon: #36454f; }
+:root[data-theme="dark"] { --ip-carbon: #c9d1d9; }
+.modal h2 { color: var(--ip-carbon); font-weight: 800; }
+.modal label:not(:has(input)) { color: var(--ip-carbon); font-weight: 700; }
+.modal label:not(:has(input))::before { background: var(--ip-carbon); }
+
+/* Botones de las ventanas emergentes con la misma apariencia de los
+   "frutos del Espíritu" de la página Corporativa (.frutos-banda .fruto en
+   web/assets/css/styles.css): píldora navy con rayas ámbar sutiles, texto
+   ámbar en mayúsculas (Poppins 700), relieve 3D y línea dorada abajo.
+   Eliminar conserva la misma forma pero en rojo, para no confundirse con
+   Guardar. */
+@font-face {
+  font-family: "Poppins";
+  font-style: normal;
+  font-weight: 700;
+  font-display: swap;
+  src: url("../../assets/fonts/poppins-700.woff2") format("woff2");
+}
+.modal {
+  --fr-navy: #1f2732;
+  --fr-navy-dark: #12161d;
+  --fr-amber: #feb209;
+  --fr-amber-dark: #d99400;
+}
+.modal .btn,
+.modal .btn.secondary,
+.modal .btn.danger {
+  position: relative;
+  overflow: hidden;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: auto;
+  margin: 0;
+  padding: 10px 22px;
+  border: 0;
+  border-radius: 999px;
+  font-family: "Poppins", "Segoe UI", sans-serif;
+  font-weight: 700;
+  font-size: 13px;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  color: var(--fr-amber);
+  background:
+    repeating-linear-gradient(135deg, rgba(254, 178, 9, 0.14) 0 8px, rgba(254, 178, 9, 0) 8px 16px),
+    linear-gradient(135deg, var(--fr-navy) 0%, var(--fr-navy-dark) 100%);
+  box-shadow:
+    0 8px 18px rgba(18, 22, 29, 0.22),
+    inset 0 1px 0 rgba(255, 255, 255, 0.10),
+    inset 0 -2px 6px rgba(0, 0, 0, 0.32);
+  transition: transform 0.12s ease, box-shadow 0.12s ease, filter 0.12s ease;
+}
+.modal .btn::after {
+  content: "";
+  position: absolute;
+  left: 0; right: 0; bottom: 0;
+  height: 2px;
+  background: linear-gradient(90deg, var(--fr-amber-dark), var(--fr-amber), var(--fr-amber-dark));
+}
+.modal .btn:hover:not(:disabled) {
+  transform: translateY(-1px);
+  filter: brightness(1.12);
+  box-shadow:
+    0 10px 22px rgba(18, 22, 29, 0.28),
+    inset 0 1px 0 rgba(255, 255, 255, 0.12),
+    inset 0 -2px 6px rgba(0, 0, 0, 0.32);
+}
+.modal .btn:active:not(:disabled) { transform: translateY(0); }
+.modal .btn:disabled { opacity: 0.55; cursor: not-allowed; }
+.modal .btn.danger { color: #ff8f8f; }
+.modal .btn.danger::after { background: linear-gradient(90deg, #b23434, #e05252, #b23434); }
+.modal .ip-form-acciones .btn.danger { margin-left: auto; }
