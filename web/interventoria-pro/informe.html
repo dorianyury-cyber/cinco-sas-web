@@ -1,0 +1,31 @@
+<!doctype html>
+<html lang="es" class="ip-preparando">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<meta name="robots" content="noindex, nofollow">
+<title>Informe mensual — Interventoría PRO</title>
+<link rel="icon" type="image/png" sizes="32x32" href="../assets/img/favicon-32.png">
+<link rel="stylesheet" href="assets/ip.css">
+</head>
+<body>
+  <div class="app-shell">
+    <aside class="sidebar" id="sidebar"></aside>
+    <main class="main">
+      <header id="ipHeader"></header>
+      <p class="text-muted ip-descripcion">Elige el mes: verás qué información hay registrada en cada capítulo y podrás generar el informe en Word con la estructura del informe mensual (tablas, curva S y registro fotográfico del mes).</p>
+      <div class="card ip-barra">
+        <label for="informeMes" class="ip-label-inline">Mes del informe</label>
+        <select id="informeMes" class="ip-filtro-mes"></select>
+        <input type="text" id="informeElaborado" placeholder="Elaborado por">
+        <input type="text" id="informeCargo" placeholder="Cargo">
+        <button type="button" class="btn ip-btn-nuevo" id="generarInformeBtn">📄 Generar informe Word</button>
+      </div>
+      <div class="alert" id="informeAlerta"></div>
+      <div id="informeContenido"><div class="card"><p class="text-muted ip-sin-margen">Cargando la información del contrato…</p></div></div>
+    </main>
+  </div>
+  <script src="../js/vendor/docx.iife.js"></script>
+  <script type="module" src="js/ip-informe.js"></script>
+</body>
+</html>

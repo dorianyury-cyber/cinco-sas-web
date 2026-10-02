@@ -2052,3 +2052,18 @@ html.ip-preparando .main::before {
 .ip-w26 { width: 26%; }
 /* La celda de acciones no recorta los botones (la tabla densa recorta con …). */
 .tabla-densa td.ip-acciones-celda { overflow: visible; text-overflow: clip; }
+
+/* Filtro de mes, curva S e indicadores */
+.ip-barra select.ip-filtro-mes { width: auto; min-width: 170px; padding: 9px 10px; }
+.ip-curva-s { width: 100%; overflow-x: auto; margin-bottom: 12px; }
+.ip-curva-s svg { display: block; width: 100%; max-width: 900px; height: auto; margin: 0 auto; }
+.ip-formula { font-size: 11px; }
+
+/* Informe mensual */
+.ip-label-inline { margin: 0; white-space: nowrap; }
+.ip-barra input[type="text"] { width: auto; flex: 1 1 180px; padding: 9px 12px; }
+.ip-informe-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(300px, 1fr)); gap: 16px; }
+.ip-informe-grid .card { margin: 0; }
+.ip-informe-grid h2 { display: flex; align-items: center; gap: 10px; }
+.ip-informe-lista { list-style: none; margin: 0; padding: 0; display: flex; flex-direction: column; gap: 6px; font-size: 13px; }
+.ip-informe-lista .badge { min-width: 26px; text-align: center; display: inline-block; }

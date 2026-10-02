@@ -281,7 +281,9 @@ function pintarMenu({ user, perfil, esGestor, contratos, contrato }) {
   };
 
   const grupos = CAPITULOS.map((cap) => {
-    const items = cap.items.map((it) => {
+    // Cantidades de obra solo aplica a contratos de obra.
+    const visibles = cap.items.filter((it) => !(it.m && MODULOS[it.m].soloObra && contrato?.tipo !== "Obra"));
+    const items = visibles.map((it) => {
       if (it.href) return enlace(it.href, it.foto, it.label);
       const mod = MODULOS[it.m];
       const href = hrefModulo(it.m, it.cap);
@@ -310,6 +312,7 @@ function pintarMenu({ user, perfil, esGestor, contratos, contrato }) {
     <nav>
       ${enlace("inicio.html", "inicio", "Inicio")}
       ${enlace("contratos.html", "contratos", esGestor ? "Contratos" : "Mis contratos")}
+      ${contrato ? enlace("informe.html", "informe", "Informe mensual") : ""}
       ${grupos.map((g, i) => `
         <div class="nav-group ip-nav-cap ip-nav-cap-${i % 4}">
           <div class="collapsible-toggle nav-group-toggle" data-target="ipGrupo-${g.cap.id}">

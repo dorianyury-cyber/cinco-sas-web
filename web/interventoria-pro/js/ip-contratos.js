@@ -46,7 +46,9 @@ async function iniciar({ user, perfil, esGestor, contratos, contrato }) {
         ${fila("Contrato N.º", esc(c.numero))}
         ${fila("Objeto", esc(c.objeto))}
         ${fila("Contratante", esc(c.contratante))}
-        ${fila("Contratista", esc(c.contratista))}
+        ${fila("Tipo de interventoría", esc(c.tipo || "Servicios"))}
+        ${fila("Contratista / proveedor", esc(c.contratista))}
+        ${fila("Municipio", esc(c.municipio))}
         ${fila("Supervisor", esc(c.supervisor))}
         ${fila("Director / interventor", esc(c.director))}
         ${fila("Valor inicial", c.valorInicial ? moneda(c.valorInicial) : "-")}
@@ -89,7 +91,7 @@ async function iniciar({ user, perfil, esGestor, contratos, contrato }) {
   }
 
   // ---------------------------------------------------------- formulario
-  const CAMPOS = ["numero", "estado", "objeto", "contratante", "contratista", "supervisor", "director", "valorInicial", "anticipoPct", "fechaInicio", "fechaFin", "plazo", "smmlv"];
+  const CAMPOS = ["numero", "tipo", "estado", "objeto", "municipio", "objetivo", "alcance", "contratante", "contratista", "supervisor", "director", "valorInicial", "anticipoPct", "fechaInicio", "fechaFin", "plazo", "smmlv"];
   const NUMERICOS = new Set(["valorInicial", "anticipoPct", "smmlv"]);
 
   function pintarMiembros() {
@@ -109,7 +111,7 @@ async function iniciar({ user, perfil, esGestor, contratos, contrato }) {
     editandoId = c?.id || null;
     limpiarAlerta(alerta);
     document.getElementById("contratoFormTitulo").textContent = c ? `Editar contrato ${c.numero || ""}` : "Nuevo contrato";
-    CAMPOS.forEach((k) => { document.getElementById(`c_${k}`).value = c?.[k] ?? (k === "estado" ? "Activo" : k === "contratista" ? "CINCO S.A.S." : ""); });
+    CAMPOS.forEach((k) => { document.getElementById(`c_${k}`).value = c?.[k] ?? (k === "estado" ? "Activo" : k === "tipo" ? "Servicios" : k === "contratista" ? "CINCO S.A.S." : ""); });
     seleccion = new Set(c?.miembros || [user.email]);
     buscarMiembro.value = "";
     pintarMiembros();

@@ -30,6 +30,7 @@ if (ctx) {
   const tarjetas = [
     { href: "inicio.html", foto: "inicio", label: "Inicio", desc: "Resumen del contrato: avance, finanzas y alertas" },
     { href: "contratos.html", foto: "contratos", label: esGestor ? "Contratos" : "Mis contratos", desc: esGestor ? "Crea contratos, su información básica y su equipo" : "Contratos en los que participas" },
+    { href: "informe.html", foto: "informe", label: "Informe mensual", desc: "Elige el mes y genera el informe en Word con todo lo registrado" },
     ...CAPITULOS.map((c) => ({ href: c.items[0].href || hrefModulo(c.items[0].m, c.items[0].cap), foto: `cap-${c.id}`, label: `${c.numero}. ${c.label}`, desc: c.desc }))
   ];
   document.getElementById("bienvenidaModulos").innerHTML = tarjetas.map((t, i) => {

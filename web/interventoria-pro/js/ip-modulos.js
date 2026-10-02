@@ -63,24 +63,113 @@ function matrizMensual({ registros, campoTipo, tipos, campoFecha = "fecha", mese
     <tbody>${filas}</tbody></table></div></div>`;
 }
 
+function pctCantidad(r) {
+  const c = Number(r.cantidadContratada) || 0;
+  return c ? Math.round(((Number(r.cantidadEjecutada) || 0) / c) * 100) : 0;
+}
+
+function curvaSHtml(ctx) {
+  if (!ctx.registros.length) return "";
+  const puntos = curvaS(ctx.registros, ctx.contrato);
+  const filas = puntos.map((p) => `<tr><td>${mesCorto(p.ym)}</td><td class="ip-num">${numero(p.programado, 1)}%</td><td class="ip-num">${p.ejecutado == null ? "–" : numero(p.ejecutado, 1) + "%"}</td><td class="ip-num">${p.ejecutado == null ? "–" : (p.ejecutado - p.programado >= 0 ? "+" : "") + numero(p.ejecutado - p.programado, 1)}</td></tr>`).join("");
+  return `<div class="card"><h2>Avance gráfico del contrato — Curva S</h2>
+    <div class="ip-curva-s">${svgCurvaS(puntos)}</div>
+    <div class="tabla-scroll"><table class="tabla-compacta ip-matriz"><thead><tr><th>Mes</th><th class="ip-num">Programado acumulado</th><th class="ip-num">Ejecutado acumulado</th><th class="ip-num">Diferencia (pts)</th></tr></thead><tbody>${filas}</tbody></table></div></div>`;
+}
+
+function indicadoresHtml(ctx) {
+  const meses = mesesDelContrato(ctx.contrato, { hastaHoy: true });
+  const ind = indicadoresSST(meses, { personal: ctx.datos.personal || [], accidentes: ctx.registros, novedades: ctx.datos.novedades || [] });
+  const filas = INDICADORES_SST.map((d) => `<tr><td><strong>${esc(d.nombre)}</strong><br><span class="text-muted ip-formula">${esc(d.formula)}</span></td>${ind.map((x) => `<td class="ip-num">${numero(x[d.clave], x[d.clave] % 1 ? 2 : 0)}%</td>`).join("")}</tr>`).join("");
+  return `<div class="card"><h2>Indicadores de accidentalidad, mes a mes</h2><div class="tabla-scroll"><table class="tabla-compacta ip-matriz">
+    <thead><tr><th>Indicador</th>${meses.map((ym) => `<th class="ip-num">${mesCorto(ym)}</th>`).join("")}</tr></thead><tbody>${filas}</tbody></table></div></div>`;
+}
+
 function nombrePersona(ctx, id) {
   const p = (ctx.datos.personal || []).find((x) => x.id === id);
   return p ? p.nombre : "-";
 }
 
-// Avance acumulado más reciente registrado de una actividad (mes ≤ hoy).
-export function avanceReal(act) {
-  const meses = Object.keys(act.avance || {}).filter((ym) => ym <= mesActual() && act.avance[ym] !== "" && act.avance[ym] != null).sort();
+// Avance acumulado registrado de una actividad hasta el mes "hasta"
+// (incluido) — se arrastra el último valor reportado.
+export function avanceReal(act, hasta = mesActual()) {
+  const meses = Object.keys(act.avance || {}).filter((ym) => ym <= hasta && act.avance[ym] !== "" && act.avance[ym] != null).sort();
   return meses.length ? Number(act.avance[meses[meses.length - 1]]) || 0 : 0;
 }
-// Avance que DEBERÍA llevar hoy según sus fechas (lineal).
-export function avanceProgramado(act) {
-  if (!act.fechaInicio || !act.fechaFin) return null;
-  const hoy = hoyISO();
-  if (hoy <= act.fechaInicio) return 0;
-  if (hoy >= act.fechaFin) return 100;
-  const total = diasEntre(act.fechaInicio, act.fechaFin) || 1;
-  return Math.round((diasEntre(act.fechaInicio, hoy) / total) * 100);
+function sumarDias(iso, dias) {
+  const d = new Date(`${iso}T12:00:00`);
+  d.setDate(d.getDate() + dias);
+  return d.toISOString().slice(0, 10);
+}
+// Inicio de la actividad: el registrado o, si no, fecha de terminación
+// menos su duración en semanas (así viene el cronograma en los informes de
+// obra: "duración (semanas)" + "fecha de terminación").
+export function inicioActividad(act) {
+  if (act.fechaInicio) return act.fechaInicio;
+  if (act.fechaFin && Number(act.duracionSemanas)) return sumarDias(act.fechaFin, -Math.round(Number(act.duracionSemanas) * 7));
+  return act.fechaFin || null;
+}
+// Avance que DEBERÍA llevar en una fecha según su cronograma (lineal).
+export function avanceProgramado(act, fechaISO = hoyISO()) {
+  const ini = inicioActividad(act);
+  if (!ini || !act.fechaFin) return null;
+  if (fechaISO < ini) return 0;
+  if (fechaISO >= act.fechaFin) return 100;
+  const total = diasEntre(ini, act.fechaFin) || 1;
+  return Math.round((diasEntre(ini, fechaISO) / total) * 100);
+}
+
+// Curva S: avance acumulado ponderado del contrato, mes a mes — programado
+// (cronograma de cada actividad, repartido linealmente entre su inicio y
+// su terminación y ponderado por su peso) contra ejecutado (avance
+// acumulado reportado de cada actividad, ponderado). El ejecutado se
+// calcula solo hasta el mes "hasta" (por defecto el actual).
+export function curvaS(actividades, contrato, hasta = mesActual()) {
+  const pesoTotal = actividades.reduce((s, a) => s + (Number(a.peso) || 0), 0);
+  const meses = mesesDelContrato(contrato);
+  return meses.map((ym) => {
+    const corte = finDeMes(ym);
+    let prog = 0, ejec = 0;
+    actividades.forEach((a) => {
+      const w = pesoTotal ? (Number(a.peso) || 0) / pesoTotal : 0;
+      prog += w * (avanceProgramado(a, corte) ?? 0);
+      ejec += w * avanceReal(a, ym);
+    });
+    return {
+      ym,
+      programado: Math.round(prog * 10) / 10,
+      ejecutado: ym <= hasta ? Math.round(ejec * 10) / 10 : null
+    };
+  });
+}
+
+// Gráfico SVG de la curva S (atributos de presentación, sin style="" —
+// la CSP del sitio no permite estilos en línea). Lo usa la pantalla y,
+// convertido a PNG, el informe Word.
+export function svgCurvaS(puntos, { ancho = 760, alto = 320, fondo = "#ffffff" } = {}) {
+  const m = { izq: 44, der: 24, arr: 26, aba: 46 };
+  const w = ancho - m.izq - m.der, h = alto - m.arr - m.aba;
+  const n = Math.max(puntos.length - 1, 1);
+  const x = (i) => m.izq + (i / n) * w;
+  const y = (v) => m.arr + h - (Math.max(0, Math.min(100, v)) / 100) * h;
+  const linea = (clave) => puntos.map((p, i) => (p[clave] == null ? null : `${x(i).toFixed(1)},${y(p[clave]).toFixed(1)}`)).filter(Boolean).join(" ");
+  const rejilla = [0, 25, 50, 75, 100].map((v) => `<line x1="${m.izq}" x2="${m.izq + w}" y1="${y(v)}" y2="${y(v)}" stroke="#e5e7eb" stroke-width="1"/><text x="${m.izq - 6}" y="${y(v) + 4}" font-size="11" text-anchor="end" fill="#6b7280" font-family="Arial">${v}%</text>`).join("");
+  const etiquetas = puntos.map((p, i) => `<text x="${x(i)}" y="${m.arr + h + 16}" font-size="10.5" text-anchor="middle" fill="#6b7280" font-family="Arial">${mesCorto(p.ym)}</text>`).join("");
+  const puntosSerie = (clave, color) => puntos.map((p, i) => (p[clave] == null ? "" : `<circle cx="${x(i)}" cy="${y(p[clave])}" r="3.2" fill="${color}"/>`)).join("");
+  const ultimo = [...puntos].reverse().find((p) => p.ejecutado != null);
+  const iUlt = ultimo ? puntos.indexOf(ultimo) : -1;
+  return `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 ${ancho} ${alto}" width="${ancho}" height="${alto}">
+    <rect x="0" y="0" width="${ancho}" height="${alto}" fill="${fondo}"/>
+    ${rejilla}${etiquetas}
+    <polyline points="${linea("programado")}" fill="none" stroke="#1f5fbf" stroke-width="2.5" stroke-dasharray="7 5"/>
+    <polyline points="${linea("ejecutado")}" fill="none" stroke="#e08a00" stroke-width="3"/>
+    ${puntosSerie("programado", "#1f5fbf")}${puntosSerie("ejecutado", "#e08a00")}
+    ${iUlt >= 0 ? `<text x="${x(iUlt)}" y="${y(ultimo.ejecutado) - 9}" font-size="12" font-weight="bold" text-anchor="${iUlt === puntos.length - 1 ? "end" : "middle"}" fill="#b86f00" font-family="Arial">${ultimo.ejecutado}%</text>` : ""}
+    <line x1="${m.izq}" x2="${m.izq + 26}" y1="${alto - 12}" y2="${alto - 12}" stroke="#1f5fbf" stroke-width="2.5" stroke-dasharray="7 5"/>
+    <text x="${m.izq + 32}" y="${alto - 8}" font-size="11.5" fill="#374151" font-family="Arial">Programado acumulado</text>
+    <line x1="${m.izq + 190}" x2="${m.izq + 216}" y1="${alto - 12}" y2="${alto - 12}" stroke="#e08a00" stroke-width="3"/>
+    <text x="${m.izq + 222}" y="${alto - 8}" font-size="11.5" fill="#374151" font-family="Arial">Ejecutado acumulado</text>
+  </svg>`;
 }
 export function avancePonderado(actividades) {
   const pesoTotal = actividades.reduce((s, a) => s + (Number(a.peso) || 0), 0);
@@ -99,7 +188,7 @@ export function avancePonderado(actividades) {
 export function estadoFinanciero(contrato, movimientos) {
   const suma = (tipo) => movimientos.filter((m) => m.tipo === tipo).reduce((s, m) => s + (Number(m.valor) || 0), 0);
   const valorTotal = (Number(contrato?.valorInicial) || 0) + suma("Adición") - suma("Reducción");
-  const ejecutado = suma("Acta parcial / Constancia de cumplimiento");
+  const ejecutado = suma("Acta parcial / Constancia de cumplimiento") + suma("Acta de recibo final");
   return {
     valorTotal, ejecutado,
     saldo: valorTotal - ejecutado,
@@ -108,6 +197,40 @@ export function estadoFinanciero(contrato, movimientos) {
     amortizado: suma("Amortización de anticipo")
   };
 }
+
+// Indicadores de accidentalidad mes a mes (Res. 0312 de 2019), con el
+// personal vinculado de cada mes como base — así los presenta el informe
+// de obra: tasa de accidentalidad, severidad, enfermedad laboral y
+// ausentismo.
+export function indicadoresSST(meses, { personal = [], accidentes = [], novedades = [] }) {
+  return meses.map((ym) => {
+    const trabajadores = personal.filter((p) => activoEnMes(p, ym)).length;
+    const delMes = accidentes.filter((a) => String(a.fecha || "").startsWith(ym));
+    const at = delMes.filter((a) => a.tipo === "Accidente de trabajo").length;
+    const el = accidentes.filter((a) => a.tipo === "Enfermedad laboral" && String(a.fecha || "") <= finDeMes(ym)).length;
+    const diasAT = delMes.reduce((s, a) => s + (Number(a.diasIncapacidad) || 0), 0);
+    const ini = `${ym}-01`, fin = finDeMes(ym);
+    const diasAusencia = novedades.filter((n) => n.tipo === "Incapacidad").reduce((s, n) => {
+      const desde = n.fecha > ini ? n.fecha : ini;
+      const hasta = (n.fechaFin || n.fecha) < fin ? (n.fechaFin || n.fecha) : fin;
+      return s + (hasta >= desde ? diasEntre(desde, hasta) + 1 : 0);
+    }, 0);
+    const pct = (num, den) => (den ? Math.round((num / den) * 10000) / 100 : 0);
+    return {
+      ym, trabajadores,
+      accidentalidad: pct(at, trabajadores),
+      severidad: pct(diasAT, trabajadores),
+      enfermedad: pct(el, trabajadores),
+      ausentismo: pct(diasAusencia, trabajadores * 30)
+    };
+  });
+}
+export const INDICADORES_SST = [
+  { clave: "accidentalidad", nombre: "Tasa de accidentalidad", formula: "(N.º de accidentes de trabajo del mes / N.º de trabajadores del mes) × 100" },
+  { clave: "severidad", nombre: "Severidad de los accidentes de trabajo", formula: "(Días de incapacidad por accidente de trabajo del mes / N.º de trabajadores del mes) × 100" },
+  { clave: "enfermedad", nombre: "Tasa de enfermedad laboral", formula: "(Casos de enfermedad laboral / N.º de trabajadores del mes) × 100" },
+  { clave: "ausentismo", nombre: "Ausentismo", formula: "(Días de ausencia por incapacidad del mes / días programados de trabajo) × 100" }
+];
 
 // ------------------------------------------------------------ capítulos
 
@@ -143,8 +266,8 @@ export const CAPITULOS = [
     { m: "capacitaciones", cap: "ambiental", label: "Capacitaciones ambientales", foto: "capacitaciones-ambiental" },
     { m: "observaciones", cap: "ambiental" }, { m: "anexos", cap: "ambiental" }
   ] },
-  { id: "tecnico", numero: "7", label: "Técnico", icon: "📐", desc: "Avance porcentual y gráfico de las actividades", items: [
-    { m: "actividades" }, { m: "observaciones", cap: "tecnico", label: "Resumen y observaciones" }, { m: "anexos", cap: "tecnico" }
+  { id: "tecnico", numero: "7", label: "Técnico", icon: "📐", desc: "Cantidades de obra, avance porcentual y curva S", items: [
+    { m: "cantidades" }, { m: "actividades" }, { m: "observaciones", cap: "tecnico", label: "Resumen y observaciones" }, { m: "anexos", cap: "tecnico" }
   ] },
   { id: "riesgos", numero: "8", label: "Matriz de riesgos", icon: "⚠️", desc: "Riesgos del contrato, impacto y monitoreo", items: [
     { m: "riesgos" }
@@ -159,6 +282,7 @@ export const CAPITULOS = [
 export const MODULOS = {
   // ======================= 1. ADMINISTRATIVO
   cronologia: {
+    acumulaEnInforme: true,
     label: "Cronología de actas", icon: "🗓️", coleccion: "cronologia",
     desc: "Resumen cronológico de las actividades administrativas: actas de inicio, suspensión, reinicio, adiciones, prórrogas, liquidación.",
     campos: [
@@ -197,10 +321,11 @@ export const MODULOS = {
 
   // ======================= 2. FINANCIERO
   financiero: {
+    acumulaEnInforme: true,
     label: "Estado financiero", icon: "💵", coleccion: "financiero",
     desc: "Adiciones, actas parciales / constancias de cumplimiento, anticipo y amortizaciones. El valor inicial se toma de la información del contrato.",
     campos: [
-      { key: "tipo", label: "Tipo de movimiento", type: "select", opciones: ["Acta parcial / Constancia de cumplimiento", "Adición", "Reducción", "Anticipo", "Amortización de anticipo"], required: true },
+      { key: "tipo", label: "Tipo de movimiento", type: "select", opciones: ["Acta parcial / Constancia de cumplimiento", "Acta de recibo final", "Adición", "Reducción", "Anticipo", "Amortización de anticipo"], required: true },
       { key: "descripcion", label: "Descripción", type: "text", required: true, placeholder: "Ej. Constancia de cumplimiento 7" },
       { key: "numero", label: "N.º acta / factura", type: "text" },
       { key: "fecha", label: "Fecha", type: "date", required: true },
@@ -217,7 +342,7 @@ export const MODULOS = {
       let saldo = Number(ctx.contrato.valorInicial) || 0;
       let acumulado = 0;
       const filas = [`<tr><td>Valor inicial del contrato</td><td class="ip-num">${moneda(saldo)}</td><td class="ip-num">–</td><td class="ip-num">${moneda(saldo)}</td><td class="ip-num">–</td></tr>`];
-      [...ctx.registros].filter((m) => ["Adición", "Reducción", "Acta parcial / Constancia de cumplimiento"].includes(m.tipo))
+      [...ctx.registros].filter((m) => ["Adición", "Reducción", "Acta parcial / Constancia de cumplimiento", "Acta de recibo final"].includes(m.tipo))
         .sort((a, b) => String(a.fecha).localeCompare(String(b.fecha)))
         .forEach((m) => {
           const v = Number(m.valor) || 0;
@@ -245,6 +370,7 @@ export const MODULOS = {
   },
 
   anticipo: {
+    acumulaEnInforme: true,
     label: "Inversión del anticipo", icon: "🏦", coleccion: "anticipo",
     desc: "En qué se invirtió el anticipo recibido. El anticipo y sus amortizaciones se registran en Estado financiero.",
     campos: [
@@ -278,6 +404,7 @@ export const MODULOS = {
 
   // ======================= 3. JURÍDICO
   garantias: {
+    sinFiltroMes: true,
     label: "Garantías y pólizas", icon: "🛡️", coleccion: "garantias",
     desc: "Cuadro de control de garantías: aseguradora, póliza, amparo y vigencia. Avisa lo vencido y lo que vence en 30 días.",
     campos: [
@@ -312,6 +439,7 @@ export const MODULOS = {
 
   // ======================= 4. SST
   personal: {
+    filtroMes: (r, ym) => activoEnMes(r, ym),
     label: "Listado de personal", icon: "👷", coleccion: "personal",
     desc: "Personal que labora en el contrato, con afiliaciones y salario. Valida que el salario no esté por debajo del SMMLV ni del pactado para el cargo.",
     campos: [
@@ -491,6 +619,7 @@ export const MODULOS = {
   },
 
   accidentes: {
+    necesita: ["personal", "novedades"],
     label: "Accidentalidad", icon: "🚑", coleccion: "accidentes",
     desc: "Accidentes e incidentes de trabajo: reporte a la ARL, investigación y días de incapacidad.",
     campos: [
@@ -510,14 +639,15 @@ export const MODULOS = {
       return { nivel: "ok", texto: "Investigado" };
     },
     resumen(ctx) {
-      if (!ctx.registros.length) return `<div class="card"><p class="ip-sin-margen">✅ El contratista no presenta accidentes ni incidentes de trabajo registrados durante la ejecución del contrato.</p></div>`;
+      const tablaInd = indicadoresHtml(ctx);
+      if (!ctx.registros.length) return `<div class="card"><p class="ip-sin-margen">✅ El contratista no presenta accidentes ni incidentes de trabajo registrados durante la ejecución del contrato.</p></div>` + tablaInd;
       const dias = ctx.registros.reduce((s, r) => s + (Number(r.diasIncapacidad) || 0), 0);
       return tarjetas([
         { icon: "🚑", valor: ctx.registros.filter((r) => r.tipo === "Accidente de trabajo").length, label: "Accidentes de trabajo" },
         { icon: "⚠️", valor: ctx.registros.filter((r) => r.tipo === "Incidente").length, label: "Incidentes" },
         { icon: "🛏️", valor: dias, label: "Días de incapacidad" },
         { icon: "🔍", valor: ctx.registros.filter((r) => r.investigado !== "Sí").length, label: "Sin investigar", cinta: 1 }
-      ]);
+      ]) + tablaInd;
     },
     alertas(ctx) {
       const n = ctx.registros.filter((r) => r.investigado !== "Sí").length;
@@ -587,6 +717,7 @@ export const MODULOS = {
 
   // ======================= 6. AMBIENTAL
   aspectos: {
+    sinFiltroMes: true,
     label: "Aspectos e impactos", icon: "🍃", coleccion: "aspectos",
     desc: "Identificación de aspectos e impactos ambientales por actividad, con su medida de control.",
     campos: [
@@ -651,6 +782,7 @@ export const MODULOS = {
   },
 
   requisitos: {
+    sinFiltroMes: true,
     label: "Requisitos legales ambientales", icon: "📜", coleccion: "requisitos",
     desc: "Normas ambientales aplicables y su cumplimiento.",
     campos: [
@@ -687,14 +819,15 @@ export const MODULOS = {
 
   // ======================= 7. TÉCNICO
   actividades: {
+    sinFiltroMes: true,
     label: "Avance de actividades", icon: "📊", coleccion: "actividades",
     desc: "Actividades del contrato con su peso y fechas. Registra el avance acumulado (%) de cada mes: el sistema calcula el avance ponderado y lo compara con lo programado a hoy.",
     campos: [
       { key: "item", label: "Ítem", type: "number", required: true },
       { key: "actividad", label: "Actividad", type: "text", required: true, ancho: true },
       { key: "peso", label: "Peso (%) dentro del contrato", type: "pct", required: true, ayuda: "Lo que pesa esta actividad en el avance total. Lo ideal es que los pesos sumen 100%." },
-      { key: "duracionSemanas", label: "Duración (semanas)", type: "number" },
-      { key: "fechaInicio", label: "Fecha de inicio", type: "date", required: true },
+      { key: "duracionSemanas", label: "Duración (semanas)", type: "number", ayuda: "Si no registras la fecha de inicio, se calcula como fecha de terminación menos esta duración." },
+      { key: "fechaInicio", label: "Fecha de inicio", type: "date" },
       { key: "fechaFin", label: "Fecha de terminación", type: "date", required: true },
       { key: "avance", label: "Avance acumulado (%) por mes", type: "avance", ancho: true }
     ],
@@ -728,7 +861,8 @@ export const MODULOS = {
           { icon: real < programado - 5 ? "⚠️" : "✅", valor: `${real >= programado ? "+" : ""}${numero(real - programado, 1)} pts`, label: "Diferencia", cinta: real < programado - 5 ? 1 : 3 },
           { icon: "📋", valor: ctx.registros.length, label: "Actividades" }
         ]) +
-        (barras ? `<div class="card"><h2>Avance gráfico del contrato</h2><p class="text-muted ip-leyenda"><span class="ip-leyenda-real"></span> Real &nbsp; <span class="ip-leyenda-prog"></span> Programado a hoy</p>${barras}</div>` : "");
+        curvaSHtml(ctx) +
+        (barras ? `<div class="card"><h2>Avance por actividad</h2><p class="text-muted ip-leyenda"><span class="ip-leyenda-real"></span> Real &nbsp; <span class="ip-leyenda-prog"></span> Programado a hoy</p>${barras}</div>` : "");
     },
     alertas(ctx) {
       return ctx.registros.map((a) => ({ a, v: MODULOS.actividades.validar(a) })).filter((x) => x.v.nivel === "danger")
@@ -736,8 +870,46 @@ export const MODULOS = {
     }
   },
 
+  cantidades: {
+    label: "Cantidades de obra", icon: "🏗️", coleccion: "cantidades", soloObra: true, sinFiltroMes: true,
+    desc: "Resumen general de actividades técnicas: cantidades contratadas contra ejecutadas por componente (redes de media y baja tensión, acometidas, transformadores, medida, apoyos…).",
+    campos: [
+      { key: "componente", label: "Componente", type: "select", opciones: ["Líneas de media tensión (LMT)", "Redes de baja tensión (RBT)", "Acometidas", "Transformadores", "Sistema de medida", "Apoyos", "Alumbrado público", "Obra civil", "Otro"], required: true },
+      { key: "tipo", label: "Tipo / fases", type: "text", placeholder: "Ej. 2ø, 3ø, 1ø, AMI" },
+      { key: "especificacion", label: "Especificación", type: "text", required: true, placeholder: "Ej. Red trenzada 2×50+50, 25 kVA, concreto 750 kg", ancho: true },
+      { key: "unidad", label: "Unidad", type: "select", opciones: ["km", "m", "und", "global"], required: true },
+      { key: "cantidadContratada", label: "Cantidad contratada", type: "number", required: true },
+      { key: "cantidadEjecutada", label: "Cantidad ejecutada", type: "number" },
+      { key: "estado", label: "Estado", type: "text", placeholder: "Ej. Construida, conectada y energizada", ancho: true }
+    ],
+    columnas: [
+      { key: "componente", ancho: 20 }, { key: "tipo", ancho: 7 }, { key: "especificacion", ancho: 25 }, { key: "unidad", ancho: 6 },
+      { key: "cantidadContratada", label: "Contratada", ancho: 9 }, { key: "cantidadEjecutada", label: "Ejecutada", ancho: 9 },
+      { key: "_pct", label: "% ejec.", ancho: 7, render: (r) => `${pctCantidad(r)}%` },
+      { key: "estado", ancho: 17 }
+    ],
+    orden: { key: "componente", dir: 1 },
+    validar(r) {
+      const p = pctCantidad(r);
+      if (p >= 100) return { nivel: "ok", texto: p > 100 ? "Mayor cantidad" : "Completa" };
+      if (p > 0) return { nivel: "warn", texto: "En ejecución" };
+      return { nivel: "warn", texto: "Sin ejecutar" };
+    },
+    resumen(ctx) {
+      if (!ctx.registros.length) return "";
+      const grupos = {};
+      ctx.registros.forEach((r) => {
+        const g = (grupos[r.componente] = grupos[r.componente] || { contratada: 0, ejecutada: 0, n: 0 });
+        g.n++; g.contratada += Math.min(100, pctCantidad(r));
+      });
+      const items = Object.entries(grupos).map(([nombre, g], i) => ({ icon: "🏗️", valor: `${Math.round(g.contratada / g.n)}%`, label: nombre, cinta: i }));
+      return tarjetas(items);
+    }
+  },
+
   // ======================= 8. RIESGOS
   riesgos: {
+    sinFiltroMes: true,
     label: "Matriz de riesgos", icon: "🧭", coleccion: "riesgos",
     desc: "Riesgos del contrato con su probabilidad, impacto, medida de monitoreo y responsable.",
     campos: [

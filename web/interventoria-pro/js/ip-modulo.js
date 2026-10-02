@@ -5,7 +5,7 @@
 import { collection, query, where, onSnapshot, getDocs, addDoc, updateDoc, deleteDoc, doc, serverTimestamp } from "https://www.gstatic.com/firebasejs/10.7.1/firebase-firestore.js";
 import { ref, uploadBytes, getDownloadURL } from "https://www.gstatic.com/firebasejs/10.7.1/firebase-storage.js";
 import {
-  db, storage, iniciarPagina, pintarEncabezado, esc, moneda, numero, fecha, fechaCorta, mesCorto, mesesDelContrato,
+  db, storage, iniciarPagina, pintarEncabezado, esc, moneda, numero, fecha, fechaCorta, mesCorto, mesLargo, mesesDelContrato,
   mostrarAlerta, limpiarAlerta, errorAmigable, aplicarAnchos, abrirModal, cerrarModal, imgModulo
 } from "./ip-core.js";
 import { MODULOS, nombreCapitulo } from "./ip-modulos.js";
@@ -31,6 +31,7 @@ function iniciarModulo({ user, perfil, contrato }) {
   const alertasEl = document.getElementById("ipAlertas");
   const listaEl = document.getElementById("ipLista");
   const buscarEl = document.getElementById("ipBuscar");
+  const filtroMesEl = document.getElementById("ipFiltroMes");
   const contadorEl = document.getElementById("ipContador");
   const form = document.getElementById("ipForm");
   const formCampos = document.getElementById("ipFormCampos");
@@ -99,9 +100,26 @@ function iniciarModulo({ user, perfil, contrato }) {
     });
   }
 
+  // Filtro de mes: muestra solo lo registrado en ese mes (según el primer
+  // campo de mes o de fecha del módulo; Personal = vinculados ese mes).
+  // Los resúmenes y alertas de arriba siguen calculándose con todo.
+  const campoMes = mod.campos.find((c) => c.type === "month") || mod.campos.find((c) => c.type === "date");
+  const usaFiltroMes = !mod.sinFiltroMes && (mod.filtroMes || campoMes);
+  if (usaFiltroMes) {
+    filtroMesEl.innerHTML = '<option value="">Todos los meses</option>' + mesesDelContrato(contrato).slice().reverse()
+      .map((ym) => `<option value="${ym}">${mesLargo(ym)}</option>`).join("");
+    filtroMesEl.classList.remove("hidden");
+    filtroMesEl.addEventListener("change", pintar);
+  }
+  function enMes(r, ym) {
+    if (mod.filtroMes) return mod.filtroMes(r, ym);
+    return String(r[campoMes.key] || "").startsWith(ym);
+  }
+
   function filtrados() {
     const t = buscarEl.value.trim().toLowerCase();
-    const rows = ordenar(ctx.registros);
+    const ym = usaFiltroMes ? filtroMesEl.value : "";
+    const rows = ordenar(ctx.registros).filter((r) => !ym || enMes(r, ym));
     if (!t) return rows;
     return rows.filter((r) => mod.columnas.some((c) => textoPlano(r, c).toLowerCase().includes(t)) ||
       mod.campos.some((c) => ["text", "textarea"].includes(c.type) && String(r[c.key] || "").toLowerCase().includes(t)));
