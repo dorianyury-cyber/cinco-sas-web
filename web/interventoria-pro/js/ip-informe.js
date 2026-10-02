@@ -5,6 +5,7 @@ import { collection, getDocs } from "https://www.gstatic.com/firebasejs/10.7.1/f
 import { db, iniciarPagina, pintarEncabezado, esc, mesLargo, mesActual, mesesDelContrato, imgModulo, hrefModulo, mostrarAlerta, limpiarAlerta, errorAmigable } from "./ip-core.js";
 import { MODULOS, CAPITULOS, activoEnMes } from "./ip-modulos.js";
 import { generarInformeMensual } from "./ip-informe-docx.js";
+import { generarInformeMensualPDF } from "./ip-informe-pdf.js";
 
 const ctx = await iniciarPagina();
 if (ctx) iniciar(ctx);
@@ -64,6 +65,64 @@ async function iniciar({ user, perfil, contrato }) {
   selMes.addEventListener("change", pintar);
   pintar();
 
+  // ---------------------------------------------------------- PDF y visor
+  const opciones = () => ({
+    contrato, ym: selMes.value, datos,
+    elaboradoPor: document.getElementById("informeElaborado").value.trim(),
+    cargo: document.getElementById("informeCargo").value.trim(),
+    radicado: document.getElementById("informeRadicado").value.trim()
+  });
+  const nombreArchivo = (ext) => `Informe ${contrato.tipo === "Obra" ? "de Interventoría" : "de seguimiento"} ${mesLargo(selMes.value)} (Contrato ${String(contrato.numero || "").replace(/[\/:*?"<>|]/g, "-")}).${ext}`;
+  function descargar(url, nombre) {
+    const a = document.createElement("a");
+    a.href = url;
+    a.download = nombre;
+    document.body.appendChild(a);
+    a.click();
+    a.remove();
+  }
+  async function conEspera(boton, texto, tarea) {
+    limpiarAlerta(alerta);
+    if (!window.jspdf) { mostrarAlerta(alerta, "No se pudo cargar el generador de PDF. Recarga la página."); return; }
+    const original = boton.textContent;
+    boton.disabled = true;
+    boton.textContent = texto;
+    try { await tarea(); }
+    catch (err) { console.error(err); mostrarAlerta(alerta, `No se pudo generar el PDF: ${errorAmigable(err)}`); }
+    finally { boton.disabled = false; boton.textContent = original; }
+  }
+  const pdfBtn = (id, portada) => {
+    const b = document.getElementById(id);
+    b.addEventListener("click", () => conEspera(b, "Generando…", async () => {
+      const doc = await generarInformeMensualPDF({ ...opciones(), portada });
+      descargar(doc.output("bloburl"), nombreArchivo("pdf"));
+    }));
+  };
+  pdfBtn("pdfOscuraBtn", "oscura");
+  pdfBtn("pdfClaraBtn", "clara");
+
+  const visor = document.getElementById("visorInformeModal");
+  const visorPdf = document.getElementById("visorPdf");
+  const visorPortada = document.getElementById("visorPortada");
+  let urlVisor = null;
+  async function pintarVisor() {
+    visorPdf.innerHTML = '<p class="text-muted ip-visor-cargando">Generando vista previa…</p>';
+    const doc = await generarInformeMensualPDF({ ...opciones(), portada: visorPortada.value });
+    if (urlVisor) URL.revokeObjectURL(urlVisor);
+    urlVisor = doc.output("bloburl");
+    visorPdf.innerHTML = `<iframe title="Vista previa del informe" src="${urlVisor}#view=FitH"></iframe>`;
+  }
+  const visualizarBtn = document.getElementById("visualizarInformeBtn");
+  visualizarBtn.addEventListener("click", () => conEspera(visualizarBtn, "Preparando…", async () => {
+    visor.classList.add("open");
+    await pintarVisor();
+  }));
+  visorPortada.addEventListener("change", () => pintarVisor().catch((err) => { visorPdf.innerHTML = `<p class="alert error">${esc(errorAmigable(err))}</p>`; }));
+  document.getElementById("visorDescargarBtn").addEventListener("click", () => { if (urlVisor) descargar(urlVisor, nombreArchivo("pdf")); });
+  const cerrarVisor = () => { visor.classList.remove("open"); visorPdf.innerHTML = ""; };
+  document.getElementById("visorCerrarBtn").addEventListener("click", cerrarVisor);
+  visor.addEventListener("click", (e) => { if (e.target === visor) cerrarVisor(); });
+
   btn.addEventListener("click", async () => {
     limpiarAlerta(alerta);
     if (!window.docx) { mostrarAlerta(alerta, "No se pudo cargar el generador de Word. Recarga la página."); return; }
@@ -88,7 +147,7 @@ async function iniciar({ user, perfil, contrato }) {
       mostrarAlerta(alerta, `No se pudo generar el informe: ${errorAmigable(err)}`);
     } finally {
       btn.disabled = false;
-      btn.textContent = "📄 Generar informe Word";
+      btn.textContent = "📄 Word";
     }
   });
 }

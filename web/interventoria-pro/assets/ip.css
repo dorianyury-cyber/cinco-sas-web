@@ -2067,3 +2067,13 @@ html.ip-preparando .main::before {
 .ip-informe-grid h2 { display: flex; align-items: center; gap: 10px; }
 .ip-informe-lista { list-style: none; margin: 0; padding: 0; display: flex; flex-direction: column; gap: 6px; font-size: 13px; }
 .ip-informe-lista .badge { min-width: 26px; text-align: center; display: inline-block; }
+
+/* Informe mensual: barra de formatos y visor del PDF */
+.ip-barra-informe .btn { margin: 0; }
+.modal.ip-visor-informe { max-width: 1150px; width: 96vw; height: 92vh; max-height: 92vh; display: flex; flex-direction: column; padding: 16px 18px; overflow: hidden; }
+.ip-visor-barra { display: flex; flex-wrap: wrap; align-items: center; gap: 10px; margin-bottom: 10px; }
+.ip-visor-barra h2 { margin: 0 auto 0 0; }
+.ip-visor-barra select { width: auto; padding: 8px 10px; }
+.ip-visor-pdf { flex: 1; min-height: 0; border: 1px solid var(--border); border-radius: 10px; overflow: hidden; background: var(--bg); }
+.ip-visor-pdf iframe { width: 100%; height: 100%; border: 0; }
+.ip-visor-cargando { padding: 16px; margin: 0; }

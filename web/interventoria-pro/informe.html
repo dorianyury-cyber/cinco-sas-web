@@ -19,12 +19,33 @@
         <select id="informeMes" class="ip-filtro-mes"></select>
         <input type="text" id="informeElaborado" placeholder="Elaborado por">
         <input type="text" id="informeCargo" placeholder="Cargo">
-        <button type="button" class="btn ip-btn-nuevo" id="generarInformeBtn">📄 Generar informe Word</button>
+        <input type="text" id="informeRadicado" placeholder="Radicado (opcional)">
+      </div>
+      <div class="card ip-barra ip-barra-informe">
+        <button type="button" class="btn ip-btn-nuevo" id="visualizarInformeBtn">👁 Visualizar</button>
+        <button type="button" class="btn" id="pdfOscuraBtn">📕 PDF portada oscura</button>
+        <button type="button" class="btn" id="pdfClaraBtn">📗 PDF portada clara</button>
+        <button type="button" class="btn" id="generarInformeBtn">📄 Word</button>
       </div>
       <div class="alert" id="informeAlerta"></div>
       <div id="informeContenido"><div class="card"><p class="text-muted ip-sin-margen">Cargando la información del contrato…</p></div></div>
     </main>
   </div>
+  <!-- Visualizador del PDF (mismo patrón que Ofertas: iframe con el PDF
+       generado en el navegador; la CSP del sitio ya permite frame-src blob:). -->
+  <div class="modal-backdrop" id="visorInformeModal">
+    <div class="modal ip-visor-informe">
+      <div class="ip-visor-barra">
+        <h2>Vista previa del informe</h2>
+        <select id="visorPortada"><option value="oscura">Portada oscura</option><option value="clara">Portada clara</option></select>
+        <button type="button" class="btn" id="visorDescargarBtn">⬇ Descargar PDF</button>
+        <button type="button" class="btn secondary" id="visorCerrarBtn">Cerrar</button>
+      </div>
+      <div class="ip-visor-pdf" id="visorPdf"></div>
+    </div>
+  </div>
+
+  <script src="../js/vendor/jspdf.umd.min.js"></script>
   <script src="../js/vendor/docx.iife.js"></script>
   <script type="module" src="js/ip-informe.js"></script>
 </body>
