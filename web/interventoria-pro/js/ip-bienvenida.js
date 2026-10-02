@@ -20,14 +20,24 @@ if (ctx) {
   selector.addEventListener("change", () => { if (selector.value) fijarContratoActivo(selector.value); });
 
   const sinContrato = contratos.length === 0;
+  const aviso = document.getElementById("bienvenidaAviso");
+  if (sinContrato) {
+    aviso.innerHTML = esGestor
+      ? 'Aún no hay contratos. <a href="contratos.html">Crea el primero en Contratos</a> para empezar a registrar información en los módulos.'
+      : "Todavía no estás asignado a ningún contrato. Pídele al gestor de Interventoría PRO que te agregue al equipo.";
+    aviso.className = "alert info ip-aviso-bienvenida";
+  }
   const tarjetas = [
     { href: "inicio.html", foto: "inicio", label: "Inicio", desc: "Resumen del contrato: avance, finanzas y alertas" },
     { href: "contratos.html", foto: "contratos", label: esGestor ? "Contratos" : "Mis contratos", desc: esGestor ? "Crea contratos, su información básica y su equipo" : "Contratos en los que participas" },
     ...CAPITULOS.map((c) => ({ href: c.items[0].href || hrefModulo(c.items[0].m, c.items[0].cap), foto: `cap-${c.id}`, label: `${c.numero}. ${c.label}`, desc: c.desc }))
   ];
   document.getElementById("bienvenidaModulos").innerHTML = tarjetas.map((t, i) => {
-    const deshabilitada = sinContrato && t.href !== "contratos.html";
-    return `<a class="modulo-card cinta cinta-${i % 4}${deshabilitada ? " ip-card-deshabilitada" : ""}" href="${deshabilitada ? "contratos.html" : t.href}">
+    // Sin contratos todavía, los módulos llevan a Contratos (no tienen
+    // dónde registrar nada) — pero las tarjetas se ven normales; el aviso
+    // de arriba explica qué hacer primero.
+    const destino = sinContrato ? "contratos.html" : t.href;
+    return `<a class="modulo-card cinta cinta-${i % 4}" href="${destino}">
       <span class="modulo-icon"><img src="${fotoModulo(t.foto)}" alt=""></span>
       <span class="modulo-label">${esc(t.label)}</span>
       <span class="modulo-desc">${esc(t.desc)}</span>

@@ -1970,3 +1970,4 @@ html.ip-preparando .main::before {
 .ip-h1-foto { width: 44px; height: 44px; border-radius: 50%; object-fit: cover; box-shadow: var(--shadow); flex-shrink: 0; }
 .ip-capitulo-foto { width: 40px; height: 40px; border-radius: 50%; object-fit: cover; flex-shrink: 0; }
 .sidebar .nav-group-toggle .nav-icon-img { width: 20px; height: 20px; }
+.ip-aviso-bienvenida { margin-top: 22px; font-size: 14px; }
