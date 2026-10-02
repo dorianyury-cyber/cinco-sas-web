@@ -6,7 +6,7 @@ import { collection, query, where, onSnapshot, getDocs, addDoc, updateDoc, delet
 import { ref, uploadBytes, getDownloadURL } from "https://www.gstatic.com/firebasejs/10.7.1/firebase-storage.js";
 import {
   db, storage, iniciarPagina, pintarEncabezado, esc, moneda, numero, fecha, fechaCorta, mesCorto, mesesDelContrato,
-  mostrarAlerta, limpiarAlerta, errorAmigable, aplicarAnchos, abrirModal, cerrarModal
+  mostrarAlerta, limpiarAlerta, errorAmigable, aplicarAnchos, abrirModal, cerrarModal, imgModulo
 } from "./ip-core.js";
 import { MODULOS, nombreCapitulo } from "./ip-modulos.js";
 
@@ -23,7 +23,7 @@ if (ctxPagina && !mod) {
 
 function iniciarModulo({ user, perfil, contrato }) {
   const titulo = mod.porCapitulo ? `${mod.label} — ${nombreCapitulo(cap)}` : mod.label;
-  pintarEncabezado(`<span>${mod.icon}</span> ${esc(titulo)}`, contrato);
+  pintarEncabezado(`${imgModulo(cap === "ambiental" && mod.id === "capacitaciones" ? "capacitaciones-ambiental" : mod.id, "ip-h1-foto")} ${esc(titulo)}`, contrato);
   document.title = `${titulo} — Interventoría PRO`;
   document.getElementById("ipDescripcion").textContent = mod.desc || "";
 

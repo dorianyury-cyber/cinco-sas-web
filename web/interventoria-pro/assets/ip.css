@@ -1965,3 +1965,8 @@ html.ip-preparando .main::before {
 .control-clave-wrap { position: relative; }
 .control-clave-wrap input { padding-right: 42px; }
 .control-clave-toggle { position: absolute; right: 6px; top: 50%; transform: translateY(-50%); border: 0; background: none; cursor: pointer; font-size: 16px; padding: 4px 6px; }
+
+/* Fotos de módulo (assets/modulos/*.jpg) en títulos y lista de capítulos */
+.ip-h1-foto { width: 44px; height: 44px; border-radius: 50%; object-fit: cover; box-shadow: var(--shadow); flex-shrink: 0; }
+.ip-capitulo-foto { width: 40px; height: 40px; border-radius: 50%; object-fit: cover; flex-shrink: 0; }
+.sidebar .nav-group-toggle .nav-icon-img { width: 20px; height: 20px; }

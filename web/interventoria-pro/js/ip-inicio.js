@@ -2,14 +2,14 @@
 // avance financiero, personal, garantías) y TODAS las alertas de los
 // módulos en un solo lugar, cada una con enlace a su módulo.
 import { collection, getDocs } from "https://www.gstatic.com/firebasejs/10.7.1/firebase-firestore.js";
-import { db, iniciarPagina, pintarEncabezado, esc, numero, moneda, diasEntre, hoyISO, aplicarAnchos, hrefModulo } from "./ip-core.js";
+import { db, iniciarPagina, pintarEncabezado, esc, numero, moneda, diasEntre, hoyISO, aplicarAnchos, hrefModulo, imgModulo } from "./ip-core.js";
 import { MODULOS, CAPITULOS, avancePonderado, estadoFinanciero } from "./ip-modulos.js";
 
 const ctx = await iniciarPagina();
 if (ctx) iniciar(ctx);
 
 async function iniciar({ contrato }) {
-  pintarEncabezado("<span>🏠</span> Inicio", contrato);
+  pintarEncabezado(`${imgModulo("inicio", "ip-h1-foto")} Inicio`, contrato);
 
   // Todas las colecciones que necesitan las alertas, una sola lectura c/u.
   const conAlertas = Object.values(MODULOS).filter((m) => m.alertas && !m.porCapitulo);
@@ -61,7 +61,7 @@ async function iniciar({ contrato }) {
   document.getElementById("inicioCapitulos").innerHTML = `<h2>📚 Capítulos del informe</h2><div class="ip-capitulos">${CAPITULOS.map((c) => {
     const n = todas.filter((a) => c.items.some((it) => it.m === a.modulo.id)).length;
     const primero = c.items[0];
-    return `<a class="ip-capitulo" href="${primero.href || hrefModulo(primero.m, primero.cap)}"><span class="ip-capitulo-icon">${c.icon}</span>
+    return `<a class="ip-capitulo" href="${primero.href || hrefModulo(primero.m, primero.cap)}">${imgModulo(`cap-${c.id}`, "ip-capitulo-foto")}
       <span><strong>${c.numero}. ${esc(c.label)}</strong><br><span class="text-muted">${esc(c.desc)}</span></span>
       ${n ? `<span class="badge warn">${n}</span>` : '<span class="badge ok">✓</span>'}</a>`;
   }).join("")}</div>`;

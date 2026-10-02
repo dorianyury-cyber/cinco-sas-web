@@ -122,7 +122,7 @@ export function nombreCapitulo(id) { return CAPITULO_LABEL[id] || id || "-"; }
 // Menú lateral / pantalla de bienvenida: capítulos del informe en su orden.
 export const CAPITULOS = [
   { id: "administrativo", numero: "1", label: "Administrativo", icon: "🗂️", desc: "Información del contrato, cronología de actas y anexos", items: [
-    { href: "contratos.html", label: "Información del contrato", icon: "ℹ️" }, { m: "cronologia" }, { m: "observaciones", cap: "administrativo" }, { m: "anexos", cap: "administrativo" }
+    { href: "contratos.html", label: "Información del contrato", foto: "info-contrato" }, { m: "cronologia" }, { m: "observaciones", cap: "administrativo" }, { m: "anexos", cap: "administrativo" }
   ] },
   { id: "financiero", numero: "2", label: "Financiero", icon: "💰", desc: "Estado financiero, actas de pago e inversión del anticipo", items: [
     { m: "financiero" }, { m: "anticipo" }, { m: "observaciones", cap: "financiero" }, { m: "anexos", cap: "financiero" }
@@ -140,7 +140,7 @@ export const CAPITULOS = [
   ] },
   { id: "ambiental", numero: "6", label: "Ambiental", icon: "🌱", desc: "Aspectos e impactos, indicadores y requisitos legales", items: [
     { m: "aspectos" }, { m: "planambiental" }, { m: "indicadores" }, { m: "requisitos" }, { m: "incidentesamb" },
-    { m: "capacitaciones", cap: "ambiental", label: "Capacitaciones ambientales" },
+    { m: "capacitaciones", cap: "ambiental", label: "Capacitaciones ambientales", foto: "capacitaciones-ambiental" },
     { m: "observaciones", cap: "ambiental" }, { m: "anexos", cap: "ambiental" }
   ] },
   { id: "tecnico", numero: "7", label: "Técnico", icon: "📐", desc: "Avance porcentual y gráfico de las actividades", items: [

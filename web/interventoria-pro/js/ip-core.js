@@ -245,6 +245,15 @@ export async function recargarContrato(id) {
 
 // ---------------------------------------------------------------- menú
 
+// Íconos de módulos: fotos propias de Cinco S.A.S. (línea de tiempo
+// corporativa y servicios) recortadas a 160 px en assets/modulos/.
+export function fotoModulo(nombre) {
+  return `assets/modulos/${nombre}.jpg`;
+}
+export function imgModulo(nombre, clase = "nav-icon-img") {
+  return `<img class="${clase}" src="${fotoModulo(nombre)}" alt="" loading="lazy">`;
+}
+
 export function hrefModulo(m, cap) {
   return `modulo.html?m=${m}${cap ? `&cap=${cap}` : ""}`;
 }
@@ -268,16 +277,16 @@ function pintarMenu({ user, perfil, esGestor, contratos, contrato }) {
 
   const enlace = (href, icono, texto, extraClase = "") => {
     const activo = href === actual || href === actual.replace(/\?$/, "");
-    return `<a href="${href}" class="${extraClase}${activo ? " active" : ""}"><span class="nav-icon-emoji">${icono}</span>${esc(texto)}</a>`;
+    return `<a href="${href}" class="${extraClase}${activo ? " active" : ""}">${imgModulo(icono)}${esc(texto)}</a>`;
   };
 
   const grupos = CAPITULOS.map((cap) => {
     const items = cap.items.map((it) => {
-      if (it.href) return enlace(it.href, it.icon, it.label);
+      if (it.href) return enlace(it.href, it.foto, it.label);
       const mod = MODULOS[it.m];
       const href = hrefModulo(it.m, it.cap);
       const esActivo = moduloActual === it.m && (capActual || null) === (it.cap || null);
-      return `<a href="${href}" class="${esActivo ? "active" : ""}"><span class="nav-icon-emoji">${it.icon || mod.icon}</span>${esc(it.label || mod.label)}</a>`;
+      return `<a href="${href}" class="${esActivo ? "active" : ""}">${imgModulo(it.foto || it.m)}${esc(it.label || mod.label)}</a>`;
     }).join("");
     const contieneActivo = cap.items.some((it) => moduloActual === it.m && (capActual || null) === (it.cap || null));
     return { cap, items, contieneActivo };
@@ -299,12 +308,12 @@ function pintarMenu({ user, perfil, esGestor, contratos, contrato }) {
       </select>
     </div>
     <nav>
-      ${enlace("inicio.html", "🏠", "Inicio")}
-      ${enlace("contratos.html", "📑", esGestor ? "Contratos" : "Mis contratos")}
+      ${enlace("inicio.html", "inicio", "Inicio")}
+      ${enlace("contratos.html", "contratos", esGestor ? "Contratos" : "Mis contratos")}
       ${grupos.map((g, i) => `
         <div class="nav-group ip-nav-cap ip-nav-cap-${i % 4}">
           <div class="collapsible-toggle nav-group-toggle" data-target="ipGrupo-${g.cap.id}">
-            <span><span class="nav-icon-emoji">${g.cap.icon}</span>${esc(g.cap.numero)}. ${esc(g.cap.label)}</span>
+            <span>${imgModulo(`cap-${g.cap.id}`)}${esc(g.cap.numero)}. ${esc(g.cap.label)}</span>
             <span class="chevron">▾</span>
           </div>
           <div class="nav-group-body" id="ipGrupo-${g.cap.id}">${g.items}</div>

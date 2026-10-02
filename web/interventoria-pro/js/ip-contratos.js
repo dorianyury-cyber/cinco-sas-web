@@ -5,14 +5,14 @@
 import { collection, addDoc, updateDoc, deleteDoc, doc, getDocs, serverTimestamp } from "https://www.gstatic.com/firebasejs/10.7.1/firebase-firestore.js";
 import {
   db, iniciarPagina, pintarEncabezado, esc, moneda, numero, fecha, fechaCorta, mostrarAlerta, limpiarAlerta, errorAmigable,
-  fijarContratoActivo, abrirModal, cerrarModal, diasEntre, hoyISO
+  fijarContratoActivo, abrirModal, cerrarModal, diasEntre, hoyISO, imgModulo
 } from "./ip-core.js";
 
 const ctx = await iniciarPagina({ requiereContrato: false });
 if (ctx) iniciar(ctx);
 
 async function iniciar({ user, perfil, esGestor, contratos, contrato }) {
-  pintarEncabezado("<span>📑</span> " + (esGestor ? "Contratos" : "Mis contratos"), contrato);
+  pintarEncabezado(`${imgModulo("contratos", "ip-h1-foto")} ${esGestor ? "Contratos" : "Mis contratos"}`, contrato);
   const lista = document.getElementById("contratosLista");
   const form = document.getElementById("contratoForm");
   const alerta = document.getElementById("contratoAlerta");
