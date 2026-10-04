@@ -49,6 +49,7 @@ async function iniciar({ user, perfil, esGestor, contratos, contrato }) {
         ${fila("Tipo de interventoría", esc(c.tipo || "Servicios"))}
         ${fila("Contratista / proveedor", esc(c.contratista))}
         ${fila("Municipio", esc(c.municipio))}
+        ${fila("Proyectos / frentes", esc(String(c.frentes || "").split(/[\n,;]+/).map((x) => x.trim()).filter(Boolean).join(" · ")))}
         ${fila("Supervisor", esc(c.supervisor))}
         ${fila("Director / interventor", esc(c.director))}
         ${fila("Valor inicial", c.valorInicial ? moneda(c.valorInicial) : "-")}
@@ -91,7 +92,7 @@ async function iniciar({ user, perfil, esGestor, contratos, contrato }) {
   }
 
   // ---------------------------------------------------------- formulario
-  const CAMPOS = ["numero", "tipo", "estado", "objeto", "municipio", "objetivo", "alcance", "contratante", "contratista", "supervisor", "director", "valorInicial", "anticipoPct", "fechaInicio", "fechaFin", "plazo", "smmlv"];
+  const CAMPOS = ["numero", "tipo", "estado", "objeto", "municipio", "objetivo", "alcance", "frentes", "contratante", "contratista", "supervisor", "director", "valorInicial", "anticipoPct", "fechaInicio", "fechaFin", "plazo", "smmlv"];
   const NUMERICOS = new Set(["valorInicial", "anticipoPct", "smmlv"]);
 
   function pintarMiembros() {

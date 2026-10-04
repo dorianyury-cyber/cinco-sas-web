@@ -2,7 +2,7 @@
 // resumen, alertas, tabla (o galería), formulario de alta/edición y
 // exportación a Excel a partir de la configuración en ip-modulos.js.
 
-import { collection, query, where, onSnapshot, getDocs, addDoc, updateDoc, deleteDoc, doc, serverTimestamp } from "https://www.gstatic.com/firebasejs/10.7.1/firebase-firestore.js";
+import { collection, query, where, onSnapshot, getDocs, addDoc, updateDoc, deleteDoc, doc, serverTimestamp, writeBatch } from "https://www.gstatic.com/firebasejs/10.7.1/firebase-firestore.js";
 import { ref, uploadBytes, getDownloadURL } from "https://www.gstatic.com/firebasejs/10.7.1/firebase-storage.js";
 import {
   db, storage, iniciarPagina, pintarEncabezado, esc, moneda, numero, fecha, fechaCorta, mesCorto, mesLargo, mesesDelContrato,
@@ -78,6 +78,7 @@ function iniciarModulo({ user, perfil, contrato }) {
       case "pct": return `${numero(v, Number(v) % 1 ? 1 : 0)}%`;
       case "number": return numero(v, Number(v) % 1 ? 2 : 0);
       case "persona": return esc((ctx.datos.personal || []).find((p) => p.id === v)?.nombre || "-");
+      case "frente": return esc(v);
       case "url": return `<a href="${esc(v)}" target="_blank" rel="noopener" class="ip-link-celda">🔗 Abrir</a>`;
       case "select": return esc(campo.opcionesObj ? nombreCapitulo(v) : v);
       default: return esc(v);
@@ -177,6 +178,10 @@ function iniciarModulo({ user, perfil, contrato }) {
   buscarEl.addEventListener("input", pintar);
 
   // ---------------------------------------------------------- formulario
+  function frentesContrato() {
+    return String(contrato.frentes || "").split(/[\n,;]+/).map((x) => x.trim()).filter(Boolean);
+  }
+
   function opcionesPersona(valor) {
     const personas = [...(ctx.datos.personal || [])].sort((a, b) => String(a.nombre).localeCompare(String(b.nombre), "es"));
     return `<option value="">— Elige —</option>` + personas.map((p) => `<option value="${p.id}" ${p.id === valor ? "selected" : ""}>${esc(p.nombre)}${p.estado === "Retirado" ? " (retirado)" : ""}</option>`).join("");
@@ -192,6 +197,14 @@ function iniciarModulo({ user, perfil, contrato }) {
       case "select": {
         const ops = c.opcionesObj || c.opciones.map((o) => ({ valor: o, texto: o }));
         control = `<select id="${id}" ${req}><option value="">— Elige —</option>${ops.map((o) => `<option value="${esc(o.valor)}" ${o.valor === v ? "selected" : ""}>${esc(o.texto)}</option>`).join("")}</select>`;
+        break;
+      }
+      case "frente": {
+        // Proyectos / frentes del contrato (Información del contrato), más
+        // "General" para lo que aplica a todo el contrato.
+        const frentes = ["General", ...frentesContrato()];
+        if (v && !frentes.includes(v)) frentes.push(v);
+        control = `<select id="${id}" ${req}><option value="">— Elige —</option>${frentes.map((fr) => `<option value="${esc(fr)}" ${fr === v ? "selected" : ""}>${esc(fr)}</option>`).join("")}</select>`;
         break;
       }
       case "persona":
@@ -329,6 +342,42 @@ function iniciarModulo({ user, perfil, contrato }) {
   });
 
   document.getElementById("ipNuevoBtn").addEventListener("click", () => abrirFormulario());
+
+  // ---------------------------------------------------------- plantilla
+  // Módulos con lista base (ej. requisitos del acta de inicio): agrega de
+  // un clic los ítems que aún no estén (compara por mod.claveUnica), así
+  // se puede volver a usar sin duplicar.
+  if (mod.plantilla) {
+    const btnPlantilla = document.getElementById("ipPlantillaBtn");
+    btnPlantilla.classList.remove("hidden");
+    btnPlantilla.textContent = `📋 Cargar lista base (${mod.plantilla.length})`;
+    btnPlantilla.addEventListener("click", async () => {
+      const clave = mod.claveUnica;
+      const existentes = new Set(ctx.registros.map((r) => String(r[clave] || "").trim()));
+      const frentes = frentesContrato();
+      // Ítems por frente cuyo frente no existe en este contrato se omiten
+      // (ej. "Sur" en un contrato que no tiene ese frente).
+      const nuevos = mod.plantilla.filter((p) => !existentes.has(p[clave].trim()) && (p.proyecto === "General" || !frentes.length || frentes.includes(p.proyecto)));
+      if (!nuevos.length) { alert("La lista base ya está completa en este contrato."); return; }
+      if (!confirm(`Se agregarán ${nuevos.length} requisito(s) de la lista base. Los que ya existen no se duplican. ¿Continuar?`)) return;
+      btnPlantilla.disabled = true;
+      try {
+        for (let i = 0; i < nuevos.length; i += 400) {
+          const lote = writeBatch(db);
+          nuevos.slice(i, i + 400).forEach((p) => {
+            const base = {};
+            mod.campos.forEach((c) => { if (c.porDefecto) base[c.key] = c.porDefecto(); });
+            lote.set(doc(coleccionRef), { ...base, ...p, creadoPor: perfil.nombre || user.email, creadoEn: serverTimestamp() });
+          });
+          await lote.commit();
+        }
+      } catch (err) {
+        alert(errorAmigable(err));
+      } finally {
+        btnPlantilla.disabled = false;
+      }
+    });
+  }
   document.getElementById("ipCancelarBtn").addEventListener("click", () => cerrarModal("ipModal"));
   document.getElementById("ipModal").addEventListener("click", (e) => { if (e.target.id === "ipModal") cerrarModal("ipModal"); });
   document.addEventListener("keydown", (e) => { if (e.key === "Escape") cerrarModal("ipModal"); });

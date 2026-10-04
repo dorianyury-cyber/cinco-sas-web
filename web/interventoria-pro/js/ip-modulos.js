@@ -14,6 +14,7 @@
 // contrato).
 
 import { esc, moneda, numero, fecha, mesCorto, hoyISO, mesActual, diasEntre, mesesDelContrato } from "./ip-core.js";
+import { LISTA_ACTA_INICIO, CATEGORIAS_ACTA } from "./ip-plantillas.js";
 
 // ------------------------------------------------------------ utilidades
 
@@ -83,6 +84,15 @@ function indicadoresHtml(ctx) {
   const filas = INDICADORES_SST.map((d) => `<tr><td><strong>${esc(d.nombre)}</strong><br><span class="text-muted ip-formula">${esc(d.formula)}</span></td>${ind.map((x) => `<td class="ip-num">${numero(x[d.clave], x[d.clave] % 1 ? 2 : 0)}%</td>`).join("")}</tr>`).join("");
   return `<div class="card"><h2>Indicadores de accidentalidad, mes a mes</h2><div class="tabla-scroll"><table class="tabla-compacta ip-matriz">
     <thead><tr><th>Indicador</th>${meses.map((ym) => `<th class="ip-num">${mesCorto(ym)}</th>`).join("")}</tr></thead><tbody>${filas}</tbody></table></div></div>`;
+}
+
+// Validación por estado de un trámite con fecha límite (entregables,
+// cambios, requerimientos): vencido si pasó la fecha sin cerrarse.
+function estadoConPlazo(r, cerrados, campoLimite) {
+  if (cerrados.includes(r.estado)) return { nivel: "ok", texto: r.estado };
+  if (r[campoLimite] && r[campoLimite] < hoyISO()) return { nivel: "danger", texto: "Vencido" };
+  if (r.estado === "Con observaciones" || r.estado === "Rechazado" || r.estado === "No conforme") return { nivel: "danger", texto: r.estado };
+  return { nivel: "warn", texto: r.estado || "Pendiente" };
 }
 
 function nombrePersona(ctx, id) {
@@ -237,21 +247,22 @@ export const INDICADORES_SST = [
 const CAPITULO_LABEL = {
   administrativo: "Aspectos administrativos", financiero: "Aspectos financieros", juridico: "Aspectos jurídicos",
   sst: "Seguridad y salud en el trabajo", social: "Aspectos sociales", ambiental: "Aspectos ambientales",
-  tecnico: "Aspectos técnicos", riesgos: "Matriz de riesgos", fotografico: "Registro fotográfico"
+  tecnico: "Aspectos técnicos", riesgos: "Matriz de riesgos", fotografico: "Registro fotográfico",
+  calidad: "Calidad (ISO 9001)"
 };
 export const CAPITULOS_OPCIONES = Object.entries(CAPITULO_LABEL).map(([valor, texto]) => ({ valor, texto }));
 export function nombreCapitulo(id) { return CAPITULO_LABEL[id] || id || "-"; }
 
 // Menú lateral / pantalla de bienvenida: capítulos del informe en su orden.
 export const CAPITULOS = [
-  { id: "administrativo", numero: "1", label: "Administrativo", icon: "🗂️", desc: "Información del contrato, cronología de actas y anexos", items: [
-    { href: "contratos.html", label: "Información del contrato", foto: "info-contrato" }, { m: "cronologia" }, { m: "observaciones", cap: "administrativo" }, { m: "anexos", cap: "administrativo" }
+  { id: "administrativo", numero: "1", label: "Administrativo", icon: "🗂️", desc: "Información del contrato, acta de inicio, cronología de actas y anexos", items: [
+    { href: "contratos.html", label: "Información del contrato", foto: "info-contrato" }, { m: "actainicio" }, { m: "cronologia" }, { m: "observaciones", cap: "administrativo" }, { m: "anexos", cap: "administrativo" }
   ] },
   { id: "financiero", numero: "2", label: "Financiero", icon: "💰", desc: "Estado financiero, actas de pago e inversión del anticipo", items: [
     { m: "financiero" }, { m: "anticipo" }, { m: "observaciones", cap: "financiero" }, { m: "anexos", cap: "financiero" }
   ] },
-  { id: "juridico", numero: "3", label: "Jurídico", icon: "⚖️", desc: "Pólizas y vigencia de los amparos", items: [
-    { m: "garantias" }, { m: "observaciones", cap: "juridico" }, { m: "anexos", cap: "juridico" }
+  { id: "juridico", numero: "3", label: "Jurídico", icon: "⚖️", desc: "Pólizas, requerimientos y multas", items: [
+    { m: "garantias" }, { m: "requerimientos" }, { m: "observaciones", cap: "juridico" }, { m: "anexos", cap: "juridico" }
   ] },
   { id: "sst", numero: "4", label: "Seguridad y Salud en el Trabajo", icon: "🦺", desc: "Personal, salarios, seguridad social, EPP, exámenes y más", items: [
     { m: "personal" }, { m: "novedades" }, { m: "epp" }, { m: "examenes" }, { m: "segsocial" },
@@ -266,14 +277,17 @@ export const CAPITULOS = [
     { m: "capacitaciones", cap: "ambiental", label: "Capacitaciones ambientales", foto: "capacitaciones-ambiental" },
     { m: "observaciones", cap: "ambiental" }, { m: "anexos", cap: "ambiental" }
   ] },
-  { id: "tecnico", numero: "7", label: "Técnico", icon: "📐", desc: "Cantidades de obra, avance porcentual y curva S", items: [
-    { m: "cantidades" }, { m: "actividades" }, { m: "observaciones", cap: "tecnico", label: "Resumen y observaciones" }, { m: "anexos", cap: "tecnico" }
+  { id: "tecnico", numero: "7", label: "Técnico", icon: "📐", desc: "Cantidades, equipos FAT/SAT, cambios, consignaciones y curva S", items: [
+    { m: "cantidades" }, { m: "suministros" }, { m: "cambios" }, { m: "consignaciones" }, { m: "actividades" }, { m: "observaciones", cap: "tecnico", label: "Resumen y observaciones" }, { m: "anexos", cap: "tecnico" }
   ] },
   { id: "riesgos", numero: "8", label: "Matriz de riesgos", icon: "⚠️", desc: "Riesgos del contrato, impacto y monitoreo", items: [
     { m: "riesgos" }
   ] },
   { id: "fotografico", numero: "9", label: "Registro fotográfico", icon: "📷", desc: "Evidencias fotográficas con su observación", items: [
     { m: "fotos" }
+  ] },
+  { id: "calidad", numero: "10", label: "Calidad (ISO 9001)", icon: "🏅", desc: "Plan de calidad, entregables del contratista y no conformidades", items: [
+    { m: "entregables" }, { m: "noconformidades" }, { m: "observaciones", cap: "calidad" }, { m: "anexos", cap: "calidad" }
   ] }
 ];
 
@@ -962,7 +976,272 @@ export const MODULOS = {
     ],
     columnas: [{ key: "fecha", ancho: 14 }, { key: "observacion", ancho: 60 }, { key: "capitulo", ancho: 26 }],
     orden: { key: "fecha", dir: -1 }
-  }
+  },
+
+  // ======================= ACTA DE INICIO (Administrativo)
+  actainicio: {
+    label: "Requisitos acta de inicio", icon: "✅", coleccion: "actainicio", sinFiltroMes: true,
+    desc: "Lista de chequeo de requisitos previos para suscribir el acta de inicio (garantías, personal, plan de calidad, cronograma, anticipo, SST, sitio). Usa «Cargar lista base» para traer los requisitos de los términos de referencia.",
+    plantilla: LISTA_ACTA_INICIO,
+    claveUnica: "requisito",
+    campos: [
+      { key: "categoria", label: "Categoría", type: "select", opciones: CATEGORIAS_ACTA, required: true },
+      { key: "proyecto", label: "Proyecto / frente", type: "frente" },
+      { key: "requisito", label: "Requisito", type: "textarea", required: true, ancho: true },
+      { key: "soporte", label: "Soporte (numeral TDR / norma)", type: "text" },
+      { key: "responsable", label: "Responsable", type: "select", opciones: ["Contratista", "Electrohuila", "Interventoría"], required: true },
+      { key: "estado", label: "Estado", type: "select", opciones: ["Pendiente", "Recibido", "Con observaciones", "Aprobado", "No aplica"], required: true, porDefecto: () => "Pendiente" },
+      { key: "fecha", label: "Fecha de recibo / verificación", type: "date" },
+      { key: "observacion", label: "Observación", type: "textarea", ancho: true },
+      { key: "evidencia", label: "Evidencia (enlace)", type: "url", ancho: true }
+    ],
+    columnas: [{ key: "categoria", ancho: 15 }, { key: "requisito", ancho: 43 }, { key: "proyecto", label: "Frente", ancho: 9 }, { key: "soporte", ancho: 11 }, { key: "responsable", ancho: 10 }],
+    orden: { key: "categoria", dir: 1 },
+    validar(r) {
+      if (["Aprobado", "No aplica"].includes(r.estado)) return { nivel: "ok", texto: r.estado };
+      if (r.estado === "Con observaciones") return { nivel: "danger", texto: "Con observaciones" };
+      return { nivel: "warn", texto: r.estado || "Pendiente" };
+    },
+    resumen(ctx) {
+      if (!ctx.registros.length) return "";
+      const listos = ctx.registros.filter((r) => ["Aprobado", "No aplica"].includes(r.estado)).length;
+      const obs = ctx.registros.filter((r) => r.estado === "Con observaciones").length;
+      const pct = Math.round((listos / ctx.registros.length) * 100);
+      const porCat = CATEGORIAS_ACTA.map((c) => {
+        const regs = ctx.registros.filter((r) => r.categoria === c);
+        if (!regs.length) return "";
+        const ok = regs.filter((r) => ["Aprobado", "No aplica"].includes(r.estado)).length;
+        const p = Math.round((ok / regs.length) * 100);
+        return `<div class="ip-barra-fila"><div class="ip-barra-label">${esc(c)}</div><div class="ip-barra-pista"><div class="ip-barra-real" data-ancho="${p}"></div></div><div class="ip-barra-valor">${ok} / ${regs.length}</div></div>`;
+      }).join("");
+      return tarjetas([
+        { icon: pct === 100 ? "✅" : "📋", valor: `${pct}%`, label: "Requisitos cumplidos", cinta: pct === 100 ? 3 : 0 },
+        { icon: "⏳", valor: ctx.registros.length - listos - obs, label: "Pendientes o en revisión", cinta: 2 },
+        { icon: "⚠️", valor: obs, label: "Con observaciones", cinta: 1 },
+        { icon: "🧾", valor: ctx.registros.length, label: "Requisitos en la lista" }
+      ]) + `<div class="card"><h2>Avance por categoría</h2>${porCat}</div>`;
+    },
+    alertas(ctx) {
+      const pend = ctx.registros.filter((r) => !["Aprobado", "No aplica"].includes(r.estado)).length;
+      const actaFirmada = (ctx.datos.cronologia || []).some((c) => c.tipo === "Acta de inicio");
+      if (!ctx.registros.length) return [{ nivel: "warn", texto: "No se ha cargado la lista de chequeo del acta de inicio." }];
+      if (pend && !actaFirmada) return [{ nivel: "warn", texto: `${pend} requisito(s) del acta de inicio sin aprobar.` }];
+      if (pend && actaFirmada) return [{ nivel: "danger", texto: `El acta de inicio ya se registró pero quedan ${pend} requisito(s) sin aprobar.` }];
+      return [];
+    },
+    necesita: ["cronologia"]
+  },
+
+  // ======================= 3. JURÍDICO — requerimientos e incumplimientos
+  requerimientos: {
+    label: "Requerimientos y multas", icon: "📮", coleccion: "requerimientos",
+    desc: "Requerimientos por incumplimiento y debido proceso (num. 4.15): explicación solicitada, respuesta del contratista, análisis y multa propuesta (0,5 % por día o por obligación, tope 10 %).",
+    campos: [
+      { key: "fecha", label: "Fecha del requerimiento", type: "date", required: true },
+      { key: "proyecto", label: "Proyecto / frente", type: "frente" },
+      { key: "obligacion", label: "Obligación incumplida", type: "textarea", required: true, ancho: true },
+      { key: "radicado", label: "Radicado / oficio", type: "text" },
+      { key: "plazoRespuesta", label: "Plazo de respuesta", type: "date" },
+      { key: "respuesta", label: "Respuesta del contratista", type: "textarea", ancho: true },
+      { key: "estado", label: "Estado", type: "select", opciones: ["Enviado", "Respondido", "Subsanado", "Escalado a Electrohuila", "Multa impuesta", "Cerrado"], required: true, porDefecto: () => "Enviado" },
+      { key: "diasRetraso", label: "Días de retraso (si es por plazo)", type: "number" },
+      { key: "multaPropuesta", label: "Multa propuesta", type: "money", ayuda: "0,5 % del valor del contrato por día de retraso o por obligación incumplida; el total no puede superar el 10 % (num. 4.16)." },
+      { key: "evidencia", label: "Evidencia (enlace)", type: "url", ancho: true }
+    ],
+    columnas: [{ key: "fecha", ancho: 11 }, { key: "obligacion", ancho: 38 }, { key: "proyecto", label: "Frente", ancho: 10 }, { key: "radicado", ancho: 12 }, { key: "plazoRespuesta", label: "Responder antes de", ancho: 13 }],
+    orden: { key: "fecha", dir: -1 },
+    validar(r) { return estadoConPlazo(r, ["Subsanado", "Cerrado", "Multa impuesta"], "plazoRespuesta"); },
+    resumen(ctx) {
+      if (!ctx.registros.length) return "";
+      const multas = ctx.registros.reduce((s, r) => s + (Number(r.multaPropuesta) || 0), 0);
+      const tope = (Number(ctx.contrato.valorInicial) || 0) * 0.1;
+      return tarjetas([
+        { icon: "📮", valor: ctx.registros.length, label: "Requerimientos" },
+        { icon: "⏳", valor: ctx.registros.filter((r) => !["Subsanado", "Cerrado", "Multa impuesta"].includes(r.estado)).length, label: "Abiertos", cinta: 2 },
+        { icon: "💸", valor: moneda(multas), label: tope ? `Multas propuestas (tope 10 %: ${moneda(tope)})` : "Multas propuestas", cinta: 1 }
+      ]);
+    },
+    alertas(ctx) {
+      const venc = ctx.registros.filter((r) => estadoConPlazo(r, ["Subsanado", "Cerrado", "Multa impuesta"], "plazoRespuesta").texto === "Vencido").length;
+      return venc ? [{ nivel: "danger", texto: `${venc} requerimiento(s) con plazo de respuesta vencido.` }] : [];
+    }
+  },
+
+  // ======================= 7. TÉCNICO — suministro de equipos (FAT / SAT)
+  suministros: {
+    label: "Equipos y suministros (FAT/SAT)", icon: "🏭", coleccion: "suministros", sinFiltroMes: true,
+    desc: "Seguimiento de equipos principales: ficha técnica, certificados RETIE/ONAC, pruebas en fábrica (FAT), despacho, llegada a sitio y pruebas en sitio (SAT) (num. 1.5.2, 4.9.1-3, 6, 42 a 45).",
+    campos: [
+      { key: "equipo", label: "Equipo", type: "text", required: true, placeholder: "Ej. Transformador 40/50 MVA 115/34,5/13,8 kV", ancho: true },
+      { key: "proyecto", label: "Proyecto / frente", type: "frente", required: true },
+      { key: "tipo", label: "Tipo", type: "select", opciones: ["Transformador de potencia", "Bahía GIS 115 kV", "Celdas GIS 36 kV", "Celdas AIS 36 kV", "Interruptor 115 kV", "Seccionador 115 kV", "Transformadores de instrumentación", "DPS", "IED de protección", "Servicios auxiliares AC/DC", "Cables y conductores", "Otro"], required: true },
+      { key: "fabricante", label: "Fabricante / referencia", type: "text" },
+      { key: "fichaTecnica", label: "Ficha técnica", type: "select", opciones: ["Pendiente", "En revisión", "Con observaciones", "Aprobada"], porDefecto: () => "Pendiente" },
+      { key: "certificados", label: "Certificado RETIE / conformidad", type: "select", opciones: ["Pendiente", "Recibido", "No aplica"], porDefecto: () => "Pendiente" },
+      { key: "fatProgramada", label: "FAT programada", type: "date" },
+      { key: "fatResultado", label: "Resultado FAT", type: "select", opciones: ["Sin realizar", "Aprobada", "Aprobada con observaciones", "Rechazada"], porDefecto: () => "Sin realizar" },
+      { key: "llegadaSitio", label: "Llegada a sitio", type: "date" },
+      { key: "satResultado", label: "Resultado SAT", type: "select", opciones: ["Sin realizar", "Aprobada", "Aprobada con observaciones", "Rechazada"], porDefecto: () => "Sin realizar" },
+      { key: "declaracionImportacion", label: "Declaración de importación DIAN", type: "select", opciones: ["Pendiente", "Recibida", "No aplica"], porDefecto: () => "No aplica" },
+      { key: "observacion", label: "Observación", type: "textarea", ancho: true },
+      { key: "evidencia", label: "Protocolos / evidencia (enlace)", type: "url", ancho: true }
+    ],
+    columnas: [{ key: "equipo", ancho: 26 }, { key: "proyecto", label: "Frente", ancho: 9 }, { key: "fichaTecnica", label: "Ficha", ancho: 11 }, { key: "fatProgramada", label: "FAT", ancho: 11 }, { key: "fatResultado", label: "Resultado FAT", ancho: 13 }, { key: "llegadaSitio", label: "En sitio", ancho: 10 }, { key: "satResultado", label: "SAT", ancho: 10 }],
+    orden: { key: "proyecto", dir: 1 },
+    validar(r) {
+      if (r.fatResultado === "Rechazada" || r.satResultado === "Rechazada") return { nivel: "danger", texto: "Prueba rechazada" };
+      if (r.fichaTecnica === "Con observaciones") return { nivel: "danger", texto: "Ficha con obs." };
+      if (r.fatProgramada && r.fatProgramada < hoyISO() && r.fatResultado === "Sin realizar") return { nivel: "danger", texto: "FAT vencida" };
+      if (r.satResultado === "Aprobada") return { nivel: "ok", texto: "En servicio" };
+      if (r.llegadaSitio) return { nivel: "ok", texto: "En sitio" };
+      if (r.fichaTecnica !== "Aprobada") return { nivel: "warn", texto: "Ficha sin aprobar" };
+      return { nivel: "warn", texto: "En fabricación" };
+    },
+    resumen(ctx) {
+      if (!ctx.registros.length) return "";
+      const n = (f) => ctx.registros.filter(f).length;
+      return tarjetas([
+        { icon: "📄", valor: `${n((r) => r.fichaTecnica === "Aprobada")}/${ctx.registros.length}`, label: "Fichas técnicas aprobadas" },
+        { icon: "🏭", valor: n((r) => (r.fatResultado || "").startsWith("Aprobada")), label: "FAT aprobadas", cinta: 2 },
+        { icon: "🚚", valor: n((r) => !!r.llegadaSitio), label: "Equipos en sitio", cinta: 0 },
+        { icon: "⚡", valor: n((r) => (r.satResultado || "").startsWith("Aprobada")), label: "SAT aprobadas", cinta: 3 }
+      ]);
+    },
+    alertas(ctx) {
+      return ctx.registros.map((r) => ({ r, v: MODULOS.suministros.validar(r) })).filter((x) => x.v.nivel === "danger")
+        .map((x) => ({ nivel: "danger", texto: `${x.r.equipo} (${x.r.proyecto || "-"}): ${x.v.texto.toLowerCase()}.` }));
+    }
+  },
+
+  // ======================= 7. TÉCNICO — control de cambios de diseño
+  cambios: {
+    label: "Control de cambios", icon: "🔁", coleccion: "cambios",
+    desc: "Ajustes al diseño o a la ejecución propuestos por el contratista: justificación técnica, firma del ingeniero responsable, aprobación de la interventoría e impacto en costo y plazo (num. 4.9.1-4 y 8).",
+    campos: [
+      { key: "fecha", label: "Fecha de solicitud", type: "date", required: true },
+      { key: "proyecto", label: "Proyecto / frente", type: "frente", required: true },
+      { key: "descripcion", label: "Cambio propuesto", type: "textarea", required: true, ancho: true },
+      { key: "justificacion", label: "Justificación técnica", type: "textarea", ancho: true },
+      { key: "firmadoPor", label: "Ingeniero que firma (matrícula)", type: "text" },
+      { key: "impactoCosto", label: "Impacto en costo", type: "money" },
+      { key: "impactoPlazo", label: "Impacto en plazo (días)", type: "number" },
+      { key: "plazoRespuesta", label: "Responder antes de", type: "date" },
+      { key: "estado", label: "Estado", type: "select", opciones: ["Radicado", "En revisión", "Con observaciones", "Aprobado", "Rechazado"], required: true, porDefecto: () => "Radicado" },
+      { key: "evidencia", label: "Planos / memorias (enlace)", type: "url", ancho: true }
+    ],
+    columnas: [{ key: "fecha", ancho: 11 }, { key: "proyecto", label: "Frente", ancho: 10 }, { key: "descripcion", ancho: 44 }, { key: "impactoCosto", label: "Costo", ancho: 13 }, { key: "impactoPlazo", label: "Días", ancho: 7 }],
+    orden: { key: "fecha", dir: -1 },
+    validar(r) { return estadoConPlazo(r, ["Aprobado"], "plazoRespuesta"); },
+    alertas(ctx) {
+      const abiertos = ctx.registros.filter((r) => ["Radicado", "En revisión"].includes(r.estado));
+      const venc = abiertos.filter((r) => r.plazoRespuesta && r.plazoRespuesta < hoyISO()).length;
+      return venc ? [{ nivel: "danger", texto: `${venc} solicitud(es) de cambio sin respuesta de la interventoría dentro del plazo.` }] : [];
+    }
+  },
+
+  // ======================= 7. TÉCNICO — plan de consignaciones
+  consignaciones: {
+    label: "Plan de consignaciones", icon: "🔌", coleccion: "consignaciones",
+    desc: "Consignaciones y maniobras para trabajos en subestaciones energizadas: programación, solicitud a Operación de Electrohuila y cumplimiento de tiempos (num. 4.9.1-47).",
+    campos: [
+      { key: "fecha", label: "Fecha programada", type: "date", required: true },
+      { key: "proyecto", label: "Proyecto / frente", type: "frente", required: true },
+      { key: "equipo", label: "Bahía / equipo a consignar", type: "text", required: true },
+      { key: "trabajo", label: "Trabajo a realizar", type: "textarea", required: true, ancho: true },
+      { key: "horaInicio", label: "Hora inicio", type: "text", placeholder: "07:00" },
+      { key: "duracionHoras", label: "Duración (horas)", type: "number" },
+      { key: "numero", label: "N.º de consignación", type: "text" },
+      { key: "estado", label: "Estado", type: "select", opciones: ["Programada", "Solicitada", "Aprobada", "Ejecutada", "Ejecutada con retraso", "Cancelada"], required: true, porDefecto: () => "Programada" },
+      { key: "observacion", label: "Observación", type: "textarea", ancho: true }
+    ],
+    columnas: [{ key: "fecha", ancho: 11 }, { key: "proyecto", label: "Frente", ancho: 10 }, { key: "equipo", ancho: 20 }, { key: "trabajo", ancho: 33 }, { key: "duracionHoras", label: "Horas", ancho: 7 }, { key: "numero", label: "N.º", ancho: 9 }],
+    orden: { key: "fecha", dir: -1 },
+    validar(r) {
+      if (r.estado === "Ejecutada") return { nivel: "ok", texto: "Ejecutada" };
+      if (r.estado === "Ejecutada con retraso") return { nivel: "danger", texto: "Con retraso" };
+      if (r.estado === "Cancelada") return { nivel: "warn", texto: "Cancelada" };
+      if (r.fecha < hoyISO()) return { nivel: "danger", texto: "Sin cierre" };
+      return { nivel: "warn", texto: r.estado };
+    }
+  },
+
+  // ======================= 10. CALIDAD — plan de calidad y entregables
+  entregables: {
+    label: "Plan de calidad y entregables", icon: "🏅", coleccion: "entregables",
+    desc: "Documentos que el contratista debe presentar para revisión y aprobación de la interventoría: plan de calidad ISO 9001:2015, procedimientos e instructivos, cronograma, programa SST, PMA, planos as-built, memorias, dictamen RETIE… (num. 1.5.2, 1.5.8 y 4.9.1-28).",
+    campos: [
+      { key: "documento", label: "Documento", type: "text", required: true, ancho: true },
+      { key: "tipo", label: "Tipo", type: "select", opciones: ["Plan de calidad", "Procedimiento / instructivo", "Cronograma", "Programa SST", "Plan de manejo ambiental", "Ingeniería / planos", "Memorias de cálculo", "Protocolos de prueba", "Planos as-built", "Dictamen RETIE", "Informe del contratista", "Dossier de calidad", "Otro"], required: true },
+      { key: "proyecto", label: "Proyecto / frente", type: "frente" },
+      { key: "version", label: "Versión", type: "text", placeholder: "Ej. V1" },
+      { key: "fechaRadicado", label: "Fecha de radicado", type: "date" },
+      { key: "plazoRevision", label: "Revisar antes de", type: "date", ayuda: "Fecha límite para que la interventoría emita concepto." },
+      { key: "estado", label: "Estado", type: "select", opciones: ["Pendiente de entrega", "Radicado", "En revisión", "Con observaciones", "Aprobado"], required: true, porDefecto: () => "Pendiente de entrega" },
+      { key: "fechaAprobacion", label: "Fecha de aprobación", type: "date" },
+      { key: "observacion", label: "Observaciones de la interventoría", type: "textarea", ancho: true },
+      { key: "enlace", label: "Documento (enlace)", type: "url", ancho: true }
+    ],
+    columnas: [{ key: "documento", ancho: 33 }, { key: "tipo", ancho: 16 }, { key: "proyecto", label: "Frente", ancho: 9 }, { key: "version", ancho: 7 }, { key: "fechaRadicado", label: "Radicado", ancho: 10 }, { key: "plazoRevision", label: "Revisar antes de", ancho: 12 }],
+    orden: { key: "fechaRadicado", dir: -1 },
+    validar(r) {
+      if (r.estado === "Aprobado") return { nivel: "ok", texto: "Aprobado" };
+      if (r.estado === "Con observaciones") return { nivel: "danger", texto: "Con observaciones" };
+      if (["Radicado", "En revisión"].includes(r.estado) && r.plazoRevision && r.plazoRevision < hoyISO()) return { nivel: "danger", texto: "Revisión vencida" };
+      return { nivel: "warn", texto: r.estado };
+    },
+    resumen(ctx) {
+      if (!ctx.registros.length) return "";
+      const plan = ctx.registros.find((r) => r.tipo === "Plan de calidad");
+      const n = (e) => ctx.registros.filter((r) => r.estado === e).length;
+      return tarjetas([
+        { icon: plan?.estado === "Aprobado" ? "✅" : "🏅", valor: plan ? plan.estado : "No registrado", label: "Plan de calidad", cinta: plan?.estado === "Aprobado" ? 3 : 1 },
+        { icon: "📥", valor: n("Radicado") + n("En revisión"), label: "En revisión de la interventoría", cinta: 2 },
+        { icon: "⚠️", valor: n("Con observaciones"), label: "Devueltos con observaciones", cinta: 1 },
+        { icon: "📄", valor: `${n("Aprobado")}/${ctx.registros.length}`, label: "Aprobados", cinta: 0 }
+      ]);
+    },
+    alertas(ctx) {
+      const out = [];
+      if (!ctx.registros.some((r) => r.tipo === "Plan de calidad")) out.push({ nivel: "warn", texto: "No se ha registrado el Plan de Calidad del contratista (num. 1.5.8: debe presentarse antes del inicio y ser aprobado por la interventoría)." });
+      const venc = ctx.registros.filter((r) => MODULOS.entregables.validar(r).texto === "Revisión vencida").length;
+      if (venc) out.push({ nivel: "danger", texto: `${venc} documento(s) con plazo de revisión de la interventoría vencido.` });
+      return out;
+    }
+  },
+
+  // ======================= 10. CALIDAD — no conformidades y acciones correctivas
+  noconformidades: {
+    label: "No conformidades y acciones", icon: "🛠️", coleccion: "noconformidades",
+    desc: "Producto o trabajo no conforme, acciones correctivas y preventivas del contratista, responsable, fecha de cierre y verificación de eficacia (ISO 9001:2015, num. 1.5.8).",
+    campos: [
+      { key: "fecha", label: "Fecha de detección", type: "date", required: true },
+      { key: "proyecto", label: "Proyecto / frente", type: "frente" },
+      { key: "origen", label: "Origen", type: "select", opciones: ["Inspección en obra", "Prueba FAT/SAT", "Revisión documental", "Auditoría", "Queja / reclamo", "Otro"], required: true },
+      { key: "descripcion", label: "No conformidad", type: "textarea", required: true, ancho: true },
+      { key: "accion", label: "Acción correctiva / preventiva", type: "textarea", ancho: true },
+      { key: "responsable", label: "Responsable (contratista)", type: "text" },
+      { key: "fechaCompromiso", label: "Fecha compromiso de cierre", type: "date" },
+      { key: "estado", label: "Estado", type: "select", opciones: ["Abierta", "En tratamiento", "Cerrada", "Cerrada - eficacia verificada"], required: true, porDefecto: () => "Abierta" },
+      { key: "evidencia", label: "Evidencia de cierre (enlace)", type: "url", ancho: true }
+    ],
+    columnas: [{ key: "fecha", ancho: 11 }, { key: "proyecto", label: "Frente", ancho: 9 }, { key: "origen", ancho: 14 }, { key: "descripcion", ancho: 36 }, { key: "fechaCompromiso", label: "Cierre", ancho: 11 }],
+    orden: { key: "fecha", dir: -1 },
+    validar(r) { return estadoConPlazo(r, ["Cerrada", "Cerrada - eficacia verificada"], "fechaCompromiso"); },
+    resumen(ctx) {
+      if (!ctx.registros.length) return "";
+      const abiertas = ctx.registros.filter((r) => !(r.estado || "").startsWith("Cerrada"));
+      return tarjetas([
+        { icon: "🛠️", valor: ctx.registros.length, label: "No conformidades" },
+        { icon: "⏳", valor: abiertas.length, label: "Abiertas", cinta: 2 },
+        { icon: "⏰", valor: abiertas.filter((r) => r.fechaCompromiso && r.fechaCompromiso < hoyISO()).length, label: "Vencidas", cinta: 1 },
+        { icon: "✅", valor: ctx.registros.filter((r) => r.estado === "Cerrada - eficacia verificada").length, label: "Eficacia verificada", cinta: 3 }
+      ]);
+    },
+    alertas(ctx) {
+      const venc = ctx.registros.filter((r) => !(r.estado || "").startsWith("Cerrada") && r.fechaCompromiso && r.fechaCompromiso < hoyISO()).length;
+      return venc ? [{ nivel: "danger", texto: `${venc} no conformidad(es) abiertas con fecha de cierre vencida.` }] : [];
+    }
+  },
 };
 
 Object.entries(MODULOS).forEach(([id, m]) => { m.id = id; });
