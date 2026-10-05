@@ -1254,3 +1254,11 @@ export const MODULOS = {
 };
 
 Object.entries(MODULOS).forEach(([id, m]) => { m.id = id; });
+
+// Fotos de evidencia en todos los módulos (pedido del usuario): desde el
+// computador o desde el celular (tomar foto o elegir de la galería). El
+// Registro fotográfico ya trae su propia foto por registro.
+Object.values(MODULOS).forEach((m) => {
+  if (m.campos.some((c) => c.type === "imagen")) return;
+  m.campos.push({ key: "fotosEvidencia", label: "Fotos de evidencia", type: "fotos", ancho: true });
+});

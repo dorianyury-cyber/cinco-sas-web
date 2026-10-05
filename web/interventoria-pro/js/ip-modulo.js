@@ -12,7 +12,8 @@ import { MODULOS, nombreCapitulo } from "./ip-modulos.js";
 import { GUIAS } from "./ip-guias.js";
 import { anotarEnLote, diferencias, identificar, refHistorial, fechaHora, ACCIONES } from "./ip-historial.js";
 import { configurarImportacion } from "./ip-importar.js";
-import { htmlCampo, leerFormulario, comprimir, frentesContrato } from "./ip-formulario.js";
+import { htmlCampo, leerFormulario, frentesContrato, controlFotos } from "./ip-formulario.js";
+const controlFotosVacio = () => ({ archivo: () => null, fotos: () => ({ conservadas: [], nuevas: [] }), camposFotos: () => [] });
 import { mostrarLibro, mostrarTabla } from "./ip-visor.js";
 
 const params = new URLSearchParams(location.search);
@@ -71,7 +72,7 @@ function iniciarModulo({ user, perfil, contrato, esGestor }) {
   const necesita = new Set([...(mod.necesita || []), ...(usaPersona ? ["personal"] : [])]);
   const ctx = { contrato, registros: [], datos: {} };
   let editandoId = null;
-  let archivoImagen = null;
+  let fotosForm = controlFotosVacio();
 
   // ---------------------------------------------------------- datos
   async function cargarNecesarios() {
@@ -179,7 +180,9 @@ function iniciarModulo({ user, perfil, contrato, esGestor }) {
           <thead><tr>${cols.map((c) => `<th>${esc(etiqueta(c))}</th>`).join("")}${conEstado ? "<th>Validación</th>" : ""}</tr></thead>
           <tbody>${rows.map((r) => {
             const v = conEstado ? mod.validar(r, ctx) : null;
-            return `<tr data-id="${r.id}" class="ip-fila">${cols.map((c) => `<td>${valorCelda(r, c)}</td>`).join("")}${v ? `<td><span class="badge ${v.nivel === "danger" ? "danger" : v.nivel === "warn" ? "warn" : "ok"}">${esc(v.texto)}</span></td>` : ""}</tr>`;
+            // 📷 n en la primera celda si el registro tiene fotos de evidencia.
+            const nFotos = mod.campos.filter((c) => c.type === "fotos").reduce((s, c) => s + (r[c.key]?.length || 0), 0);
+            return `<tr data-id="${r.id}" class="ip-fila">${cols.map((c, j) => `<td>${valorCelda(r, c)}${j === 0 && nFotos ? ` <span class="ip-fotos-badge" title="Fotos de evidencia">📷${nFotos}</span>` : ""}</td>`).join("")}${v ? `<td><span class="badge ${v.nivel === "danger" ? "danger" : v.nivel === "warn" ? "warn" : "ok"}">${esc(v.texto)}</span></td>` : ""}</tr>`;
           }).join("")}</tbody></table></div></div>`;
     listaEl.querySelectorAll("col[data-ancho-col]").forEach((col) => { col.style.width = `${col.dataset.anchoCol}%`; });
     listaEl.querySelectorAll("tr.ip-fila").forEach((tr) => {
@@ -209,20 +212,14 @@ function iniciarModulo({ user, perfil, contrato, esGestor }) {
 
   function abrirFormulario(registro = null) {
     editandoId = registro?.id || null;
-    archivoImagen = null;
+
     limpiarAlerta(formAlerta);
     document.getElementById("ipFormTitulo").textContent = registro ? `Editar — ${mod.label}` : `Nuevo — ${mod.label}`;
     formCampos.innerHTML = mod.campos.map((c) => htmlCampo(c, registro ? registro[c.key] : (c.porDefecto ? c.porDefecto() : ""), { contrato, personal: ctx.datos.personal })).join("");
     eliminarBtn.classList.toggle("hidden", !registro || !esGestor);
     pintarHistorialRegistro(registro);
-    const img = mod.campos.find((c) => c.type === "imagen");
-    if (img) {
-      document.getElementById(`f_${img.key}`).addEventListener("change", (e) => {
-        archivoImagen = e.target.files[0] || null;
-        const prev = document.getElementById(`f_${img.key}_prev`);
-        if (archivoImagen) { prev.src = URL.createObjectURL(archivoImagen); prev.classList.remove("hidden"); }
-      });
-    }
+    // Tomar foto / elegir de galería, ya comprimidas al elegirlas.
+    fotosForm = controlFotos(formCampos, mod.campos, registro);
     abrirModal("ipModal");
     formCampos.querySelector("input, select, textarea")?.focus();
   }
@@ -253,16 +250,27 @@ function iniciarModulo({ user, perfil, contrato, esGestor }) {
     guardarBtn.disabled = true;
     guardarBtn.textContent = "Guardando...";
     try {
-      const img = mod.campos.find((c) => c.type === "imagen");
-      if (img && archivoImagen) {
-        const blob = await comprimir(archivoImagen);
+      const subir = async (blob) => {
         const ruta = `interventoria-pro/${contrato.id}/${mod.coleccion}/${crypto.randomUUID()}.jpg`;
         const r = ref(storage, ruta);
         await uploadBytes(r, blob, { contentType: "image/jpeg" });
-        datos[img.key] = await getDownloadURL(r);
+        return { url: await getDownloadURL(r), ruta };
+      };
+      const img = mod.campos.find((c) => c.type === "imagen");
+      if (img && fotosForm.archivo(img.key)) {
+        const { url, ruta } = await subir(fotosForm.archivo(img.key));
+        datos[img.key] = url;
         datos[`${img.key}Ruta`] = ruta;
       } else if (img && !editandoId) {
-        throw new Error("Elige una foto.");
+        throw new Error("Toma o elige una foto.");
+      }
+      // Fotos de evidencia: las que quedaron + las nuevas, ya subidas.
+      for (const key of fotosForm.camposFotos()) {
+        const f = fotosForm.fotos(key);
+        if (f.nuevas.length) guardarBtn.textContent = `Subiendo ${f.nuevas.length} foto(s)…`;
+        const subidas = [];
+        for (const blob of f.nuevas) subidas.push(await subir(blob));
+        datos[key] = [...f.conservadas, ...subidas];
       }
       datos.actualizadoPor = perfil.nombre || user.email;
       datos.actualizadoEn = serverTimestamp();
@@ -371,7 +379,7 @@ function iniciarModulo({ user, perfil, contrato, esGestor }) {
   document.getElementById("ipExcelBtn").addEventListener("click", async () => {
     const ExcelJS = window.ExcelJS;
     if (!ExcelJS) { alert("No se pudo cargar el generador de Excel."); return; }
-    const campos = mod.campos.filter((c) => !["imagen", "avance"].includes(c.type));
+    const campos = mod.campos.filter((c) => !["imagen", "avance", "fotos"].includes(c.type));
     const wb = new ExcelJS.Workbook();
     const ws = wb.addWorksheet(mod.label.slice(0, 31));
     ws.columns = [...campos.map((c) => ({ header: c.label, key: c.key })), ...(mod.validar ? [{ header: "Validación", key: "_estado" }] : [])];

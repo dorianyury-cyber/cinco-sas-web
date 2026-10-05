@@ -26,7 +26,7 @@ const cedulaNorm = (t) => String(t ?? "").replace(/[^\dA-Za-z]/g, "");
 function columnasImportables(mod, contrato) {
   const cols = [];
   for (const c of mod.campos) {
-    if (c.type === "imagen") continue;
+    if (c.type === "imagen" || c.type === "fotos") continue;
     if (c.type === "avance") {
       mesesDelContrato(contrato).forEach((ym) => cols.push({ ...c, key: `${c.key}.${ym}`, label: `Avance ${mesCorto(ym)} (%)`, type: "pctMes", padre: c.key, ym }));
       continue;

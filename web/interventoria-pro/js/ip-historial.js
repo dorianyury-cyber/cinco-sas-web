@@ -26,6 +26,7 @@ export function textoValor(campo, v, personal = []) {
     case "pct": return `${v} %`;
     case "persona": return personal.find((p) => p.id === v)?.nombre || String(v);
     case "imagen": return "(foto)";
+    case "fotos": return v.length ? `${v.length} foto(s)` : "—";
     case "avance": return Object.entries(v || {}).sort().map(([m, x]) => `${m}: ${x} %`).join(" · ") || "—";
     default: return String(v);
   }
@@ -38,7 +39,8 @@ export function diferencias(campos, antes = {}, despues = {}, personal = []) {
     if (!(c.key in despues)) continue;
     const a = JSON.stringify(antes[c.key] ?? null);
     const d = JSON.stringify(despues[c.key] ?? null);
-    if (a === d || (antes[c.key] == null && (despues[c.key] === "" || despues[c.key] == null))) continue;
+    const vacio = (x) => x == null || x === "" || (Array.isArray(x) && !x.length);
+    if (a === d || (vacio(antes[c.key]) && vacio(despues[c.key]))) continue;
     out.push({ campo: c.key, etiqueta: c.label, antes: textoValor(c, antes[c.key], personal), despues: textoValor(c, despues[c.key], personal) });
   }
   return out;

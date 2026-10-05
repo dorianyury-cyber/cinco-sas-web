@@ -14,7 +14,7 @@ import { collection, doc, getDocs, getDocFromServer, serverTimestamp, writeBatch
 import { ref, uploadBytes, getDownloadURL } from "https://www.gstatic.com/firebasejs/10.7.1/firebase-storage.js";
 import { db, storage, iniciarPagina, pintarEncabezado, esc, imgModulo, hoyISO, mostrarAlerta, limpiarAlerta, errorAmigable, fijarContratoActivo } from "./ip-core.js";
 import { MODULOS, CAPITULOS, nombreCapitulo } from "./ip-modulos.js";
-import { htmlCampo, leerFormulario, comprimir } from "./ip-formulario.js";
+import { htmlCampo, leerFormulario, controlFotos } from "./ip-formulario.js";
 import { anotarEnLote, diferencias, identificar } from "./ip-historial.js";
 
 // Lo que se registra en terreno. cap fijo = capítulo del módulo; elegirCap =
@@ -114,12 +114,12 @@ async function iniciar({ user, perfil, contrato, contratos }) {
 
   // ---------------------------------------------------------- formulario
   let acceso = null;
-  let foto = null;
+  let fotosForm = null;
   let otro = false;
 
   function abrir(a, conservar = {}) {
     acceso = a;
-    foto = null;
+
     const mod = MODULOS[a.m];
     limpiarAlerta(alertaEl);
     limpiarAlerta(mensajeEl);
@@ -133,14 +133,8 @@ async function iniciar({ user, perfil, contrato, contratos }) {
       if (v === undefined) v = c.porDefecto ? c.porDefecto() : c.type === "date" && c.key === "fecha" ? hoyISO() : "";
       return htmlCampo(c, v, { contrato, personal, camara: true });
     }).join("");
-    camposEl.querySelectorAll("[data-foto-de]").forEach((inp) => inp.addEventListener("change", async () => {
-      const f = inp.files[0];
-      if (!f) return;
-      foto = await comprimir(f);
-      const prev = document.getElementById(`${inp.dataset.fotoDe}_prev`);
-      prev.src = URL.createObjectURL(foto);
-      prev.classList.remove("hidden");
-    }));
+    // Tomar foto / elegir de galería (ya comprimidas al elegirlas).
+    fotosForm = controlFotos(camposEl, mod.campos);
     tilesEl.classList.add("hidden");
     document.getElementById("cpContratoCard").classList.add("hidden");
     formCard.classList.remove("hidden");
@@ -162,7 +156,11 @@ async function iniciar({ user, perfil, contrato, contratos }) {
     limpiarAlerta(alertaEl);
     const mod = MODULOS[acceso.m];
     const campoFoto = mod.campos.find((c) => c.type === "imagen");
+    const foto = campoFoto ? fotosForm.archivo(campoFoto.key) : null;
     if (campoFoto?.required && !foto) { mostrarAlerta(alertaEl, "Toma o elige una foto."); return; }
+    // Fotos de evidencia nuevas, por campo (se guardan en el teléfono hasta subir).
+    const fotosNuevas = {};
+    fotosForm.camposFotos().forEach((k) => { fotosNuevas[k] = [...fotosForm.fotos(k).nuevas]; });
     const datos = leerFormulario(mod.campos, camposEl);
     const cap = acceso.elegirCap ? document.getElementById("f__cap").value : acceso.cap || null;
     if (mod.porCapitulo && cap) datos[mod.porCapitulo] = cap;
@@ -173,7 +171,7 @@ async function iniciar({ user, perfil, contrato, contratos }) {
         contratoId: contrato.id, contratoNumero: contrato.numero || "",
         usuario: user.email, modulo: mod.id, cap,
         docId: doc(collection(db, "ipContratos", contrato.id, mod.coleccion)).id,
-        datos, foto: foto || null, campoFoto: campoFoto?.key || null,
+        datos, foto: foto || null, campoFoto: campoFoto?.key || null, fotosNuevas,
         creadoLocal: new Date().toISOString(), intentos: 0, ultimoError: ""
       };
       await guardarLocal(item);
@@ -181,7 +179,7 @@ async function iniciar({ user, perfil, contrato, contratos }) {
       if (conservar) {
         // Lo que suele repetirse (fecha, tipo, capítulo) se deja; lo que
         // describe el registro se limpia.
-        mod.campos.forEach((c) => { if (["textarea", "imagen", "url", "number", "money", "pct"].includes(c.type)) delete conservar[c.key]; });
+        mod.campos.forEach((c) => { if (["textarea", "imagen", "fotos", "url", "number", "money", "pct"].includes(c.type)) delete conservar[c.key]; });
       }
       if (seguirOtro) abrir(acceso, conservar); else cerrar();
       mostrarAlerta(mensajeEl, navigator.onLine ? "Guardado en el teléfono. Subiendo…" : "Guardado en el teléfono. Se subirá cuando haya señal.", "info");
@@ -210,12 +208,17 @@ async function iniciar({ user, perfil, contrato, contratos }) {
       ? `<ul class="ip-cola">${cola.map((x) => {
           const mod = MODULOS[x.modulo];
           const otroContrato = x.contratoId !== contrato.id ? ` · contrato ${esc(x.contratoNumero)}` : "";
-          return `<li>${x.foto ? `<img class="ip-cola-foto" data-qid="${x.qid}" alt="">` : imgModulo(x.modulo, "ip-cola-foto")}
-            <span><strong>${esc(mod?.label || x.modulo)}</strong>${otroContrato}<br><span class="text-muted">${esc(identificar(mod || {}, x.datos) || "")}</span>
+          const nFotos = (x.foto ? 1 : 0) + Object.values(x.fotosNuevas || {}).reduce((s, l) => s + l.length, 0);
+          return `<li>${nFotos ? `<img class="ip-cola-foto" data-qid="${x.qid}" alt="">` : imgModulo(x.modulo, "ip-cola-foto")}
+            <span><strong>${esc(mod?.label || x.modulo)}</strong>${otroContrato}${nFotos ? ` · 📷${nFotos}` : ""}<br><span class="text-muted">${esc(identificar(mod || {}, x.datos) || "")}</span>
             ${x.ultimoError ? `<br><span class="ip-texto-rojo">${esc(x.ultimoError)}</span>` : ""}</span></li>`;
         }).join("")}</ul>`
       : '<p class="text-muted ip-sin-margen">No hay nada pendiente: todo lo registrado en este teléfono ya está en el aplicativo.</p>';
-    cola.forEach((x) => { if (x.foto) { const img = colaEl.querySelector(`img[data-qid="${x.qid}"]`); if (img) img.src = URL.createObjectURL(x.foto); } });
+    cola.forEach((x) => {
+      const miniatura = x.foto || Object.values(x.fotosNuevas || {}).flat()[0];
+      const img = miniatura && colaEl.querySelector(`img[data-qid="${x.qid}"]`);
+      if (img) img.src = URL.createObjectURL(miniatura);
+    });
   }
 
   async function subirUno(x) {
@@ -232,6 +235,18 @@ async function iniciar({ user, perfil, contrato, contratos }) {
       await conLimite(uploadBytes(r, x.foto, { contentType: "image/jpeg" }), LIMITE_SUBIDA_MS, "La foto no alcanzó a subir (señal débil)");
       datos[x.campoFoto] = await getDownloadURL(r);
       datos[`${x.campoFoto}Ruta`] = ruta;
+    }
+    // Fotos de evidencia: ruta fija por registro y posición, así un
+    // reintento sobrescribe la misma foto en vez de duplicarla.
+    for (const [key, blobs] of Object.entries(x.fotosNuevas || {})) {
+      const lista = [];
+      for (let i = 0; i < blobs.length; i++) {
+        const ruta = `interventoria-pro/${x.contratoId}/${mod.coleccion}/${x.qid}-${key}-${i + 1}.jpg`;
+        const r = ref(storage, ruta);
+        await conLimite(uploadBytes(r, blobs[i], { contentType: "image/jpeg" }), LIMITE_SUBIDA_MS, "Las fotos no alcanzaron a subir (señal débil)");
+        lista.push({ url: await getDownloadURL(r), ruta });
+      }
+      datos[key] = lista;
     }
     const nombre = perfil.nombre || user.email;
     Object.assign(datos, { creadoPor: nombre, creadoEn: serverTimestamp(), actualizadoPor: nombre, actualizadoEn: serverTimestamp(), registradoEnCampo: x.creadoLocal });

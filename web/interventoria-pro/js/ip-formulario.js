@@ -48,16 +48,25 @@ export function htmlCampo(c, valor, { contrato, personal = [], camara = false } 
     case "date": control = `<input type="date" id="${id}" value="${esc(v)}" ${req}>`; break;
     case "month": control = `<input type="month" id="${id}" value="${esc(v)}" ${req}>`; break;
     case "url": control = `<input type="url" id="${id}" value="${esc(v)}" ${req} placeholder="https://…">`; break;
+    // Fotos: dos botones con dos <input> distintos (mismo patrón de
+    // Copropiedad Saludable): el de cámara lleva capture="environment" y
+    // abre la cámara del celular; el de galería NO lo lleva (con capture,
+    // Android a veces esconde la galería) y en "fotos" permite elegir
+    // varias. En el computador ambos abren el selector de archivos.
     case "imagen":
-      control = camara
-        ? `<div class="ip-foto-botones">
-            <label class="btn ip-foto-boton">📷 Tomar foto<input type="file" accept="image/*" capture="environment" data-foto-de="${id}" class="ip-oculto"></label>
-            <label class="btn secondary ip-foto-boton">🖼️ De la galería<input type="file" accept="image/*" data-foto-de="${id}" class="ip-oculto"></label>
-          </div>
-          <input type="hidden" id="${id}">
-          <img id="${id}_prev" class="ip-foto-prev ${v ? "" : "hidden"}" src="${esc(v)}" alt="">`
-        : `<input type="file" id="${id}" accept="image/*" ${req && !v ? "required" : ""}>
-          <img id="${id}_prev" class="ip-foto-prev ${v ? "" : "hidden"}" src="${esc(v)}" alt="">`;
+      control = `<div class="ip-foto-botones">
+          <label class="btn ip-foto-boton">📷 Tomar foto<input type="file" accept="image/*" capture="environment" data-foto-de="${c.key}" class="ip-oculto"></label>
+          <label class="btn secondary ip-foto-boton">🖼️ Elegir de galería<input type="file" accept="image/*" data-foto-de="${c.key}" class="ip-oculto"></label>
+        </div>
+        <input type="hidden" id="${id}">
+        <img id="${id}_prev" class="ip-foto-prev ${v ? "" : "hidden"}" src="${esc(v)}" alt="">`;
+      break;
+    case "fotos":
+      control = `<div class="ip-foto-botones">
+          <label class="btn ip-foto-boton">📷 Tomar foto<input type="file" accept="image/*" capture="environment" data-fotos-de="${c.key}" class="ip-oculto"></label>
+          <label class="btn secondary ip-foto-boton">🖼️ Elegir de galería<input type="file" accept="image/*" multiple data-fotos-de="${c.key}" class="ip-oculto"></label>
+        </div>
+        <div class="ip-fotos-prev" id="${id}_prev"></div>`;
       break;
     case "avance": {
       const meses = mesesDelContrato(contrato);
@@ -68,15 +77,74 @@ export function htmlCampo(c, valor, { contrato, personal = [], camara = false } 
     }
     default: control = `<input type="text" id="${id}" value="${esc(v)}" ${req} placeholder="${esc(c.placeholder || "")}">`;
   }
-  return `<div class="ip-campo ${c.ancho || ["textarea", "avance", "imagen"].includes(c.type) ? "ip-campo-ancho" : ""}">
+  return `<div class="ip-campo ${c.ancho || ["textarea", "avance", "imagen", "fotos"].includes(c.type) ? "ip-campo-ancho" : ""}">
     <label for="${id}">${esc(c.label)}${c.required ? " *" : ""}</label>${control}
     ${c.ayuda ? `<p class="text-muted ip-ayuda">${esc(c.ayuda)}</p>` : ""}</div>`;
+}
+
+export const MAX_FOTOS = 6;
+
+// Maneja los campos de foto de un formulario ya pintado: comprime cada
+// foto al elegirla (como en Copropiedad Saludable: así nunca se guarda ni
+// se previsualiza una foto pesada), muestra miniaturas y deja quitar
+// fotos. registro = el registro que se edita (para las fotos ya subidas).
+export function controlFotos(contenedor, campos, registro = null) {
+  const unica = {};   // imagen: key -> Blob comprimido
+  const fotos = {};   // fotos: key -> { conservadas: [{url, ruta}], nuevas: [Blob] }
+  campos.filter((c) => c.type === "fotos").forEach((c) => {
+    fotos[c.key] = { conservadas: Array.isArray(registro?.[c.key]) ? [...registro[c.key]] : [], nuevas: [] };
+  });
+
+  function pintarFotos(key) {
+    const el = contenedor.querySelector(`#f_${key}_prev`);
+    if (!el) return;
+    const f = fotos[key];
+    const total = f.conservadas.length + f.nuevas.length;
+    el.innerHTML = [
+      ...f.conservadas.map((x, i) => `<div class="ip-fotos-item"><a href="${esc(x.url)}" target="_blank" rel="noopener"><img src="${esc(x.url)}" alt=""></a><button type="button" data-quitar="c${i}" title="Quitar foto">✕</button></div>`),
+      ...f.nuevas.map((b, i) => `<div class="ip-fotos-item ip-fotos-nueva"><img data-nueva="${i}" alt=""><button type="button" data-quitar="n${i}" title="Quitar foto">✕</button></div>`)
+    ].join("") + `<span class="text-muted ip-fotos-cuenta">${total ? `${total} de ${MAX_FOTOS} foto(s)` : `Sin fotos (máx. ${MAX_FOTOS}). Se comprimen solas antes de subir.`}</span>`;
+    el.querySelectorAll("img[data-nueva]").forEach((img) => { img.src = URL.createObjectURL(f.nuevas[Number(img.dataset.nueva)]); });
+    el.querySelectorAll("[data-quitar]").forEach((b) => b.addEventListener("click", () => {
+      const tipo = b.dataset.quitar[0], i = Number(b.dataset.quitar.slice(1));
+      if (tipo === "c") f.conservadas.splice(i, 1); else f.nuevas.splice(i, 1);
+      pintarFotos(key);
+    }));
+  }
+  Object.keys(fotos).forEach(pintarFotos);
+
+  contenedor.querySelectorAll("[data-fotos-de]").forEach((inp) => inp.addEventListener("change", async () => {
+    const key = inp.dataset.fotosDe;
+    const f = fotos[key];
+    const libres = MAX_FOTOS - f.conservadas.length - f.nuevas.length;
+    const elegidas = [...inp.files].slice(0, Math.max(0, libres));
+    if (inp.files.length > elegidas.length) alert(`Máximo ${MAX_FOTOS} fotos por registro: se agregaron ${elegidas.length}.`);
+    for (const archivo of elegidas) f.nuevas.push(await comprimir(archivo));
+    inp.value = "";
+    pintarFotos(key);
+  }));
+  contenedor.querySelectorAll("[data-foto-de]").forEach((inp) => inp.addEventListener("change", async () => {
+    const archivo = inp.files[0];
+    if (!archivo) return;
+    const key = inp.dataset.fotoDe;
+    unica[key] = await comprimir(archivo);
+    inp.value = "";
+    const prev = contenedor.querySelector(`#f_${key}_prev`);
+    prev.src = URL.createObjectURL(unica[key]);
+    prev.classList.remove("hidden");
+  }));
+
+  return {
+    archivo: (key) => unica[key] || null,
+    fotos: (key) => fotos[key] || { conservadas: [], nuevas: [] },
+    camposFotos: () => Object.keys(fotos)
+  };
 }
 
 export function leerFormulario(campos, contenedor) {
   const datos = {};
   for (const c of campos) {
-    if (c.type === "imagen") continue;
+    if (c.type === "imagen" || c.type === "fotos") continue;
     if (c.type === "avance") {
       const mapa = {};
       contenedor.querySelectorAll("[data-avance-mes]").forEach((inp) => {
