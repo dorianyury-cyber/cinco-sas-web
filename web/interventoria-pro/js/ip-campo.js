@@ -53,9 +53,33 @@ async function operar(modo, fn) {
     tx.onerror = () => reject(tx.error);
   });
 }
-const guardarLocal = (item) => operar("readwrite", (s) => s.put(item));
-const borrarLocal = (qid) => operar("readwrite", (s) => s.delete(qid));
-const listarLocal = () => operar("readonly", (s) => s.getAll());
+// Respaldo: si el navegador no deja usar IndexedDB (ej. algunos modos de
+// navegación privada), los pendientes viven en memoria mientras la página
+// esté abierta, y se avisa a la persona que no la cierre hasta que suban.
+const memoria = new Map();
+let soloMemoria = false;
+async function guardarLocal(item) {
+  if (!soloMemoria) {
+    try { await operar("readwrite", (s) => s.put(item)); return; } catch (err) { console.warn("IndexedDB no disponible:", err); soloMemoria = true; }
+  }
+  memoria.set(item.qid, item);
+}
+async function borrarLocal(qid) {
+  memoria.delete(qid);
+  if (!soloMemoria) { try { await operar("readwrite", (s) => s.delete(qid)); } catch (err) { soloMemoria = true; } }
+}
+async function listarLocal() {
+  let guardados = [];
+  if (!soloMemoria) { try { guardados = await operar("readonly", (s) => s.getAll()); } catch (err) { soloMemoria = true; } }
+  return [...guardados, ...memoria.values()];
+}
+
+// Safari (sobre todo en navegación privada) no deja guardar un Blob en
+// IndexedDB: las fotos se guardan como datos binarios ({ buf, tipo }) y se
+// vuelven Blob al mostrarlas o subirlas. aBlob acepta también los Blob de
+// pendientes guardados antes de este cambio.
+const aDatos = async (b) => (b ? { buf: await b.arrayBuffer(), tipo: b.type || "image/jpeg" } : null);
+const aBlob = (x) => (!x ? null : x instanceof Blob ? x : new Blob([x.buf], { type: x.tipo || "image/jpeg" }));
 
 function conLimite(promesa, ms, texto) {
   return Promise.race([promesa, new Promise((_, rej) => setTimeout(() => rej(new Error(texto)), ms))]);
@@ -159,19 +183,19 @@ async function iniciar({ user, perfil, contrato, contratos }) {
     const foto = campoFoto ? fotosForm.archivo(campoFoto.key) : null;
     if (campoFoto?.required && !foto) { mostrarAlerta(alertaEl, "Toma o elige una foto."); return; }
     // Fotos de evidencia nuevas, por campo (se guardan en el teléfono hasta subir).
-    const fotosNuevas = {};
-    fotosForm.camposFotos().forEach((k) => { fotosNuevas[k] = [...fotosForm.fotos(k).nuevas]; });
     const datos = leerFormulario(mod.campos, camposEl);
     const cap = acceso.elegirCap ? document.getElementById("f__cap").value : acceso.cap || null;
     if (mod.porCapitulo && cap) datos[mod.porCapitulo] = cap;
     guardarBtn.disabled = otroBtn.disabled = true;
     try {
+      const fotosNuevas = {};
+      for (const k of fotosForm.camposFotos()) fotosNuevas[k] = await Promise.all(fotosForm.fotos(k).nuevas.map(aDatos));
       const item = {
         qid: crypto.randomUUID(),
         contratoId: contrato.id, contratoNumero: contrato.numero || "",
         usuario: user.email, modulo: mod.id, cap,
         docId: doc(collection(db, "ipContratos", contrato.id, mod.coleccion)).id,
-        datos, foto: foto || null, campoFoto: campoFoto?.key || null, fotosNuevas,
+        datos, foto: await aDatos(foto), campoFoto: campoFoto?.key || null, fotosNuevas,
         creadoLocal: new Date().toISOString(), intentos: 0, ultimoError: ""
       };
       await guardarLocal(item);
@@ -182,11 +206,14 @@ async function iniciar({ user, perfil, contrato, contratos }) {
         mod.campos.forEach((c) => { if (["textarea", "imagen", "fotos", "url", "number", "money", "pct"].includes(c.type)) delete conservar[c.key]; });
       }
       if (seguirOtro) abrir(acceso, conservar); else cerrar();
-      mostrarAlerta(mensajeEl, navigator.onLine ? "Guardado en el teléfono. Subiendo…" : "Guardado en el teléfono. Se subirá cuando haya señal.", "info");
+      mostrarAlerta(mensajeEl, soloMemoria
+        ? "Este navegador no deja guardar en el teléfono (ej. navegación privada): el registro se sube ahora. Si no hay señal, NO cierres esta página hasta que diga «Todo subido»."
+        : navigator.onLine ? "Guardado en el teléfono. Subiendo…" : "Guardado en el teléfono. Se subirá cuando haya señal.", "info");
       await pintarCola();
       sincronizar();
     } catch (err) {
-      mostrarAlerta(alertaEl, `No se pudo guardar en el teléfono: ${errorAmigable(err)}`);
+      console.error(err);
+      mostrarAlerta(alertaEl, `No se pudo guardar: ${errorAmigable(err)}${err?.name && err.name !== "Error" ? ` (${err.name})` : ""}`);
     } finally {
       guardarBtn.disabled = otroBtn.disabled = false;
     }
@@ -217,7 +244,7 @@ async function iniciar({ user, perfil, contrato, contratos }) {
     cola.forEach((x) => {
       const miniatura = x.foto || Object.values(x.fotosNuevas || {}).flat()[0];
       const img = miniatura && colaEl.querySelector(`img[data-qid="${x.qid}"]`);
-      if (img) img.src = URL.createObjectURL(miniatura);
+      if (img) img.src = URL.createObjectURL(aBlob(miniatura));
     });
   }
 
@@ -232,7 +259,7 @@ async function iniciar({ user, perfil, contrato, contratos }) {
     if (x.foto && x.campoFoto) {
       const ruta = `interventoria-pro/${x.contratoId}/${mod.coleccion}/${x.qid}.jpg`;
       const r = ref(storage, ruta);
-      await conLimite(uploadBytes(r, x.foto, { contentType: "image/jpeg" }), LIMITE_SUBIDA_MS, "La foto no alcanzó a subir (señal débil)");
+      await conLimite(uploadBytes(r, aBlob(x.foto), { contentType: "image/jpeg" }), LIMITE_SUBIDA_MS, "La foto no alcanzó a subir (señal débil)");
       datos[x.campoFoto] = await getDownloadURL(r);
       datos[`${x.campoFoto}Ruta`] = ruta;
     }
@@ -243,7 +270,7 @@ async function iniciar({ user, perfil, contrato, contratos }) {
       for (let i = 0; i < blobs.length; i++) {
         const ruta = `interventoria-pro/${x.contratoId}/${mod.coleccion}/${x.qid}-${key}-${i + 1}.jpg`;
         const r = ref(storage, ruta);
-        await conLimite(uploadBytes(r, blobs[i], { contentType: "image/jpeg" }), LIMITE_SUBIDA_MS, "Las fotos no alcanzaron a subir (señal débil)");
+        await conLimite(uploadBytes(r, aBlob(blobs[i]), { contentType: "image/jpeg" }), LIMITE_SUBIDA_MS, "Las fotos no alcanzaron a subir (señal débil)");
         lista.push({ url: await getDownloadURL(r), ruta });
       }
       datos[key] = lista;
