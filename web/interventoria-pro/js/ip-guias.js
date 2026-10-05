@@ -322,6 +322,6 @@ export const GENERALIDADES = {
     "Semáforo de validación: verde = al día, amarillo = pendiente o por vencer, rojo = vencido, rechazado o con observaciones.",
     "«Para revisar» agrupa las alertas de cada módulo; en Inicio aparecen todas las del contrato.",
     "Las fechas se muestran en formato día/mes/año y los valores en pesos colombianos.",
-    "Cada módulo se puede exportar a Excel con todos sus campos."
+    "Cada módulo se puede exportar a Excel con todos sus campos e importar desde Excel con su plantilla (vista previa antes de guardar; en Personal y Actividades, la cédula o el ítem existentes se actualizan en vez de duplicarse)."
   ]
 };

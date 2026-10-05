@@ -453,6 +453,7 @@ export const MODULOS = {
 
   // ======================= 4. SST
   personal: {
+    claveImport: "cedula",
     filtroMes: (r, ym) => activoEnMes(r, ym),
     label: "Listado de personal", icon: "👷", coleccion: "personal",
     desc: "Personal que labora en el contrato, con afiliaciones y salario. Valida que el salario no esté por debajo del SMMLV ni del pactado para el cargo.",
@@ -833,6 +834,7 @@ export const MODULOS = {
 
   // ======================= 7. TÉCNICO
   actividades: {
+    claveImport: "item",
     sinFiltroMes: true,
     label: "Avance de actividades", icon: "📊", coleccion: "actividades",
     desc: "Actividades del contrato con su peso y fechas. Registra el avance acumulado (%) de cada mes: el sistema calcula el avance ponderado y lo compara con lo programado a hoy.",

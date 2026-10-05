@@ -22,6 +22,7 @@
         <select id="ipFiltroMes" class="ip-filtro-mes hidden" title="Ver solo lo registrado en un mes"></select>
         <input type="search" id="ipBuscar" placeholder="Buscar…">
         <span class="text-muted ip-contador" id="ipContador"></span>
+        <button type="button" class="btn secondary ip-btn-excel hidden" id="ipImportarBtn">📥 Importar Excel</button>
         <button type="button" class="btn secondary ip-btn-excel" id="ipExcelBtn">📊 Exportar Excel</button>
       </div>
       <div id="ipLista"><div class="card"><p class="text-muted ip-sin-margen">Cargando…</p></div></div>
@@ -41,6 +42,24 @@
           <button type="button" class="btn danger hidden" id="ipEliminarBtn">Eliminar</button>
         </div>
       </form>
+    </div>
+  </div>
+
+  <div class="modal-backdrop" id="ipImportModal">
+    <div class="modal ip-modal-ancho ip-import-modal">
+      <h2 id="ipImportTitulo">Importar desde Excel</h2>
+      <ol class="ip-import-pasos">
+        <li>Descarga la plantilla del módulo y llénala (una fila por registro). <button type="button" class="btn secondary" id="ipImportPlantilla">⬇ Descargar plantilla</button></li>
+        <li>Elige el archivo lleno: <input type="file" id="ipImportArchivo" accept=".xlsx"></li>
+        <li>Revisa la vista previa: solo se importan las filas sin error.</li>
+      </ol>
+      <p class="text-muted ip-ayuda" id="ipImportNota"></p>
+      <div class="alert" id="ipImportAlerta"></div>
+      <div id="ipImportPrevia"></div>
+      <div class="ip-form-acciones">
+        <button type="button" class="btn hidden" id="ipImportConfirmar">Importar</button>
+        <button type="button" class="btn secondary" id="ipImportCerrar">Cerrar</button>
+      </div>
     </div>
   </div>
 

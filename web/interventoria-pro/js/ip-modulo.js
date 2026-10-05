@@ -11,6 +11,7 @@ import {
 import { MODULOS, nombreCapitulo } from "./ip-modulos.js";
 import { GUIAS } from "./ip-guias.js";
 import { anotarEnLote, diferencias, identificar, refHistorial, fechaHora, ACCIONES } from "./ip-historial.js";
+import { configurarImportacion } from "./ip-importar.js";
 
 const params = new URLSearchParams(location.search);
 const mod = MODULOS[params.get("m")];
@@ -403,6 +404,9 @@ function iniciarModulo({ user, perfil, contrato, esGestor }) {
   });
 
   document.getElementById("ipNuevoBtn").addEventListener("click", () => abrirFormulario());
+
+  // Importación desde Excel (plantilla, vista previa y guardado con historial).
+  configurarImportacion({ mod, contrato, ctx, user, perfil, coleccionRef, cap, frentesContrato, titulo: tituloModulo });
 
   // ---------------------------------------------------------- plantilla
   // Módulos con lista base (ej. requisitos del acta de inicio): agrega de
