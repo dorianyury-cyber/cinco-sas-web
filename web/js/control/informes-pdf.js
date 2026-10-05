@@ -284,9 +284,14 @@ export async function generarInformePDF(informe) {
   const anchoPagina = doc.internal.pageSize.getWidth();
   const altoPagina = doc.internal.pageSize.getHeight();
   const margenX = 20;
+  // Margen de encuadernación (mm extra a la izquierda, para archivar en
+  // carpeta física): lo pide quien llama (ej. Interventoría PRO = 10).
+  const margenIzq = margenX + (Number(informe.margenEncuadernacion) || 0);
+  const margenDer = margenX;
   const margenSuperior = 26;
   const margenInferior = altoPagina - 22;
-  const anchoUtil = anchoPagina - margenX * 2;
+  const anchoUtil = anchoPagina - margenIzq - margenDer;
+  const centroContenido = margenIzq + anchoUtil / 2;
   const lineHeight = 5.2;
 
   // Compartidos entre la simulación de páginas del índice (más abajo) y el
@@ -374,7 +379,7 @@ export async function generarInformePDF(informe) {
     saltoSiNoCabe(lineHeight);
     paginasConContenido.add(doc.internal.getNumberOfPages());
     const anchoDisponible = anchoUtil - (esPrimeraLineaDeItem ? 0 : sangria);
-    const xBase = margenX + (esPrimeraLineaDeItem ? 0 : sangria);
+    const xBase = margenIzq + (esPrimeraLineaDeItem ? 0 : sangria);
 
     let anchoTokens = 0;
     lineaTokens.forEach((t) => { anchoTokens += medirToken(t); });
@@ -555,7 +560,7 @@ export async function generarInformePDF(informe) {
     }
     indiceEntradas.push({ texto: texto || "", nivel, pagina: doc.internal.getNumberOfPages() });
     const lineas = doc.splitTextToSize(texto || "", anchoUtil);
-    doc.text(lineas, margenX, y);
+    doc.text(lineas, margenIzq, y);
     paginasConContenido.add(doc.internal.getNumberOfPages());
     y += lineas.length * (lineHeight + (nivel === 1 ? 1.5 : 0.5)) + 3;
   }
@@ -605,12 +610,12 @@ export async function generarInformePDF(informe) {
       doc.setFont("helvetica", "bold");
       doc.setFontSize(9.5);
       doc.setTextColor(...NAVY);
-      doc.text(lineasNombre, anchoPagina / 2, y, { align: "center" });
+      doc.text(lineasNombre, centroContenido, y, { align: "center" });
       paginasConContenido.add(doc.internal.getNumberOfPages());
       y += altoNombre;
       graficosEntradas.push({ texto: bloque.nombre || `Figura ${numero}`, pagina: doc.internal.getNumberOfPages() });
 
-      const x = margenX + (anchoUtil - ancho) / 2;
+      const x = margenIzq + (anchoUtil - ancho) / 2;
       doc.addImage(img.dataUrl, "JPEG", x, y, ancho, alto);
       paginasConContenido.add(doc.internal.getNumberOfPages());
       y += alto + 3;
@@ -620,20 +625,81 @@ export async function generarInformePDF(informe) {
         doc.setFont("helvetica", "italic");
         doc.setFontSize(9);
         doc.setTextColor(...TEXT_MUTED);
-        doc.text(lineasPie, anchoPagina - margenX, y, { align: "right" });
+        doc.text(lineasPie, anchoPagina - margenDer, y, { align: "right" });
         y += altoPie;
       }
       y += 6;
     } catch (e) {
       saltoSiNoCabe(14);
       doc.setDrawColor(214, 69, 69);
-      doc.rect(margenX, y, anchoUtil, 14);
+      doc.rect(margenIzq, y, anchoUtil, 14);
       doc.setFont("helvetica", "italic");
       doc.setFontSize(9);
       doc.setTextColor(178, 52, 52);
-      doc.text("Aviso: no se pudo cargar esta imagen al generar el documento.", margenX + 4, y + 8);
+      doc.text("Aviso: no se pudo cargar esta imagen al generar el documento.", margenIzq + 4, y + 8);
       paginasConContenido.add(doc.internal.getNumberOfPages());
       y += 20;
+    }
+  }
+
+  // Galería de fotos (registro fotográfico): cuadrícula de `columnas` fotos
+  // por fila (2 por defecto), cada una en un recuadro del mismo tamaño
+  // (la foto se ajusta sin deformarse) con su título y fecha debajo. Ocupa
+  // mucho menos alto que una foto por bloque a todo el ancho. Cada foto
+  // sigue contando como figura en la Lista de gráficos.
+  async function dibujarGaleria(bloque) {
+    const columnas = Math.max(1, Math.min(3, bloque.columnas || 2));
+    const separacion = 6;
+    const anchoCelda = (anchoUtil - separacion * (columnas - 1)) / columnas;
+    // Recuadro algo más bajo que 4:3 para que quepan 3 filas (6 fotos) por página.
+    const altoFoto = Math.min(anchoCelda * 0.62, (margenInferior - margenSuperior - 30) / 3 - 14);
+    const imagenes = await Promise.all((bloque.fotos || []).map(async (f) => {
+      try { return await cargarImagenComoDataURL(f.url, "#ffffff", "JPEG"); } catch (e) { return null; }
+    }));
+    for (let i = 0; i < imagenes.length; i += columnas) {
+      const fila = (bloque.fotos || []).slice(i, i + columnas);
+      // Texto de cada celda (máx. 3 renglones de título + 1 de fecha).
+      doc.setFontSize(8.5);
+      const textos = fila.map((f, j) => {
+        doc.setFont("helvetica", "bold");
+        const numero = graficosEntradas.length + j + 1;
+        let titulo = doc.splitTextToSize(`Figura ${numero}. ${f.nombre || ""}`.trim(), anchoCelda);
+        if (titulo.length > 3) titulo = [...titulo.slice(0, 2), `${titulo[2].replace(/\s*\S*$/, "")}…`];
+        return { titulo, pie: f.pie || "" };
+      });
+      const altoTexto = Math.max(...textos.map((t) => t.titulo.length * 3.6 + (t.pie ? 3.8 : 0)));
+      saltoSiNoCabe(altoFoto + altoTexto + 6);
+      fila.forEach((f, j) => {
+        const x = margenIzq + j * (anchoCelda + separacion);
+        const img = imagenes[i + j];
+        doc.setDrawColor(220, 224, 229);
+        doc.rect(x, y, anchoCelda, altoFoto);
+        if (img) {
+          let w = anchoCelda, h = w * (img.alto / img.ancho);
+          if (h > altoFoto) { h = altoFoto; w = h * (img.ancho / img.alto); }
+          doc.addImage(img.dataUrl, "JPEG", x + (anchoCelda - w) / 2, y + (altoFoto - h) / 2, w, h);
+        } else {
+          doc.setFont("helvetica", "italic");
+          doc.setFontSize(8);
+          doc.setTextColor(178, 52, 52);
+          doc.text("No se pudo cargar esta foto.", x + anchoCelda / 2, y + altoFoto / 2, { align: "center" });
+        }
+        let yTexto = y + altoFoto + 4;
+        doc.setFont("helvetica", "bold");
+        doc.setFontSize(8.5);
+        doc.setTextColor(...NAVY);
+        doc.text(textos[j].titulo, x, yTexto);
+        yTexto += textos[j].titulo.length * 3.6;
+        if (textos[j].pie) {
+          doc.setFont("helvetica", "italic");
+          doc.setFontSize(8);
+          doc.setTextColor(...TEXT_MUTED);
+          doc.text(textos[j].pie, x, yTexto);
+        }
+        graficosEntradas.push({ texto: f.nombre || "Foto", pagina: doc.internal.getNumberOfPages() });
+      });
+      paginasConContenido.add(doc.internal.getNumberOfPages());
+      y += altoFoto + altoTexto + 8;
     }
   }
 
@@ -737,7 +803,7 @@ export async function generarInformePDF(informe) {
     const altoEncabezado = sumaRango(alturaFilas, 0, filasEncabezado);
     saltoSiNoCabe(altoTitulo + altoEncabezado);
     doc.setTextColor(...NAVY);
-    doc.text(lineasTitulo, anchoPagina / 2, y, { align: "center" });
+    doc.text(lineasTitulo, centroContenido, y, { align: "center" });
     paginasConContenido.add(doc.internal.getNumberOfPages());
     y += altoTitulo;
     tablasEntradas.push({ texto: bloque.titulo || `Tabla ${numero}`, pagina: doc.internal.getNumberOfPages() });
@@ -755,7 +821,7 @@ export async function generarInformePDF(informe) {
     // la tabla, para que no queden filas "huérfanas" sin saber qué columna
     // es cada una.
     function dibujarFila(fila, fi, yPos) {
-      let x = margenX;
+      let x = margenIzq;
       if (fi === 0) doc.setFillColor(...GRIS_CLARO);
       for (let ci = 0; ci < numCols; ci++) {
         const info = celdaCombinada(merges, fi, ci);
@@ -768,7 +834,7 @@ export async function generarInformePDF(informe) {
         }
         x += anchos[ci];
       }
-      x = margenX;
+      x = margenIzq;
       for (let ci = 0; ci < numCols; ci++) {
         const info = celdaCombinada(merges, fi, ci);
         if (!info || info.esAncla) {
@@ -831,7 +897,7 @@ export async function generarInformePDF(informe) {
       doc.setTextColor(...TEXT_MUTED);
       const lineasNota = doc.splitTextToSize(bloque.nota, anchoUtil);
       saltoSiNoCabe(lineasNota.length * 4.5);
-      doc.text(lineasNota, anchoPagina - margenX, y, { align: "right" });
+      doc.text(lineasNota, anchoPagina - margenDer, y, { align: "right" });
       paginasConContenido.add(doc.internal.getNumberOfPages());
       y += lineasNota.length * 4.5;
     }
@@ -884,12 +950,12 @@ export async function generarInformePDF(informe) {
       doc.setFont("helvetica", "bold");
       doc.setFontSize(10);
       doc.setTextColor(...NAVY);
-      doc.text(bloque.etiqueta.toUpperCase(), margenX, y);
+      doc.text(bloque.etiqueta.toUpperCase(), margenIzq, y);
     }
     y += altoEtiqueta + espacioParaFirmar;
 
     firmantes.forEach((firmante, i) => {
-      const xCentro = margenX + anchoColumna * i + anchoColumna / 2;
+      const xCentro = margenIzq + anchoColumna * i + anchoColumna / 2;
 
       const imgFirma = imagenesFirma[i];
       if (imgFirma) {
@@ -930,6 +996,7 @@ export async function generarInformePDF(informe) {
     else if (bloque.tipo === "titulo4") dibujarTitulo(4, bloque.texto);
     else if (bloque.tipo === "tabla") dibujarTabla(bloque);
     else if (bloque.tipo === "imagen") await dibujarImagen(bloque);
+    else if (bloque.tipo === "galeria") await dibujarGaleria(bloque);
     else if (bloque.tipo === "firma") await dibujarFirma(bloque);
     else dibujarParrafo(bloque.texto);
   }
@@ -1017,7 +1084,7 @@ export async function generarInformePDF(informe) {
   let yPortada = 165;
   doc.setTextColor(...colorValor);
   const xValor = anchoPagina / 2 - 10;
-  const anchoValor = anchoPagina - margenX - xValor;
+  const anchoValor = anchoPagina - margenDer - xValor;
   // El cargo va en su(s) propio(s) renglón(es) debajo del nombre (no pegado
   // con un guion) — así un cargo de varias líneas (ej. título + rol actual)
   // siempre se lee como bloque propio, sin importar si la primera línea es
@@ -1109,7 +1176,7 @@ export async function generarInformePDF(informe) {
     doc.setFont("helvetica", "bold");
     doc.setFontSize(15);
     doc.setTextColor(...NAVY);
-    doc.text(tituloSeccion, margenX, yy);
+    doc.text(tituloSeccion, margenIzq, yy);
     yy += 11;
 
     entradas.forEach((entrada) => {
@@ -1127,8 +1194,8 @@ export async function generarInformePDF(informe) {
       const anchoPagina2 = doc.getTextWidth(textoPagina);
       const anchoTexto = anchoUtil - indent - anchoPagina2 - 4;
       const lineasTexto = doc.splitTextToSize(entrada.texto, anchoTexto);
-      doc.text(lineasTexto[0] + (lineasTexto.length > 1 ? "…" : ""), margenX + indent, yy);
-      doc.text(textoPagina, anchoPagina - margenX, yy, { align: "right" });
+      doc.text(lineasTexto[0] + (lineasTexto.length > 1 ? "…" : ""), margenIzq + indent, yy);
+      doc.text(textoPagina, anchoPagina - margenDer, yy, { align: "right" });
       yy += 6.4;
     });
   }
@@ -1144,12 +1211,12 @@ export async function generarInformePDF(informe) {
     doc.setPage(p);
     doc.setDrawColor(...AMBER);
     doc.setLineWidth(0.6);
-    doc.line(margenX, 16, anchoPagina - margenX, 16);
+    doc.line(margenIzq, 16, anchoPagina - margenDer, 16);
     let anchoLogo = 0;
     if (logo) {
       const altoLogo = 8;
       anchoLogo = altoLogo * (logo.ancho / logo.alto);
-      doc.addImage(logo.dataUrl, "PNG", margenX, 6, anchoLogo, altoLogo);
+      doc.addImage(logo.dataUrl, "PNG", margenIzq, 6, anchoLogo, altoLogo);
     }
     // El título puede ser largo — se ajusta al espacio real que queda a la
     // derecha del logo (no una sola línea fija) partiéndolo en hasta 2
@@ -1157,7 +1224,7 @@ export async function generarInformePDF(informe) {
     // nunca quede montado sobre el logo.
     doc.setFont("helvetica", "normal");
     doc.setTextColor(...TEXT_MUTED);
-    const anchoDisponibleTitulo = anchoPagina - margenX - (margenX + anchoLogo + 4);
+    const anchoDisponibleTitulo = anchoPagina - margenDer - (margenIzq + anchoLogo + 4);
     let tamanoTitulo = 8;
     let lineasTitulo = doc.splitTextToSize(informe.titulo || "", anchoDisponibleTitulo);
     while (lineasTitulo.length > 2 && tamanoTitulo > 6) {
@@ -1169,14 +1236,14 @@ export async function generarInformePDF(informe) {
     if (lineasTitulo.length > 2) lineasTitulo = [lineasTitulo[0], lineasTitulo[1].replace(/.{3}$/, "...")];
     const yInicioTitulo = lineasTitulo.length > 1 ? 8 : 11;
     lineasTitulo.slice(0, 2).forEach((linea, i) => {
-      doc.text(linea, anchoPagina - margenX, yInicioTitulo + i * 3.6, { align: "right" });
+      doc.text(linea, anchoPagina - margenDer, yInicioTitulo + i * 3.6, { align: "right" });
     });
 
     doc.setFillColor(...GRIS_CLARO);
     doc.rect(0, altoPagina - 14, anchoPagina, 14, "F");
     doc.setFontSize(7.5);
-    doc.text(`Código: ${CODIGO_FORMATO} · Versión: ${VERSION_FORMATO}`, margenX, altoPagina - 6);
-    doc.text(`Radicado ${informe.radicado || ""} · Página ${p} de ${totalPaginas}`, anchoPagina - margenX, altoPagina - 6, { align: "right" });
+    doc.text(`Código: ${CODIGO_FORMATO} · Versión: ${VERSION_FORMATO}`, margenIzq, altoPagina - 6);
+    doc.text(`Radicado ${informe.radicado || ""} · Página ${p} de ${totalPaginas}`, anchoPagina - margenDer, altoPagina - 6, { align: "right" });
   }
 
   return doc;

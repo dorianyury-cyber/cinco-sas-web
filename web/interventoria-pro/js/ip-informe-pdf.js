@@ -30,7 +30,8 @@ export async function generarInformeMensualPDF({ contrato, ym, datos, elaboradoP
     } else if (b.tipo === "imagen") {
       bloquesPdf.push({ tipo: "imagen", url: b.dataUrl || b.url, nombre: b.nombre || "", pieDeFoto: "", tamano: b.tamano || 100 });
     } else if (b.tipo === "fotos") {
-      b.fotos.forEach((f) => bloquesPdf.push({ tipo: "imagen", url: f.url, nombre: f.observacion, pieDeFoto: f.fecha, tamano: 65 }));
+      // Cuadrícula de 2 fotos por fila (ahorra espacio vertical).
+      bloquesPdf.push({ tipo: "galeria", columnas: 2, fotos: b.fotos.map((f) => ({ url: f.url, nombre: f.observacion, pie: f.fecha })) });
     } else if (b.tipo === "firma") {
       bloquesPdf.push({ tipo: "firma", etiqueta: "Elaboró", firmantes: [{ nombre: b.nombre, cargo: `${b.cargo}\n${b.empresa}`, firmaUrl: null }] });
     }
@@ -51,6 +52,8 @@ export async function generarInformeMensualPDF({ contrato, ym, datos, elaboradoP
     contratoFechaFin: contrato.fechaFin || null,
     firmaNombre: firma?.nombre || "",
     firmaCargo: firma?.cargo || "",
+    // 1 cm más a la izquierda para archivar en carpeta física.
+    margenEncuadernacion: 10,
     bloques: bloquesPdf
   });
   return doc;

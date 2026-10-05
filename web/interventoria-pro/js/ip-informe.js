@@ -1,7 +1,7 @@
 // Informe mensual: el usuario elige el mes, ve qué se registró en cada
 // capítulo ese mes (para completar lo que falte antes de generar) y
 // descarga el Word armado con esos datos (ip-informe-docx.js).
-import { collection, getDocs } from "https://www.gstatic.com/firebasejs/10.7.1/firebase-firestore.js";
+import { collection, getDocs, doc, runTransaction, serverTimestamp } from "https://www.gstatic.com/firebasejs/10.7.1/firebase-firestore.js";
 import { db, iniciarPagina, pintarEncabezado, esc, mesLargo, mesActual, mesesDelContrato, imgModulo, hrefModulo, mostrarAlerta, limpiarAlerta, errorAmigable } from "./ip-core.js";
 import { MODULOS, CAPITULOS, activoEnMes } from "./ip-modulos.js";
 import { generarInformeMensual } from "./ip-informe-docx.js";
@@ -165,7 +165,59 @@ async function iniciar({ user, perfil, contrato }) {
     fotosEl.querySelector('[data-fotos="nada"]').addEventListener("click", () => { fotosSel = new Set(); guardarFotosSel(); pintarFotos(); pintar(); });
   }
 
-  selMes.addEventListener("change", () => { cargarFotosSel(); pintar(); pintarFotos(); });
+  // ---------------------------------------------------------- radicado
+  // Consecutivo propio de los informes de Interventoría PRO: IIP-año-número
+  // (contador en contadores/ip_informe_{año}, como los radicados del módulo
+  // Informes). Cada radicado queda guardado en el contrato con su mes
+  // (ipContratos/{id}/radicados), así el informe de un mes reutiliza el suyo.
+  const radicadoEl = document.getElementById("informeRadicado");
+  const radicadoBtn = document.getElementById("radicadoBtn");
+  const radicadosRef = collection(db, "ipContratos", contrato.id, "radicados");
+  const radicadosPorMes = {};
+  let radicadoAuto = "";
+  try {
+    (await getDocs(radicadosRef)).docs.map((d) => d.data())
+      .sort((a, b) => String(a.radicado).localeCompare(String(b.radicado)))
+      .forEach((r) => { radicadosPorMes[r.ym] = r.radicado; });
+  } catch (err) { /* sin radicados guardados todavía */ }
+  function ponerRadicadoDelMes() {
+    // Solo reemplaza lo que el aplicativo puso; no lo que se escribió a mano.
+    if (radicadoEl.value && radicadoEl.value !== radicadoAuto) return;
+    radicadoAuto = radicadosPorMes[selMes.value] || "";
+    radicadoEl.value = radicadoAuto;
+  }
+  radicadoBtn.addEventListener("click", async () => {
+    const ym = selMes.value;
+    const existente = radicadosPorMes[ym];
+    if (existente && !confirm(`El informe de ${mesLargo(ym)} ya tiene el radicado ${existente}.\n\n«Aceptar» genera uno NUEVO (ej. si se reemite el informe).\n«Cancelar» deja ${existente}.`)) {
+      radicadoEl.value = radicadoAuto = existente;
+      return;
+    }
+    radicadoBtn.disabled = true;
+    limpiarAlerta(alerta);
+    try {
+      const anio = new Date().getFullYear();
+      const contadorRef = doc(db, "contadores", `ip_informe_${anio}`);
+      let radicado = "";
+      await runTransaction(db, async (tx) => {
+        const snap = await tx.get(contadorRef);
+        const siguiente = snap.exists() ? snap.data().siguiente : 1;
+        radicado = `IIP-${anio}-${String(siguiente).padStart(3, "0")}`;
+        tx.set(contadorRef, { siguiente: siguiente + 1 });
+        tx.set(doc(radicadosRef, radicado), { radicado, ym, contratoNumero: contrato.numero || "", generadoPor: user.email, generadoPorNombre: perfil.nombre || user.email, generadoEn: serverTimestamp() });
+      });
+      radicadosPorMes[ym] = radicado;
+      radicadoEl.value = radicadoAuto = radicado;
+      mostrarAlerta(alerta, `Radicado ${radicado} asignado al informe de ${mesLargo(ym)}. Va en la portada y en el pie de cada página (PDF y Word).`, "success");
+    } catch (err) {
+      mostrarAlerta(alerta, `No se pudo generar el radicado: ${errorAmigable(err)}`);
+    } finally {
+      radicadoBtn.disabled = false;
+    }
+  });
+  ponerRadicadoDelMes();
+
+  selMes.addEventListener("change", () => { cargarFotosSel(); pintar(); pintarFotos(); ponerRadicadoDelMes(); });
   cargarFotosSel();
   pintar();
   pintarFotos();
@@ -249,7 +301,8 @@ async function iniciar({ user, perfil, contrato }) {
         elaboradoPor: document.getElementById("informeElaborado").value.trim(),
         cargo: document.getElementById("informeCargo").value.trim(),
         incluir: new Set(seleccion),
-        fotosIncluir: [...fotosSel]
+        fotosIncluir: [...fotosSel],
+        radicado: radicadoEl.value.trim()
       });
       const a = document.createElement("a");
       a.href = URL.createObjectURL(blob);

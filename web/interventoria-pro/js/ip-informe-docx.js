@@ -41,7 +41,7 @@ function anchosProporcionales(encabezados, filas) {
   return pct.map((p) => (p / suma) * 100);
 }
 
-export async function generarInformeMensual({ contrato, ym, datos, elaboradoPor, cargo, incluir = null, fotosIncluir = null }) {
+export async function generarInformeMensual({ contrato, ym, datos, elaboradoPor, cargo, incluir = null, fotosIncluir = null, radicado = "" }) {
   const {
     Document, Packer, Paragraph, TextRun, ImageRun, Table, TableRow, TableCell, ShadingType, WidthType,
     Header, Footer, AlignmentType, PageNumber, VerticalAlign, HeadingLevel, LevelFormat, BorderStyle, TableOfContents, PageBreak
@@ -99,24 +99,29 @@ export async function generarInformeMensual({ contrato, ym, datos, elaboradoPor,
         if (bl.nombre) cuerpo.push(new Paragraph({ alignment: AlignmentType.CENTER, spacing: { after: 160 }, children: [T(`Figura. ${bl.nombre}.`, { size: 17, italics: true, color: MUTED })] }));
       } catch (e) { cuerpo.push(P("(No se pudo cargar la imagen)", { italics: true, color: MUTED })); }
     } else if (bl.tipo === "fotos") {
+      // Una sola tabla de 2 columnas (una fila por cada par de fotos), con
+      // cada foto ajustada a un recuadro de 78 × 58 mm sin deformarse:
+      // ocupa mucho menos alto que una foto por bloque.
+      const filas = [];
       for (let i = 0; i < bl.fotos.length; i += 2) {
         const celdas = await Promise.all(bl.fotos.slice(i, i + 2).map(async (f) => {
           const hijos = [];
           try {
             const img = await cargarImagen(f.url);
-            const anchoPx = Math.round(80 * PX_POR_MM);
-            hijos.push(new Paragraph({ alignment: AlignmentType.CENTER, children: [new ImageRun({ data: img.buffer, type: "jpg", transformation: { width: anchoPx, height: Math.round(anchoPx * Math.min(1, img.alto / img.ancho)) } })] }));
+            let anchoMm = 78, altoMm = anchoMm * (img.alto / img.ancho);
+            if (altoMm > 58) { altoMm = 58; anchoMm = altoMm * (img.ancho / img.alto); }
+            hijos.push(new Paragraph({ alignment: AlignmentType.CENTER, children: [new ImageRun({ data: img.buffer, type: "jpg", transformation: { width: Math.round(anchoMm * PX_POR_MM), height: Math.round(altoMm * PX_POR_MM) } })] }));
           } catch (e) {
             hijos.push(new Paragraph({ children: [T("(No se pudo cargar la foto)", { italics: true, color: MUTED, size: 16 })] }));
           }
-          hijos.push(new Paragraph({ spacing: { before: 60 }, children: [T("Observación: ", { bold: true, size: 17 }), T(f.observacion, { size: 17 })] }));
-          hijos.push(new Paragraph({ children: [T(f.fecha, { size: 16, color: MUTED })] }));
-          return new TableCell({ width: { size: 50, type: WidthType.PERCENTAGE }, margins: { top: 80, bottom: 80, left: 80, right: 80 }, children: hijos });
+          hijos.push(new Paragraph({ spacing: { before: 40 }, children: [T(f.observacion, { bold: true, size: 16 })] }));
+          hijos.push(new Paragraph({ children: [T(f.fecha, { size: 15, italics: true, color: MUTED })] }));
+          return new TableCell({ width: { size: 50, type: WidthType.PERCENTAGE }, margins: { top: 60, bottom: 60, left: 80, right: 80 }, children: hijos });
         }));
         if (celdas.length === 1) celdas.push(new TableCell({ width: { size: 50, type: WidthType.PERCENTAGE }, children: [new Paragraph({ children: [] })] }));
-        cuerpo.push(new Table({ width: { size: 100, type: WidthType.PERCENTAGE }, borders: bordes, rows: [new TableRow({ children: celdas })] }));
-        cuerpo.push(P("", { after: 60 }));
+        filas.push(new TableRow({ cantSplit: true, children: celdas }));
       }
+      if (filas.length) cuerpo.push(new Table({ width: { size: 100, type: WidthType.PERCENTAGE }, borders: bordes, rows: filas }));
     } else if (bl.tipo === "firma") {
       cuerpo.push(new Paragraph({ spacing: { before: 600 }, children: [T("______________________________________")] }));
       cuerpo.push(new Paragraph({ children: [T(bl.nombre, { bold: true })] }));
@@ -140,7 +145,7 @@ export async function generarInformeMensual({ contrato, ym, datos, elaboradoPor,
     ] })]
   });
   const pie = new Paragraph({ alignment: AlignmentType.RIGHT, children: [
-    new TextRun({ text: "Interventoría PRO · Cinco S.A.S. · Página ", color: MUTED, size: 14, font: "Arial" }),
+    new TextRun({ text: `${radicado ? `Radicado ${radicado} · ` : ""}Interventoría PRO · Cinco S.A.S. · Página `, color: MUTED, size: 14, font: "Arial" }),
     new TextRun({ children: [PageNumber.CURRENT], color: MUTED, size: 14, font: "Arial" }),
     new TextRun({ text: " de ", color: MUTED, size: 14, font: "Arial" }),
     new TextRun({ children: [PageNumber.TOTAL_PAGES], color: MUTED, size: 14, font: "Arial" })
@@ -151,6 +156,7 @@ export async function generarInformeMensual({ contrato, ym, datos, elaboradoPor,
   portada.push(new Paragraph({ alignment: AlignmentType.CENTER, spacing: { after: 120 }, children: [new TextRun({ text: titulo.toUpperCase(), bold: true, size: 34, color: NAVY, font: "Arial" })] }));
   portada.push(new Paragraph({ alignment: AlignmentType.CENTER, spacing: { after: 500 }, children: [new TextRun({ text: mesLargo(ym).toUpperCase(), bold: true, size: 26, color: "D99400", font: "Arial" })] }));
   portada.push(tabla(["INFORME", ""], [
+    ...(radicado ? [["Radicado", radicado]] : []),
     ["Contrato N.º", contrato.numero || "-"], ["Objeto", contrato.objeto || "-"], ["Contratante", contrato.contratante || "-"],
     [esObra ? "Contratista / proveedor" : "Contratista", contrato.contratista || "-"],
     ["Interventor", "CONSTRUCCIÓN, INGENIERÍA Y CONSULTORÍA – CINCO S.A.S."],
@@ -169,7 +175,8 @@ export async function generarInformeMensual({ contrato, ym, datos, elaboradoPor,
       { level: 1, format: LevelFormat.DECIMAL, text: "%1.%2.", alignment: AlignmentType.START, style: { paragraph: { indent: { left: 576, hanging: 576 } } } }
     ] }] },
     sections: [{
-      properties: { page: { size: { width: 12240, height: 15840 }, margin: { top: 1134, bottom: 1134, left: 1247, right: 1134, header: 340, footer: 340 } } },
+      // Izquierda 1 cm más ancha (1247 + 567 twips) para archivar en carpeta física.
+      properties: { page: { size: { width: 12240, height: 15840 }, margin: { top: 1134, bottom: 1134, left: 1814, right: 1134, header: 340, footer: 340 } } },
       headers: { default: new Header({ children: [encabezado] }) },
       footers: { default: new Footer({ children: [pie] }) },
       children: [...portada, ...cuerpo]
