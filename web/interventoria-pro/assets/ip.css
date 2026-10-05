@@ -2191,3 +2191,60 @@ span.ip-aviso-rojo { color: var(--danger); background: none; }
 
 /* Los cuadros de texto usan la misma letra del aplicativo. */
 textarea { font-family: inherit; }
+
+/* Menú en el celular: recogido detrás del botón "☰ Menú" */
+.ip-menu-movil { display: none; }
+@media (max-width: 860px) {
+  .sidebar { padding: 10px 14px; }
+  .ip-sidebar-cabeza { display: flex; align-items: center; justify-content: space-between; gap: 10px; }
+  .sidebar .ip-sidebar-cabeza .brand { padding: 4px 0; border-bottom: 0; margin-bottom: 0; }
+  .sidebar .ip-sidebar-cabeza .brand img { height: 30px; }
+  .ip-menu-movil { display: inline-flex; align-items: center; gap: 6px; width: auto; margin: 0; padding: 7px 14px; border: 1px solid var(--border); border-radius: 999px; background: var(--card-bg); color: var(--text); font: inherit; font-size: 13px; font-weight: 600; cursor: pointer; }
+  .sidebar:not(.ip-menu-abierto) > :not(.ip-sidebar-cabeza) { display: none; }
+  .sidebar.ip-menu-abierto .ip-sidebar-cabeza { border-bottom: 1px solid var(--border); padding-bottom: 8px; margin-bottom: 10px; }
+  .main { padding: 14px; }
+}
+
+/* Tablero de contratos */
+.ip-w9 { width: 9%; } .ip-w11 { width: 11%; } .ip-w13 { width: 13%; }
+.ip-check-linea { display: inline-flex; align-items: center; gap: 6px; margin: 0; font-size: 13px; font-weight: 400; cursor: pointer; }
+.ip-check-linea input { width: auto; margin: 0; accent-color: var(--cinco-orange-dark); }
+.ip-tabla-tablero .ip-fila { cursor: pointer; }
+.ip-celda-barra { display: flex; flex-direction: column; gap: 0; }
+.ip-celda-barra .ip-mini-pista { margin-top: 3px; height: 5px; }
+.ip-texto-rojo { color: var(--danger); font-weight: 600; }
+.ip-tablero-detalle { grid-template-columns: 1fr 1.2fr; }
+@media (max-width: 1000px) { .ip-tablero-detalle { grid-template-columns: 1fr; } }
+.ip-datos { display: grid; grid-template-columns: 1fr 1fr; gap: 4px 16px; font-size: 13px; }
+@media (max-width: 560px) { .ip-datos { grid-template-columns: 1fr; } }
+.ip-dato span { color: var(--text-muted); }
+.ip-dato-objeto { font-size: 12.5px; margin: 10px 0 0; }
+
+/* Registro en campo (pensado para el celular) */
+.ip-campo-estado { display: flex; flex-wrap: wrap; align-items: center; gap: 10px 16px; padding: 10px 16px; }
+.ip-red { font-weight: 700; font-size: 13px; padding: 4px 12px; border-radius: 999px; }
+.ip-red-si { background: rgba(30, 158, 87, 0.12); color: var(--success); }
+.ip-red-no { background: rgba(214, 69, 69, 0.12); color: var(--danger); }
+.ip-campo-pendientes { font-size: 13px; font-weight: 600; }
+.ip-campo-tiles { display: grid; grid-template-columns: repeat(auto-fill, minmax(240px, 1fr)); gap: 12px; margin-bottom: 18px; }
+.ip-campo-tile { display: flex; align-items: center; gap: 12px; padding: 14px; min-height: 76px; border: 1px solid var(--border); border-radius: var(--radius); background: var(--card-bg); color: var(--text); box-shadow: var(--shadow); text-align: left; font: inherit; cursor: pointer; position: relative; overflow: hidden; }
+.ip-campo-tile:active { transform: scale(0.98); }
+.ip-campo-tile strong { display: block; font-size: 15px; }
+.ip-campo-tile .text-muted { display: block; font-size: 12.5px; margin-top: 2px; }
+.ip-campo-tile-foto { width: 52px; height: 52px; border-radius: 12px; object-fit: cover; flex-shrink: 0; }
+.ip-foto-botones { display: flex; flex-wrap: wrap; gap: 10px; margin-top: 4px; }
+.ip-foto-boton { cursor: pointer; }
+.ip-oculto { position: absolute; width: 1px; height: 1px; opacity: 0; pointer-events: none; }
+.ip-cola { list-style: none; margin: 0; padding: 0; }
+.ip-cola li { display: flex; align-items: center; gap: 10px; padding: 8px 0; border-bottom: 1px solid var(--border); font-size: 13px; }
+.ip-cola li:last-child { border-bottom: 0; }
+.ip-cola-foto { width: 46px; height: 46px; border-radius: 8px; object-fit: cover; flex-shrink: 0; }
+@media (max-width: 560px) {
+  .ip-campo-tiles { grid-template-columns: 1fr 1fr; gap: 10px; }
+  .ip-campo-tile { flex-direction: column; text-align: center; gap: 8px; padding: 12px 8px; }
+  .ip-campo-tile .text-muted { display: none; }
+  .ip-campo-main .ip-form-acciones { flex-direction: column; align-items: stretch; }
+  .ip-campo-main input, .ip-campo-main select, .ip-campo-main textarea { font-size: 16px; }
+}
+.ip-tarjetas.ip-tarjetas-5 { grid-template-columns: repeat(5, minmax(0, 1fr)); }
+@media (max-width: 1100px) { .ip-tarjetas.ip-tarjetas-5 { grid-template-columns: repeat(auto-fit, minmax(150px, 1fr)); } }

@@ -1,9 +1,9 @@
 // Inicio de un contrato: indicadores principales (tiempo, avance técnico,
 // avance financiero, personal, garantías) y TODAS las alertas de los
 // módulos en un solo lugar, cada una con enlace a su módulo.
-import { collection, getDocs } from "https://www.gstatic.com/firebasejs/10.7.1/firebase-firestore.js";
-import { db, iniciarPagina, pintarEncabezado, esc, numero, moneda, diasEntre, hoyISO, aplicarAnchos, hrefModulo, imgModulo } from "./ip-core.js";
-import { MODULOS, CAPITULOS, avancePonderado, estadoFinanciero } from "./ip-modulos.js";
+import { iniciarPagina, pintarEncabezado, esc, numero, moneda, aplicarAnchos, hrefModulo, imgModulo } from "./ip-core.js";
+import { CAPITULOS } from "./ip-modulos.js";
+import { cargarDatosContrato, resumirContrato } from "./ip-resumen.js";
 
 const ctx = await iniciarPagina();
 if (ctx) iniciar(ctx);
@@ -11,26 +11,8 @@ if (ctx) iniciar(ctx);
 async function iniciar({ contrato }) {
   pintarEncabezado(`${imgModulo("inicio", "ip-h1-foto")} Inicio`, contrato);
 
-  // Todas las colecciones que necesitan las alertas, una sola lectura c/u.
-  const conAlertas = Object.values(MODULOS).filter((m) => m.alertas && !m.porCapitulo);
-  const colecciones = new Set(["personal", "actividades", "financiero", "garantias"]);
-  conAlertas.forEach((m) => { colecciones.add(m.coleccion); (m.necesita || []).forEach((c) => colecciones.add(c)); });
-  const datos = {};
-  await Promise.all([...colecciones].map(async (c) => {
-    const snap = await getDocs(collection(db, "ipContratos", contrato.id, c));
-    datos[c] = snap.docs.map((d) => ({ id: d.id, ...d.data() }));
-  }));
-
-  // ---------------------------------------------------------- tarjetas
-  const tecnico = avancePonderado(datos.actividades);
-  const ef = estadoFinanciero(contrato, datos.financiero);
-  const hoy = hoyISO();
-  const tiempo = contrato.fechaInicio && contrato.fechaFin
-    ? Math.max(0, Math.min(100, Math.round((diasEntre(contrato.fechaInicio, hoy) / (diasEntre(contrato.fechaInicio, contrato.fechaFin) || 1)) * 100)))
-    : 0;
-  const diasRestantes = contrato.fechaFin ? diasEntre(hoy, contrato.fechaFin) : null;
-  const activos = datos.personal.filter((p) => p.estado !== "Retirado" && (!p.fechaRetiro || p.fechaRetiro >= hoy)).length;
-  const garantiasMal = datos.garantias.filter((g) => MODULOS.garantias.validar(g).nivel !== "ok").length;
+  const datos = await cargarDatosContrato(contrato.id);
+  const { tecnico, ef, tiempo, diasRestantes, activos, garantiasMal, alertas: todas } = resumirContrato(contrato, datos);
 
   const barra = (pct, clase = "") => `<div class="ip-mini-pista"><div class="ip-mini-relleno ${clase}" data-ancho="${pct}"></div></div>`;
   const tile = (i, icon, valor, label, extra = "") => `
@@ -47,12 +29,6 @@ async function iniciar({ contrato }) {
   aplicarAnchos(cont);
 
   // ---------------------------------------------------------- alertas
-  const todas = [];
-  conAlertas.forEach((m) => {
-    const ctxM = { contrato, registros: datos[m.coleccion] || [], datos };
-    (m.alertas(ctxM) || []).forEach((a) => todas.push({ ...a, modulo: m }));
-  });
-  todas.sort((a, b) => (a.nivel === "danger" ? 0 : 1) - (b.nivel === "danger" ? 0 : 1));
   document.getElementById("inicioAlertas").innerHTML = `<h2>⚠️ Para revisar (${todas.length})</h2>` + (todas.length
     ? `<ul class="ip-alertas">${todas.map((a) => `<li class="ip-alerta-${a.nivel}"><a href="${hrefModulo(a.modulo.id)}">${esc(a.modulo.label)}</a> — ${esc(a.texto)}</li>`).join("")}</ul>`
     : `<p class="ip-sin-margen">✅ Todo al día: ningún módulo tiene alertas.</p>`)

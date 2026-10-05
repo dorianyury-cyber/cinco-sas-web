@@ -308,10 +308,13 @@ function pintarMenu({ user, perfil, esGestor, contratos, contrato }) {
   const abiertos = leerGrupos();
 
   aside.innerHTML = `
-    <a href="bienvenida.html" class="brand">
-      <img src="assets/logo.png" alt="CINCO S.A.S.">
-      <span>Interventoría PRO</span>
-    </a>
+    <div class="ip-sidebar-cabeza">
+      <a href="bienvenida.html" class="brand">
+        <img src="assets/logo.png" alt="CINCO S.A.S.">
+        <span>Interventoría PRO</span>
+      </a>
+      <button type="button" class="ip-menu-movil" id="ipMenuMovil" aria-expanded="false">☰ Menú</button>
+    </div>
     <div class="ip-selector-contrato">
       <label for="ipSelectorContrato">Contrato</label>
       <select id="ipSelectorContrato">
@@ -321,6 +324,8 @@ function pintarMenu({ user, perfil, esGestor, contratos, contrato }) {
     </div>
     <nav>
       ${enlace("inicio.html", "inicio", "Inicio")}
+      ${contratos.length ? enlace("tablero.html", "tablero", "Tablero de contratos") : ""}
+      ${contrato ? enlace("campo.html", "campo", "Registro en campo") : ""}
       ${enlace("contratos.html", "contratos", esGestor ? "Contratos" : "Mis contratos")}
       ${enlace("generalidades.html", "generalidades", "Generalidades")}
       ${contrato ? enlace("informe.html", "informe", "Informe mensual") : ""}
@@ -365,6 +370,15 @@ function pintarMenu({ user, perfil, esGestor, contratos, contrato }) {
     location.reload();
   });
   document.getElementById("logoutBtn").addEventListener("click", cerrarSesion);
+
+  // En el celular el menú arranca recogido detrás del botón "☰ Menú" para
+  // que el contenido de la página quede a la vista sin bajar.
+  const botonMovil = document.getElementById("ipMenuMovil");
+  botonMovil.addEventListener("click", () => {
+    const abierto = aside.classList.toggle("ip-menu-abierto");
+    botonMovil.setAttribute("aria-expanded", String(abierto));
+    botonMovil.textContent = abierto ? "✕ Cerrar" : "☰ Menú";
+  });
 }
 
 // Encabezado de cada página: título + franja con el contrato activo.

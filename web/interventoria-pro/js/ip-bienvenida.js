@@ -32,6 +32,8 @@ if (ctx) {
   }
   const tarjetas = [
     { href: "inicio.html", foto: "inicio", label: "Inicio", desc: "Resumen del contrato: avance, finanzas y alertas" },
+    { href: "campo.html", foto: "campo", label: "Registro en campo", desc: "Desde el celular en la obra: fotos, inspecciones y novedades, aun sin señal" },
+    { href: "tablero.html", foto: "tablero", label: "Tablero de contratos", desc: "Todos los contratos en una vista, con su semáforo y alertas" },
     { href: "contratos.html", foto: "contratos", label: esGestor ? "Contratos" : "Mis contratos", desc: esGestor ? "Crea contratos, su información básica y su equipo" : "Contratos en los que participas" },
     { href: "generalidades.html", foto: "generalidades", label: "Generalidades", desc: "Qué es el aplicativo, cómo se usa y qué controla cada módulo" },
     { href: "informe.html", foto: "informe", label: "Informe mensual", desc: "Elige el mes, marca las secciones y genera el informe en PDF o Word" },

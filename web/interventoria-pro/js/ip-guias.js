@@ -314,13 +314,15 @@ export const GENERALIDADES = {
   ],
   flujo: [
     ["Al iniciar el contrato", "Crea el contrato, define sus frentes y equipo, carga la lista de requisitos del acta de inicio y verifica cada requisito hasta el 100 %."],
-    ["Durante cada mes", "Registra en cada módulo lo ocurrido: personal y seguridad social, avance de actividades, actas y pagos, entregables, inspecciones, fotos y observaciones. Atiende las alertas de Inicio."],
+    ["Durante cada mes", "Registra en cada módulo lo ocurrido: personal y seguridad social, avance de actividades, actas y pagos, entregables, inspecciones, fotos y observaciones. Atiende las alertas de Inicio. Lo que ocurre en la obra (fotos, inspecciones, accidentes, novedades, charlas) se puede registrar desde el celular en Registro en campo."],
     ["Al cierre del mes", "En Informe mensual elige el mes, marca las secciones a incluir, revisa la vista previa y genera el PDF o el Word."],
     ["Al finalizar el contrato", "Verifica el recibo final, la vigencia de las garantías posteriores y el cierre de no conformidades, requerimientos y pendientes."]
   ],
   convenciones: [
     "Semáforo de validación: verde = al día, amarillo = pendiente o por vencer, rojo = vencido, rechazado o con observaciones.",
     "«Para revisar» agrupa las alertas de cada módulo; en Inicio aparecen todas las del contrato.",
+    "Tablero de contratos: muestra todos los contratos en una vista con su semáforo general — en riesgo (alertas rojas, plazo vencido o avance técnico más de 5 puntos atrás de lo programado), atención (solo alertas amarillas) o al día.",
+    "Registro en campo: lo registrado desde el celular se guarda primero en el teléfono y se sube solo cuando hay señal; mientras tanto aparece en «Pendientes por subir». Conviene abrir la página con señal antes de salir a la obra.",
     "Las fechas se muestran en formato día/mes/año y los valores en pesos colombianos.",
     "Cada módulo se puede exportar a Excel con todos sus campos e importar desde Excel con su plantilla (vista previa antes de guardar; en Personal y Actividades, la cédula o el ítem existentes se actualizan en vez de duplicarse)."
   ]

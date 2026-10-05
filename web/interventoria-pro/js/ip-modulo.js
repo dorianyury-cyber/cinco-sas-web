@@ -12,6 +12,7 @@ import { MODULOS, nombreCapitulo } from "./ip-modulos.js";
 import { GUIAS } from "./ip-guias.js";
 import { anotarEnLote, diferencias, identificar, refHistorial, fechaHora, ACCIONES } from "./ip-historial.js";
 import { configurarImportacion } from "./ip-importar.js";
+import { htmlCampo, leerFormulario, comprimir, frentesContrato } from "./ip-formulario.js";
 
 const params = new URLSearchParams(location.search);
 const mod = MODULOS[params.get("m")];
@@ -203,73 +204,14 @@ function iniciarModulo({ user, perfil, contrato, esGestor }) {
   buscarEl.addEventListener("input", pintar);
 
   // ---------------------------------------------------------- formulario
-  function frentesContrato() {
-    return String(contrato.frentes || "").split(/[\n,;]+/).map((x) => x.trim()).filter(Boolean);
-  }
-
-  function opcionesPersona(valor) {
-    const personas = [...(ctx.datos.personal || [])].sort((a, b) => String(a.nombre).localeCompare(String(b.nombre), "es"));
-    return `<option value="">— Elige —</option>` + personas.map((p) => `<option value="${p.id}" ${p.id === valor ? "selected" : ""}>${esc(p.nombre)}${p.estado === "Retirado" ? " (retirado)" : ""}</option>`).join("");
-  }
-
-  function htmlCampo(c, valor) {
-    const id = `f_${c.key}`;
-    const req = c.required ? "required" : "";
-    const v = valor ?? "";
-    let control;
-    switch (c.type) {
-      case "textarea": control = `<textarea id="${id}" rows="${c.filas || 3}" ${req} placeholder="${esc(c.placeholder || "")}">${esc(v)}</textarea>`; break;
-      case "select": {
-        const ops = c.opcionesObj || c.opciones.map((o) => ({ valor: o, texto: o }));
-        // Un valor guardado que ya no está en la lista (ej. una opción
-        // renombrada) se conserva para no perderlo al editar.
-        if (v && !ops.some((o) => o.valor === v)) ops.push({ valor: v, texto: v });
-        control = `<select id="${id}" ${req}><option value="">— Elige —</option>${ops.map((o) => `<option value="${esc(o.valor)}" ${o.valor === v ? "selected" : ""}>${esc(o.texto)}</option>`).join("")}</select>`;
-        break;
-      }
-      case "frente": {
-        // Proyectos / frentes del contrato (Información del contrato), más
-        // "General" para lo que aplica a todo el contrato.
-        const frentes = ["General", ...frentesContrato()];
-        if (v && !frentes.includes(v)) frentes.push(v);
-        control = `<select id="${id}" ${req}><option value="">— Elige —</option>${frentes.map((fr) => `<option value="${esc(fr)}" ${fr === v ? "selected" : ""}>${esc(fr)}</option>`).join("")}</select>`;
-        break;
-      }
-      case "persona":
-        control = (ctx.datos.personal || []).length
-          ? `<select id="${id}" ${req}>${opcionesPersona(v)}</select>`
-          : `<p class="text-muted ip-sin-margen">Primero registra el personal en <a href="modulo.html?m=personal">Listado de personal</a>.</p>`;
-        break;
-      case "money": control = `<input type="number" id="${id}" step="1" min="0" value="${esc(v)}" ${req} placeholder="0">`; break;
-      case "pct": control = `<input type="number" id="${id}" step="0.1" min="0" max="100" value="${esc(v)}" ${req}>`; break;
-      case "number": control = `<input type="number" id="${id}" step="any" value="${esc(v)}" ${req}>`; break;
-      case "date": control = `<input type="date" id="${id}" value="${esc(v)}" ${req}>`; break;
-      case "month": control = `<input type="month" id="${id}" value="${esc(v)}" ${req}>`; break;
-      case "url": control = `<input type="url" id="${id}" value="${esc(v)}" ${req} placeholder="https://…">`; break;
-      case "imagen":
-        control = `<input type="file" id="${id}" accept="image/*" ${req && !v ? "required" : ""}>
-          <img id="${id}_prev" class="ip-foto-prev ${v ? "" : "hidden"}" src="${esc(v)}" alt="">`;
-        break;
-      case "avance": {
-        const meses = mesesDelContrato(contrato);
-        control = `<div class="ip-avance-grid">${meses.map((ym) => `
-          <label class="ip-avance-mes"><span>${mesCorto(ym)}</span>
-            <input type="number" min="0" max="100" step="0.1" data-avance-mes="${ym}" value="${esc(v?.[ym] ?? "")}"></label>`).join("")}</div>`;
-        break;
-      }
-      default: control = `<input type="text" id="${id}" value="${esc(v)}" ${req} placeholder="${esc(c.placeholder || "")}">`;
-    }
-    return `<div class="ip-campo ${c.ancho || ["textarea", "avance", "imagen"].includes(c.type) ? "ip-campo-ancho" : ""}">
-      <label for="${id}">${esc(c.label)}${c.required ? " *" : ""}</label>${control}
-      ${c.ayuda ? `<p class="text-muted ip-ayuda">${esc(c.ayuda)}</p>` : ""}</div>`;
-  }
+  const frentesDelContrato = () => frentesContrato(contrato);
 
   function abrirFormulario(registro = null) {
     editandoId = registro?.id || null;
     archivoImagen = null;
     limpiarAlerta(formAlerta);
     document.getElementById("ipFormTitulo").textContent = registro ? `Editar — ${mod.label}` : `Nuevo — ${mod.label}`;
-    formCampos.innerHTML = mod.campos.map((c) => htmlCampo(c, registro ? registro[c.key] : (c.porDefecto ? c.porDefecto() : ""))).join("");
+    formCampos.innerHTML = mod.campos.map((c) => htmlCampo(c, registro ? registro[c.key] : (c.porDefecto ? c.porDefecto() : ""), { contrato, personal: ctx.datos.personal })).join("");
     eliminarBtn.classList.toggle("hidden", !registro || !esGestor);
     pintarHistorialRegistro(registro);
     const img = mod.campos.find((c) => c.type === "imagen");
@@ -302,49 +244,10 @@ function iniciarModulo({ user, perfil, contrato, esGestor }) {
     }
   }
 
-  function leerFormulario() {
-    const datos = {};
-    for (const c of mod.campos) {
-      if (c.type === "imagen") continue;
-      if (c.type === "avance") {
-        const mapa = {};
-        formCampos.querySelectorAll("[data-avance-mes]").forEach((inp) => {
-          if (inp.value !== "") mapa[inp.dataset.avanceMes] = Math.min(100, Math.max(0, Number(inp.value)));
-        });
-        datos[c.key] = mapa;
-        continue;
-      }
-      const el = document.getElementById(`f_${c.key}`);
-      if (!el) continue;
-      let v = el.value.trim();
-      if (["money", "number", "pct"].includes(c.type)) v = v === "" ? null : Number(v);
-      datos[c.key] = v;
-    }
-    return datos;
-  }
-
-  // Foto comprimida antes de subir (máx. 1600 px, JPEG 0.8): una foto de
-  // celular pesa varios MB y no hace falta para el informe.
-  function comprimir(file) {
-    return new Promise((resolve) => {
-      const img = new Image();
-      img.onload = () => {
-        const escala = Math.min(1, 1600 / Math.max(img.naturalWidth, img.naturalHeight));
-        const canvas = document.createElement("canvas");
-        canvas.width = Math.round(img.naturalWidth * escala);
-        canvas.height = Math.round(img.naturalHeight * escala);
-        canvas.getContext("2d").drawImage(img, 0, 0, canvas.width, canvas.height);
-        canvas.toBlob((b) => resolve(b || file), "image/jpeg", 0.8);
-      };
-      img.onerror = () => resolve(file);
-      img.src = URL.createObjectURL(file);
-    });
-  }
-
   form.addEventListener("submit", async (e) => {
     e.preventDefault();
     limpiarAlerta(formAlerta);
-    const datos = leerFormulario();
+    const datos = leerFormulario(mod.campos, formCampos);
     if (mod.porCapitulo && cap) datos[mod.porCapitulo] = cap;
     guardarBtn.disabled = true;
     guardarBtn.textContent = "Guardando...";
@@ -406,7 +309,7 @@ function iniciarModulo({ user, perfil, contrato, esGestor }) {
   document.getElementById("ipNuevoBtn").addEventListener("click", () => abrirFormulario());
 
   // Importación desde Excel (plantilla, vista previa y guardado con historial).
-  configurarImportacion({ mod, contrato, ctx, user, perfil, coleccionRef, cap, frentesContrato, titulo: tituloModulo });
+  configurarImportacion({ mod, contrato, ctx, user, perfil, coleccionRef, cap, frentesContrato: frentesDelContrato, titulo: tituloModulo });
 
   // ---------------------------------------------------------- plantilla
   // Módulos con lista base (ej. requisitos del acta de inicio): agrega de
@@ -416,7 +319,7 @@ function iniciarModulo({ user, perfil, contrato, esGestor }) {
     const btnPlantilla = document.getElementById("ipPlantillaBtn");
     btnPlantilla.classList.remove("hidden");
     // Los ítems marcados "*" se repiten por cada frente del contrato.
-    const listaBase = mod.expandir ? mod.expandir(mod.plantilla, frentesContrato()) : mod.plantilla;
+    const listaBase = mod.expandir ? mod.expandir(mod.plantilla, frentesDelContrato()) : mod.plantilla;
     btnPlantilla.textContent = `📋 Cargar lista base (${listaBase.length})`;
     btnPlantilla.addEventListener("click", async () => {
       const clave = mod.claveUnica;

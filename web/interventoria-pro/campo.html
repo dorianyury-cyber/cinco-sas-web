@@ -1,0 +1,47 @@
+<!doctype html>
+<html lang="es" class="ip-preparando">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<meta name="robots" content="noindex, nofollow">
+<title>Registro en campo — Interventoría PRO</title>
+<link rel="icon" type="image/png" sizes="32x32" href="../assets/img/favicon-32.png">
+<link rel="stylesheet" href="assets/ip.css">
+</head>
+<body>
+  <div class="app-shell">
+    <aside class="sidebar" id="sidebar"></aside>
+    <main class="main ip-campo-main">
+      <header id="ipHeader"></header>
+      <div class="card ip-campo-estado" id="cpEstado">
+        <span id="cpRed" class="ip-red"></span>
+        <span id="cpPendientes" class="ip-campo-pendientes"></span>
+        <button type="button" class="btn secondary hidden" id="cpSubirBtn">⬆ Subir ahora</button>
+      </div>
+      <p class="text-muted ip-descripcion">Registra desde la obra con el celular. Lo que guardes queda en este teléfono y se sube solo cuando haya señal; si se va la señal, no se pierde.</p>
+
+      <div id="cpTiles" class="ip-campo-tiles"></div>
+
+      <div class="card cinta cinta-1 hidden" id="cpFormCard">
+        <h2 id="cpFormTitulo">Nuevo registro</h2>
+        <form id="cpForm">
+          <div class="ip-form-grid" id="cpCampos"></div>
+          <div class="alert" id="cpAlerta"></div>
+          <div class="ip-form-acciones">
+            <button type="submit" class="btn" id="cpGuardarBtn">Guardar</button>
+            <button type="button" class="btn secondary" id="cpOtroBtn">Guardar y registrar otro</button>
+            <button type="button" class="btn secondary" id="cpCancelarBtn">Cancelar</button>
+          </div>
+        </form>
+      </div>
+
+      <div class="alert" id="cpMensaje"></div>
+      <div class="card cinta cinta-3" id="cpColaCard">
+        <h2>Pendientes por subir en este teléfono</h2>
+        <div id="cpCola"></div>
+      </div>
+    </main>
+  </div>
+  <script type="module" src="js/ip-campo.js"></script>
+</body>
+</html>
