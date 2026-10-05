@@ -326,7 +326,7 @@ function pintarMenu({ user, perfil, esGestor, contratos, contrato }) {
     <nav>
       <div class="nav-pilar nav-pilar-0">
         <div class="collapsible-toggle nav-group-toggle ip-pilar-toggle" data-target="ipGrupo-herramientas">
-          <span>🧰 Herramientas</span><span class="chevron">▾</span>
+          <span>${imgModulo("grupo-herramientas")}Herramientas</span><span class="chevron">▾</span>
         </div>
         <div class="nav-group-body" id="ipGrupo-herramientas">
         ${enlace("inicio.html", "inicio", "Inicio")}
@@ -341,7 +341,7 @@ function pintarMenu({ user, perfil, esGestor, contratos, contrato }) {
       </div>
       <div class="nav-pilar nav-pilar-1">
         <div class="collapsible-toggle nav-group-toggle ip-pilar-toggle" data-target="ipGrupo-capitulos">
-          <span>📚 Capítulos del informe</span><span class="chevron">▾</span>
+          <span>${imgModulo("grupo-capitulos")}Capítulos del informe</span><span class="chevron">▾</span>
         </div>
         <div class="nav-group-body" id="ipGrupo-capitulos">
       ${grupos.map((g, i) => `
