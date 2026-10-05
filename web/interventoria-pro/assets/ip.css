@@ -2383,3 +2383,17 @@ textarea { font-family: inherit; }
 .ip-btn-cuenta:hover { transform: translateY(-1px); filter: brightness(1.12); text-decoration: none; color: var(--fr-amber); }
 .ip-topbar-acciones .ip-btn-cuenta { width: 190px; }
 @media (max-width: 560px) { .ip-topbar-acciones { gap: 8px; } .ip-topbar-acciones .ip-btn-cuenta { width: auto; padding: 8px 10px; } }
+
+/* Visualizadores (ip-visor.js): ver antes de descargar o cargar */
+.modal.ip-visor-modal { max-width: 1100px; width: calc(100% - 32px); }
+.ip-visor-nota { font-size: 12.5px; margin: 0 0 10px; }
+.ip-visor-pestanas { display: flex; flex-wrap: wrap; gap: 6px; margin-bottom: 10px; }
+.ip-visor-pestanas button { width: auto; margin: 0; padding: 5px 12px; border: 1px solid var(--border); border-radius: 999px; background: var(--card-bg); color: var(--text); font: inherit; font-size: 12.5px; cursor: pointer; }
+.ip-visor-pestanas button.activa { background: #1f2732; border-color: #1f2732; color: #feb209; font-weight: 700; }
+.ip-visor-texto p { margin: 0 0 6px; font-size: 13px; }
+.ip-visor-tabla { max-height: 58vh; overflow: auto; border: 1px solid var(--border); border-radius: 8px; }
+.ip-visor-tabla table { table-layout: fixed; width: 100%; }
+.ip-visor-tabla th { position: sticky; top: 0; z-index: 1; background: var(--card-bg); }
+.ip-visor-tabla td, .ip-visor-tabla th { font-size: 12px; padding: 5px 8px; vertical-align: top; white-space: normal; overflow-wrap: break-word; word-break: normal; hyphens: none; }
+.ip-visor-existente td { color: var(--text-muted); background: rgba(0, 0, 0, 0.03); }
+.ip-visor-acciones { justify-content: center; }

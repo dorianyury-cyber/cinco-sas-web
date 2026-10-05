@@ -5,6 +5,7 @@
 // ip-resumen.js, igual que en Inicio.
 import { esc, numero, moneda, fecha, fechaCorta, aplicarAnchos, hrefModulo, fijarContratoActivo, hoyISO } from "./ip-core.js";
 import { cargarDatosContrato, resumirContrato } from "./ip-resumen.js";
+import { mostrarLibro } from "./ip-visor.js";
 
 const SEMAFORO = {
   riesgo: { icono: "🔴", texto: "En riesgo", badge: "danger" },
@@ -195,10 +196,6 @@ export async function montarTablero({ contratos, activo, esGestor, onEditar }) {
     ws.getRow(1).fill = { type: "pattern", pattern: "solid", fgColor: { argb: "FFD9820B" } };
     ws.getRow(1).alignment = { wrapText: true, vertical: "middle" };
     ws.eachRow((row, i) => { if (i > 1) row.alignment = { wrapText: true, vertical: "top" }; });
-    const buffer = await wb.xlsx.writeBuffer();
-    const a = document.createElement("a");
-    a.href = URL.createObjectURL(new Blob([buffer], { type: "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet" }));
-    a.download = `Contratos ${hoyISO()}.xlsx`;
-    a.click();
+    mostrarLibro(wb, `Contratos ${hoyISO()}.xlsx`, { titulo: "Vista previa — Contratos", nota: `${visibles().length} contrato(s) según el filtro actual.` });
   });
 }

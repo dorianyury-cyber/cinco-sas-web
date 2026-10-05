@@ -13,6 +13,7 @@ import { GUIAS } from "./ip-guias.js";
 import { anotarEnLote, diferencias, identificar, refHistorial, fechaHora, ACCIONES } from "./ip-historial.js";
 import { configurarImportacion } from "./ip-importar.js";
 import { htmlCampo, leerFormulario, comprimir, frentesContrato } from "./ip-formulario.js";
+import { mostrarLibro, mostrarTabla } from "./ip-visor.js";
 
 const params = new URLSearchParams(location.search);
 const mod = MODULOS[params.get("m")];
@@ -320,13 +321,27 @@ function iniciarModulo({ user, perfil, contrato, esGestor }) {
     btnPlantilla.classList.remove("hidden");
     // Los ítems marcados "*" se repiten por cada frente del contrato.
     const listaBase = mod.expandir ? mod.expandir(mod.plantilla, frentesDelContrato()) : mod.plantilla;
-    btnPlantilla.textContent = `📋 Cargar lista base (${listaBase.length})`;
+    btnPlantilla.textContent = `📋 Ver y cargar lista base (${listaBase.length})`;
     btnPlantilla.addEventListener("click", async () => {
       const clave = mod.claveUnica;
       const existentes = new Set(ctx.registros.map((r) => String(r[clave] || "").trim()));
       const nuevos = listaBase.filter((p) => !existentes.has(p[clave].trim()));
-      if (!nuevos.length) { alert("La lista base ya está completa en este contrato."); return; }
-      if (!confirm(`Se agregarán ${nuevos.length} requisito(s) de la lista base. Los que ya existen no se duplican. ¿Continuar?`)) return;
+      // Vista previa de toda la lista base: qué se agregaría y qué ya está.
+      const cols = ["categoria", "requisito", "proyecto", "responsable", "soporte"].filter((k) => listaBase.some((p) => p[k]));
+      const etiqueta = (k) => mod.campos.find((c) => c.key === k)?.label || { categoria: "Categoría", requisito: "Requisito", proyecto: "Proyecto / frente", responsable: "Responsable", soporte: "Soporte" }[k];
+      mostrarTabla({
+        titulo: `Lista base — ${tituloModulo}`,
+        nota: nuevos.length
+          ? `${listaBase.length} requisito(s) en la lista base: ${nuevos.length} se agregarían y ${listaBase.length - nuevos.length} ya están en el contrato (en gris; no se duplican). Después de cargarla puedes editar cada requisito o marcarlo «No aplica».`
+          : `Los ${listaBase.length} requisito(s) de la lista base ya están en este contrato.`,
+        columnas: ["", ...cols.map(etiqueta)],
+        filas: listaBase.map((p) => [existentes.has(p[clave].trim()) ? "Ya está" : "Nuevo", ...cols.map((k) => p[k] || "")]),
+        marcar: (f) => (f[0] === "Ya está" ? "ip-visor-existente" : ""),
+        accion: nuevos.length ? { texto: `Agregar ${nuevos.length} requisito(s)`, fn: () => cargarLista(nuevos) } : null
+      });
+    });
+    async function cargarLista(nuevos) {
+      const clave = mod.claveUnica;
       btnPlantilla.disabled = true;
       try {
         for (let i = 0; i < nuevos.length; i += 400) {
@@ -344,7 +359,7 @@ function iniciarModulo({ user, perfil, contrato, esGestor }) {
       } finally {
         btnPlantilla.disabled = false;
       }
-    });
+    }
   }
   document.getElementById("ipCancelarBtn").addEventListener("click", () => cerrarModal("ipModal"));
   document.getElementById("ipModal").addEventListener("click", (e) => { if (e.target.id === "ipModal") cerrarModal("ipModal"); });
@@ -382,10 +397,7 @@ function iniciarModulo({ user, perfil, contrato, esGestor }) {
       col.eachCell({ includeEmpty: false }, (cell) => { max = Math.max(max, String(cell.value ?? "").length); });
       col.width = Math.min(60, Math.max(8, max + 2));
     });
-    const buffer = await wb.xlsx.writeBuffer();
-    const a = document.createElement("a");
-    a.href = URL.createObjectURL(new Blob([buffer], { type: "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet" }));
-    a.download = `${mod.id}${cap ? "_" + cap : ""}_${(contrato.numero || "contrato").replace(/[^\w-]/g, "_")}.xlsx`;
-    a.click();
+    // Primero se ve en pantalla; desde ahí se descarga.
+    mostrarLibro(wb, `${mod.id}${cap ? "_" + cap : ""}_${(contrato.numero || "contrato").replace(/[^\w-]/g, "_")}.xlsx`, { titulo: `Vista previa — ${tituloModulo}`, nota: `${ctx.registros.length} registro(s) con todas las columnas del formulario.` });
   });
 }

@@ -3,6 +3,7 @@
 import { query, orderBy, limit, getDocs } from "https://www.gstatic.com/firebasejs/10.7.1/firebase-firestore.js";
 import { iniciarPagina, pintarEncabezado, esc, imgModulo, errorAmigable } from "./ip-core.js";
 import { refHistorial, ACCIONES, fechaHora } from "./ip-historial.js";
+import { mostrarLibro } from "./ip-visor.js";
 
 const ctx = await iniciarPagina();
 if (ctx) iniciar(ctx);
@@ -73,10 +74,6 @@ async function iniciar({ contrato }) {
     ws.getRow(1).fill = { type: "pattern", pattern: "solid", fgColor: { argb: "FF1F2732" } };
     ws.getColumn("c").alignment = { wrapText: true, vertical: "top" };
     ws.views = [{ state: "frozen", ySplit: 1 }];
-    const buf = await wb.xlsx.writeBuffer();
-    const a = document.createElement("a");
-    a.href = URL.createObjectURL(new Blob([buf], { type: "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet" }));
-    a.download = `Historial de cambios (Contrato ${String(contrato.numero || "").replace(/[\/:*?"<>|]/g, "-")}).xlsx`;
-    a.click();
+    mostrarLibro(wb, `Historial de cambios (Contrato ${String(contrato.numero || "").replace(/[\/:*?"<>|]/g, "-")}).xlsx`, { titulo: "Vista previa — Historial de cambios", nota: `${filtradas().length} cambio(s) según los filtros actuales.` });
   });
 }

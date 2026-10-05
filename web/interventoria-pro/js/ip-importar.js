@@ -16,6 +16,7 @@ import { doc, writeBatch, serverTimestamp } from "https://www.gstatic.com/fireba
 import { db, esc, mesCorto, mesesDelContrato, abrirModal, cerrarModal, mostrarAlerta, limpiarAlerta, errorAmigable } from "./ip-core.js";
 import { anotarEnLote, diferencias, identificar } from "./ip-historial.js";
 import { nombreCapitulo } from "./ip-modulos.js";
+import { mostrarLibro } from "./ip-visor.js";
 
 const sinTildes = (t) => String(t ?? "").normalize("NFD").replace(/[̀-ͯ]/g, "").toLowerCase().replace(/\s+/g, " ").trim();
 const cedulaNorm = (t) => String(t ?? "").replace(/[^\dA-Za-z]/g, "");
@@ -104,11 +105,8 @@ export async function descargarPlantilla({ mod, contrato, frentes, titulo }) {
     r.alignment = { wrapText: true, vertical: "top" };
   });
 
-  const buf = await wb.xlsx.writeBuffer();
-  const a = document.createElement("a");
-  a.href = URL.createObjectURL(new Blob([buf], { type: "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet" }));
-  a.download = `Plantilla ${titulo} (Contrato ${String(contrato.numero || "").replace(/[\/:*?"<>|]/g, "-")}).xlsx`;
-  a.click();
+  // Se ve primero: columnas, cuáles son obligatorias y las opciones válidas.
+  mostrarLibro(wb, `Plantilla ${titulo} (Contrato ${String(contrato.numero || "").replace(/[\/:*?"<>|]/g, "-")}).xlsx`, { titulo: `Plantilla de importación — ${titulo}`, nota: "La hoja «Datos» es la que se llena (una fila por registro); «Instrucciones» explica cada columna y sus opciones." });
 }
 
 // ------------------------------------------------------------ lectura y validación
