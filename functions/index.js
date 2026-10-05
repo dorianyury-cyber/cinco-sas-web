@@ -10,3 +10,5 @@ exports.enviarPQR = enviarPQR;
 exports.recibirStaffConecta = recibirStaffConecta;
 exports.emitirRadicadoInformeGestion = emitirRadicadoInformeGestion;
 exports.iniciarSesionConConecta = iniciarSesionConConecta;
+const { enviarAvisosInterventoriaPro } = require("./src/avisosInterventoriaPro");
+exports.enviarAvisosInterventoriaPro = enviarAvisosInterventoriaPro;

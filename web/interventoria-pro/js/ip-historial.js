@@ -10,7 +10,7 @@
 import { collection, doc, serverTimestamp } from "https://www.gstatic.com/firebasejs/10.7.1/firebase-firestore.js";
 import { db, moneda, fecha, mesLargo } from "./ip-core.js";
 
-export const ACCIONES = { crear: "Creó", editar: "Editó", eliminar: "Eliminó", lista: "Cargó lista base", contrato: "Editó el contrato" };
+export const ACCIONES = { crear: "Creó", editar: "Editó", eliminar: "Eliminó", lista: "Cargó lista base", contrato: "Editó el contrato", correo: "Envió avisos por correo" };
 
 export function refHistorial(contratoId) {
   return collection(db, "ipContratos", contratoId, "historial");

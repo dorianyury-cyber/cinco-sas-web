@@ -55,7 +55,8 @@ async function iniciar({ contrato }) {
   todas.sort((a, b) => (a.nivel === "danger" ? 0 : 1) - (b.nivel === "danger" ? 0 : 1));
   document.getElementById("inicioAlertas").innerHTML = `<h2>⚠️ Para revisar (${todas.length})</h2>` + (todas.length
     ? `<ul class="ip-alertas">${todas.map((a) => `<li class="ip-alerta-${a.nivel}"><a href="${hrefModulo(a.modulo.id)}">${esc(a.modulo.label)}</a> — ${esc(a.texto)}</li>`).join("")}</ul>`
-    : `<p class="ip-sin-margen">✅ Todo al día: ningún módulo tiene alertas.</p>`);
+    : `<p class="ip-sin-margen">✅ Todo al día: ningún módulo tiene alertas.</p>`)
+    + `<div class="ip-acciones-centro"><a class="btn secondary" href="avisos.html">📧 Avisar al gestor por correo</a></div>`;
 
   // ---------------------------------------------------------- capítulos
   document.getElementById("inicioCapitulos").innerHTML = `<h2>📚 Capítulos del informe</h2><div class="ip-capitulos">${CAPITULOS.map((c) => {

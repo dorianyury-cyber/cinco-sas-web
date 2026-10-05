@@ -1,0 +1,51 @@
+<!doctype html>
+<html lang="es" class="ip-preparando">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<meta name="robots" content="noindex, nofollow">
+<title>Avisos por correo — Interventoría PRO</title>
+<link rel="icon" type="image/png" sizes="32x32" href="../assets/img/favicon-32.png">
+<link rel="stylesheet" href="assets/ip.css">
+</head>
+<body>
+  <div class="app-shell">
+    <aside class="sidebar" id="sidebar"></aside>
+    <main class="main">
+      <header id="ipHeader"></header>
+      <p class="text-muted ip-descripcion">El aplicativo revisa lo vencido o por vencer del contrato. La interventoría decide qué avisos enviar al gestor de Interventoría PRO y con qué nota: nada se envía de forma automática.</p>
+      <div class="alert" id="avAlerta"></div>
+      <div class="cards-row ip-avisos-fila">
+        <div class="card cinta cinta-1">
+          <h2>1. Avisos a incluir</h2>
+          <div class="ip-avisos-acciones">
+            <button type="button" class="btn secondary" id="avMarcarTodos">Marcar todos</button>
+            <button type="button" class="btn secondary" id="avMarcarVencidos">Solo vencidos</button>
+            <button type="button" class="btn secondary" id="avDesmarcar">Desmarcar</button>
+            <button type="button" class="btn secondary" id="avRecalcular">↻ Recalcular</button>
+          </div>
+          <div id="avAvisos"><p class="text-muted ip-sin-margen">Revisando el contrato…</p></div>
+        </div>
+        <div class="card cinta cinta-0">
+          <h2>2. Destinatarios</h2>
+          <p class="text-muted ip-ayuda">Gestores de Interventoría PRO:</p>
+          <div id="avGestores" class="ip-avisos-equipo"></div>
+          <p class="text-muted ip-ayuda">Equipo del contrato (opcional):</p>
+          <div id="avEquipo" class="ip-avisos-equipo"></div>
+          <h2 class="ip-avisos-sub">3. Nota de la interventoría (opcional)</h2>
+          <textarea id="avNota" rows="4" maxlength="2000" placeholder="Ej. Les solicitamos atender estos pendientes antes del próximo comité de obra."></textarea>
+          <p class="ip-avisos-resumen" id="avResumen"></p>
+          <div class="ip-acciones-centro">
+            <button type="button" class="btn" id="avEnviar">📧 Enviar correo</button>
+          </div>
+        </div>
+      </div>
+      <div class="card cinta cinta-3">
+        <h2>Envíos anteriores</h2>
+        <div id="avEnvios"><p class="text-muted ip-sin-margen">Cargando…</p></div>
+      </div>
+    </main>
+  </div>
+  <script type="module" src="js/ip-avisos.js"></script>
+</body>
+</html>
