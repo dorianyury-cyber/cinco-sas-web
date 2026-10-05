@@ -54,4 +54,20 @@ if (ctx) {
   };
   document.getElementById("bienvenidaHerramientas").innerHTML = herramientas.map(tarjeta).join("");
   document.getElementById("bienvenidaCapitulos").innerHTML = capitulos.map(tarjeta).join("");
+  document.getElementById("cuentaHerramientas").textContent = `${herramientas.length} herramientas`;
+  document.getElementById("cuentaCapitulos").textContent = `${capitulos.length} capítulos`;
+
+  // Solo se ven las dos tarjetas de grupo; al tocar una se despliegan sus
+  // opciones debajo (y se pliega la otra, para no alargar la página).
+  const grupos = { herramientas: "grupoHerramientas", capitulos: "grupoCapitulos" };
+  document.querySelectorAll(".ip-bienv-grupo-btn").forEach((btn) => btn.addEventListener("click", () => {
+    const abrir = btn.getAttribute("aria-expanded") !== "true";
+    document.querySelectorAll(".ip-bienv-grupo-btn").forEach((b) => {
+      const activo = abrir && b === btn;
+      b.setAttribute("aria-expanded", String(activo));
+      b.classList.toggle("abierto", activo);
+      document.getElementById(grupos[b.dataset.grupo]).classList.toggle("hidden", !activo);
+    });
+    if (abrir) document.getElementById(grupos[btn.dataset.grupo]).scrollIntoView({ behavior: "smooth", block: "nearest" });
+  }));
 }

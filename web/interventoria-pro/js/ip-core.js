@@ -301,7 +301,8 @@ function pintarMenu({ user, perfil, esGestor, contratos, contrato }) {
     return { cap, items, contieneActivo };
   });
 
-  // Los capítulos arrancan plegados (pedido del usuario): solo quedan
+  // Los dos grupos (Herramientas / Capítulos del informe) y cada capítulo
+  // arrancan plegados (pedido del usuario): solo quedan
   // abiertos los que la persona abrió a mano durante esta visita. Al
   // entrar de nuevo al aplicativo (bienvenida o ingreso) se olvidan — ver
   // reiniciarMenu().
@@ -324,7 +325,10 @@ function pintarMenu({ user, perfil, esGestor, contratos, contrato }) {
     </div>
     <nav>
       <div class="nav-pilar nav-pilar-0">
-        <div class="nav-pilar-titulo">Herramientas</div>
+        <div class="collapsible-toggle nav-group-toggle ip-pilar-toggle" data-target="ipGrupo-herramientas">
+          <span>🧰 Herramientas</span><span class="chevron">▾</span>
+        </div>
+        <div class="nav-group-body" id="ipGrupo-herramientas">
         ${enlace("inicio.html", "inicio", "Inicio")}
         ${contrato ? enlace("campo.html", "campo", "Registro en campo") : ""}
         ${contratos.length ? enlace("tablero.html", "tablero", "Tablero de contratos") : ""}
@@ -333,9 +337,13 @@ function pintarMenu({ user, perfil, esGestor, contratos, contrato }) {
         ${contrato ? enlace("historial.html", "historial", "Historial de cambios") : ""}
         ${contrato ? enlace("avisos.html", "avisos", "Avisos por correo") : ""}
         ${enlace("generalidades.html", "generalidades", "Generalidades")}
+        </div>
       </div>
       <div class="nav-pilar nav-pilar-1">
-        <div class="nav-pilar-titulo">Capítulos del informe mensual</div>
+        <div class="collapsible-toggle nav-group-toggle ip-pilar-toggle" data-target="ipGrupo-capitulos">
+          <span>📚 Capítulos del informe</span><span class="chevron">▾</span>
+        </div>
+        <div class="nav-group-body" id="ipGrupo-capitulos">
       ${grupos.map((g, i) => `
         <div class="nav-group ip-nav-cap ip-nav-cap-${i % 4}">
           <div class="collapsible-toggle nav-group-toggle" data-target="ipGrupo-${g.cap.id}">
@@ -344,6 +352,7 @@ function pintarMenu({ user, perfil, esGestor, contratos, contrato }) {
           </div>
           <div class="nav-group-body" id="ipGrupo-${g.cap.id}">${g.items}</div>
         </div>`).join("")}
+        </div>
       </div>
     </nav>
     <div class="spacer"></div>

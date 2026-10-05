@@ -2265,3 +2265,31 @@ textarea { font-family: inherit; }
 .ip-bienv-grupo .bienvenida-modulos { margin-top: 14px; }
 .sidebar .nav-pilar { padding-bottom: 2px; }
 .sidebar .nav-pilar-titulo { padding-bottom: 4px; }
+
+/* Grupos plegables del menú lateral: Herramientas / Capítulos del informe */
+.sidebar .nav-pilar { margin: 8px 0; }
+.sidebar .ip-pilar-toggle { display: flex; align-items: center; justify-content: space-between; padding: 9px 10px; border-radius: 8px; font-size: calc(var(--font-scale) * 12px); font-weight: 800; letter-spacing: 0.6px; color: var(--pilar-texto); cursor: pointer; }
+.sidebar .ip-pilar-toggle:hover { color: var(--pilar-texto); background: var(--sidebar-hover); }
+.sidebar .ip-pilar-toggle .chevron { color: var(--pilar-texto); }
+.sidebar #ipGrupo-capitulos .nav-group-toggle:not(.ip-pilar-toggle) { padding-left: 10px; }
+
+/* Bienvenida: solo dos tarjetas de grupo; al tocarlas se despliegan */
+.ip-bienv-grupos { display: grid; grid-template-columns: 1fr 1fr; gap: 18px; margin-top: 26px; }
+@media (max-width: 760px) { .ip-bienv-grupos { grid-template-columns: 1fr; } }
+.ip-bienv-grupo-btn { display: flex; align-items: center; gap: 18px; padding: 22px; border: 1px solid var(--border); border-left: 5px solid #1f5fbf; border-radius: var(--radius); background: var(--card-bg); color: var(--text); box-shadow: var(--shadow); font: inherit; text-align: left; cursor: pointer; transition: transform 0.1s ease, box-shadow 0.15s ease; }
+.ip-bienv-grupo-btn.ip-bienv-grupo-1 { border-left-color: #1e9e57; }
+.ip-bienv-grupo-btn:hover { transform: translateY(-2px); }
+.ip-bienv-grupo-btn.abierto { box-shadow: 0 0 0 2px #1f5fbf, var(--shadow); }
+.ip-bienv-grupo-btn.ip-bienv-grupo-1.abierto { box-shadow: 0 0 0 2px #1e9e57, var(--shadow); }
+.ip-bienv-grupo-btn img { width: 76px; height: 76px; border-radius: 50%; object-fit: cover; flex-shrink: 0; }
+.ip-bienv-grupo-texto { display: flex; flex-direction: column; gap: 4px; flex: 1; }
+.ip-bienv-grupo-texto strong { font-size: 18px; color: #1f5fbf; }
+.ip-bienv-grupo-1 .ip-bienv-grupo-texto strong { color: #1e9e57; }
+:root[data-theme="dark"] .ip-bienv-grupo-texto strong { color: #7fa8f0; }
+:root[data-theme="dark"] .ip-bienv-grupo-1 .ip-bienv-grupo-texto strong { color: #5fd08f; }
+.ip-bienv-grupo-texto .text-muted { font-size: 13px; }
+.ip-bienv-grupo-cuenta { font-size: 12px; font-weight: 700; color: var(--text-muted); }
+.ip-bienv-grupo-btn .chevron { font-size: 18px; color: var(--text-muted); transition: transform 0.2s ease; }
+.ip-bienv-grupo-btn.abierto .chevron { transform: rotate(180deg); }
+.ip-bienv-grupos + .ip-bienv-grupo, .ip-bienv-grupo + .ip-bienv-grupo { margin-top: 18px; }
+.ip-bienv-grupo .bienvenida-modulos { margin-top: 0; }
