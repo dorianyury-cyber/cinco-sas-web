@@ -1,9 +1,9 @@
-// Tablero de contratos: todos los contratos visibles para la persona (el
-// gestor ve todos; el equipo, los suyos) en una tabla de una línea por
-// contrato con su semáforo, y abajo el detalle del seleccionado (la fila 1
-// por defecto). El estado de cada contrato se calcula con ip-resumen.js,
-// igual que en Inicio.
-import { iniciarPagina, pintarEncabezado, esc, numero, moneda, fechaCorta, aplicarAnchos, hrefModulo, imgModulo, fijarContratoActivo, hoyISO } from "./ip-core.js";
+// Vista de todos los contratos dentro de la página Contratos: tarjetas de
+// resumen, una tabla de una línea por contrato con su semáforo, y abajo la
+// ficha completa del seleccionado (la fila 1 por defecto, o el contrato
+// activo) con sus alertas. El estado de cada contrato se calcula con
+// ip-resumen.js, igual que en Inicio.
+import { esc, numero, moneda, fecha, fechaCorta, aplicarAnchos, hrefModulo, fijarContratoActivo, hoyISO } from "./ip-core.js";
 import { cargarDatosContrato, resumirContrato } from "./ip-resumen.js";
 
 const SEMAFORO = {
@@ -13,11 +13,7 @@ const SEMAFORO = {
 };
 const INACTIVOS = ["Terminado", "Liquidado"];
 
-const ctx = await iniciarPagina({ requiereContrato: false });
-if (ctx) iniciar(ctx);
-
-async function iniciar({ contratos, contrato: activo }) {
-  pintarEncabezado(`${imgModulo("tablero", "ip-h1-foto")} Tablero de contratos`, null);
+export async function montarTablero({ contratos, activo, esGestor, onEditar }) {
   const tarjetasEl = document.getElementById("tbTarjetas");
   const listaEl = document.getElementById("tbLista");
   const detalleEl = document.getElementById("tbDetalle");
@@ -26,7 +22,7 @@ async function iniciar({ contratos, contrato: activo }) {
   const contadorEl = document.getElementById("tbContador");
 
   if (!contratos.length) {
-    tarjetasEl.innerHTML = `<div class="card"><p class="text-muted ip-sin-margen">No tienes contratos todavía. <a href="contratos.html">Ir a Contratos</a>.</p></div>`;
+    tarjetasEl.innerHTML = `<div class="card"><p class="text-muted ip-sin-margen">${esGestor ? "Todavía no hay contratos. Usa «+ Nuevo contrato» para crear el primero." : "No estás asignado a ningún contrato. Pídele al gestor de Interventoría PRO que te agregue al equipo."}</p></div>`;
     return;
   }
 
@@ -50,8 +46,10 @@ async function iniciar({ contratos, contrato: activo }) {
   const orden = { riesgo: 0, atencion: 1, ok: 2 };
   filas.sort((a, b) => (orden[a.r?.semaforo] ?? 3) - (orden[b.r?.semaforo] ?? 3) || String(a.c.numero || "").localeCompare(String(b.c.numero || ""), "es", { numeric: true }));
 
-  let seleccionado = null;
+  let seleccionado = activo?.id || null;
   const esActivo = (c) => !INACTIVOS.includes(c.estado);
+  // Si el contrato en uso está terminado, se muestran todos para no ocultarlo.
+  if (activo && !esActivo(activo)) soloActivosEl.checked = false;
 
   function visibles() {
     return filas.filter((f) => (!soloActivosEl.checked || esActivo(f.c)) && (!filtroEl.value || f.r?.semaforo === filtroEl.value));
@@ -91,11 +89,12 @@ async function iniciar({ contratos, contrato: activo }) {
       <thead><tr><th>Estado</th><th>Contrato</th><th>Contratante · objeto</th><th>Faltan</th><th>Tiempo</th><th>Avance técnico</th><th>Financiero</th><th>Alertas</th></tr></thead>
       <tbody>${rows.map(({ c, r, error }) => {
         const sel = c.id === seleccionado ? " ip-fila-activa" : "";
-        if (error) return `<tr class="ip-fila${sel}" data-id="${c.id}"><td><span class="badge danger">Error</span></td><td><strong>${esc(c.numero || "-")}</strong></td><td colspan="6">No se pudo leer este contrato.</td></tr>`;
+        const enUso = activo?.id === c.id ? ' <span class="ip-en-uso" title="Contrato en uso">●</span>' : "";
+        if (error) return `<tr class="ip-fila${sel}" data-id="${c.id}"><td><span class="badge danger">Error</span></td><td><strong>${esc(c.numero || "-")}</strong>${enUso}</td><td colspan="6">No se pudo leer este contrato.</td></tr>`;
         const s = SEMAFORO[r.semaforo];
         return `<tr class="ip-fila${sel}" data-id="${c.id}">
           <td><span class="badge ${s.badge}">${s.icono} ${s.texto}</span></td>
-          <td><strong>${esc(c.numero || "-")}</strong></td>
+          <td><strong>${esc(c.numero || "-")}</strong>${enUso}</td>
           <td title="${esc(`${c.contratante || ""} · ${c.objeto || ""}`)}">${esc(c.contratante || "-")}<span class="text-muted"> · ${esc(c.objeto || "")}</span></td>
           <td class="${r.plazoVencido ? "ip-texto-rojo" : ""}" title="${r.plazoVencido ? "Plazo vencido" : "Días para terminar"}">${textoPlazo(r)}</td>
           <td><div class="ip-celda-barra"><span>${r.tiempo}%</span>${barra(r.tiempo)}</div></td>
@@ -113,32 +112,43 @@ async function iniciar({ contratos, contrato: activo }) {
     pintarDetalle();
   }
 
-  // Detalle compacto "Etiqueta: valor" + todas las alertas del contrato.
+  // Ficha completa "Etiqueta: valor" + alertas del contrato seleccionado.
   function pintarDetalle() {
     const f = filas.find((x) => x.c.id === seleccionado);
     if (!f) { detalleEl.innerHTML = ""; return; }
     const { c, r } = f;
     const dato = (k, v) => `<div class="ip-dato"><span>${k}:</span> <strong>${v || "-"}</strong></div>`;
+    const frentes = String(c.frentes || "").split(/[\n,;]+/).map((x) => x.trim()).filter(Boolean).join(" · ");
     detalleEl.innerHTML = `<div class="cards-row ip-tablero-detalle">
       <div class="card cinta cinta-0">
-        <h2>📁 Contrato ${esc(c.numero || "")}</h2>
+        <h2>🗂️ Contrato ${esc(c.numero || "")}${activo?.id === c.id ? ' <span class="badge ok">En uso</span>' : ""}</h2>
+        <p class="ip-dato-objeto"><strong>Objeto:</strong> ${esc(c.objeto || "-")}</p>
         <div class="ip-datos">
           ${dato("Contratante", esc(c.contratante))}
-          ${dato("Tipo", esc(c.tipo || "Servicios"))}
+          ${dato("Contratista / proveedor", esc(c.contratista))}
+          ${dato("Tipo de interventoría", esc(c.tipo || "Servicios"))}
           ${dato("Estado", esc(c.estado || "Activo"))}
+          ${dato("Municipio", esc(c.municipio))}
+          ${dato("Proyectos / frentes", esc(frentes))}
+          ${dato("Supervisor", esc(c.supervisor))}
           ${dato("Director / interventor", esc(c.director))}
-          ${dato("Inicio", fechaCorta(c.fechaInicio))}
-          ${dato("Terminación", fechaCorta(c.fechaFin))}
-          ${dato("Valor", c.valorInicial ? moneda(r ? r.ef.valorTotal : c.valorInicial) : "-")}
+          ${dato("Valor inicial", c.valorInicial ? moneda(c.valorInicial) : "-")}
+          ${dato("Anticipo", c.anticipoPct ? `${numero(c.anticipoPct, 1)}%` : "-")}
+          ${dato("Inicio", fecha(c.fechaInicio))}
+          ${dato("Terminación", fecha(c.fechaFin))}
+          ${dato("Plazo", esc(c.plazo))}
+          ${dato("SMMLV vigente", c.smmlv ? moneda(c.smmlv) : '<span class="text-muted">Sin registrar</span>')}
+          ${r ? dato("Tiempo transcurrido", `${r.tiempo}%`) : ""}
           ${r ? dato("Ejecutado", `${moneda(r.ef.ejecutado)} (${numero(r.ef.pct, 1)}%)`) : ""}
           ${r ? dato("Avance técnico", `${numero(r.tecnico.real, 1)}% de ${numero(r.tecnico.programado, 1)}% programado`) : ""}
           ${r ? dato("Personal activo", r.activos) : ""}
+          ${dato("Equipo", `${(c.miembros || []).length} persona(s)`)}
         </div>
-        <p class="text-muted ip-dato-objeto">${esc(c.objeto || "")}</p>
         <div class="ip-acciones-centro">
-          <button type="button" class="btn" data-abrir="inicio.html">Abrir contrato</button>
+          <button type="button" class="btn" data-abrir="inicio.html">${activo?.id === c.id ? "Ir al contrato" : "Usar este contrato"}</button>
           <button type="button" class="btn secondary" data-abrir="informe.html">Informe mensual</button>
           <button type="button" class="btn secondary" data-abrir="avisos.html">📧 Avisos</button>
+          ${esGestor ? '<button type="button" class="btn secondary" id="tbEditarBtn">✏️ Editar</button>' : ""}
         </div>
       </div>
       <div class="card cinta cinta-1">
@@ -148,15 +158,15 @@ async function iniciar({ contratos, contrato: activo }) {
           : '<p class="ip-sin-margen">✅ Todo al día: ningún módulo tiene alertas.</p>'}
       </div>
     </div>`;
-    // Ir a cualquier página de ese contrato lo deja como contrato activo.
+    // Ir a cualquier página de ese contrato lo deja como contrato en uso.
     detalleEl.querySelectorAll("[data-abrir]").forEach((b) => b.addEventListener("click", () => { fijarContratoActivo(c.id); location.href = b.dataset.abrir; }));
     detalleEl.querySelectorAll("a[data-modulo]").forEach((a) => a.addEventListener("click", () => fijarContratoActivo(c.id)));
+    document.getElementById("tbEditarBtn")?.addEventListener("click", () => onEditar(c));
   }
 
   function pintarTodo() { pintarTarjetas(); pintarLista(); }
   filtroEl.addEventListener("change", pintarLista);
   soloActivosEl.addEventListener("change", pintarTodo);
-  if (activo) seleccionado = activo.id;
   pintarTodo();
 
   // ---------------------------------------------------------- Excel
@@ -164,7 +174,7 @@ async function iniciar({ contratos, contrato: activo }) {
     const ExcelJS = window.ExcelJS;
     if (!ExcelJS) { alert("No se pudo cargar el generador de Excel."); return; }
     const wb = new ExcelJS.Workbook();
-    const ws = wb.addWorksheet("Tablero");
+    const ws = wb.addWorksheet("Contratos");
     // Anchos según el contenido esperado de cada columna.
     ws.columns = [
       { header: "Estado", key: "estado", width: 12 }, { header: "Contrato", key: "numero", width: 14 },
@@ -188,7 +198,7 @@ async function iniciar({ contratos, contrato: activo }) {
     const buffer = await wb.xlsx.writeBuffer();
     const a = document.createElement("a");
     a.href = URL.createObjectURL(new Blob([buffer], { type: "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet" }));
-    a.download = `Tablero de contratos ${hoyISO()}.xlsx`;
+    a.download = `Contratos ${hoyISO()}.xlsx`;
     a.click();
   });
 }

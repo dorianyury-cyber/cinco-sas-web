@@ -331,7 +331,6 @@ function pintarMenu({ user, perfil, esGestor, contratos, contrato }) {
         <div class="nav-group-body" id="ipGrupo-herramientas">
         ${enlace("inicio.html", "inicio", "Inicio")}
         ${contrato ? enlace("campo.html", "campo", "Registro en campo") : ""}
-        ${contratos.length ? enlace("tablero.html", "tablero", "Tablero de contratos") : ""}
         ${contrato ? enlace("informe.html", "informe", "Informe mensual") : ""}
         ${enlace("contratos.html", "contratos", esGestor ? "Contratos" : "Mis contratos")}
         ${contrato ? enlace("historial.html", "historial", "Historial de cambios") : ""}

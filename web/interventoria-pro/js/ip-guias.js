@@ -321,7 +321,7 @@ export const GENERALIDADES = {
   convenciones: [
     "Semáforo de validación: verde = al día, amarillo = pendiente o por vencer, rojo = vencido, rechazado o con observaciones.",
     "«Para revisar» agrupa las alertas de cada módulo; en Inicio aparecen todas las del contrato.",
-    "Tablero de contratos: muestra todos los contratos en una vista con su semáforo general — en riesgo (alertas rojas, plazo vencido o avance técnico más de 5 puntos atrás de lo programado), atención (solo alertas amarillas) o al día.",
+    "Contratos: muestra todos los contratos en una vista con su semáforo general — en riesgo (alertas rojas, plazo vencido o avance técnico más de 5 puntos atrás de lo programado), atención (solo alertas amarillas) o al día.",
     "Registro en campo: lo registrado desde el celular se guarda primero en el teléfono y se sube solo cuando hay señal; mientras tanto aparece en «Pendientes por subir». Conviene abrir la página con señal antes de salir a la obra.",
     "Las fechas se muestran en formato día/mes/año y los valores en pesos colombianos.",
     "Cada módulo se puede exportar a Excel con todos sus campos e importar desde Excel con su plantilla (vista previa antes de guardar; en Personal y Actividades, la cédula o el ítem existentes se actualizan en vez de duplicarse)."

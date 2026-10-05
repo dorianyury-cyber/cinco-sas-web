@@ -1,9 +1,12 @@
-// Contratos de Interventoría PRO: información básica de cada contrato
-// (numeral "Información Básica del Contrato" del informe) y su equipo.
+// Contratos de Interventoría PRO: en una sola página, el estado de todos
+// los contratos (semáforo, avance, alertas — antes "Tablero de contratos"),
+// la información básica de cada uno (numeral "Información Básica del
+// Contrato" del informe) y su equipo.
 // El gestor crea/edita contratos y define quién del personal de Cinco
 // S.A.S. trabaja en cada uno; los miembros solo ven los suyos.
 import { collection, addDoc, updateDoc, deleteDoc, doc, getDocs, serverTimestamp, writeBatch } from "https://www.gstatic.com/firebasejs/10.7.1/firebase-firestore.js";
 import { anotarEnLote, diferencias } from "./ip-historial.js";
+import { montarTablero } from "./ip-tablero.js";
 import {
   db, iniciarPagina, pintarEncabezado, esc, moneda, numero, fecha, fechaCorta, mostrarAlerta, limpiarAlerta, errorAmigable,
   fijarContratoActivo, abrirModal, cerrarModal, diasEntre, hoyISO, imgModulo
@@ -13,8 +16,7 @@ const ctx = await iniciarPagina({ requiereContrato: false });
 if (ctx) iniciar(ctx);
 
 async function iniciar({ user, perfil, esGestor, contratos, contrato }) {
-  pintarEncabezado(`${imgModulo("contratos", "ip-h1-foto")} ${esGestor ? "Contratos" : "Mis contratos"}`, contrato);
-  const lista = document.getElementById("contratosLista");
+  pintarEncabezado(`${imgModulo("contratos", "ip-h1-foto")} ${esGestor ? "Contratos" : "Mis contratos"}`, null);
   const form = document.getElementById("contratoForm");
   const alerta = document.getElementById("contratoAlerta");
   const miembrosEl = document.getElementById("c_miembros");
@@ -30,66 +32,6 @@ async function iniciar({ user, perfil, esGestor, contratos, contrato }) {
     empleados = snap.docs.map((d) => ({ email: d.id, ...d.data() }))
       .filter((e) => e.estado === "activo")
       .sort((a, b) => String(a.nombre || a.email).localeCompare(String(b.nombre || b.email), "es"));
-  }
-
-  // ---------------------------------------------------------- ficha del contrato activo
-  function pintarFicha() {
-    const el = document.getElementById("ipFicha");
-    if (!contrato) { el.innerHTML = ""; return; }
-    const c = contrato;
-    const transcurrido = c.fechaInicio && c.fechaFin
-      ? Math.max(0, Math.min(100, Math.round((diasEntre(c.fechaInicio, hoyISO()) / (diasEntre(c.fechaInicio, c.fechaFin) || 1)) * 100)))
-      : null;
-    const fila = (k, v) => `<tr><th>${k}</th><td>${v || "-"}</td></tr>`;
-    el.innerHTML = `<div class="card cinta cinta-0">
-      <h2>🗂️ Información básica del contrato activo</h2>
-      <table class="tabla-compacta ip-tabla-ficha"><tbody>
-        ${fila("Contrato N.º", esc(c.numero))}
-        ${fila("Objeto", esc(c.objeto))}
-        ${fila("Contratante", esc(c.contratante))}
-        ${fila("Tipo de interventoría", esc(c.tipo || "Servicios"))}
-        ${fila("Contratista / proveedor", esc(c.contratista))}
-        ${fila("Municipio", esc(c.municipio))}
-        ${fila("Proyectos / frentes", esc(String(c.frentes || "").split(/[\n,;]+/).map((x) => x.trim()).filter(Boolean).join(" · ")))}
-        ${fila("Supervisor", esc(c.supervisor))}
-        ${fila("Director / interventor", esc(c.director))}
-        ${fila("Valor inicial", c.valorInicial ? moneda(c.valorInicial) : "-")}
-        ${fila("Anticipo", c.anticipoPct ? `${numero(c.anticipoPct, 1)}%` : "-")}
-        ${fila("Fecha de inicio", fecha(c.fechaInicio))}
-        ${fila("Fecha de terminación", fecha(c.fechaFin))}
-        ${fila("Plazo", esc(c.plazo))}
-        ${fila("Tiempo transcurrido", transcurrido == null ? "-" : `${transcurrido}%`)}
-        ${fila("SMMLV vigente", c.smmlv ? moneda(c.smmlv) : "<span class=\"text-muted\">Sin registrar</span>")}
-        ${fila("Estado", esc(c.estado || "Activo"))}
-        ${fila("Equipo", `${(c.miembros || []).length} persona(s)`)}
-      </tbody></table>
-      ${esGestor ? `<div class="ip-acciones-centro"><button type="button" class="btn secondary ip-btn-auto" id="editarActivoBtn">✏️ Editar información del contrato</button></div>` : ""}
-    </div>`;
-    document.getElementById("editarActivoBtn")?.addEventListener("click", () => abrirFormulario(contrato));
-  }
-
-  // ---------------------------------------------------------- lista
-  function pintarLista() {
-    document.getElementById("contratosContador").textContent = `${contratos.length} contrato(s)`;
-    if (!contratos.length) {
-      lista.innerHTML = `<div class="card"><p class="text-muted ip-sin-margen">${esGestor ? "Todavía no hay contratos. Usa «+ Nuevo contrato» para crear el primero." : "No estás asignado a ningún contrato. Pídele al gestor de Interventoría PRO que te agregue al equipo."}</p></div>`;
-      return;
-    }
-    lista.innerHTML = `<div class="card ip-tabla-card"><div class="tabla-scroll"><table class="tabla-densa ip-tabla">
-      <colgroup><col class="ip-w10"><col class="ip-w18"><col class="ip-w26"><col class="ip-w10"><col class="ip-w10"><col class="ip-w8"><col class="ip-w18"></colgroup>
-      <thead><tr><th>Contrato</th><th>Contratante</th><th>Objeto</th><th>Inicio</th><th>Terminación</th><th>Estado</th><th></th></tr></thead>
-      <tbody>${contratos.map((c) => `<tr class="${contrato?.id === c.id ? "ip-fila-activa" : ""}">
-        <td><strong>${esc(c.numero || "-")}</strong></td><td>${esc(c.contratante || "-")}</td><td>${esc(c.objeto || "-")}</td>
-        <td>${fechaCorta(c.fechaInicio)}</td><td>${fechaCorta(c.fechaFin)}</td><td>${esc(c.estado || "Activo")}</td>
-        <td class="ip-acciones-celda">
-          ${contrato?.id === c.id ? '<span class="badge ok">En uso</span>' : `<button type="button" class="btn ip-btn-mini" data-usar="${c.id}">Usar</button>`}
-          ${esGestor ? `<button type="button" class="btn secondary ip-btn-mini" data-editar="${c.id}">Editar</button>` : ""}
-        </td></tr>`).join("")}</tbody></table></div></div>`;
-    lista.querySelectorAll("[data-usar]").forEach((b) => b.addEventListener("click", () => {
-      fijarContratoActivo(b.dataset.usar);
-      location.href = "inicio.html";
-    }));
-    lista.querySelectorAll("[data-editar]").forEach((b) => b.addEventListener("click", () => abrirFormulario(contratos.find((c) => c.id === b.dataset.editar))));
   }
 
   // ---------------------------------------------------------- formulario
@@ -186,8 +128,9 @@ async function iniciar({ user, perfil, esGestor, contratos, contrato }) {
   document.getElementById("contratoCancelarBtn").addEventListener("click", () => cerrarModal("contratoModal"));
   document.getElementById("contratoModal").addEventListener("click", (e) => { if (e.target.id === "contratoModal") cerrarModal("contratoModal"); });
 
-  pintarFicha();
-  pintarLista();
+  // Lista con semáforo + ficha del seleccionado (ip-tablero.js). El gestor
+  // edita desde la ficha.
+  montarTablero({ contratos, activo: contrato, esGestor, onEditar: abrirFormulario });
   const editar = new URLSearchParams(location.search).get("editar");
   if (editar && esGestor) {
     const c = contratos.find((x) => x.id === editar);

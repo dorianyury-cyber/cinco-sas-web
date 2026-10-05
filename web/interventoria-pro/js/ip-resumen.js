@@ -1,5 +1,5 @@
 // Estado de un contrato (indicadores + alertas de todos los módulos),
-// calculado igual en Inicio (un contrato) y en el Tablero de contratos
+// calculado igual en Inicio (un contrato) y en Contratos
 // (todos los visibles), para que ambos digan siempre lo mismo.
 import { collection, getDocs } from "https://www.gstatic.com/firebasejs/10.7.1/firebase-firestore.js";
 import { db, diasEntre, hoyISO } from "./ip-core.js";

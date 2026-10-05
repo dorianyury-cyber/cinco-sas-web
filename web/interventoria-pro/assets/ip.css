@@ -2294,3 +2294,4 @@ textarea { font-family: inherit; }
 .ip-bienv-grupos + .ip-bienv-grupo, .ip-bienv-grupo + .ip-bienv-grupo { margin-top: 18px; }
 .ip-bienv-grupo .bienvenida-modulos { margin-top: 0; }
 .sidebar .ip-pilar-toggle span:first-child { display: inline-flex; align-items: center; gap: 6px; }
+.ip-en-uso { color: var(--success); font-size: 11px; margin-left: 4px; }

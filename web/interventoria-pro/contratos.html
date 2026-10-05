@@ -13,12 +13,22 @@
     <aside class="sidebar" id="sidebar"></aside>
     <main class="main">
       <header id="ipHeader"></header>
-      <div id="ipFicha"></div>
+      <p class="text-muted ip-descripcion">Todos los contratos en una sola vista: su semáforo, tiempo, avance técnico y financiero, y sus alertas. Elige un contrato para ver su información completa y entrar a él.</p>
+      <div id="tbTarjetas"><div class="card"><p class="text-muted ip-sin-margen">Revisando los contratos…</p></div></div>
       <div class="card ip-barra ip-barra-centro">
         <button type="button" class="btn ip-btn-nuevo hidden" id="nuevoContratoBtn">+ Nuevo contrato</button>
-        <span class="text-muted ip-contador" id="contratosContador"></span>
+        <select id="tbFiltro" class="ip-filtro-mes">
+          <option value="">Todos los estados</option>
+          <option value="riesgo">🔴 En riesgo</option>
+          <option value="atencion">🟡 Requieren atención</option>
+          <option value="ok">🟢 Al día</option>
+        </select>
+        <label class="ip-check-linea"><input type="checkbox" id="tbSoloActivos" checked> Solo contratos activos</label>
+        <button type="button" class="btn secondary" id="tbExcelBtn">📊 Exportar a Excel</button>
+        <span class="text-muted ip-contador" id="tbContador"></span>
       </div>
-      <div id="contratosLista"></div>
+      <div id="tbLista"></div>
+      <div id="tbDetalle"></div>
     </main>
   </div>
 
@@ -64,6 +74,7 @@
     </div>
   </div>
 
+  <script src="../js/vendor/exceljs.min.js"></script>
   <script type="module" src="js/ip-contratos.js"></script>
 </body>
 </html>
