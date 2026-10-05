@@ -109,6 +109,8 @@ export async function montarTablero({ contratos, activo, esGestor, onEditar }) {
       seleccionado = tr.dataset.id;
       listaEl.querySelectorAll("tr.ip-fila").forEach((x) => x.classList.toggle("ip-fila-activa", x === tr));
       pintarDetalle();
+      // La ficha está arriba de la lista: se sube a mostrarla.
+      detalleEl.scrollIntoView({ behavior: "smooth", block: "start" });
     }));
     pintarDetalle();
   }

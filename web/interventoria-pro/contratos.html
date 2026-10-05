@@ -15,8 +15,13 @@
       <header id="ipHeader"></header>
       <p class="text-muted ip-descripcion">Todos los contratos en una sola vista: su semáforo, tiempo, avance técnico y financiero, y sus alertas. Elige un contrato para ver su información completa y entrar a él.</p>
       <div id="tbTarjetas"><div class="card"><p class="text-muted ip-sin-margen">Revisando los contratos…</p></div></div>
+      <div class="ip-acciones-centro ip-contratos-nuevo"><button type="button" class="btn ip-btn-nuevo hidden" id="nuevoContratoBtn">+ Nuevo contrato</button></div>
+      <!-- Ficha del contrato seleccionado arriba y la lista de contratos
+           abajo (pedido del usuario); al elegir uno en la lista, la página
+           sube a su ficha. -->
+      <div id="tbDetalle"></div>
+      <h2 class="ip-gen-titulo" id="tbListaTitulo">Lista de contratos</h2>
       <div class="card ip-barra ip-barra-centro">
-        <button type="button" class="btn ip-btn-nuevo hidden" id="nuevoContratoBtn">+ Nuevo contrato</button>
         <select id="tbFiltro" class="ip-filtro-mes">
           <option value="">Todos los estados</option>
           <option value="riesgo">🔴 En riesgo</option>
@@ -28,7 +33,6 @@
         <span class="text-muted ip-contador" id="tbContador"></span>
       </div>
       <div id="tbLista"></div>
-      <div id="tbDetalle"></div>
     </main>
   </div>
 

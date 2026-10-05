@@ -2431,3 +2431,7 @@ textarea { font-family: inherit; }
 .ip-fotos-cuenta { font-size: 12px; }
 .ip-fotos-badge { font-size: 11px; color: var(--text-muted); white-space: nowrap; }
 @media (max-width: 560px) { .ip-fotos-item { width: 72px; height: 72px; } }
+.ip-contratos-nuevo { margin: 4px 0 14px; }
+.ip-contratos-nuevo:has(.hidden) { display: none; }
+#tbDetalle { scroll-margin-top: 16px; }
+#tbListaTitulo { margin-top: 22px; }
