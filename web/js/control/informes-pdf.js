@@ -531,7 +531,11 @@ export async function generarInformePDF(informe) {
   }
 
   function dibujarTitulo(nivel, textoOriginal) {
-    const texto = `${numeroTitulo(nivel)} ${textoOriginal || ""}`.trim();
+    // Si el título ya trae su número escrito a mano (ej. "1. Quiénes somos",
+    // "2.3 Alcance"), se quita: la numeración la pone el PDF (antes salía
+    // "1. 1. Quiénes somos").
+    const sinNumero = String(textoOriginal || "").replace(/^\s*(?:\d+(?:\.\d+)*\s*[.)\-–]|\d+(?:\.\d+)+)\s+/, "");
+    const texto = `${numeroTitulo(nivel)} ${sinNumero}`.trim();
     if (nivel === 1) {
       // Título 1 siempre arranca página nueva — pero si ya estamos al
       // principio de una página en blanco no hace falta desperdiciar una.
