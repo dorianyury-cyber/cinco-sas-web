@@ -12,7 +12,7 @@
 // en el teléfono y antes de reintentar se pregunta al servidor si ya existe.
 import { collection, doc, getDocs, getDocFromServer, serverTimestamp, writeBatch } from "https://www.gstatic.com/firebasejs/10.7.1/firebase-firestore.js";
 import { ref, uploadBytes, getDownloadURL } from "https://www.gstatic.com/firebasejs/10.7.1/firebase-storage.js";
-import { db, storage, iniciarPagina, pintarEncabezado, esc, imgModulo, hoyISO, mostrarAlerta, limpiarAlerta, errorAmigable } from "./ip-core.js";
+import { db, storage, iniciarPagina, pintarEncabezado, esc, imgModulo, hoyISO, mostrarAlerta, limpiarAlerta, errorAmigable, fijarContratoActivo } from "./ip-core.js";
 import { MODULOS, CAPITULOS, nombreCapitulo } from "./ip-modulos.js";
 import { htmlCampo, leerFormulario, comprimir } from "./ip-formulario.js";
 import { anotarEnLote, diferencias, identificar } from "./ip-historial.js";
@@ -65,8 +65,21 @@ function conLimite(promesa, ms, texto) {
 const ctxPagina = await iniciarPagina();
 if (ctxPagina) iniciar(ctxPagina);
 
-async function iniciar({ user, perfil, contrato }) {
+async function iniciar({ user, perfil, contrato, contratos }) {
   pintarEncabezado(`${imgModulo("campo", "ip-h1-foto")} Registro en campo`, contrato);
+
+  // Selector de contrato a la vista (en el celular el del menú queda
+  // escondido tras "☰ Menú"). Cambiarlo no mueve lo ya guardado: cada
+  // registro pendiente conserva el contrato con el que se guardó.
+  const selContrato = document.getElementById("cpContrato");
+  const nombreContrato = (c) => `${c.numero || "Sin número"} — ${c.contratante || c.objeto || ""}`;
+  selContrato.innerHTML = contratos.map((c) => `<option value="${c.id}" ${c.id === contrato.id ? "selected" : ""}>${esc(nombreContrato(c))}</option>`).join("");
+  let cambiandoContrato = false;
+  selContrato.addEventListener("change", () => {
+    cambiandoContrato = true;
+    fijarContratoActivo(selContrato.value);
+    location.reload();
+  });
   const tilesEl = document.getElementById("cpTiles");
   const formCard = document.getElementById("cpFormCard");
   const camposEl = document.getElementById("cpCampos");
@@ -111,6 +124,7 @@ async function iniciar({ user, perfil, contrato }) {
     limpiarAlerta(alertaEl);
     limpiarAlerta(mensajeEl);
     document.getElementById("cpFormTitulo").textContent = a.label;
+    document.getElementById("cpDestino").innerHTML = `Se guardará en: <strong>Contrato ${esc(contrato.numero || "")}</strong>${contrato.contratante ? ` · ${esc(contrato.contratante)}` : ""}`;
     const capOpcion = a.elegirCap
       ? `<div class="ip-campo"><label for="f__cap">Capítulo *</label><select id="f__cap" required><option value="">— Elige —</option>${CAPITULOS.filter((c) => c.items.some((it) => it.m === a.m)).map((c) => `<option value="${c.id}" ${conservar._cap === c.id ? "selected" : ""}>${esc(c.numero)}. ${esc(c.label)}</option>`).join("")}</select></div>`
       : "";
@@ -128,12 +142,14 @@ async function iniciar({ user, perfil, contrato }) {
       prev.classList.remove("hidden");
     }));
     tilesEl.classList.add("hidden");
+    document.getElementById("cpContratoCard").classList.add("hidden");
     formCard.classList.remove("hidden");
     formCard.scrollIntoView({ behavior: "smooth", block: "start" });
   }
   function cerrar() {
     formCard.classList.add("hidden");
     tilesEl.classList.remove("hidden");
+    document.getElementById("cpContratoCard").classList.remove("hidden");
     acceso = null;
   }
   document.getElementById("cpCancelarBtn").addEventListener("click", cerrar);
@@ -259,7 +275,7 @@ async function iniciar({ user, perfil, contrato }) {
   window.addEventListener("offline", pintarRed);
   setInterval(() => { if (navigator.onLine) misPendientes().then((c) => { if (c.length) sincronizar(); }); }, 30000);
   // Aviso al salir con cosas pendientes (no se pierden, pero conviene saberlo).
-  window.addEventListener("beforeunload", (e) => { if (pendEl.textContent.includes("pendiente")) { e.preventDefault(); e.returnValue = ""; } });
+  window.addEventListener("beforeunload", (e) => { if (!cambiandoContrato && pendEl.textContent.includes("pendiente")) { e.preventDefault(); e.returnValue = ""; } });
 
   pintarRed();
   await pintarCola();

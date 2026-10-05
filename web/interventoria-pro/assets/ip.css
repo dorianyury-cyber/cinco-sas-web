@@ -2248,3 +2248,7 @@ textarea { font-family: inherit; }
 }
 .ip-tarjetas.ip-tarjetas-5 { grid-template-columns: repeat(5, minmax(0, 1fr)); }
 @media (max-width: 1100px) { .ip-tarjetas.ip-tarjetas-5 { grid-template-columns: repeat(auto-fit, minmax(150px, 1fr)); } }
+.ip-campo-contrato { padding: 12px 16px; }
+.ip-campo-contrato label { display: block; font-size: 13px; font-weight: 700; margin-bottom: 6px; }
+.ip-campo-contrato select { width: 100%; margin: 0; font-size: 15px; font-weight: 600; }
+.ip-campo-destino { margin: -4px 0 12px; padding: 8px 12px; border-radius: 8px; background: rgba(245, 166, 35, 0.12); font-size: 14px; }
