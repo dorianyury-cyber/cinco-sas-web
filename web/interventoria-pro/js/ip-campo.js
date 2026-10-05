@@ -180,25 +180,32 @@ async function iniciar({ user, perfil, contrato, contratos }) {
     limpiarAlerta(alertaEl);
     const mod = MODULOS[acceso.m];
     const campoFoto = mod.campos.find((c) => c.type === "imagen");
-    const foto = campoFoto ? fotosForm.archivo(campoFoto.key) : null;
-    if (campoFoto?.required && !foto) { mostrarAlerta(alertaEl, "Toma o elige una foto."); return; }
-    // Fotos de evidencia nuevas, por campo (se guardan en el teléfono hasta subir).
+    // Foto de obra: hasta 6 fotos acumuladas; cada una será su registro.
+    const fotosObra = campoFoto ? fotosForm.archivos(campoFoto.key) : [];
+    if (campoFoto?.required && !fotosObra.length) { mostrarAlerta(alertaEl, "Toma o elige al menos una foto."); return; }
     const datos = leerFormulario(mod.campos, camposEl);
     const cap = acceso.elegirCap ? document.getElementById("f__cap").value : acceso.cap || null;
     if (mod.porCapitulo && cap) datos[mod.porCapitulo] = cap;
     guardarBtn.disabled = otroBtn.disabled = true;
     try {
+      // Fotos de evidencia nuevas, por campo (se guardan en el teléfono hasta subir).
       const fotosNuevas = {};
       for (const k of fotosForm.camposFotos()) fotosNuevas[k] = await Promise.all(fotosForm.fotos(k).nuevas.map(aDatos));
-      const item = {
+      const ahora = new Date().toISOString();
+      const nuevoItem = async (foto, extra = {}) => ({
         qid: crypto.randomUUID(),
         contratoId: contrato.id, contratoNumero: contrato.numero || "",
         usuario: user.email, modulo: mod.id, cap,
         docId: doc(collection(db, "ipContratos", contrato.id, mod.coleccion)).id,
-        datos, foto: await aDatos(foto), campoFoto: campoFoto?.key || null, fotosNuevas,
-        creadoLocal: new Date().toISOString(), intentos: 0, ultimoError: ""
-      };
-      await guardarLocal(item);
+        datos, foto: await aDatos(foto), campoFoto: campoFoto?.key || null, fotosNuevas: {},
+        creadoLocal: ahora, intentos: 0, ultimoError: "", ...extra
+      });
+      // Un pendiente por cada foto de obra; si el módulo no lleva foto
+      // propia, un solo pendiente con sus fotos de evidencia.
+      const items = fotosObra.length
+        ? await Promise.all(fotosObra.map((f) => nuevoItem(f)))
+        : [await nuevoItem(null, { fotosNuevas })];
+      for (const it of items) await guardarLocal(it);
       const conservar = seguirOtro ? { ...datos, _cap: cap } : null;
       if (conservar) {
         // Lo que suele repetirse (fecha, tipo, capítulo) se deja; lo que

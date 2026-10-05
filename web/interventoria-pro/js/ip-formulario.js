@@ -53,7 +53,19 @@ export function htmlCampo(c, valor, { contrato, personal = [], camara = false } 
     // abre la cámara del celular; el de galería NO lo lleva (con capture,
     // Android a veces esconde la galería) y en "fotos" permite elegir
     // varias. En el computador ambos abren el selector de archivos.
+    // Registro nuevo con foto (ej. Registro fotográfico): se acumulan hasta
+    // MAX_FOTOS y al guardar cada foto queda como su propio registro.
+    // Al editar uno existente se reemplaza su única foto.
     case "imagen":
+      if (!v) {
+        control = `<div class="ip-foto-botones">
+          <label class="btn ip-foto-boton">📷 Tomar foto<input type="file" accept="image/*" capture="environment" data-fotos-de="${c.key}" class="ip-oculto"></label>
+          <label class="btn secondary ip-foto-boton">🖼️ Elegir de galería<input type="file" accept="image/*" multiple data-fotos-de="${c.key}" class="ip-oculto"></label>
+        </div>
+        <div class="ip-fotos-prev" id="${id}_prev"></div>
+        <p class="text-muted ip-ayuda">Puedes tomar o elegir varias (hasta ${MAX_FOTOS}); se van sumando. Cada foto se guarda como un registro con la misma fecha y observación.</p>`;
+        break;
+      }
       control = `<div class="ip-foto-botones">
           <label class="btn ip-foto-boton">📷 Tomar foto<input type="file" accept="image/*" capture="environment" data-foto-de="${c.key}" class="ip-oculto"></label>
           <label class="btn secondary ip-foto-boton">🖼️ Elegir de galería<input type="file" accept="image/*" data-foto-de="${c.key}" class="ip-oculto"></label>
@@ -89,11 +101,14 @@ export const MAX_FOTOS = 6;
 // se previsualiza una foto pesada), muestra miniaturas y deja quitar
 // fotos. registro = el registro que se edita (para las fotos ya subidas).
 export function controlFotos(contenedor, campos, registro = null) {
-  const unica = {};   // imagen: key -> Blob comprimido
-  const fotos = {};   // fotos: key -> { conservadas: [{url, ruta}], nuevas: [Blob] }
+  const unica = {};   // imagen al editar: key -> Blob comprimido (reemplaza la foto)
+  const fotos = {};   // fotos (y imagen de un registro nuevo): key -> { conservadas: [{url, ruta}], nuevas: [Blob] }
   campos.filter((c) => c.type === "fotos").forEach((c) => {
     fotos[c.key] = { conservadas: Array.isArray(registro?.[c.key]) ? [...registro[c.key]] : [], nuevas: [] };
   });
+  // Imagen de un registro nuevo: lista acumulable (una foto = un registro).
+  const imagenesNuevas = campos.filter((c) => c.type === "imagen" && !registro?.[c.key]).map((c) => c.key);
+  imagenesNuevas.forEach((k) => { fotos[k] = { conservadas: [], nuevas: [] }; });
 
   function pintarFotos(key) {
     const el = contenedor.querySelector(`#f_${key}_prev`);
@@ -113,15 +128,21 @@ export function controlFotos(contenedor, campos, registro = null) {
   }
   Object.keys(fotos).forEach(pintarFotos);
 
+  // Cada selección SUMA a las anteriores (nunca las reemplaza). Los archivos
+  // se copian antes de limpiar el campo, para poder volver a abrir la
+  // cámara o la galería y elegir otra.
   contenedor.querySelectorAll("[data-fotos-de]").forEach((inp) => inp.addEventListener("change", async () => {
     const key = inp.dataset.fotosDe;
     const f = fotos[key];
-    const libres = MAX_FOTOS - f.conservadas.length - f.nuevas.length;
-    const elegidas = [...inp.files].slice(0, Math.max(0, libres));
-    if (inp.files.length > elegidas.length) alert(`Máximo ${MAX_FOTOS} fotos por registro: se agregaron ${elegidas.length}.`);
-    for (const archivo of elegidas) f.nuevas.push(await comprimir(archivo));
+    const archivos = [...inp.files];
     inp.value = "";
-    pintarFotos(key);
+    const libres = MAX_FOTOS - f.conservadas.length - f.nuevas.length;
+    const elegidas = archivos.slice(0, Math.max(0, libres));
+    if (archivos.length > elegidas.length) alert(`Máximo ${MAX_FOTOS} fotos por registro: ${elegidas.length ? `se agregaron ${elegidas.length}` : "ya están completas"}.`);
+    for (const archivo of elegidas) {
+      f.nuevas.push(await comprimir(archivo));
+      pintarFotos(key);
+    }
   }));
   contenedor.querySelectorAll("[data-foto-de]").forEach((inp) => inp.addEventListener("change", async () => {
     const archivo = inp.files[0];
@@ -135,9 +156,13 @@ export function controlFotos(contenedor, campos, registro = null) {
   }));
 
   return {
+    // Foto que reemplaza la de un registro que se edita.
     archivo: (key) => unica[key] || null,
+    // Fotos acumuladas de un registro nuevo (una por registro al guardar).
+    archivos: (key) => (imagenesNuevas.includes(key) ? [...fotos[key].nuevas] : unica[key] ? [unica[key]] : []),
     fotos: (key) => fotos[key] || { conservadas: [], nuevas: [] },
-    camposFotos: () => Object.keys(fotos)
+    // Solo los campos "fotos" (lista dentro del mismo registro).
+    camposFotos: () => Object.keys(fotos).filter((k) => !imagenesNuevas.includes(k))
   };
 }
 

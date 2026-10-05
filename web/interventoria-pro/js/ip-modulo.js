@@ -258,12 +258,20 @@ function iniciarModulo({ user, perfil, contrato, puede }) {
         return { url: await getDownloadURL(r), ruta };
       };
       const img = mod.campos.find((c) => c.type === "imagen");
-      if (img && fotosForm.archivo(img.key)) {
+      // Registro nuevo con varias fotos: una entrada por foto (misma fecha,
+      // capítulo y observación); se suben aquí y se crean más abajo.
+      let fotosRegistros = [];
+      if (img && editandoId && fotosForm.archivo(img.key)) {
         const { url, ruta } = await subir(fotosForm.archivo(img.key));
         datos[img.key] = url;
         datos[`${img.key}Ruta`] = ruta;
       } else if (img && !editandoId) {
-        throw new Error("Toma o elige una foto.");
+        const blobs = fotosForm.archivos(img.key);
+        if (!blobs.length) throw new Error("Toma o elige al menos una foto.");
+        for (let i = 0; i < blobs.length; i++) {
+          guardarBtn.textContent = `Subiendo foto ${i + 1} de ${blobs.length}…`;
+          fotosRegistros.push(await subir(blobs[i]));
+        }
       }
       // Fotos de evidencia: las que quedaron + las nuevas, ya subidas.
       for (const key of fotosForm.camposFotos()) {
@@ -286,9 +294,13 @@ function iniciarModulo({ user, perfil, contrato, puede }) {
       } else {
         datos.creadoPor = perfil.nombre || user.email;
         datos.creadoEn = serverTimestamp();
-        const nuevo = doc(coleccionRef);
-        lote.set(nuevo, datos);
-        anotarEnLote(lote, contrato.id, { ...base, registroId: nuevo.id, accion: "crear", resumen: identificar(mod, datos), cambios: diferencias(mod.campos, {}, datos, ctx.datos.personal || []) });
+        // Sin foto propia del módulo: un solo registro. Con fotos: uno por foto.
+        const variantes = fotosRegistros.length ? fotosRegistros.map(({ url, ruta }) => ({ ...datos, [img.key]: url, [`${img.key}Ruta`]: ruta })) : [datos];
+        variantes.forEach((d) => {
+          const nuevo = doc(coleccionRef);
+          lote.set(nuevo, d);
+          anotarEnLote(lote, contrato.id, { ...base, registroId: nuevo.id, accion: "crear", resumen: identificar(mod, d), cambios: diferencias(mod.campos, {}, d, ctx.datos.personal || []) });
+        });
       }
       await lote.commit();
       cerrarModal("ipModal");
