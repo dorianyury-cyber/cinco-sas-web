@@ -30,14 +30,16 @@ if (ctx) {
       : "Todavía no estás asignado a ningún contrato. Pídele al gestor de Interventoría PRO que te agregue al equipo.";
     aviso.className = "alert info ip-aviso-bienvenida";
   }
+  // Mismo orden del menú: el desarrollo del contrato (crearlo, asignar el
+  // equipo, seguirlo día a día, avisar, cerrar el mes y consultar).
   const herramientas = [
-    { href: "inicio.html", foto: "inicio", label: "Inicio", desc: "Resumen del contrato: avance, finanzas y alertas" },
-    { href: "campo.html", foto: "campo", label: "Registro en campo", desc: "Desde el celular en la obra: fotos, inspecciones y novedades, aun sin señal" },
-    { href: "informe.html", foto: "informe", label: "Informe mensual", desc: "Elige el mes, marca las secciones y genera el informe en PDF o Word" },
     { href: "contratos.html", foto: "contratos", label: esGestor ? "Contratos" : "Mis contratos", desc: esGestor ? "Todos los contratos con su semáforo y alertas; crea y edita contratos" : "Tus contratos con su semáforo, alertas e información básica" },
     { href: "equipo.html", foto: "equipo", label: "Equipo de interventoría", desc: esGestor ? "Asigna los colaboradores de cada contrato en una sola vista" : "Quién está asignado a cada uno de tus contratos" },
-    { href: "historial.html", foto: "historial", label: "Historial de cambios", desc: "Quién registró o cambió cada dato, cuándo y qué cambió" },
+    { href: "inicio.html", foto: "inicio", label: "Inicio", desc: "Resumen del contrato: avance, finanzas y alertas" },
+    { href: "campo.html", foto: "campo", label: "Registro en campo", desc: "Desde el celular en la obra: fotos, inspecciones y novedades, aun sin señal" },
     { href: "avisos.html", foto: "avisos", label: "Avisos por correo", desc: "Envía al gestor lo vencido o por vencer, cuando la interventoría lo decida" },
+    { href: "informe.html", foto: "informe", label: "Informe mensual", desc: "Elige el mes, marca las secciones y genera el informe en PDF o Word" },
+    { href: "historial.html", foto: "historial", label: "Historial de cambios", desc: "Quién registró o cambió cada dato, cuándo y qué cambió" }
   ];
   const capitulos = CAPITULOS.map((c) => ({ href: c.items[0].href || hrefModulo(c.items[0].m, c.items[0].cap), foto: `cap-${c.id}`, label: `${c.numero}. ${c.label}`, desc: c.desc }));
   // Sin contratos todavía, las tarjetas llevan a Contratos (no hay dónde

@@ -350,13 +350,15 @@ function pintarMenu({ user, perfil, esGestor, contratos, contrato }) {
           <span>${imgModulo("grupo-herramientas")}Herramientas</span><span class="chevron">▾</span>
         </div>
         <div class="nav-group-body" id="ipGrupo-herramientas">
-        ${enlace("inicio.html", "inicio", "Inicio")}
-        ${contrato ? enlace("campo.html", "campo", "Registro en campo") : ""}
-        ${contrato ? enlace("informe.html", "informe", "Informe mensual") : ""}
+        ${/* Orden del desarrollo del contrato: crearlo y asignar equipo,
+             seguirlo día a día, avisar, cerrar el mes y consultar. */ ""}
         ${enlace("contratos.html", "contratos", esGestor ? "Contratos" : "Mis contratos")}
         ${enlace("equipo.html", "equipo", "Equipo de interventoría")}
-        ${contrato ? enlace("historial.html", "historial", "Historial de cambios") : ""}
+        ${enlace("inicio.html", "inicio", "Inicio")}
+        ${contrato ? enlace("campo.html", "campo", "Registro en campo") : ""}
         ${contrato ? enlace("avisos.html", "avisos", "Avisos por correo") : ""}
+        ${contrato ? enlace("informe.html", "informe", "Informe mensual") : ""}
+        ${contrato ? enlace("historial.html", "historial", "Historial de cambios") : ""}
         </div>
       </div>
       <div class="nav-pilar nav-pilar-1">

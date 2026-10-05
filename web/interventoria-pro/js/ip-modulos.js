@@ -253,32 +253,38 @@ const CAPITULO_LABEL = {
 export const CAPITULOS_OPCIONES = Object.entries(CAPITULO_LABEL).map(([valor, texto]) => ({ valor, texto }));
 export function nombreCapitulo(id) { return CAPITULO_LABEL[id] || id || "-"; }
 
-// Menú lateral / pantalla de bienvenida: capítulos del informe en su orden.
+// Menú lateral / pantalla de bienvenida: capítulos del informe en su orden
+// (la numeración es la del informe mensual). Dentro de cada capítulo, los
+// módulos van en el orden en que ocurren en una interventoría real (pedido
+// del usuario): primero lo que se exige al iniciar, luego lo del día a día
+// y al final observaciones y anexos. El orden del informe NO sale de aquí
+// (ip-informe-contenido.js tiene el suyo).
 export const CAPITULOS = [
   { id: "administrativo", numero: "1", label: "Administrativo", icon: "🗂️", desc: "Información del contrato, acta de inicio, cronología de actas y anexos", items: [
     { href: "contratos.html", label: "Información del contrato", foto: "info-contrato" }, { m: "actainicio" }, { m: "cronologia" }, { m: "observaciones", cap: "administrativo" }, { m: "anexos", cap: "administrativo" }
   ] },
-  { id: "financiero", numero: "2", label: "Financiero", icon: "💰", desc: "Estado financiero, actas de pago e inversión del anticipo", items: [
-    { m: "financiero" }, { m: "anticipo" }, { m: "observaciones", cap: "financiero" }, { m: "anexos", cap: "financiero" }
+  { id: "financiero", numero: "2", label: "Financiero", icon: "💰", desc: "Inversión del anticipo, estado financiero y actas de pago", items: [
+    { m: "anticipo" }, { m: "financiero" }, { m: "observaciones", cap: "financiero" }, { m: "anexos", cap: "financiero" }
   ] },
   { id: "juridico", numero: "3", label: "Jurídico", icon: "⚖️", desc: "Pólizas, requerimientos y multas", items: [
     { m: "garantias" }, { m: "requerimientos" }, { m: "observaciones", cap: "juridico" }, { m: "anexos", cap: "juridico" }
   ] },
-  { id: "sst", numero: "4", label: "Seguridad y Salud en el Trabajo", icon: "🦺", desc: "Personal, salarios, seguridad social, EPP, exámenes y más", items: [
-    { m: "personal" }, { m: "novedades" }, { m: "epp" }, { m: "examenes" }, { m: "segsocial" },
-    { m: "accidentes" }, { m: "capacitaciones", cap: "sst" }, { m: "inspecciones" },
+  { id: "sst", numero: "4", label: "Seguridad y Salud en el Trabajo", icon: "🦺", desc: "Personal, exámenes, seguridad social, EPP, capacitación y accidentalidad", items: [
+    { m: "personal" }, { m: "examenes" }, { m: "segsocial" }, { m: "epp" },
+    { m: "capacitaciones", cap: "sst" }, { m: "inspecciones" }, { m: "novedades" }, { m: "accidentes" },
     { m: "observaciones", cap: "sst" }, { m: "anexos", cap: "sst" }
   ] },
   { id: "social", numero: "5", label: "Social", icon: "🤝", desc: "Socialización del proyecto con la comunidad", items: [
     { m: "socializacion" }, { m: "anexos", cap: "social" }
   ] },
   { id: "ambiental", numero: "6", label: "Ambiental", icon: "🌱", desc: "Aspectos e impactos, indicadores y requisitos legales", items: [
-    { m: "aspectos" }, { m: "planambiental" }, { m: "indicadores" }, { m: "requisitos" }, { m: "incidentesamb" },
+    { m: "requisitos" }, { m: "aspectos" }, { m: "planambiental" },
     { m: "capacitaciones", cap: "ambiental", label: "Capacitaciones ambientales", foto: "capacitaciones-ambiental" },
+    { m: "indicadores" }, { m: "incidentesamb" },
     { m: "observaciones", cap: "ambiental" }, { m: "anexos", cap: "ambiental" }
   ] },
-  { id: "tecnico", numero: "7", label: "Técnico", icon: "📐", desc: "Cantidades, equipos FAT/SAT, cambios, consignaciones y curva S", items: [
-    { m: "cantidades" }, { m: "suministros" }, { m: "cambios" }, { m: "consignaciones" }, { m: "actividades" }, { m: "observaciones", cap: "tecnico", label: "Resumen y observaciones" }, { m: "anexos", cap: "tecnico" }
+  { id: "tecnico", numero: "7", label: "Técnico", icon: "📐", desc: "Avance y curva S, equipos FAT/SAT, consignaciones, cantidades y cambios", items: [
+    { m: "actividades" }, { m: "suministros" }, { m: "consignaciones" }, { m: "cantidades" }, { m: "cambios" }, { m: "observaciones", cap: "tecnico", label: "Resumen y observaciones" }, { m: "anexos", cap: "tecnico" }
   ] },
   { id: "riesgos", numero: "8", label: "Matriz de riesgos", icon: "⚠️", desc: "Riesgos del contrato, impacto y monitoreo", items: [
     { m: "riesgos" }
