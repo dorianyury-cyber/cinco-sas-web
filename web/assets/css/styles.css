@@ -2151,3 +2151,9 @@ body.app-control details.control-nuevo { scroll-margin-top: calc(var(--alto-cabe
   body.app-control .page-banner p { display: none; }
   body.app-control .control-cabecera-fija { position: static; }
 }
+
+/* Tarjetas dentro de .section-dark: el fondo de la tarjeta es claro
+   (--card-bg), así que su título y su texto no deben heredar el blanco de
+   la sección — antes los h3 quedaban blanco sobre blanco. */
+.section-dark .card h3 { color: var(--text); }
+.section-dark .card p { color: var(--text-muted); }

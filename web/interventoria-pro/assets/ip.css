@@ -2252,3 +2252,16 @@ textarea { font-family: inherit; }
 .ip-campo-contrato label { display: block; font-size: 13px; font-weight: 700; margin-bottom: 6px; }
 .ip-campo-contrato select { width: 100%; margin: 0; font-size: 15px; font-weight: 600; }
 .ip-campo-destino { margin: -4px 0 12px; padding: 8px 12px; border-radius: 8px; background: rgba(245, 166, 35, 0.12); font-size: 14px; }
+
+/* Bienvenida en dos grupos: Herramientas y Capítulos del informe mensual,
+   con el mismo ribete de color de los grupos del menú lateral. */
+.ip-bienv-grupo { margin-top: 26px; padding-left: 14px; border-left: 4px solid #1f5fbf; }
+.ip-bienv-grupo-1 { border-left-color: #1e9e57; }
+.ip-bienv-grupo h2 { margin: 0; font-size: 18px; color: #1f5fbf; }
+.ip-bienv-grupo-1 h2 { color: #1e9e57; }
+:root[data-theme="dark"] .ip-bienv-grupo h2 { color: #7fa8f0; }
+:root[data-theme="dark"] .ip-bienv-grupo-1 h2 { color: #5fd08f; }
+.ip-bienv-grupo > p { margin: 4px 0 0; font-size: 13px; }
+.ip-bienv-grupo .bienvenida-modulos { margin-top: 14px; }
+.sidebar .nav-pilar { padding-bottom: 2px; }
+.sidebar .nav-pilar-titulo { padding-bottom: 4px; }

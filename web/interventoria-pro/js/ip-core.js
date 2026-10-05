@@ -323,14 +323,19 @@ function pintarMenu({ user, perfil, esGestor, contratos, contrato }) {
       </select>
     </div>
     <nav>
-      ${enlace("inicio.html", "inicio", "Inicio")}
-      ${contratos.length ? enlace("tablero.html", "tablero", "Tablero de contratos") : ""}
-      ${contrato ? enlace("campo.html", "campo", "Registro en campo") : ""}
-      ${enlace("contratos.html", "contratos", esGestor ? "Contratos" : "Mis contratos")}
-      ${enlace("generalidades.html", "generalidades", "Generalidades")}
-      ${contrato ? enlace("informe.html", "informe", "Informe mensual") : ""}
-      ${contrato ? enlace("historial.html", "historial", "Historial de cambios") : ""}
-      ${contrato ? enlace("avisos.html", "avisos", "Avisos por correo") : ""}
+      <div class="nav-pilar nav-pilar-0">
+        <div class="nav-pilar-titulo">Herramientas</div>
+        ${enlace("inicio.html", "inicio", "Inicio")}
+        ${contrato ? enlace("campo.html", "campo", "Registro en campo") : ""}
+        ${contratos.length ? enlace("tablero.html", "tablero", "Tablero de contratos") : ""}
+        ${contrato ? enlace("informe.html", "informe", "Informe mensual") : ""}
+        ${enlace("contratos.html", "contratos", esGestor ? "Contratos" : "Mis contratos")}
+        ${contrato ? enlace("historial.html", "historial", "Historial de cambios") : ""}
+        ${contrato ? enlace("avisos.html", "avisos", "Avisos por correo") : ""}
+        ${enlace("generalidades.html", "generalidades", "Generalidades")}
+      </div>
+      <div class="nav-pilar nav-pilar-1">
+        <div class="nav-pilar-titulo">Capítulos del informe mensual</div>
       ${grupos.map((g, i) => `
         <div class="nav-group ip-nav-cap ip-nav-cap-${i % 4}">
           <div class="collapsible-toggle nav-group-toggle" data-target="ipGrupo-${g.cap.id}">
@@ -339,6 +344,7 @@ function pintarMenu({ user, perfil, esGestor, contratos, contrato }) {
           </div>
           <div class="nav-group-body" id="ipGrupo-${g.cap.id}">${g.items}</div>
         </div>`).join("")}
+      </div>
     </nav>
     <div class="spacer"></div>
     <div class="user-box">
