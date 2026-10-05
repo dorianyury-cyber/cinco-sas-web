@@ -4,12 +4,18 @@
 // guarda todo junto; cada contrato que cambia actualiza su lista
 // "miembros" y deja su entrada en el historial (quién entra / quién sale).
 // El resto del equipo la ve en modo consulta, solo con sus contratos.
-import { collection, getDocs, doc, writeBatch, serverTimestamp } from "https://www.gstatic.com/firebasejs/10.7.1/firebase-firestore.js";
+import { collection, getDocs, doc, writeBatch, serverTimestamp, updateDoc } from "https://www.gstatic.com/firebasejs/10.7.1/firebase-firestore.js";
 import { db, iniciarPagina, pintarEncabezado, esc, imgModulo, mostrarAlerta, limpiarAlerta, errorAmigable, hoyISO } from "./ip-core.js";
 import { anotarEnLote } from "./ip-historial.js";
-import { mostrarLibro } from "./ip-visor.js";
+import { mostrarLibro, mostrarTabla } from "./ip-visor.js";
 
 const INACTIVOS = ["Terminado", "Liquidado"];
+const RESUMEN_ROL = {
+  admin: "Administrador: todo lo del gestor, más eliminar contratos y cambiar roles. Se asigna en Empleados del módulo interno.",
+  gestor: "Gestor: ve todos los contratos, los crea y edita, asigna equipos, elimina registros y recibe los avisos por correo.",
+  equipo: "Equipo: ve y registra información solo en los contratos donde está marcado; no elimina registros ni edita el contrato.",
+  inactivo: "No está activo en Empleados: no puede ingresar."
+};
 
 const ctx = await iniciarPagina({ requiereContrato: false });
 if (ctx) iniciar(ctx);
@@ -30,7 +36,12 @@ async function iniciar({ user, perfil, esGestor, contratos }) {
   const empleados = snap.docs.map((d) => ({ email: d.id, ...d.data() }))
     .filter((e) => e.estado === "activo")
     .sort((a, b) => String(a.nombre || a.email).localeCompare(String(b.nombre || b.email), "es"));
-  const esGestorEmp = (e) => e.rol === "admin" || e.gestionaInterventoriaPro === true;
+  // Roles de Interventoría PRO (ver ROLES abajo). El de administrador viene
+  // del rol "admin" en Empleados y no se cambia aquí; gestor = casilla
+  // gestionaInterventoriaPro de Empleados, que solo el administrador puede
+  // cambiar (firestore.rules: empleados solo los edita esAdmin()).
+  const rolDe = (e) => (e.inactivo ? "inactivo" : e.rol === "admin" ? "admin" : e.gestionaInterventoriaPro === true ? "gestor" : "equipo");
+  const puedeCambiarRoles = perfil.rol === "admin";
 
   // Asignaciones: original (lo guardado) y actual (con los cambios sin guardar).
   const original = new Map(contratos.map((c) => [c.id, new Set(c.miembros || [])]));
@@ -46,6 +57,58 @@ async function iniciar({ user, perfil, esGestor, contratos }) {
     const antes = original.get(c.id), ahora = actual.get(c.id);
     return { c, entran: [...ahora].filter((m) => !antes.has(m)), salen: [...antes].filter((m) => !ahora.has(m)) };
   }).filter((x) => x.entran.length || x.salen.length);
+
+  // ---------------------------------------------------------- roles
+  const ETIQUETA_ROL = { admin: "Administrador", gestor: "Gestor", equipo: "Equipo", inactivo: "Inactivo" };
+  function celdaRol(e) {
+    const rol = rolDe(e);
+    if (rol === "admin" || rol === "inactivo" || !puedeCambiarRoles) {
+      return `<span class="ip-rol ip-rol-${rol}" title="${esc(RESUMEN_ROL[rol] || "")}">${ETIQUETA_ROL[rol]}</span>`;
+    }
+    // Solo el administrador: dos botones, el activo resaltado.
+    return `<div class="ip-rol-selector" role="group" aria-label="Rol de ${esc(e.nombre || e.email)}">
+      ${["equipo", "gestor"].map((r) => `<button type="button" class="${rol === r ? "activo" : ""}" data-rol="${r}" data-email="${esc(e.email)}" title="${esc(RESUMEN_ROL[r])}">${ETIQUETA_ROL[r]}</button>`).join("")}
+    </div>`;
+  }
+  async function cambiarRol(email, nuevo) {
+    const e = empleados.find((x) => x.email === email);
+    if (!e || rolDe(e) === nuevo) return;
+    const texto = nuevo === "gestor"
+      ? `¿Hacer a ${e.nombre || email} GESTOR de Interventoría PRO?\n\nPodrá ver TODOS los contratos, crearlos y editarlos, asignar equipos y eliminar registros.`
+      : `¿Quitarle a ${e.nombre || email} el rol de gestor?\n\nQuedará como EQUIPO: solo verá y registrará información en los contratos donde esté marcado.`;
+    if (!confirm(texto)) return;
+    limpiarAlerta(alerta);
+    try {
+      await updateDoc(doc(db, "empleados", email), { gestionaInterventoriaPro: nuevo === "gestor" });
+      e.gestionaInterventoriaPro = nuevo === "gestor";
+      mostrarAlerta(alerta, `${e.nombre || email} ahora es ${ETIQUETA_ROL[nuevo].toLowerCase()} de Interventoría PRO.`, "success");
+      pintar();
+    } catch (err) {
+      mostrarAlerta(alerta, `No se pudo cambiar el rol: ${errorAmigable(err)}`);
+    }
+  }
+  document.getElementById("eqRolesBtn").addEventListener("click", () => {
+    const si = "✅ Sí", no = "—";
+    mostrarTabla({
+      titulo: "Roles y permisos de Interventoría PRO",
+      nota: `${puedeCambiarRoles ? "Como administrador, cambias el rol con los botones Equipo / Gestor de cada colaborador." : "El rol lo asigna el administrador."} Para que alguien aparezca aquí debe estar activo en Empleados del módulo interno de Cinco S.A.S.`,
+      columnas: ["Qué puede hacer", "Administrador", "Gestor", "Equipo del contrato"],
+      filas: [
+        ["Ver contratos", "Todos", "Todos", "Solo donde está marcado"],
+        ["Registrar y editar información en los módulos", si, si, "Solo en sus contratos"],
+        ["Tomar y subir fotos, Registro en campo", si, si, "Solo en sus contratos"],
+        ["Generar el informe mensual (PDF / Word)", si, si, "Solo de sus contratos"],
+        ["Enviar avisos por correo al gestor", si, si, "Solo de sus contratos"],
+        ["Ver el historial de cambios", si, si, "Solo de sus contratos"],
+        ["Crear contratos y editar su información básica", si, si, no],
+        ["Asignar el equipo de cada contrato", si, si, no],
+        ["Eliminar registros (queda en el historial)", si, si, no],
+        ["Recibir los avisos por correo como gestor", si, si, no],
+        ["Eliminar un contrato completo", si, no, no],
+        ["Cambiar el rol de los colaboradores", si, no, no]
+      ]
+    });
+  });
 
   function pintarTarjetas() {
     const cs = contratosVisibles();
@@ -72,19 +135,21 @@ async function iniciar({ user, perfil, esGestor, contratos }) {
       return;
     }
     matrizEl.innerHTML = `<div class="card ip-tabla-card"><div class="ip-eq-scroll"><table class="tabla-compacta ip-eq-matriz">
-      <thead><tr><th class="ip-eq-persona">Colaborador</th>${cs.map((c) => `<th class="ip-eq-col" title="${esc(`${c.numero || ""} — ${c.contratante || ""} · ${c.objeto || ""}`)}"><span class="ip-eq-num">${esc(c.numero || "Sin número")}</span><span class="ip-eq-cte">${esc(c.contratante || "")}</span></th>`).join("")}<th class="ip-eq-total">Contratos</th></tr></thead>
+      <thead><tr><th class="ip-eq-persona">Colaborador</th><th class="ip-eq-rol">Rol</th>${cs.map((c) => `<th class="ip-eq-col" title="${esc(`${c.numero || ""} — ${c.contratante || ""} · ${c.objeto || ""}`)}"><span class="ip-eq-num">${esc(c.numero || "Sin número")}</span><span class="ip-eq-cte">${esc(c.contratante || "")}</span></th>`).join("")}<th class="ip-eq-total">Contratos</th></tr></thead>
       <tbody>${filas.map((e) => {
         const n = cs.filter((c) => asignado(c, e.email)).length;
         return `<tr class="${e.inactivo ? "ip-eq-inactivo" : ""}">
-          <td class="ip-eq-persona"><strong>${esc(e.nombre || e.email)}</strong>${esGestorEmp(e) ? ' <span class="badge ok" title="Gestor de Interventoría PRO: ve todos los contratos aunque no esté asignado">Gestor</span>' : ""}<br><span class="text-muted">${esc(e.cargo || "")}${e.cargo ? " · " : ""}${esc(e.email)}</span></td>
+          <td class="ip-eq-persona"><strong>${esc(e.nombre || e.email)}</strong><br><span class="text-muted">${esc(e.cargo || "")}${e.cargo ? " · " : ""}${esc(e.email)}</span></td>
+          <td class="ip-eq-rol">${celdaRol(e)}</td>
           ${cs.map((c) => {
             const cambio = asignado(c, e.email) !== original.get(c.id).has(e.email);
             return `<td class="ip-eq-celda${cambio ? " ip-eq-cambio" : ""}"><input type="checkbox" data-c="${c.id}" data-e="${esc(e.email)}" ${asignado(c, e.email) ? "checked" : ""} ${esGestor ? "" : "disabled"} aria-label="${esc(`${e.nombre || e.email} en ${c.numero || ""}`)}"></td>`;
           }).join("")}
           <td class="ip-eq-total">${n || "–"}</td></tr>`;
       }).join("")}</tbody>
-      <tfoot><tr><th class="ip-eq-persona">Personas asignadas</th>${cs.map((c) => `<th class="ip-eq-col">${actual.get(c.id).size}</th>`).join("")}<th></th></tr></tfoot>
+      <tfoot><tr><th class="ip-eq-persona">Personas asignadas</th><th class="ip-eq-rol"></th>${cs.map((c) => `<th class="ip-eq-col">${actual.get(c.id).size}</th>`).join("")}<th></th></tr></tfoot>
     </table></div></div>`;
+    matrizEl.querySelectorAll("[data-rol]").forEach((b) => b.addEventListener("click", () => cambiarRol(b.dataset.email, b.dataset.rol)));
     matrizEl.querySelectorAll("input[data-c]").forEach((chk) => chk.addEventListener("change", () => {
       const s = actual.get(chk.dataset.c);
       if (chk.checked) s.add(chk.dataset.e); else s.delete(chk.dataset.e);
@@ -144,10 +209,10 @@ async function iniciar({ user, perfil, esGestor, contratos }) {
     const cs = contratosVisibles();
     const wb = new ExcelJS.Workbook();
     const ws = wb.addWorksheet("Equipo");
-    ws.columns = [{ header: "Colaborador", key: "n", width: 32 }, { header: "Cargo", key: "g", width: 24 }, { header: "Correo", key: "e", width: 30 },
+    ws.columns = [{ header: "Colaborador", key: "n", width: 32 }, { header: "Rol", key: "rol", width: 14 }, { header: "Cargo", key: "g", width: 24 }, { header: "Correo", key: "e", width: 30 },
       ...cs.map((c) => ({ header: c.numero || "Sin número", key: c.id, width: 11 })), { header: "Contratos", key: "t", width: 10 }];
     filasBase.forEach((e) => {
-      const fila = { n: e.nombre || e.email, g: e.cargo || "", e: e.email, t: cs.filter((c) => asignado(c, e.email)).length };
+      const fila = { n: e.nombre || e.email, rol: ETIQUETA_ROL[rolDe(e)], g: e.cargo || "", e: e.email, t: cs.filter((c) => asignado(c, e.email)).length };
       cs.forEach((c) => { fila[c.id] = asignado(c, e.email) ? "X" : ""; });
       ws.addRow(fila);
     });
