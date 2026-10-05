@@ -12,9 +12,9 @@ import { GUIAS, GENERALIDADES as G } from "./ip-guias.js";
 
 // Preguntas frecuentes: los "¿cómo hago…?" que no están en una sola guía.
 const FAQ = [
-  { t: "¿Cómo creo un contrato nuevo?", pasos: ["Entra a Contratos (grupo Herramientas).", "Usa «+ Nuevo contrato» (solo el gestor de Interventoría PRO lo ve).", "Llena la información básica, los proyectos o frentes (uno por línea) y marca el equipo del contrato.", "Guarda: el contrato queda como contrato en uso."], href: "contratos.html", ir: "Ir a Contratos" },
+  { t: "¿Cómo creo un contrato nuevo?", pasos: ["Entra a Contratos (grupo Herramientas).", "Usa «+ Nuevo contrato» (solo el gestor de Interventoría PRO lo ve).", "Llena la información básica y los proyectos o frentes (uno por línea).", "Guarda: el contrato queda como contrato en uso. Luego asigna su equipo en Equipo de interventoría."], href: "contratos.html", ir: "Ir a Contratos" },
   { t: "¿Cómo cambio de contrato?", pasos: ["En el menú lateral, elige el contrato en el selector «Contrato» de arriba.", "También desde Contratos: selecciona el contrato y usa «Usar este contrato».", "En Registro en campo hay un selector propio a la vista."], href: "contratos.html", ir: "Ir a Contratos" },
-  { t: "¿Cómo agrego personas al equipo de un contrato?", pasos: ["En Contratos, selecciona el contrato y usa «✏️ Editar» (solo el gestor).", "En «Equipo del contrato» busca y marca a las personas.", "Guarda: desde ese momento ven el contrato y pueden registrar información."], href: "contratos.html", ir: "Ir a Contratos" },
+  { t: "¿Cómo asigno colaboradores a un contrato?", pasos: ["Entra a Equipo de interventoría (grupo Herramientas).", "Cada fila es un colaborador activo y cada columna un contrato: marca o desmarca la casilla (solo el gestor).", "Usa «💾 Guardar cambios»: quienes entran ven el contrato y registran información; quienes salen dejan de verlo. Queda constancia en el historial.", "Los gestores ven todos los contratos aunque no estén marcados."], href: "equipo.html", ir: "Ir a Equipo de interventoría" },
   { t: "¿Quién puede eliminar registros?", pasos: ["Solo el gestor de Interventoría PRO (permiso en Empleados del módulo interno).", "Lo eliminado queda guardado en el Historial de cambios con su contenido, la persona y la fecha."], href: "historial.html", ir: "Ver el historial" },
   { t: "¿Cómo genero el informe mensual en PDF o Word?", pasos: ["Entra a Informe mensual.", "Elige el mes y marca las secciones que quieres incluir.", "Revisa la vista previa y genera el PDF (portada clara u oscura) o el Word para los ajustes finales."], href: "informe.html", ir: "Ir al Informe mensual" },
   { t: "¿Cómo cargo información desde Excel?", pasos: ["En el módulo, usa «Importar desde Excel».", "Descarga la plantilla del módulo y llénala, una fila por registro.", "Elige el archivo y revisa la vista previa: solo se importan las filas sin error.", "En Personal (por cédula) y Actividades (por ítem) se actualiza el registro existente en vez de duplicarlo; las celdas vacías no borran datos."], href: hrefModulo("personal"), ir: "Ir a Listado de personal" },
@@ -34,7 +34,8 @@ const FAQ = [
 const PAGINAS = [
   { t: "Inicio", d: "Resumen del contrato en uso: tiempo, avance técnico y financiero, personal, garantías y todas las alertas.", href: "inicio.html" },
   { t: "Registro en campo", d: "Registro desde el celular en la obra, aun sin señal: fotos, inspecciones, accidentes, novedades y charlas.", href: "campo.html" },
-  { t: "Contratos", d: "Todos los contratos con su semáforo, avance y alertas; ficha completa, creación y edición de contratos y su equipo.", href: "contratos.html" },
+  { t: "Contratos", d: "Todos los contratos con su semáforo, avance y alertas; ficha completa, creación y edición de contratos.", href: "contratos.html" },
+  { t: "Equipo de interventoría", d: "Matriz de colaboradores y contratos: quién está asignado a cada contrato (personas, equipo, miembros, usuarios).", href: "equipo.html" },
   { t: "Informe mensual", d: "Generación del informe del mes en PDF o Word con las secciones elegidas.", href: "informe.html" },
   { t: "Historial de cambios", d: "Quién creó, editó o eliminó cada registro, cuándo y qué cambió.", href: "historial.html" },
   { t: "Avisos por correo", d: "Envío consciente al gestor de lo vencido o por vencer.", href: "avisos.html" }

@@ -1,7 +1,8 @@
 // Contratos de Interventoría PRO: en una sola página, el estado de todos
 // los contratos (semáforo, avance, alertas — antes "Tablero de contratos"),
 // la información básica de cada uno (numeral "Información Básica del
-// Contrato" del informe) y su equipo.
+// Contrato" del informe). El equipo de cada contrato se asigna aparte, en
+// Equipo de interventoría (equipo.html).
 // El gestor crea/edita contratos y define quién del personal de Cinco
 // S.A.S. trabaja en cada uno; los miembros solo ven los suyos.
 import { collection, addDoc, updateDoc, deleteDoc, doc, getDocs, serverTimestamp, writeBatch } from "https://www.gstatic.com/firebasejs/10.7.1/firebase-firestore.js";
@@ -19,20 +20,10 @@ async function iniciar({ user, perfil, esGestor, contratos, contrato }) {
   pintarEncabezado(`${imgModulo("contratos", "ip-h1-foto")} ${esGestor ? "Contratos" : "Mis contratos"}`, null);
   const form = document.getElementById("contratoForm");
   const alerta = document.getElementById("contratoAlerta");
-  const miembrosEl = document.getElementById("c_miembros");
-  const buscarMiembro = document.getElementById("c_buscarMiembro");
   const esAdmin = perfil.rol === "admin";
   let editandoId = null;
-  let empleados = [];
-  let seleccion = new Set();
 
-  if (esGestor) {
-    document.getElementById("nuevoContratoBtn").classList.remove("hidden");
-    const snap = await getDocs(collection(db, "empleados"));
-    empleados = snap.docs.map((d) => ({ email: d.id, ...d.data() }))
-      .filter((e) => e.estado === "activo")
-      .sort((a, b) => String(a.nombre || a.email).localeCompare(String(b.nombre || b.email), "es"));
-  }
+  if (esGestor) document.getElementById("nuevoContratoBtn").classList.remove("hidden");
 
   // ---------------------------------------------------------- formulario
   const CAMPOS = ["numero", "tipo", "estado", "objeto", "municipio", "objetivo", "alcance", "frentes", "contratante", "contratista", "supervisor", "director", "valorInicial", "anticipoPct", "fechaInicio", "fechaFin", "plazo", "smmlv"];
@@ -41,27 +32,12 @@ async function iniciar({ user, perfil, esGestor, contratos, contrato }) {
   const ETIQUETAS = { numero: "Contrato N.º", tipo: "Tipo de interventoría", estado: "Estado", objeto: "Objeto", municipio: "Municipio", objetivo: "Objetivo", alcance: "Alcance", frentes: "Proyectos / frentes", contratante: "Contratante", contratista: "Contratista", supervisor: "Supervisor", director: "Director / interventor", valorInicial: "Valor inicial", anticipoPct: "Anticipo (%)", fechaInicio: "Fecha de inicio", fechaFin: "Fecha de terminación", plazo: "Plazo", smmlv: "SMMLV" };
   const CAMPOS_HIST = CAMPOS.map((k) => ({ key: k, label: ETIQUETAS[k] || k, type: ["valorInicial", "smmlv"].includes(k) ? "money" : k.startsWith("fecha") ? "date" : "text" }));
 
-  function pintarMiembros() {
-    const t = buscarMiembro.value.trim().toLowerCase();
-    const visibles = empleados.filter((e) => !t || `${e.nombre || ""} ${e.email} ${e.cargo || ""}`.toLowerCase().includes(t));
-    miembrosEl.innerHTML = visibles.map((e) => `
-      <label class="ip-miembro"><input type="checkbox" value="${esc(e.email)}" ${seleccion.has(e.email) ? "checked" : ""}>
-        <span><strong>${esc(e.nombre || e.email)}</strong> <span class="text-muted">${esc(e.cargo || "")} · ${esc(e.email)}</span></span></label>`).join("")
-      || '<p class="text-muted ip-sin-margen">Ningún empleado coincide.</p>';
-    miembrosEl.querySelectorAll("input[type=checkbox]").forEach((chk) => chk.addEventListener("change", () => {
-      if (chk.checked) seleccion.add(chk.value); else seleccion.delete(chk.value);
-    }));
-  }
-  buscarMiembro.addEventListener("input", pintarMiembros);
 
   function abrirFormulario(c = null) {
     editandoId = c?.id || null;
     limpiarAlerta(alerta);
     document.getElementById("contratoFormTitulo").textContent = c ? `Editar contrato ${c.numero || ""}` : "Nuevo contrato";
     CAMPOS.forEach((k) => { document.getElementById(`c_${k}`).value = c?.[k] ?? (k === "estado" ? "Activo" : k === "tipo" ? "Servicios" : k === "contratista" ? "CINCO S.A.S." : ""); });
-    seleccion = new Set(c?.miembros || [user.email]);
-    buscarMiembro.value = "";
-    pintarMiembros();
     document.getElementById("contratoEliminarBtn").classList.toggle("hidden", !(c && esAdmin));
     abrirModal("contratoModal");
   }
@@ -78,7 +54,6 @@ async function iniciar({ user, perfil, esGestor, contratos, contrato }) {
       mostrarAlerta(alerta, "La fecha de terminación no puede ser anterior a la de inicio.");
       return;
     }
-    datos.miembros = [...seleccion];
     datos.actualizadoEn = serverTimestamp();
     datos.actualizadoPor = user.email;
     const btn = document.getElementById("contratoGuardarBtn");
@@ -89,14 +64,11 @@ async function iniciar({ user, perfil, esGestor, contratos, contrato }) {
       if (editandoId) {
         const antes = contratos.find((c) => c.id === editandoId) || {};
         const cambios = diferencias(CAMPOS_HIST, antes, datos);
-        const antesEq = new Set(antes.miembros || []);
-        const agregados = datos.miembros.filter((m) => !antesEq.has(m));
-        const quitados = [...antesEq].filter((m) => !datos.miembros.includes(m));
-        if (agregados.length || quitados.length) cambios.push({ campo: "miembros", etiqueta: "Equipo", antes: quitados.length ? `Salen: ${quitados.join(", ")}` : "—", despues: agregados.length ? `Entran: ${agregados.join(", ")}` : "—" });
         lote.update(doc(db, "ipContratos", editandoId), datos);
         if (cambios.length) anotarEnLote(lote, editandoId, { user, perfil, modulo: "contrato", moduloLabel: "Información del contrato", registroId: editandoId, accion: "contrato", resumen: `Contrato ${datos.numero}`, cambios });
       } else {
         datos.creadoEn = serverTimestamp();
+        datos.miembros = [user.email];
         datos.creadoPor = user.email;
         const nuevo = doc(collection(db, "ipContratos"));
         lote.set(nuevo, datos);

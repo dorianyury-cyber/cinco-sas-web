@@ -34,7 +34,8 @@ if (ctx) {
     { href: "inicio.html", foto: "inicio", label: "Inicio", desc: "Resumen del contrato: avance, finanzas y alertas" },
     { href: "campo.html", foto: "campo", label: "Registro en campo", desc: "Desde el celular en la obra: fotos, inspecciones y novedades, aun sin señal" },
     { href: "informe.html", foto: "informe", label: "Informe mensual", desc: "Elige el mes, marca las secciones y genera el informe en PDF o Word" },
-    { href: "contratos.html", foto: "contratos", label: esGestor ? "Contratos" : "Mis contratos", desc: esGestor ? "Todos los contratos con su semáforo y alertas; crea y edita contratos y su equipo" : "Tus contratos con su semáforo, alertas e información básica" },
+    { href: "contratos.html", foto: "contratos", label: esGestor ? "Contratos" : "Mis contratos", desc: esGestor ? "Todos los contratos con su semáforo y alertas; crea y edita contratos" : "Tus contratos con su semáforo, alertas e información básica" },
+    { href: "equipo.html", foto: "equipo", label: "Equipo de interventoría", desc: esGestor ? "Asigna los colaboradores de cada contrato en una sola vista" : "Quién está asignado a cada uno de tus contratos" },
     { href: "historial.html", foto: "historial", label: "Historial de cambios", desc: "Quién registró o cambió cada dato, cuándo y qué cambió" },
     { href: "avisos.html", foto: "avisos", label: "Avisos por correo", desc: "Envía al gestor lo vencido o por vencer, cuando la interventoría lo decida" },
   ];

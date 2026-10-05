@@ -354,6 +354,7 @@ function pintarMenu({ user, perfil, esGestor, contratos, contrato }) {
         ${contrato ? enlace("campo.html", "campo", "Registro en campo") : ""}
         ${contrato ? enlace("informe.html", "informe", "Informe mensual") : ""}
         ${enlace("contratos.html", "contratos", esGestor ? "Contratos" : "Mis contratos")}
+        ${enlace("equipo.html", "equipo", "Equipo de interventoría")}
         ${contrato ? enlace("historial.html", "historial", "Historial de cambios") : ""}
         ${contrato ? enlace("avisos.html", "avisos", "Avisos por correo") : ""}
         </div>

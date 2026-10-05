@@ -1,0 +1,37 @@
+<!doctype html>
+<html lang="es" class="ip-preparando">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<meta name="robots" content="noindex, nofollow">
+<title>Equipo de interventoría — Interventoría PRO</title>
+<link rel="icon" type="image/png" sizes="32x32" href="../assets/img/favicon-32.png">
+<link rel="stylesheet" href="assets/ip.css">
+</head>
+<body>
+  <div class="app-shell">
+    <aside class="sidebar" id="sidebar"></aside>
+    <main class="main">
+      <header id="ipHeader"></header>
+      <p class="text-muted ip-descripcion" id="eqDescripcion">Quién del personal de Cinco S.A.S. está asignado a cada contrato. Cada casilla marcada da acceso a ese contrato: la persona lo ve y registra información en sus módulos.</p>
+      <div id="eqTarjetas"></div>
+      <div class="card ip-barra ip-barra-centro">
+        <input type="search" id="eqBuscar" placeholder="Buscar colaborador o cargo…">
+        <label class="ip-check-linea"><input type="checkbox" id="eqSoloActivos" checked> Solo contratos activos</label>
+        <label class="ip-check-linea"><input type="checkbox" id="eqSoloAsignados"> Solo colaboradores con contrato</label>
+        <button type="button" class="btn secondary" id="eqExcelBtn">📊 Ver / exportar</button>
+        <span class="text-muted ip-contador" id="eqContador"></span>
+      </div>
+      <div class="alert" id="eqAlerta"></div>
+      <div id="eqMatriz"><div class="card"><p class="text-muted ip-sin-margen">Cargando el equipo…</p></div></div>
+      <div class="ip-eq-guardar hidden" id="eqGuardarBarra">
+        <span id="eqPendientes"></span>
+        <button type="button" class="btn secondary" id="eqDeshacerBtn">Deshacer</button>
+        <button type="button" class="btn" id="eqGuardarBtn">💾 Guardar cambios</button>
+      </div>
+    </main>
+  </div>
+  <script src="../js/vendor/exceljs.min.js"></script>
+  <script type="module" src="js/ip-equipo.js"></script>
+</body>
+</html>
