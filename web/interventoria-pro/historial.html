@@ -1,0 +1,31 @@
+<!doctype html>
+<html lang="es" class="ip-preparando">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<meta name="robots" content="noindex, nofollow">
+<title>Historial de cambios — Interventoría PRO</title>
+<link rel="icon" type="image/png" sizes="32x32" href="../assets/img/favicon-32.png">
+<link rel="stylesheet" href="assets/ip.css">
+</head>
+<body>
+  <div class="app-shell">
+    <aside class="sidebar" id="sidebar"></aside>
+    <main class="main">
+      <header id="ipHeader"></header>
+      <p class="text-muted ip-descripcion">Registro de quién creó, editó o eliminó información en este contrato, cuándo y qué cambió. Las entradas no se pueden modificar ni borrar.</p>
+      <div class="card ip-barra">
+        <select id="hFiltroModulo" class="ip-filtro-mes"><option value="">Todos los módulos</option></select>
+        <select id="hFiltroUsuario" class="ip-filtro-mes"><option value="">Todas las personas</option></select>
+        <select id="hFiltroAccion" class="ip-filtro-mes"><option value="">Todas las acciones</option></select>
+        <input type="search" id="hBuscar" placeholder="Buscar…">
+        <span class="text-muted ip-contador" id="hContador"></span>
+        <button type="button" class="btn secondary ip-btn-excel" id="hExcelBtn">📊 Exportar Excel</button>
+      </div>
+      <div id="hLista"><div class="card"><p class="text-muted ip-sin-margen">Cargando…</p></div></div>
+    </main>
+  </div>
+  <script src="../js/vendor/exceljs.min.js"></script>
+  <script type="module" src="js/ip-historial-pagina.js"></script>
+</body>
+</html>

@@ -324,6 +324,7 @@ function pintarMenu({ user, perfil, esGestor, contratos, contrato }) {
       ${enlace("contratos.html", "contratos", esGestor ? "Contratos" : "Mis contratos")}
       ${enlace("generalidades.html", "generalidades", "Generalidades")}
       ${contrato ? enlace("informe.html", "informe", "Informe mensual") : ""}
+      ${contrato ? enlace("historial.html", "historial", "Historial de cambios") : ""}
       ${grupos.map((g, i) => `
         <div class="nav-group ip-nav-cap ip-nav-cap-${i % 4}">
           <div class="collapsible-toggle nav-group-toggle" data-target="ipGrupo-${g.cap.id}">

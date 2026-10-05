@@ -305,11 +305,12 @@ export const GENERALIDADES = {
     "Registrar una vez y usar muchas: lo que se registra en los módulos alimenta las alertas, los resúmenes, el Excel y el informe mensual.",
     "Controlar con evidencia: cada registro puede llevar el enlace a su soporte para dejar trazabilidad.",
     "Anticipar: las alertas avisan lo vencido o por vencer antes de que se convierta en incumplimiento.",
+    "Trazabilidad: cada creación, edición o eliminación queda en el Historial de cambios con la persona, la fecha y los valores antes y después; el historial no se puede modificar y solo el gestor puede eliminar registros.",
     "Separar por contrato y por frente: cada contrato es independiente y, dentro de él, los registros pueden asociarse a un proyecto o frente (ej. una subestación, un tramo o un sector)."
   ],
   roles: [
-    ["Gestor", "Crea contratos, define su información básica, sus frentes y su equipo. Ve todos los contratos."],
-    ["Miembro del equipo", "Registra y consulta la información de los contratos en los que participa."]
+    ["Gestor", "Crea contratos, define su información básica, sus frentes y su equipo, y es el único que puede eliminar registros. Ve todos los contratos."],
+    ["Miembro del equipo", "Registra, edita y consulta la información de los contratos en los que participa; no puede eliminar registros."]
   ],
   flujo: [
     ["Al iniciar el contrato", "Crea el contrato, define sus frentes y equipo, carga la lista de requisitos del acta de inicio y verifica cada requisito hasta el 100 %."],

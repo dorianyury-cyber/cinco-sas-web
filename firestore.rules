@@ -303,9 +303,26 @@ service cloud.firestore {
       allow create, update: if gestionaInterventoriaPro();
       allow delete: if esAdmin();
 
-      match /{coleccion}/{registroId} {
-        allow read, write: if gestionaInterventoriaPro()
+      // Historial de cambios: solo se AGREGA (nunca se edita ni se borra),
+      // a nombre de quien hace el cambio y con la hora del servidor.
+      match /historial/{entradaId} {
+        allow read: if gestionaInterventoriaPro()
           || miembroIp(get(/databases/$(database)/documents/ipContratos/$(contratoId)).data);
+        allow create: if (gestionaInterventoriaPro()
+            || miembroIp(get(/databases/$(database)/documents/ipContratos/$(contratoId)).data))
+          && request.resource.data.usuario == request.auth.token.email
+          && request.resource.data.fecha == request.time;
+        allow update, delete: if false;
+      }
+
+      // Registros de los módulos: el equipo crea y edita; eliminar queda
+      // solo para el gestor (queda constancia en el historial).
+      match /{coleccion}/{registroId} {
+        allow read: if coleccion != 'historial' && (gestionaInterventoriaPro()
+          || miembroIp(get(/databases/$(database)/documents/ipContratos/$(contratoId)).data));
+        allow create, update: if coleccion != 'historial' && (gestionaInterventoriaPro()
+          || miembroIp(get(/databases/$(database)/documents/ipContratos/$(contratoId)).data));
+        allow delete: if coleccion != 'historial' && gestionaInterventoriaPro();
       }
     }
   }

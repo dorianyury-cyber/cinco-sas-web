@@ -2,7 +2,8 @@
 // (numeral "Información Básica del Contrato" del informe) y su equipo.
 // El gestor crea/edita contratos y define quién del personal de Cinco
 // S.A.S. trabaja en cada uno; los miembros solo ven los suyos.
-import { collection, addDoc, updateDoc, deleteDoc, doc, getDocs, serverTimestamp } from "https://www.gstatic.com/firebasejs/10.7.1/firebase-firestore.js";
+import { collection, addDoc, updateDoc, deleteDoc, doc, getDocs, serverTimestamp, writeBatch } from "https://www.gstatic.com/firebasejs/10.7.1/firebase-firestore.js";
+import { anotarEnLote, diferencias } from "./ip-historial.js";
 import {
   db, iniciarPagina, pintarEncabezado, esc, moneda, numero, fecha, fechaCorta, mostrarAlerta, limpiarAlerta, errorAmigable,
   fijarContratoActivo, abrirModal, cerrarModal, diasEntre, hoyISO, imgModulo
@@ -94,6 +95,9 @@ async function iniciar({ user, perfil, esGestor, contratos, contrato }) {
   // ---------------------------------------------------------- formulario
   const CAMPOS = ["numero", "tipo", "estado", "objeto", "municipio", "objetivo", "alcance", "frentes", "contratante", "contratista", "supervisor", "director", "valorInicial", "anticipoPct", "fechaInicio", "fechaFin", "plazo", "smmlv"];
   const NUMERICOS = new Set(["valorInicial", "anticipoPct", "smmlv"]);
+  // Etiquetas y tipos para el historial de cambios del contrato.
+  const ETIQUETAS = { numero: "Contrato N.º", tipo: "Tipo de interventoría", estado: "Estado", objeto: "Objeto", municipio: "Municipio", objetivo: "Objetivo", alcance: "Alcance", frentes: "Proyectos / frentes", contratante: "Contratante", contratista: "Contratista", supervisor: "Supervisor", director: "Director / interventor", valorInicial: "Valor inicial", anticipoPct: "Anticipo (%)", fechaInicio: "Fecha de inicio", fechaFin: "Fecha de terminación", plazo: "Plazo", smmlv: "SMMLV" };
+  const CAMPOS_HIST = CAMPOS.map((k) => ({ key: k, label: ETIQUETAS[k] || k, type: ["valorInicial", "smmlv"].includes(k) ? "money" : k.startsWith("fecha") ? "date" : "text" }));
 
   function pintarMiembros() {
     const t = buscarMiembro.value.trim().toLowerCase();
@@ -138,14 +142,26 @@ async function iniciar({ user, perfil, esGestor, contratos, contrato }) {
     const btn = document.getElementById("contratoGuardarBtn");
     btn.disabled = true;
     try {
+      // El cambio al contrato y su entrada de historial van en un solo lote.
+      const lote = writeBatch(db);
       if (editandoId) {
-        await updateDoc(doc(db, "ipContratos", editandoId), datos);
+        const antes = contratos.find((c) => c.id === editandoId) || {};
+        const cambios = diferencias(CAMPOS_HIST, antes, datos);
+        const antesEq = new Set(antes.miembros || []);
+        const agregados = datos.miembros.filter((m) => !antesEq.has(m));
+        const quitados = [...antesEq].filter((m) => !datos.miembros.includes(m));
+        if (agregados.length || quitados.length) cambios.push({ campo: "miembros", etiqueta: "Equipo", antes: quitados.length ? `Salen: ${quitados.join(", ")}` : "—", despues: agregados.length ? `Entran: ${agregados.join(", ")}` : "—" });
+        lote.update(doc(db, "ipContratos", editandoId), datos);
+        if (cambios.length) anotarEnLote(lote, editandoId, { user, perfil, modulo: "contrato", moduloLabel: "Información del contrato", registroId: editandoId, accion: "contrato", resumen: `Contrato ${datos.numero}`, cambios });
       } else {
         datos.creadoEn = serverTimestamp();
         datos.creadoPor = user.email;
-        const nuevo = await addDoc(collection(db, "ipContratos"), datos);
+        const nuevo = doc(collection(db, "ipContratos"));
+        lote.set(nuevo, datos);
+        anotarEnLote(lote, nuevo.id, { user, perfil, modulo: "contrato", moduloLabel: "Información del contrato", registroId: nuevo.id, accion: "crear", resumen: `Contrato ${datos.numero}` });
         fijarContratoActivo(nuevo.id);
       }
+      await lote.commit();
       location.reload();
     } catch (err) {
       mostrarAlerta(alerta, errorAmigable(err));

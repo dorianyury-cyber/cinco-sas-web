@@ -10,6 +10,7 @@ import {
 } from "./ip-core.js";
 import { MODULOS, nombreCapitulo } from "./ip-modulos.js";
 import { GUIAS } from "./ip-guias.js";
+import { anotarEnLote, diferencias, identificar, refHistorial, fechaHora, ACCIONES } from "./ip-historial.js";
 
 const params = new URLSearchParams(location.search);
 const mod = MODULOS[params.get("m")];
@@ -22,8 +23,9 @@ if (ctxPagina && !mod) {
   iniciarModulo(ctxPagina);
 }
 
-function iniciarModulo({ user, perfil, contrato }) {
+function iniciarModulo({ user, perfil, contrato, esGestor }) {
   const titulo = mod.porCapitulo ? `${mod.label} — ${nombreCapitulo(cap)}` : mod.label;
+  const tituloModulo = titulo;
   pintarEncabezado(`${imgModulo(cap === "ambiental" && mod.id === "capacitaciones" ? "capacitaciones-ambiental" : mod.id, "ip-h1-foto")} ${esc(titulo)}`, contrato);
   document.title = `${titulo} — Interventoría PRO`;
   // Guía del módulo: qué se controla, cómo y qué revisa el aplicativo solo.
@@ -267,7 +269,8 @@ function iniciarModulo({ user, perfil, contrato }) {
     limpiarAlerta(formAlerta);
     document.getElementById("ipFormTitulo").textContent = registro ? `Editar — ${mod.label}` : `Nuevo — ${mod.label}`;
     formCampos.innerHTML = mod.campos.map((c) => htmlCampo(c, registro ? registro[c.key] : (c.porDefecto ? c.porDefecto() : ""))).join("");
-    eliminarBtn.classList.toggle("hidden", !registro);
+    eliminarBtn.classList.toggle("hidden", !registro || !esGestor);
+    pintarHistorialRegistro(registro);
     const img = mod.campos.find((c) => c.type === "imagen");
     if (img) {
       document.getElementById(`f_${img.key}`).addEventListener("change", (e) => {
@@ -278,6 +281,24 @@ function iniciarModulo({ user, perfil, contrato }) {
     }
     abrirModal("ipModal");
     formCampos.querySelector("input, select, textarea")?.focus();
+  }
+
+  // Historial de este registro en la ventana de edición (lo más reciente
+  // primero). Sin orderBy en la consulta para no requerir índice compuesto.
+  const histEl = document.getElementById("ipHistorialRegistro");
+  async function pintarHistorialRegistro(registro) {
+    if (!registro) { histEl.classList.add("hidden"); histEl.innerHTML = ""; return; }
+    histEl.classList.remove("hidden");
+    histEl.innerHTML = `<summary>🕘 Historial de este registro</summary><p class="text-muted ip-sin-margen">Cargando…</p>`;
+    try {
+      const snap = await getDocs(query(refHistorial(contrato.id), where("registroId", "==", registro.id)));
+      const entradas = snap.docs.map((d) => d.data()).sort((a, b) => (b.fecha?.seconds || 0) - (a.fecha?.seconds || 0));
+      const lineas = entradas.map((h) => `<li><strong>${esc(fechaHora(h.fecha))}</strong> · ${esc(h.usuarioNombre)} · ${esc(ACCIONES[h.accion] || h.accion)}${h.accion === "editar" && h.cambios?.length ? `<ul>${h.cambios.map((c) => `<li>${esc(c.etiqueta)}: <span class="ip-hist-antes">${esc(c.antes)}</span> → <span class="ip-hist-despues">${esc(c.despues)}</span></li>`).join("")}</ul>` : ""}</li>`).join("");
+      const origen = registro.creadoPor ? `<li class="text-muted">Creado por ${esc(registro.creadoPor)}${registro.creadoEn ? ` el ${esc(fechaHora(registro.creadoEn))}` : ""}</li>` : "";
+      histEl.innerHTML = `<summary>🕘 Historial de este registro (${entradas.length})</summary><ul class="ip-hist-lista">${lineas || ""}${entradas.some((h) => h.accion === "crear") ? "" : origen}${!lineas && !origen ? '<li class="text-muted">Sin cambios registrados desde que se activó el historial.</li>' : ""}</ul>`;
+    } catch (err) {
+      histEl.innerHTML = `<summary>🕘 Historial de este registro</summary><p class="text-muted ip-sin-margen">${esc(errorAmigable(err))}</p>`;
+    }
   }
 
   function leerFormulario() {
@@ -340,13 +361,22 @@ function iniciarModulo({ user, perfil, contrato }) {
       }
       datos.actualizadoPor = perfil.nombre || user.email;
       datos.actualizadoEn = serverTimestamp();
+      // El cambio y su entrada de historial se guardan juntos (un lote).
+      const lote = writeBatch(db);
+      const base = { user, perfil, modulo: mod.id, moduloLabel: tituloModulo };
       if (editandoId) {
-        await updateDoc(doc(coleccionRef, editandoId), datos);
+        const antes = ctx.registros.find((r) => r.id === editandoId) || {};
+        const cambios = diferencias(mod.campos, antes, datos, ctx.datos.personal || []);
+        lote.update(doc(coleccionRef, editandoId), datos);
+        if (cambios.length) anotarEnLote(lote, contrato.id, { ...base, registroId: editandoId, accion: "editar", resumen: identificar(mod, { ...antes, ...datos }), cambios });
       } else {
         datos.creadoPor = perfil.nombre || user.email;
         datos.creadoEn = serverTimestamp();
-        await addDoc(coleccionRef, datos);
+        const nuevo = doc(coleccionRef);
+        lote.set(nuevo, datos);
+        anotarEnLote(lote, contrato.id, { ...base, registroId: nuevo.id, accion: "crear", resumen: identificar(mod, datos), cambios: diferencias(mod.campos, {}, datos, ctx.datos.personal || []) });
       }
+      await lote.commit();
       cerrarModal("ipModal");
     } catch (err) {
       mostrarAlerta(formAlerta, errorAmigable(err));
@@ -357,9 +387,15 @@ function iniciarModulo({ user, perfil, contrato }) {
   });
 
   eliminarBtn.addEventListener("click", async () => {
-    if (!editandoId || !confirm("¿Eliminar este registro? Esta acción no se puede deshacer.")) return;
+    if (!esGestor) return;
+    if (!editandoId || !confirm("¿Eliminar este registro? Esta acción no se puede deshacer; quedará constancia en el historial.")) return;
     try {
-      await deleteDoc(doc(coleccionRef, editandoId));
+      const antes = ctx.registros.find((r) => r.id === editandoId) || {};
+      const lote = writeBatch(db);
+      lote.delete(doc(coleccionRef, editandoId));
+      // Se guarda el contenido eliminado para que no se pierda la evidencia.
+      anotarEnLote(lote, contrato.id, { user, perfil, modulo: mod.id, moduloLabel: tituloModulo, registroId: editandoId, accion: "eliminar", resumen: identificar(mod, antes), cambios: diferencias(mod.campos, {}, antes, ctx.datos.personal || []) });
+      await lote.commit();
       cerrarModal("ipModal");
     } catch (err) {
       mostrarAlerta(formAlerta, errorAmigable(err));
@@ -388,6 +424,7 @@ function iniciarModulo({ user, perfil, contrato }) {
       try {
         for (let i = 0; i < nuevos.length; i += 400) {
           const lote = writeBatch(db);
+          if (i === 0) anotarEnLote(lote, contrato.id, { user, perfil, modulo: mod.id, moduloLabel: tituloModulo, accion: "lista", resumen: `${nuevos.length} requisito(s) agregados desde la lista base` });
           nuevos.slice(i, i + 400).forEach((p) => {
             const base = {};
             mod.campos.forEach((c) => { if (c.porDefecto) base[c.key] = c.porDefecto(); });
