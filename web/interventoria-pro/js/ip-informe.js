@@ -6,7 +6,7 @@ import { db, iniciarPagina, pintarEncabezado, esc, mesLargo, mesActual, mesesDel
 import { MODULOS, CAPITULOS, activoEnMes } from "./ip-modulos.js";
 import { generarInformeMensual } from "./ip-informe-docx.js";
 import { generarInformeMensualPDF } from "./ip-informe-pdf.js";
-import { claveSeccion } from "./ip-informe-contenido.js";
+import { claveSeccion, fotosDelContrato } from "./ip-informe-contenido.js";
 
 // Secciones que no forman parte del informe clásico: por defecto entran
 // solo si el contrato ya tiene información en ellas.
@@ -40,6 +40,8 @@ async function iniciar({ user, perfil, contrato }) {
 
   // Cuántos registros tiene cada módulo en el mes elegido.
   function delMes(mod, cap, ym) {
+    // Registro fotográfico: las fotos marcadas en "Fotos para el informe".
+    if (mod.id === "fotos") return fotosSel.size;
     let regs = datos[mod.coleccion] || [];
     if (mod.porCapitulo && cap) regs = regs.filter((r) => r[mod.porCapitulo] === cap);
     if (mod.filtroMes) return regs.filter((r) => mod.filtroMes(r, ym)).length;
@@ -116,8 +118,57 @@ async function iniciar({ user, perfil, contrato }) {
   });
   document.getElementById("seleccionTodoBtn").addEventListener("click", () => { todasLasClaves.forEach((k) => seleccion.add(k)); guardarSeleccion(); pintar(); });
   document.getElementById("seleccionNadaBtn").addEventListener("click", () => { seleccion.clear(); guardarSeleccion(); pintar(); });
-  selMes.addEventListener("change", pintar);
+  // ---------------------------------------------------------- fotos del informe
+  // Todas las fotos del contrato (Registro fotográfico + fotos de evidencia),
+  // por mes. Por defecto van las del mes del informe, pero se puede marcar
+  // cualquiera (ej. una foto subida tarde que es del periodo). La selección
+  // se recuerda por contrato y mes en este navegador.
+  const fotosEl = document.getElementById("informeFotos");
+  const todasFotos = fotosDelContrato(datos).filter((f) => f.url);
+  const claveFotos = () => `ip-informe-fotos-${contrato.id}-${selMes.value}`;
+  let fotosSel = new Set();
+  function cargarFotosSel() {
+    let guardadas = null;
+    try { guardadas = JSON.parse(localStorage.getItem(claveFotos()) || "null"); } catch (e) { /* sin almacenamiento */ }
+    fotosSel = new Set(guardadas || todasFotos.filter((f) => String(f.fecha || "").startsWith(selMes.value)).map((f) => f.url));
+  }
+  const guardarFotosSel = () => { try { localStorage.setItem(claveFotos(), JSON.stringify([...fotosSel])); } catch (e) { /* sin almacenamiento */ } };
+  function pintarFotos() {
+    const ym = selMes.value;
+    if (!todasFotos.length) {
+      fotosEl.innerHTML = '<p class="text-muted ip-sin-margen">Este contrato todavía no tiene fotos (Registro fotográfico o fotos de evidencia de los módulos).</p>';
+      return;
+    }
+    const porMes = {};
+    todasFotos.forEach((f) => { const m = String(f.fecha || "").slice(0, 7) || "sin-fecha"; (porMes[m] = porMes[m] || []).push(f); });
+    const meses = Object.keys(porMes).sort().reverse();
+    fotosEl.innerHTML = `<div class="ip-fotos-inf-cabeza">
+        <strong>${fotosSel.size} foto(s) seleccionada(s)</strong>
+        <button type="button" class="btn secondary" data-fotos="mes">Solo las de ${esc(mesLargo(ym))}</button>
+        <button type="button" class="btn secondary" data-fotos="nada">Ninguna</button>
+      </div>
+      ${meses.map((m) => `<div class="ip-fotos-inf-mes">
+        <h3>${m === "sin-fecha" ? "Sin fecha" : esc(mesLargo(m))}${m === ym ? ' <span class="badge ok">mes del informe</span>' : ""} <span class="text-muted">(${porMes[m].length})</span></h3>
+        <div class="ip-fotos-inf-grid">${porMes[m].map((f) => `<label class="ip-fotos-inf-item${fotosSel.has(f.url) ? " sel" : ""}" title="${esc(f.observacion || "")}">
+          <input type="checkbox" data-url="${esc(f.url)}" ${fotosSel.has(f.url) ? "checked" : ""}>
+          <img src="${esc(f.url)}" alt="" loading="lazy">
+          <span>${esc(f.fecha || "")} · ${esc(String(f.observacion || "").slice(0, 60))}</span></label>`).join("")}</div></div>`).join("")}`;
+    fotosEl.querySelectorAll("input[data-url]").forEach((chk) => chk.addEventListener("change", () => {
+      if (chk.checked) fotosSel.add(chk.dataset.url); else fotosSel.delete(chk.dataset.url);
+      guardarFotosSel();
+      pintarFotos(); pintar();
+    }));
+    fotosEl.querySelector('[data-fotos="mes"]').addEventListener("click", () => {
+      fotosSel = new Set(todasFotos.filter((f) => String(f.fecha || "").startsWith(ym)).map((f) => f.url));
+      guardarFotosSel(); pintarFotos(); pintar();
+    });
+    fotosEl.querySelector('[data-fotos="nada"]').addEventListener("click", () => { fotosSel = new Set(); guardarFotosSel(); pintarFotos(); pintar(); });
+  }
+
+  selMes.addEventListener("change", () => { cargarFotosSel(); pintar(); pintarFotos(); });
+  cargarFotosSel();
   pintar();
+  pintarFotos();
   const sinSeleccion = () => {
     if (seleccion.size) return false;
     mostrarAlerta(alerta, "Selecciona al menos una sección para incluir en el informe.");
@@ -130,7 +181,8 @@ async function iniciar({ user, perfil, contrato }) {
     elaboradoPor: document.getElementById("informeElaborado").value.trim(),
     cargo: document.getElementById("informeCargo").value.trim(),
     radicado: document.getElementById("informeRadicado").value.trim(),
-    incluir: new Set(seleccion)
+    incluir: new Set(seleccion),
+    fotosIncluir: [...fotosSel]
   });
   const nombreArchivo = (ext) => `Informe ${contrato.tipo === "Obra" ? "de Interventoría" : "de seguimiento"} ${mesLargo(selMes.value)} (Contrato ${String(contrato.numero || "").replace(/[\/:*?"<>|]/g, "-")}).${ext}`;
   function descargar(url, nombre) {
@@ -196,7 +248,8 @@ async function iniciar({ user, perfil, contrato }) {
         contrato, ym, datos,
         elaboradoPor: document.getElementById("informeElaborado").value.trim(),
         cargo: document.getElementById("informeCargo").value.trim(),
-        incluir: new Set(seleccion)
+        incluir: new Set(seleccion),
+        fotosIncluir: [...fotosSel]
       });
       const a = document.createElement("a");
       a.href = URL.createObjectURL(blob);

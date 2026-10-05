@@ -1015,36 +1015,56 @@ export async function generarInformePDF(informe) {
   doc.text(TIPO_LABEL[informe.tipoInforme] || "Informe", anchoPagina / 2, 115 + tituloLineas.length * 8 + 4, { align: "center" });
 
   let yPortada = 165;
-  doc.setFontSize(10.5);
   doc.setTextColor(...colorValor);
   const xValor = anchoPagina / 2 - 10;
   const anchoValor = anchoPagina - margenX - xValor;
-  const filaPortada = (etiqueta, valor) => {
-    if (!valor) return;
+  // El cargo va en su(s) propio(s) renglón(es) debajo del nombre (no pegado
+  // con un guion) — así un cargo de varias líneas (ej. título + rol actual)
+  // siempre se lee como bloque propio, sin importar si la primera línea es
+  // corta y cabría junto al nombre.
+  const filasPortada = [
+    ["Contrato:", informe.contratoCodigo ? `${informe.contratoCodigo}${informe.contratoNumero ? " · N.º " + informe.contratoNumero : ""}` : null],
+    ["Objeto:", informe.contratoNombre, true],
+    ["Cliente:", informe.contratoCliente],
+    ["Supervisor:", informe.contratoSupervisor],
+    ["Vigencia:", informe.contratoFechaInicio ? `${formatearFecha(informe.contratoFechaInicio)} — ${informe.contratoFechaFin ? formatearFecha(informe.contratoFechaFin) : "en curso"}` : null],
+    ["Elaborado por:", informe.firmaNombre ? `${informe.firmaNombre}${informe.firmaCargo ? "\n" + informe.firmaCargo : ""}` : null]
+  ].filter(([, valor]) => valor);
+  // Cada salto de línea escrito a mano (ej. en "Cargo", que ahora es una
+  // caja de varias líneas) se respeta tal cual, y cada uno de esos
+  // renglones se ajusta aparte al ancho disponible si hace falta —
+  // partir el texto completo de una sola vez con splitTextToSize no
+  // garantiza conservar los saltos ya puestos.
+  const renglonesDe = (valor) => String(valor).split("\n").flatMap((linea) => doc.splitTextToSize(linea.trim(), anchoValor));
+  // Todo debe caber encima del radicado y la fecha (posición fija al pie):
+  // si un objeto muy largo no cabe, se reduce la letra (hasta 8 pt) y, si
+  // aun así no cabe, se recorta el objeto con "…" (antes se montaba encima
+  // del radicado).
+  const limitePortada = altoPagina - 38;
+  // Interlineado de 1,25 (en mm: pt × 0,3528 × 1,25), el mismo con que se
+  // dibuja el texto, para que lo medido y lo dibujado coincidan.
+  const FACTOR_LINEA = 1.25;
+  const interlinea = (tam) => tam * 0.3528 * FACTOR_LINEA;
+  const alturaFilas = (tam) => { doc.setFontSize(tam); return filasPortada.reduce((s, [, v]) => s + renglonesDe(v).length * interlinea(tam) + 2, 0); };
+  let tamPortada = 10.5;
+  while (tamPortada > 8 && yPortada + alturaFilas(tamPortada) > limitePortada) tamPortada -= 0.5;
+  doc.setFontSize(tamPortada);
+  const sobrante = yPortada + alturaFilas(tamPortada) - limitePortada;
+  filasPortada.forEach(([etiqueta, valor, recortable]) => {
+    let renglones = renglonesDe(valor);
+    if (recortable && sobrante > 0) {
+      const quitar = Math.ceil(sobrante / interlinea(tamPortada));
+      const quedan = Math.max(2, renglones.length - quitar);
+      if (quedan < renglones.length) renglones = [...renglones.slice(0, quedan - 1), `${renglones[quedan - 1].replace(/\s*\S*$/, "")}…`];
+    }
     doc.setFont("helvetica", "bold");
     doc.setTextColor(...colorEtiqueta);
     doc.text(etiqueta, anchoPagina / 2 - 45, yPortada);
     doc.setFont("helvetica", "normal");
     doc.setTextColor(...colorValor);
-    // Cada salto de línea escrito a mano (ej. en "Cargo", que ahora es una
-    // caja de varias líneas) se respeta tal cual, y cada uno de esos
-    // renglones se ajusta aparte al ancho disponible si hace falta —
-    // partir el texto completo de una sola vez con splitTextToSize no
-    // garantiza conservar los saltos ya puestos.
-    const renglones = String(valor).split("\n").flatMap((linea) => doc.splitTextToSize(linea, anchoValor));
-    doc.text(renglones, xValor, yPortada);
-    yPortada += renglones.length * 5.2 + 2;
-  };
-  filaPortada("Contrato:", informe.contratoCodigo ? `${informe.contratoCodigo}${informe.contratoNumero ? " · N.º " + informe.contratoNumero : ""}` : null);
-  filaPortada("Objeto:", informe.contratoNombre);
-  filaPortada("Cliente:", informe.contratoCliente);
-  filaPortada("Supervisor:", informe.contratoSupervisor);
-  if (informe.contratoFechaInicio) filaPortada("Vigencia:", `${formatearFecha(informe.contratoFechaInicio)} — ${informe.contratoFechaFin ? formatearFecha(informe.contratoFechaFin) : "en curso"}`);
-  // El cargo va en su(s) propio(s) renglón(es) debajo del nombre (no pegado
-  // con un guion) — así un cargo de varias líneas (ej. título + rol actual)
-  // siempre se lee como bloque propio, sin importar si la primera línea es
-  // corta y cabría junto al nombre.
-  filaPortada("Elaborado por:", informe.firmaNombre ? `${informe.firmaNombre}${informe.firmaCargo ? "\n" + informe.firmaCargo : ""}` : null);
+    doc.text(renglones, xValor, yPortada, { lineHeightFactor: FACTOR_LINEA });
+    yPortada += renglones.length * interlinea(tamPortada) + 2;
+  });
 
   doc.setFont("helvetica", "bold");
   doc.setFontSize(11);

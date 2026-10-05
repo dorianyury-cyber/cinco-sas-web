@@ -31,6 +31,29 @@ export function fechaLarga(iso) {
   if (!iso) return "-";
   return new Date(`${iso}T12:00:00`).toLocaleDateString("es-CO", { day: "numeric", month: "long", year: "numeric" });
 }
+// Todas las fotos del contrato con su fecha: las del Registro fotográfico
+// (una por registro) y las "Fotos de evidencia" de los demás módulos (la
+// fecha es la del registro: su primer campo de fecha o de mes, o el día en
+// que se creó). La usan el informe y la página Informe mensual.
+export function fotosDelContrato(datos) {
+  const fotos = (datos.fotos || []).filter((f) => f.foto).map((f) => ({ url: f.foto, fecha: f.fecha, observacion: f.observacion }));
+  Object.values(MODULOS).forEach((m) => {
+    const campoFotos = m.campos.find((c) => c.type === "fotos");
+    if (!campoFotos) return;
+    const campoFecha = m.campos.find((c) => c.type === "date") || m.campos.find((c) => c.type === "month");
+    (datos[m.coleccion] || []).forEach((r) => {
+      const lista = r[campoFotos.key] || [];
+      if (!lista.length) return;
+      const creado = r.creadoEn?.toDate ? r.creadoEn.toDate().toISOString().slice(0, 10) : "";
+      const f = (campoFecha && r[campoFecha.key]) || r.registradoEnCampo?.slice(0, 10) || creado;
+      const fechaReg = /^\d{4}-\d{2}$/.test(f) ? `${f}-01` : f;
+      const texto = r.observacion || r.descripcion || r.tema || r.actividad || r.hallazgos || r.texto || r.requisito || "";
+      lista.forEach((x) => fotos.push({ url: x.url, fecha: fechaReg, observacion: `${m.label}${texto ? `: ${String(texto).slice(0, 160)}` : ""}` }));
+    });
+  });
+  return fotos;
+}
+
 export function tituloInforme(contrato) {
   return contrato.tipo === "Obra" ? "Informe mensual de interventoría" : "Informe mensual de seguimiento contractual";
 }
@@ -63,7 +86,7 @@ export function claveSeccion(it) {
   return it.cap ? `${it.m}:${it.cap}` : it.m;
 }
 
-export async function construirInforme({ contrato, ym, datos, elaboradoPor, cargo, incluir = null }) {
+export async function construirInforme({ contrato, ym, datos, elaboradoPor, cargo, incluir = null, fotosIncluir = null }) {
   const corte = finDeMes(ym);
   const esObra = contrato.tipo === "Obra";
   const mesesHasta = mesesDelContrato(contrato).filter((m) => m <= ym);
@@ -378,9 +401,21 @@ export async function construirInforme({ contrato, ym, datos, elaboradoPor, carg
   // ================================================================ 11. REGISTRO FOTOGRÁFICO
   await capitulo("Registro fotográfico", [
     ["fotos", () => {
-      const fotos = del("fotos").sort((a, c) => String(a.fecha).localeCompare(String(c.fecha)));
-      if (fotos.length) b.push({ tipo: "fotos", fotos: fotos.map((f) => ({ url: f.foto, observacion: f.observacion || "-", fecha: fechaLarga(f.fecha) })) });
-      else nota("Sin registro fotográfico para el periodo.");
+      // Fotos del periodo: las del Registro fotográfico y las "Fotos de
+      // evidencia" de cualquier módulo cuyo registro sea de este mes.
+      // Si en la página se eligieron fotos (de cualquier mes: una foto
+      // subida tarde puede ser del periodo), van esas; si no, las del mes.
+      const todas = fotosDelContrato(datos);
+      const elegidas = fotosIncluir ? new Set(fotosIncluir) : null;
+      const fotos = todas.filter((f) => (elegidas ? elegidas.has(f.url) : String(f.fecha || "").startsWith(ym))).sort((a, c) => String(a.fecha).localeCompare(String(c.fecha)));
+      if (fotos.length) b.push({ tipo: "fotos", fotos: fotos.map((f) => ({ url: f.url, observacion: f.observacion || "-", fecha: fechaLarga(f.fecha) })) });
+      else {
+        // Avisa si hay fotos, pero de otros meses (para que no "desaparezcan").
+        const otros = [...new Set(todas.map((f) => String(f.fecha || "").slice(0, 7)).filter(Boolean))].sort();
+        nota(otros.length
+          ? `Sin registro fotográfico con fecha de ${mesLargo(ym)}. Hay ${todas.length} foto(s) registradas en: ${otros.map(mesLargo).join(", ")}.`
+          : "Sin registro fotográfico para el periodo.");
+      }
     }]
   ]);
 
