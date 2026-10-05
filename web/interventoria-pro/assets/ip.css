@@ -2362,3 +2362,24 @@ textarea { font-family: inherit; }
 .ip-ayuda-detalle ol { padding-left: 20px; }
 .ip-ayuda-extra { padding: 8px 10px; border-radius: 8px; background: rgba(31, 95, 191, 0.08); }
 .ip-ayuda-detalle .btn { display: inline-flex; width: auto; margin-top: 10px; }
+
+/* Generalidades por secciones: navegación anterior / siguiente */
+.ip-gen-nav { display: flex; justify-content: space-between; align-items: center; gap: 10px; flex-wrap: wrap; margin: 18px 0 8px; }
+.ip-gen-nav:empty { display: none; }
+
+/* Cambiar contraseña / Cerrar sesión: dos botones iguales con el estilo
+   "fruto del Espíritu" (mismo de los botones de las ventanas). */
+.ip-cuenta-botones { display: grid; gap: 8px; margin-top: 10px; }
+.ip-btn-cuenta {
+  position: relative; overflow: hidden; display: inline-flex; align-items: center; justify-content: center; gap: 6px;
+  width: 100%; margin: 0; padding: 8px 14px; border: 0; border-radius: 999px; cursor: pointer; text-decoration: none;
+  font-family: "Poppins", "Segoe UI", sans-serif; font-weight: 700; font-size: 10.5px; letter-spacing: 0.05em; text-transform: uppercase;
+  color: var(--fr-amber);
+  background: repeating-linear-gradient(135deg, rgba(254, 178, 9, 0.14) 0 8px, rgba(254, 178, 9, 0) 8px 16px), linear-gradient(135deg, var(--fr-navy) 0%, var(--fr-navy-dark) 100%);
+  box-shadow: 0 4px 10px rgba(18, 22, 29, 0.18), inset 0 1px 0 rgba(255, 255, 255, 0.10), inset 0 -2px 4px rgba(0, 0, 0, 0.28);
+  transition: transform 0.12s ease, filter 0.12s ease;
+}
+.ip-btn-cuenta::after { content: ""; position: absolute; left: 0; right: 0; bottom: 0; height: 1.5px; background: linear-gradient(90deg, var(--fr-amber-dark), var(--fr-amber), var(--fr-amber-dark)); }
+.ip-btn-cuenta:hover { transform: translateY(-1px); filter: brightness(1.12); text-decoration: none; color: var(--fr-amber); }
+.ip-topbar-acciones .ip-btn-cuenta { width: 190px; }
+@media (max-width: 560px) { .ip-topbar-acciones { gap: 8px; } .ip-topbar-acciones .ip-btn-cuenta { width: auto; padding: 8px 10px; } }

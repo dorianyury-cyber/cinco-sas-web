@@ -378,8 +378,10 @@ function pintarMenu({ user, perfil, esGestor, contratos, contrato }) {
     <div class="user-box">
       <div id="userName">${esc(perfil.nombre || user.email)}</div>
       <div class="text-muted ip-user-rol">${esGestor ? "Gestor de Interventoría PRO" : "Equipo del contrato"}</div>
-      <a href="../control/cambiar-clave.html" class="ip-user-link">🔒 Cambiar contraseña</a>
-      <button class="btn secondary" id="logoutBtn">Cerrar sesión</button>
+      <div class="ip-cuenta-botones">
+        <a href="../control/cambiar-clave.html" class="ip-btn-cuenta">🔒 Cambiar contraseña</a>
+        <button type="button" class="ip-btn-cuenta" id="logoutBtn">⏻ Cerrar sesión</button>
+      </div>
     </div>`;
 
   aside.querySelectorAll(".nav-group-toggle").forEach((toggle) => {

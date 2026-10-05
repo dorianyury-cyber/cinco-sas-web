@@ -2,7 +2,7 @@
 // de trabajo, convenciones y, por capítulo, qué controla cada módulo (de
 // ip-guias.js). Redactado en términos generales; lo específico, solo como
 // ejemplo.
-import { iniciarPagina, pintarEncabezado, esc, imgModulo, hrefModulo } from "./ip-core.js";
+import { iniciarPagina, pintarEncabezado, esc, imgModulo, hrefModulo, SECCIONES_GENERALIDADES } from "./ip-core.js";
 import { CAPITULOS, MODULOS } from "./ip-modulos.js";
 import { GUIAS, GENERALIDADES as G } from "./ip-guias.js";
 
@@ -40,17 +40,36 @@ if (ctx) {
       </div>`).join("")}</div>
     </div>
     <div class="card cinta cinta-0" id="gen-convenciones"><h2>Convenciones</h2><ul class="ip-gen-lista">${G.convenciones.map((c) => `<li>${esc(c)}</li>`).join("")}</ul></div>
-    <h2 class="ip-gen-titulo" id="gen-capitulos">Qué controla cada capítulo</h2>
-    <p class="text-muted ip-descripcion">Cada módulo explica en su parte superior qué se controla, cómo se controla y qué revisa el aplicativo por sí solo.</p>
-    <div class="ip-informe-grid">${capitulos}</div>`;
+    <div id="gen-capitulos">
+      <h2 class="ip-gen-titulo">Qué controla cada capítulo</h2>
+      <p class="text-muted ip-descripcion">Cada módulo explica en su parte superior qué se controla, cómo se controla y qué revisa el aplicativo por sí solo.</p>
+      <div class="ip-informe-grid">${capitulos}</div>
+    </div>
+    <div class="ip-gen-nav" id="genNav"></div>`;
 
-  // El contenido se arma después de cargar: se lleva a la sección pedida
-  // (#gen-...) a mano, también cuando se elige otra desde el menú sin
-  // salir de la página.
-  const irASeccion = () => {
-    const el = location.hash && document.getElementById(location.hash.slice(1));
-    if (el) el.scrollIntoView({ behavior: "smooth", block: "start" });
+  // Desde un submenú de "Conoce el aplicativo" (#gen-...) se muestra SOLO
+  // esa sección, con anterior / siguiente y "Ver todas"; sin ancla se ve
+  // la página completa. Funciona también al cambiar de tema sin salir.
+  const nav = document.getElementById("genNav");
+  const secciones = SECCIONES_GENERALIDADES.filter((s) => document.getElementById(s.id));
+  const mostrar = () => {
+    const id = location.hash.slice(1);
+    const i = secciones.findIndex((s) => s.id === id);
+    document.querySelectorAll('.sidebar a[href^="generalidades.html#"]').forEach((a) => a.classList.toggle("active", a.getAttribute("href") === `generalidades.html#${id}`));
+    secciones.forEach((s) => document.getElementById(s.id).classList.toggle("hidden", i >= 0 && s.id !== id));
+    if (i < 0) {
+      nav.innerHTML = "";
+      pintarEncabezado(`${imgModulo("generalidades", "ip-h1-foto")} Generalidades`, ctx.contrato);
+      return;
+    }
+    const s = secciones[i];
+    pintarEncabezado(`${imgModulo(s.foto, "ip-h1-foto")} ${esc(s.label)}`, ctx.contrato, "Conoce el aplicativo");
+    const ant = secciones[i - 1], sig = secciones[i + 1];
+    nav.innerHTML = `${ant ? `<a class="btn secondary" href="#${ant.id}">← ${esc(ant.label)}</a>` : "<span></span>"}
+      <a class="btn secondary" href="generalidades.html">Ver todas las secciones</a>
+      ${sig ? `<a class="btn secondary" href="#${sig.id}">${esc(sig.label)} →</a>` : "<span></span>"}`;
+    window.scrollTo({ top: 0 });
   };
-  irASeccion();
-  window.addEventListener("hashchange", irASeccion);
+  mostrar();
+  window.addEventListener("hashchange", mostrar);
 }
