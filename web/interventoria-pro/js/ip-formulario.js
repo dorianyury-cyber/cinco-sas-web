@@ -73,6 +73,13 @@ export function htmlCampo(c, valor, { contrato, personal = [], camara = false } 
         <input type="hidden" id="${id}">
         <img id="${id}_prev" class="ip-foto-prev ${v ? "" : "hidden"}" src="${esc(v)}" alt="">`;
       break;
+    // Documentos PDF adjuntos (pólizas, actas, contratos firmados…).
+    case "documentos":
+      control = `<div class="ip-foto-botones">
+          <label class="btn ip-foto-boton">📎 Adjuntar PDF<input type="file" accept="application/pdf,.pdf" multiple data-docs-de="${c.key}" class="ip-oculto"></label>
+        </div>
+        <div class="ip-docs-lista" id="${id}_lista"></div>`;
+      break;
     case "fotos":
       control = `<div class="ip-foto-botones">
           <label class="btn ip-foto-boton">📷 Tomar foto<input type="file" accept="image/*" capture="environment" data-fotos-de="${c.key}" class="ip-oculto"></label>
@@ -89,7 +96,7 @@ export function htmlCampo(c, valor, { contrato, personal = [], camara = false } 
     }
     default: control = `<input type="text" id="${id}" value="${esc(v)}" ${req} placeholder="${esc(c.placeholder || "")}">`;
   }
-  return `<div class="ip-campo ${c.ancho || ["textarea", "avance", "imagen", "fotos"].includes(c.type) ? "ip-campo-ancho" : ""}">
+  return `<div class="ip-campo ${c.ancho || ["textarea", "avance", "imagen", "fotos", "documentos"].includes(c.type) ? "ip-campo-ancho" : ""}">
     <label for="${id}">${esc(c.label)}${c.required ? " *" : ""}</label>${control}
     ${c.ayuda ? `<p class="text-muted ip-ayuda">${esc(c.ayuda)}</p>` : ""}</div>`;
 }
@@ -166,10 +173,98 @@ export function controlFotos(contenedor, campos, registro = null) {
   };
 }
 
+// ------------------------------------------------------------ documentos PDF
+export const MAX_DOCS = 10;
+export const MAX_MB_DOC = 20;
+const tamano = (b) => (b >= 1048576 ? `${(b / 1048576).toFixed(1)} MB` : `${Math.max(1, Math.round(b / 1024))} KB`);
+
+// Visor de PDF en la misma página (blob en un iframe, permitido por la
+// política del sitio). Si el archivo no se puede descargar para mostrarlo
+// (ej. sin conexión), se abre en una pestaña nueva.
+export async function verPdf(fuente, nombre = "Documento") {
+  let url;
+  try {
+    const blob = fuente instanceof Blob ? fuente : await (await fetch(fuente)).blob();
+    url = URL.createObjectURL(new Blob([blob], { type: "application/pdf" }));
+  } catch (err) {
+    window.open(fuente, "_blank", "noopener");
+    return;
+  }
+  const fondo = document.createElement("div");
+  fondo.className = "modal-backdrop open ip-visor-fondo";
+  fondo.innerHTML = `<div class="modal ip-modal-ancho ip-visor-modal ip-visor-pdf" role="dialog" aria-label="${esc(nombre)}">
+    <h2>📄 ${esc(nombre)}</h2>
+    <iframe title="${esc(nombre)}"></iframe>
+    <div class="ip-form-acciones ip-visor-acciones">
+      <a class="btn" download="${esc(nombre.endsWith(".pdf") ? nombre : `${nombre}.pdf`)}">⬇ Descargar</a>
+      <button type="button" class="btn secondary">Cerrar</button>
+    </div></div>`;
+  fondo.querySelector("iframe").src = url;
+  fondo.querySelector("a[download]").href = url;
+  document.body.appendChild(fondo);
+  const cerrar = () => { fondo.remove(); URL.revokeObjectURL(url); };
+  fondo.querySelector("button").addEventListener("click", cerrar);
+  fondo.addEventListener("click", (e) => { if (e.target === fondo) cerrar(); });
+}
+
+// Maneja los campos "documentos" de un formulario ya pintado: lista con los
+// ya subidos (ver / quitar) y los nuevos por subir (solo PDF, máx.
+// MAX_DOCS por registro y MAX_MB_DOC MB cada uno).
+export function controlDocumentos(contenedor, campos, registro = null) {
+  const docs = {};
+  campos.filter((c) => c.type === "documentos").forEach((c) => {
+    docs[c.key] = { conservados: Array.isArray(registro?.[c.key]) ? [...registro[c.key]] : [], nuevos: [] };
+  });
+  function pintar(key) {
+    const el = contenedor.querySelector(`#f_${key}_lista`);
+    if (!el) return;
+    const d = docs[key];
+    const fila = (nombre, peso, idx, nuevo) => `<div class="ip-doc-item${nuevo ? " ip-doc-nuevo" : ""}">
+      <span class="ip-doc-nombre">📄 ${esc(nombre)} <span class="text-muted">${peso ? tamano(peso) : ""}${nuevo ? " · por subir" : ""}</span></span>
+      <button type="button" class="ip-doc-ver" data-ver="${idx}">👁 Ver</button>
+      <button type="button" class="ip-doc-quitar" data-quitar="${idx}" title="Quitar documento">✕</button></div>`;
+    el.innerHTML = [
+      ...d.conservados.map((x, i) => fila(x.nombre, x.tamano, `c${i}`, false)),
+      ...d.nuevos.map((x, i) => fila(x.name, x.size, `n${i}`, true))
+    ].join("") || `<span class="text-muted ip-fotos-cuenta">Sin documentos (PDF, máx. ${MAX_DOCS}, hasta ${MAX_MB_DOC} MB cada uno).</span>`;
+    const pos = (v) => ({ tipo: v[0], i: Number(v.slice(1)) });
+    el.querySelectorAll("[data-ver]").forEach((b) => b.addEventListener("click", () => {
+      const { tipo, i } = pos(b.dataset.ver);
+      if (tipo === "c") verPdf(d.conservados[i].url, d.conservados[i].nombre); else verPdf(d.nuevos[i], d.nuevos[i].name);
+    }));
+    el.querySelectorAll("[data-quitar]").forEach((b) => b.addEventListener("click", () => {
+      const { tipo, i } = pos(b.dataset.quitar);
+      if (tipo === "c") d.conservados.splice(i, 1); else d.nuevos.splice(i, 1);
+      pintar(key);
+    }));
+  }
+  Object.keys(docs).forEach(pintar);
+  contenedor.querySelectorAll("[data-docs-de]").forEach((inp) => inp.addEventListener("change", () => {
+    const key = inp.dataset.docsDe;
+    const d = docs[key];
+    const archivos = [...inp.files];
+    inp.value = "";
+    const rechazados = [];
+    for (const a of archivos) {
+      const esPdf = a.type === "application/pdf" || /\.pdf$/i.test(a.name);
+      if (!esPdf) { rechazados.push(`${a.name}: no es PDF`); continue; }
+      if (a.size > MAX_MB_DOC * 1048576) { rechazados.push(`${a.name}: pesa más de ${MAX_MB_DOC} MB`); continue; }
+      if (d.conservados.length + d.nuevos.length >= MAX_DOCS) { rechazados.push(`${a.name}: ya hay ${MAX_DOCS} documentos`); continue; }
+      d.nuevos.push(a);
+    }
+    if (rechazados.length) alert(`No se agregaron:\n${rechazados.join("\n")}`);
+    pintar(key);
+  }));
+  return {
+    docs: (key) => docs[key] || { conservados: [], nuevos: [] },
+    camposDocs: () => Object.keys(docs)
+  };
+}
+
 export function leerFormulario(campos, contenedor) {
   const datos = {};
   for (const c of campos) {
-    if (c.type === "imagen" || c.type === "fotos") continue;
+    if (c.type === "imagen" || c.type === "fotos" || c.type === "documentos") continue;
     if (c.type === "avance") {
       const mapa = {};
       contenedor.querySelectorAll("[data-avance-mes]").forEach((inp) => {

@@ -27,6 +27,7 @@ export function textoValor(campo, v, personal = []) {
     case "persona": return personal.find((p) => p.id === v)?.nombre || String(v);
     case "imagen": return "(foto)";
     case "fotos": return v.length ? `${v.length} foto(s)` : "—";
+    case "documentos": return v.length ? v.map((d) => d.nombre).join(", ") : "—";
     case "avance": return Object.entries(v || {}).sort().map(([m, x]) => `${m}: ${x} %`).join(" · ") || "—";
     default: return String(v);
   }

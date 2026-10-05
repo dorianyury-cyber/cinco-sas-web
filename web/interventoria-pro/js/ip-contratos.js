@@ -8,8 +8,10 @@
 import { collection, addDoc, updateDoc, deleteDoc, doc, getDocs, serverTimestamp, writeBatch } from "https://www.gstatic.com/firebasejs/10.7.1/firebase-firestore.js";
 import { anotarEnLote, diferencias } from "./ip-historial.js";
 import { montarTablero } from "./ip-tablero.js";
+import { htmlCampo, controlDocumentos } from "./ip-formulario.js";
+import { ref, uploadBytes, getDownloadURL } from "https://www.gstatic.com/firebasejs/10.7.1/firebase-storage.js";
 import {
-  db, iniciarPagina, pintarEncabezado, esc, moneda, numero, fecha, fechaCorta, mostrarAlerta, limpiarAlerta, errorAmigable,
+  db, storage, iniciarPagina, pintarEncabezado, esc, moneda, numero, fecha, fechaCorta, mostrarAlerta, limpiarAlerta, errorAmigable,
   fijarContratoActivo, abrirModal, cerrarModal, diasEntre, hoyISO, imgModulo
 } from "./ip-core.js";
 
@@ -29,14 +31,19 @@ async function iniciar({ user, perfil, esGestor, puede, contratos, contrato }) {
   const NUMERICOS = new Set(["valorInicial", "anticipoPct", "smmlv"]);
   // Etiquetas y tipos para el historial de cambios del contrato.
   const ETIQUETAS = { numero: "Contrato N.º", tipo: "Tipo de interventoría", estado: "Estado", objeto: "Objeto", municipio: "Municipio", objetivo: "Objetivo", alcance: "Alcance", frentes: "Proyectos / frentes", contratante: "Contratante", contratista: "Contratista", supervisor: "Supervisor", director: "Director / interventor", valorInicial: "Valor inicial", anticipoPct: "Anticipo (%)", fechaInicio: "Fecha de inicio", fechaFin: "Fecha de terminación", plazo: "Plazo", smmlv: "SMMLV" };
-  const CAMPOS_HIST = CAMPOS.map((k) => ({ key: k, label: ETIQUETAS[k] || k, type: ["valorInicial", "smmlv"].includes(k) ? "money" : k.startsWith("fecha") ? "date" : "text" }));
-
+  // Documentos del contrato (PDF): contrato firmado, actas, pólizas…
+  const CAMPO_DOCS = { key: "documentos", label: "Documentos del contrato (PDF)", type: "documentos", ayuda: "Ej. contrato firmado, acta de inicio, pólizas aprobadas, otrosíes. Se ven con 👁 y se pueden quitar." };
+  const CAMPOS_HIST = [...CAMPOS.map((k) => ({ key: k, label: ETIQUETAS[k] || k, type: ["valorInicial", "smmlv"].includes(k) ? "money" : k.startsWith("fecha") ? "date" : "text" })), CAMPO_DOCS];
+  const docsEl = document.getElementById("c_docsCampo");
+  let docsCtrl = null;
 
   function abrirFormulario(c = null) {
     editandoId = c?.id || null;
     limpiarAlerta(alerta);
     document.getElementById("contratoFormTitulo").textContent = c ? `Editar contrato ${c.numero || ""}` : "Nuevo contrato";
     CAMPOS.forEach((k) => { document.getElementById(`c_${k}`).value = c?.[k] ?? (k === "estado" ? "Activo" : k === "tipo" ? "Servicios" : k === "contratista" ? "CINCO S.A.S." : ""); });
+    docsEl.innerHTML = htmlCampo(CAMPO_DOCS, c?.documentos);
+    docsCtrl = controlDocumentos(docsEl, [CAMPO_DOCS], c);
     document.getElementById("contratoEliminarBtn").classList.toggle("hidden", !(c && puede.eliminarContratos));
     abrirModal("contratoModal");
   }
@@ -58,6 +65,19 @@ async function iniciar({ user, perfil, esGestor, puede, contratos, contrato }) {
     const btn = document.getElementById("contratoGuardarBtn");
     btn.disabled = true;
     try {
+      // Documentos PDF: se suben primero (con el id del contrato, nuevo o no).
+      const refContrato = editandoId ? doc(db, "ipContratos", editandoId) : doc(collection(db, "ipContratos"));
+      const d = docsCtrl.docs("documentos");
+      const subidos = [];
+      for (let i = 0; i < d.nuevos.length; i++) {
+        btn.textContent = `Subiendo PDF ${i + 1} de ${d.nuevos.length}…`;
+        const archivo = d.nuevos[i];
+        const ruta = `interventoria-pro/${refContrato.id}/contrato/${crypto.randomUUID()}.pdf`;
+        const r = ref(storage, ruta);
+        await uploadBytes(r, archivo, { contentType: "application/pdf", customMetadata: { nombre: archivo.name } });
+        subidos.push({ nombre: archivo.name, url: await getDownloadURL(r), ruta, tamano: archivo.size });
+      }
+      datos.documentos = [...d.conservados, ...subidos];
       // El cambio al contrato y su entrada de historial van en un solo lote.
       const lote = writeBatch(db);
       if (editandoId) {
@@ -69,7 +89,7 @@ async function iniciar({ user, perfil, esGestor, puede, contratos, contrato }) {
         datos.creadoEn = serverTimestamp();
         datos.miembros = [user.email];
         datos.creadoPor = user.email;
-        const nuevo = doc(collection(db, "ipContratos"));
+        const nuevo = refContrato;
         lote.set(nuevo, datos);
         anotarEnLote(lote, nuevo.id, { user, perfil, modulo: "contrato", moduloLabel: "Información del contrato", registroId: nuevo.id, accion: "crear", resumen: `Contrato ${datos.numero}` });
         fijarContratoActivo(nuevo.id);
@@ -79,6 +99,7 @@ async function iniciar({ user, perfil, esGestor, puede, contratos, contrato }) {
     } catch (err) {
       mostrarAlerta(alerta, errorAmigable(err));
       btn.disabled = false;
+      btn.textContent = "Guardar";
     }
   });
 

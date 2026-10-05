@@ -2455,3 +2455,18 @@ textarea { font-family: inherit; }
 .ip-permisos-tabla input[type="checkbox"] { width: 18px; height: 18px; margin: 0; accent-color: var(--cinco-orange-dark); cursor: pointer; }
 .ip-permisos-tabla input:disabled { cursor: default; }
 .ip-rol-selector button { padding: 4px 9px; }
+
+/* Documentos PDF adjuntos */
+.ip-docs-lista { display: flex; flex-direction: column; gap: 6px; margin-top: 10px; }
+.ip-doc-item { display: flex; align-items: center; gap: 8px; padding: 6px 10px; border: 1px solid var(--border); border-radius: 8px; background: var(--card-bg); font-size: 13px; }
+.ip-doc-nuevo { border-color: var(--cinco-orange); }
+.ip-doc-nombre { flex: 1; min-width: 0; overflow-wrap: anywhere; }
+.ip-doc-ver, .ip-doc-quitar { width: auto; margin: 0; padding: 4px 10px; border: 1px solid var(--border); border-radius: 999px; background: var(--card-bg); color: var(--text); font: inherit; font-size: 12px; cursor: pointer; }
+.ip-doc-quitar { padding: 4px 8px; }
+.ip-doc-ver:hover { border-color: var(--cinco-orange); }
+.modal.ip-visor-pdf iframe { width: 100%; height: 70vh; border: 1px solid var(--border); border-radius: 8px; background: #fff; }
+.ip-docs-ficha { display: flex; flex-wrap: wrap; align-items: center; gap: 6px; margin: 4px 0 10px; font-size: 13px; }
+.ip-doc-chip { width: auto; margin: 0; padding: 4px 10px; border: 1px solid var(--border); border-radius: 999px; background: var(--card-bg); color: var(--text); font: inherit; font-size: 12px; cursor: pointer; }
+.ip-doc-chip:hover { border-color: var(--cinco-orange); }
+.ip-editar-fila { font-size: 11.5px; font-weight: 700; color: var(--cinco-orange-dark); white-space: nowrap; }
+.ip-fila:hover .ip-editar-fila { text-decoration: underline; }

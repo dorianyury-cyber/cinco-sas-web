@@ -6,6 +6,7 @@
 import { esc, numero, moneda, fecha, fechaCorta, aplicarAnchos, hrefModulo, fijarContratoActivo, hoyISO } from "./ip-core.js";
 import { cargarDatosContrato, resumirContrato } from "./ip-resumen.js";
 import { mostrarLibro } from "./ip-visor.js";
+import { verPdf } from "./ip-formulario.js";
 
 const SEMAFORO = {
   riesgo: { icono: "🔴", texto: "En riesgo", badge: "danger" },
@@ -126,6 +127,7 @@ export async function montarTablero({ contratos, activo, esGestor, onEditar }) {
       <div class="card cinta cinta-0">
         <h2>🗂️ Contrato ${esc(c.numero || "")}${activo?.id === c.id ? ' <span class="badge ok">En uso</span>' : ""}</h2>
         <p class="ip-dato-objeto"><strong>Objeto:</strong> ${esc(c.objeto || "-")}</p>
+        ${(c.documentos || []).length ? `<div class="ip-docs-ficha"><strong>📎 Documentos:</strong> ${c.documentos.map((d, i) => `<button type="button" class="ip-doc-chip" data-doc="${i}" title="Ver ${esc(d.nombre)}">📄 ${esc(d.nombre)}</button>`).join("")}</div>` : ""}
         <div class="ip-datos">
           ${dato("Contratante", esc(c.contratante))}
           ${dato("Contratista / proveedor", esc(c.contratista))}
@@ -165,6 +167,10 @@ export async function montarTablero({ contratos, activo, esGestor, onEditar }) {
     detalleEl.querySelectorAll("[data-abrir]").forEach((b) => b.addEventListener("click", () => { fijarContratoActivo(c.id); location.href = b.dataset.abrir; }));
     detalleEl.querySelectorAll("a[data-modulo]").forEach((a) => a.addEventListener("click", () => fijarContratoActivo(c.id)));
     document.getElementById("tbEditarBtn")?.addEventListener("click", () => onEditar(c));
+    detalleEl.querySelectorAll("[data-doc]").forEach((b) => b.addEventListener("click", () => {
+      const d = c.documentos[Number(b.dataset.doc)];
+      verPdf(d.url, d.nombre);
+    }));
   }
 
   function pintarTodo() { pintarTarjetas(); pintarLista(); }

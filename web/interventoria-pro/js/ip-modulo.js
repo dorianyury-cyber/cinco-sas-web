@@ -12,7 +12,7 @@ import { MODULOS, nombreCapitulo } from "./ip-modulos.js";
 import { GUIAS } from "./ip-guias.js";
 import { anotarEnLote, diferencias, identificar, refHistorial, fechaHora, ACCIONES } from "./ip-historial.js";
 import { configurarImportacion } from "./ip-importar.js";
-import { htmlCampo, leerFormulario, frentesContrato, controlFotos } from "./ip-formulario.js";
+import { htmlCampo, leerFormulario, frentesContrato, controlFotos, controlDocumentos } from "./ip-formulario.js";
 const controlFotosVacio = () => ({ archivo: () => null, fotos: () => ({ conservadas: [], nuevas: [] }), camposFotos: () => [] });
 import { mostrarLibro, mostrarTabla } from "./ip-visor.js";
 
@@ -74,6 +74,7 @@ function iniciarModulo({ user, perfil, contrato, puede }) {
   const ctx = { contrato, registros: [], datos: {} };
   let editandoId = null;
   let fotosForm = controlFotosVacio();
+  let docsForm = { docs: () => ({ conservados: [], nuevos: [] }), camposDocs: () => [] };
 
   // ---------------------------------------------------------- datos
   async function cargarNecesarios() {
@@ -170,20 +171,23 @@ function iniciarModulo({ user, perfil, contrato, puede }) {
     const cols = mod.columnas;
     const conEstado = !!mod.validar;
     const anchoEstado = 12;
+    const anchoEditar = 7;
     const suma = cols.reduce((s, c) => s + (c.ancho || 10), 0);
-    const factor = (100 - (conEstado ? anchoEstado : 0)) / suma;
+    const factor = (100 - (conEstado ? anchoEstado : 0) - anchoEditar) / suma;
     const etiqueta = (c) => c.label || mod.campos.find((f) => f.key === c.key)?.label || c.key;
+    const cuenta = (r, tipo) => mod.campos.filter((c) => c.type === tipo).reduce((s, c) => s + (r[c.key]?.length || 0), 0);
 
     listaEl.innerHTML = rows.length === 0
       ? `<div class="card"><p class="text-muted ip-sin-margen">${ctx.registros.length ? "Ningún registro coincide con la búsqueda." : "Todavía no hay registros. Usa «+ Nuevo registro» para agregar el primero."}</p></div>`
       : `<div class="card ip-tabla-card"><div class="tabla-scroll"><table class="tabla-densa ip-tabla">
-          <colgroup>${cols.map((c) => `<col data-ancho-col="${((c.ancho || 10) * factor).toFixed(2)}">`).join("")}${conEstado ? `<col data-ancho-col="${anchoEstado}">` : ""}</colgroup>
-          <thead><tr>${cols.map((c) => `<th>${esc(etiqueta(c))}</th>`).join("")}${conEstado ? "<th>Validación</th>" : ""}</tr></thead>
+          <colgroup>${cols.map((c) => `<col data-ancho-col="${((c.ancho || 10) * factor).toFixed(2)}">`).join("")}${conEstado ? `<col data-ancho-col="${anchoEstado}">` : ""}<col data-ancho-col="${anchoEditar}"></colgroup>
+          <thead><tr>${cols.map((c) => `<th>${esc(etiqueta(c))}</th>`).join("")}${conEstado ? "<th>Validación</th>" : ""}<th></th></tr></thead>
           <tbody>${rows.map((r) => {
             const v = conEstado ? mod.validar(r, ctx) : null;
-            // 📷 n en la primera celda si el registro tiene fotos de evidencia.
-            const nFotos = mod.campos.filter((c) => c.type === "fotos").reduce((s, c) => s + (r[c.key]?.length || 0), 0);
-            return `<tr data-id="${r.id}" class="ip-fila">${cols.map((c, j) => `<td>${valorCelda(r, c)}${j === 0 && nFotos ? ` <span class="ip-fotos-badge" title="Fotos de evidencia">📷${nFotos}</span>` : ""}</td>`).join("")}${v ? `<td><span class="badge ${v.nivel === "danger" ? "danger" : v.nivel === "warn" ? "warn" : "ok"}">${esc(v.texto)}</span></td>` : ""}</tr>`;
+            // 📷 n / 📎 n en la primera celda si el registro tiene fotos o documentos.
+            const nFotos = cuenta(r, "fotos"), nDocs = cuenta(r, "documentos");
+            const marcas = `${nFotos ? ` <span class="ip-fotos-badge" title="Fotos de evidencia">📷${nFotos}</span>` : ""}${nDocs ? ` <span class="ip-fotos-badge" title="Documentos PDF adjuntos">📎${nDocs}</span>` : ""}`;
+            return `<tr data-id="${r.id}" class="ip-fila">${cols.map((c, j) => `<td>${valorCelda(r, c)}${j === 0 ? marcas : ""}</td>`).join("")}${v ? `<td><span class="badge ${v.nivel === "danger" ? "danger" : v.nivel === "warn" ? "warn" : "ok"}">${esc(v.texto)}</span></td>` : ""}<td class="ip-acciones-celda"><span class="ip-editar-fila" title="Ver o editar: cambiar datos, adjuntar PDF o fotos">✏️ ${puede.registrar ? "Editar" : "Ver"}</span></td></tr>`;
           }).join("")}</tbody></table></div></div>`;
     listaEl.querySelectorAll("col[data-ancho-col]").forEach((col) => { col.style.width = `${col.dataset.anchoCol}%`; });
     listaEl.querySelectorAll("tr.ip-fila").forEach((tr) => {
@@ -221,6 +225,7 @@ function iniciarModulo({ user, perfil, contrato, puede }) {
     pintarHistorialRegistro(registro);
     // Tomar foto / elegir de galería, ya comprimidas al elegirlas.
     fotosForm = controlFotos(formCampos, mod.campos, registro);
+    docsForm = controlDocumentos(formCampos, mod.campos, registro);
     abrirModal("ipModal");
     formCampos.querySelector("input, select, textarea")?.focus();
   }
@@ -272,6 +277,20 @@ function iniciarModulo({ user, perfil, contrato, puede }) {
           guardarBtn.textContent = `Subiendo foto ${i + 1} de ${blobs.length}…`;
           fotosRegistros.push(await subir(blobs[i]));
         }
+      }
+      // Documentos PDF: los que quedaron + los nuevos, ya subidos.
+      for (const key of docsForm.camposDocs()) {
+        const d = docsForm.docs(key);
+        const subidos = [];
+        for (let i = 0; i < d.nuevos.length; i++) {
+          const archivo = d.nuevos[i];
+          guardarBtn.textContent = `Subiendo PDF ${i + 1} de ${d.nuevos.length}…`;
+          const ruta = `interventoria-pro/${contrato.id}/${mod.coleccion}/${crypto.randomUUID()}.pdf`;
+          const r = ref(storage, ruta);
+          await uploadBytes(r, archivo, { contentType: "application/pdf", customMetadata: { nombre: archivo.name } });
+          subidos.push({ nombre: archivo.name, url: await getDownloadURL(r), ruta, tamano: archivo.size });
+        }
+        datos[key] = [...d.conservados, ...subidos];
       }
       // Fotos de evidencia: las que quedaron + las nuevas, ya subidas.
       for (const key of fotosForm.camposFotos()) {
@@ -399,7 +418,7 @@ function iniciarModulo({ user, perfil, contrato, puede }) {
   document.getElementById("ipExcelBtn").addEventListener("click", async () => {
     const ExcelJS = window.ExcelJS;
     if (!ExcelJS) { alert("No se pudo cargar el generador de Excel."); return; }
-    const campos = mod.campos.filter((c) => !["imagen", "avance", "fotos"].includes(c.type));
+    const campos = mod.campos.filter((c) => !["imagen", "avance", "fotos", "documentos"].includes(c.type));
     const wb = new ExcelJS.Workbook();
     const ws = wb.addWorksheet(mod.label.slice(0, 31));
     ws.columns = [...campos.map((c) => ({ header: c.label, key: c.key })), ...(mod.validar ? [{ header: "Validación", key: "_estado" }] : [])];

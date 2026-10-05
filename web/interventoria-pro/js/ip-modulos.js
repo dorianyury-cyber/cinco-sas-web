@@ -1262,3 +1262,8 @@ Object.values(MODULOS).forEach((m) => {
   if (m.campos.some((c) => c.type === "imagen")) return;
   m.campos.push({ key: "fotosEvidencia", label: "Fotos de evidencia", type: "fotos", ancho: true });
 });
+// Documentos PDF adjuntos en todos los módulos (ej. la póliza firmada, un
+// acta, una planilla): se ven en el visor y se pueden quitar al editar.
+Object.values(MODULOS).forEach((m) => {
+  m.campos.push({ key: "documentos", label: "Documentos adjuntos (PDF)", type: "documentos", ancho: true });
+});

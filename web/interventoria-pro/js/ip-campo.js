@@ -152,7 +152,8 @@ async function iniciar({ user, perfil, contrato, contratos }) {
     const capOpcion = a.elegirCap
       ? `<div class="ip-campo"><label for="f__cap">Capítulo *</label><select id="f__cap" required><option value="">— Elige —</option>${CAPITULOS.filter((c) => c.items.some((it) => it.m === a.m)).map((c) => `<option value="${c.id}" ${conservar._cap === c.id ? "selected" : ""}>${esc(c.numero)}. ${esc(c.label)}</option>`).join("")}</select></div>`
       : "";
-    camposEl.innerHTML = capOpcion + mod.campos.map((c) => {
+    // Los PDF se adjuntan desde el computador (en el módulo), no en campo.
+    camposEl.innerHTML = capOpcion + mod.campos.filter((c) => c.type !== "documentos").map((c) => {
       let v = conservar[c.key];
       if (v === undefined) v = c.porDefecto ? c.porDefecto() : c.type === "date" && c.key === "fecha" ? hoyISO() : "";
       return htmlCampo(c, v, { contrato, personal, camara: true });
