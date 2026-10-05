@@ -230,6 +230,8 @@ export async function iniciarPagina({ requiereContrato = true, conMenu = true } 
   const ctx = { user, perfil, esGestor, contratos, contrato };
   if (conMenu) pintarMenu(ctx);
   document.documentElement.classList.remove("ip-preparando");
+  // Botón de Ayuda con buscador (se carga aparte: importa las guías).
+  import("./ip-ayuda.js").then((m) => m.montarAyuda()).catch(() => {});
   return ctx;
 }
 
