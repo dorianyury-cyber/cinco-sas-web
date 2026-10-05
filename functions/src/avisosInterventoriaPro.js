@@ -22,6 +22,7 @@
 
 const { onCall, HttpsError } = require("firebase-functions/v2/https");
 const admin = require("firebase-admin");
+const CORREO_GERENCIA = "gerencia.cincoltda@hotmail.com";
 const nodemailer = require("nodemailer");
 
 const URL_APP = "https://cincosas.com.co/interventoria-pro";
@@ -168,12 +169,12 @@ function armarCorreo(contrato, avisos, hoy, { nota = "", remitente = "" } = {}) 
       <p style="font:13px Arial;color:#374151">Revisión del ${fechaCorta(hoy)}: <strong>${avisos.length}</strong> aviso(s), <strong style="color:#b42828">${rojos}</strong> vencido(s).</p>
       ${notaHtml}
       ${bloques}
-      <p style="margin-top:20px;font:12px Arial;color:#5c6570">Enviado por ${esc(remitente)} desde Interventoría PRO — CINCO S.A.S.</p>
+      <p style="margin-top:20px;font:12px Arial;color:#5c6570">Enviado por ${esc(remitente)} desde Interventoría PRO — CINCO S.A.S. Las respuestas a este correo llegan a ${CORREO_GERENCIA}.</p>
     </div></div>`;
   const texto = [`Interventoría PRO — ${titulo}`, `Revisión del ${fechaCorta(hoy)}: ${avisos.length} aviso(s).`, ""]
     .concat(nota ? [nota, ""] : [])
     .concat(Object.entries(grupos).flatMap(([g, l]) => [`${g}:`, ...l.map((a) => ` - ${a.texto}`), ""]))
-    .concat([`Enviado por ${remitente} desde Interventoría PRO — CINCO S.A.S.`]).join("\n");
+    .concat([`Enviado por ${remitente} desde Interventoría PRO — CINCO S.A.S. Las respuestas a este correo llegan a ${CORREO_GERENCIA}.`]).join("\n");
   return { asunto: `${rojos ? "⚠ " : ""}Interventoría PRO · ${titulo}: ${avisos.length} aviso(s)`, html, texto };
 }
 
@@ -240,9 +241,11 @@ exports.enviarAvisosInterventoriaPro = onCall(async (request) => {
     connectionTimeout: 10000, greetingTimeout: 10000, socketTimeout: 10000
   });
   await transporter.sendMail({
-    from: `"Interventoría PRO - Cinco S.A.S." <${process.env.SMTP_USER}>`,
+    from: `"Gerencia Cinco S.A.S. - Interventoría PRO" <${process.env.SMTP_USER}>`,
     to: para.join(", "),
-    replyTo: email,
+    // Las respuestas llegan a la gerencia aunque el envío técnico sea por la
+    // cuenta Gmail de las PQR (Gmail no permite enviar como una cuenta Hotmail).
+    replyTo: CORREO_GERENCIA,
     subject: correo.asunto,
     text: correo.texto,
     html: correo.html
