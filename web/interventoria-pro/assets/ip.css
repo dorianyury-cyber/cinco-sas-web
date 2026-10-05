@@ -2295,3 +2295,11 @@ textarea { font-family: inherit; }
 .ip-bienv-grupo .bienvenida-modulos { margin-top: 0; }
 .sidebar .ip-pilar-toggle span:first-child { display: inline-flex; align-items: center; gap: 6px; }
 .ip-en-uso { color: var(--success); font-size: 11px; margin-left: 4px; }
+
+/* Contratos: la ficha del contrato ocupa todo el ancho y "Para revisar"
+   va debajo (pedido del usuario); los datos se reparten en 3 columnas. */
+.ip-tablero-detalle { grid-template-columns: 1fr; }
+.ip-tablero-detalle .ip-datos { grid-template-columns: repeat(3, minmax(0, 1fr)); }
+@media (max-width: 900px) { .ip-tablero-detalle .ip-datos { grid-template-columns: 1fr 1fr; } }
+@media (max-width: 560px) { .ip-tablero-detalle .ip-datos { grid-template-columns: 1fr; } }
+.ip-tablero-detalle .ip-dato-objeto { margin: 0 0 10px; }
