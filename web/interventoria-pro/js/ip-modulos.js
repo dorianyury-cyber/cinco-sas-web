@@ -14,7 +14,7 @@
 // contrato).
 
 import { esc, moneda, numero, fecha, mesCorto, hoyISO, mesActual, diasEntre, mesesDelContrato } from "./ip-core.js";
-import { LISTA_ACTA_INICIO, CATEGORIAS_ACTA } from "./ip-plantillas.js";
+import { LISTA_ACTA_INICIO, CATEGORIAS_ACTA, expandirPorFrentes } from "./ip-plantillas.js";
 
 // ------------------------------------------------------------ utilidades
 
@@ -983,13 +983,14 @@ export const MODULOS = {
     label: "Requisitos acta de inicio", icon: "✅", coleccion: "actainicio", sinFiltroMes: true,
     desc: "Lista de chequeo de requisitos previos para suscribir el acta de inicio (garantías, personal, plan de calidad, cronograma, anticipo, SST, sitio). Usa «Cargar lista base» para traer los requisitos de los términos de referencia.",
     plantilla: LISTA_ACTA_INICIO,
+    expandir: expandirPorFrentes,
     claveUnica: "requisito",
     campos: [
       { key: "categoria", label: "Categoría", type: "select", opciones: CATEGORIAS_ACTA, required: true },
       { key: "proyecto", label: "Proyecto / frente", type: "frente" },
       { key: "requisito", label: "Requisito", type: "textarea", required: true, ancho: true },
       { key: "soporte", label: "Soporte (numeral TDR / norma)", type: "text" },
-      { key: "responsable", label: "Responsable", type: "select", opciones: ["Contratista", "Electrohuila", "Interventoría"], required: true },
+      { key: "responsable", label: "Responsable", type: "select", opciones: ["Contratista", "Contratante", "Interventoría"], required: true },
       { key: "estado", label: "Estado", type: "select", opciones: ["Pendiente", "Recibido", "Con observaciones", "Aprobado", "No aplica"], required: true, porDefecto: () => "Pendiente" },
       { key: "fecha", label: "Fecha de recibo / verificación", type: "date" },
       { key: "observacion", label: "Observación", type: "textarea", ancho: true },
@@ -1035,7 +1036,7 @@ export const MODULOS = {
   // ======================= 3. JURÍDICO — requerimientos e incumplimientos
   requerimientos: {
     label: "Requerimientos y multas", icon: "📮", coleccion: "requerimientos",
-    desc: "Requerimientos por incumplimiento y debido proceso (num. 4.15): explicación solicitada, respuesta del contratista, análisis y multa propuesta (0,5 % por día o por obligación, tope 10 %).",
+    desc: "Requerimientos por incumplimiento y su debido proceso: explicación solicitada, respuesta del contratista, análisis de la interventoría y multa propuesta según el contrato.",
     campos: [
       { key: "fecha", label: "Fecha del requerimiento", type: "date", required: true },
       { key: "proyecto", label: "Proyecto / frente", type: "frente" },
@@ -1043,9 +1044,9 @@ export const MODULOS = {
       { key: "radicado", label: "Radicado / oficio", type: "text" },
       { key: "plazoRespuesta", label: "Plazo de respuesta", type: "date" },
       { key: "respuesta", label: "Respuesta del contratista", type: "textarea", ancho: true },
-      { key: "estado", label: "Estado", type: "select", opciones: ["Enviado", "Respondido", "Subsanado", "Escalado a Electrohuila", "Multa impuesta", "Cerrado"], required: true, porDefecto: () => "Enviado" },
+      { key: "estado", label: "Estado", type: "select", opciones: ["Enviado", "Respondido", "Subsanado", "Escalado al contratante", "Multa impuesta", "Cerrado"], required: true, porDefecto: () => "Enviado" },
       { key: "diasRetraso", label: "Días de retraso (si es por plazo)", type: "number" },
-      { key: "multaPropuesta", label: "Multa propuesta", type: "money", ayuda: "0,5 % del valor del contrato por día de retraso o por obligación incumplida; el total no puede superar el 10 % (num. 4.16)." },
+      { key: "multaPropuesta", label: "Multa propuesta", type: "money", ayuda: "Según la cláusula de multas del contrato (ej. 0,5 % del valor por día de retraso o por obligación incumplida, con tope del 10 %)." },
       { key: "evidencia", label: "Evidencia (enlace)", type: "url", ancho: true }
     ],
     columnas: [{ key: "fecha", ancho: 11 }, { key: "obligacion", ancho: 38 }, { key: "proyecto", label: "Frente", ancho: 10 }, { key: "radicado", ancho: 12 }, { key: "plazoRespuesta", label: "Responder antes de", ancho: 13 }],
@@ -1070,11 +1071,11 @@ export const MODULOS = {
   // ======================= 7. TÉCNICO — suministro de equipos (FAT / SAT)
   suministros: {
     label: "Equipos y suministros (FAT/SAT)", icon: "🏭", coleccion: "suministros", sinFiltroMes: true,
-    desc: "Seguimiento de equipos principales: ficha técnica, certificados RETIE/ONAC, pruebas en fábrica (FAT), despacho, llegada a sitio y pruebas en sitio (SAT) (num. 1.5.2, 4.9.1-3, 6, 42 a 45).",
+    desc: "Seguimiento de los equipos y suministros principales: ficha técnica, certificados de conformidad, pruebas en fábrica (FAT), despacho, llegada a sitio y pruebas en sitio (SAT).",
     campos: [
-      { key: "equipo", label: "Equipo", type: "text", required: true, placeholder: "Ej. Transformador 40/50 MVA 115/34,5/13,8 kV", ancho: true },
+      { key: "equipo", label: "Equipo", type: "text", required: true, placeholder: "Ej. Transformador de potencia 40/50 MVA", ancho: true },
       { key: "proyecto", label: "Proyecto / frente", type: "frente", required: true },
-      { key: "tipo", label: "Tipo", type: "select", opciones: ["Transformador de potencia", "Bahía GIS 115 kV", "Celdas GIS 36 kV", "Celdas AIS 36 kV", "Interruptor 115 kV", "Seccionador 115 kV", "Transformadores de instrumentación", "DPS", "IED de protección", "Servicios auxiliares AC/DC", "Cables y conductores", "Otro"], required: true },
+      { key: "tipo", label: "Tipo", type: "select", opciones: ["Transformador de potencia", "Celdas o tableros", "Interruptores", "Seccionadores", "Transformadores de instrumentación", "Descargadores (DPS)", "Equipos de protección y control (IED)", "Servicios auxiliares AC/DC", "Equipos de medida", "Cables y conductores", "Estructuras y apoyos", "Otro"], required: true },
       { key: "fabricante", label: "Fabricante / referencia", type: "text" },
       { key: "fichaTecnica", label: "Ficha técnica", type: "select", opciones: ["Pendiente", "En revisión", "Con observaciones", "Aprobada"], porDefecto: () => "Pendiente" },
       { key: "certificados", label: "Certificado RETIE / conformidad", type: "select", opciones: ["Pendiente", "Recibido", "No aplica"], porDefecto: () => "Pendiente" },
@@ -1116,7 +1117,7 @@ export const MODULOS = {
   // ======================= 7. TÉCNICO — control de cambios de diseño
   cambios: {
     label: "Control de cambios", icon: "🔁", coleccion: "cambios",
-    desc: "Ajustes al diseño o a la ejecución propuestos por el contratista: justificación técnica, firma del ingeniero responsable, aprobación de la interventoría e impacto en costo y plazo (num. 4.9.1-4 y 8).",
+    desc: "Ajustes al diseño o a la ejecución propuestos por el contratista: justificación técnica, profesional responsable, concepto de la interventoría e impacto en costo y plazo.",
     campos: [
       { key: "fecha", label: "Fecha de solicitud", type: "date", required: true },
       { key: "proyecto", label: "Proyecto / frente", type: "frente", required: true },
@@ -1142,7 +1143,7 @@ export const MODULOS = {
   // ======================= 7. TÉCNICO — plan de consignaciones
   consignaciones: {
     label: "Plan de consignaciones", icon: "🔌", coleccion: "consignaciones",
-    desc: "Consignaciones y maniobras para trabajos en subestaciones energizadas: programación, solicitud a Operación de Electrohuila y cumplimiento de tiempos (num. 4.9.1-47).",
+    desc: "Consignaciones y maniobras para trabajar en instalaciones en servicio (ej. subestaciones o redes energizadas): programación, solicitud al operador y cumplimiento de tiempos.",
     campos: [
       { key: "fecha", label: "Fecha programada", type: "date", required: true },
       { key: "proyecto", label: "Proyecto / frente", type: "frente", required: true },
@@ -1168,7 +1169,7 @@ export const MODULOS = {
   // ======================= 10. CALIDAD — plan de calidad y entregables
   entregables: {
     label: "Plan de calidad y entregables", icon: "🏅", coleccion: "entregables",
-    desc: "Documentos que el contratista debe presentar para revisión y aprobación de la interventoría: plan de calidad ISO 9001:2015, procedimientos e instructivos, cronograma, programa SST, PMA, planos as-built, memorias, dictamen RETIE… (num. 1.5.2, 1.5.8 y 4.9.1-28).",
+    desc: "Documentos que el contratista debe presentar para revisión y aprobación de la interventoría (ej. plan de calidad, procedimientos, cronograma, programa SST, planos as-built, protocolos de prueba).",
     campos: [
       { key: "documento", label: "Documento", type: "text", required: true, ancho: true },
       { key: "tipo", label: "Tipo", type: "select", opciones: ["Plan de calidad", "Procedimiento / instructivo", "Cronograma", "Programa SST", "Plan de manejo ambiental", "Ingeniería / planos", "Memorias de cálculo", "Protocolos de prueba", "Planos as-built", "Dictamen RETIE", "Informe del contratista", "Dossier de calidad", "Otro"], required: true },
@@ -1202,7 +1203,7 @@ export const MODULOS = {
     },
     alertas(ctx) {
       const out = [];
-      if (!ctx.registros.some((r) => r.tipo === "Plan de calidad")) out.push({ nivel: "warn", texto: "No se ha registrado el Plan de Calidad del contratista (num. 1.5.8: debe presentarse antes del inicio y ser aprobado por la interventoría)." });
+      if (!ctx.registros.some((r) => r.tipo === "Plan de calidad")) out.push({ nivel: "warn", texto: "No se ha registrado el Plan de Calidad del contratista (normalmente debe presentarse antes del inicio y ser aprobado por la interventoría)." });
       const venc = ctx.registros.filter((r) => MODULOS.entregables.validar(r).texto === "Revisión vencida").length;
       if (venc) out.push({ nivel: "danger", texto: `${venc} documento(s) con plazo de revisión de la interventoría vencido.` });
       return out;
@@ -1212,7 +1213,7 @@ export const MODULOS = {
   // ======================= 10. CALIDAD — no conformidades y acciones correctivas
   noconformidades: {
     label: "No conformidades y acciones", icon: "🛠️", coleccion: "noconformidades",
-    desc: "Producto o trabajo no conforme, acciones correctivas y preventivas del contratista, responsable, fecha de cierre y verificación de eficacia (ISO 9001:2015, num. 1.5.8).",
+    desc: "Producto o trabajo no conforme, acciones correctivas y preventivas del contratista, responsable, fecha de cierre y verificación de eficacia.",
     campos: [
       { key: "fecha", label: "Fecha de detección", type: "date", required: true },
       { key: "proyecto", label: "Proyecto / frente", type: "frente" },

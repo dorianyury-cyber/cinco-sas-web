@@ -9,6 +9,7 @@ import { auth, app } from "../../js/control/firebase-control.js";
 import { agregarToggleClave } from "../../js/control/clave-visible.js";
 
 agregarToggleClave(document.getElementById("clave"));
+try { sessionStorage.removeItem("ip-nav-abiertos"); } catch (e) { /* sin almacenamiento */ }
 const functions = getFunctions(app);
 
 onAuthStateChanged(auth, (user) => {

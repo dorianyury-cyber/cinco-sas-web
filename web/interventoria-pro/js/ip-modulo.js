@@ -9,6 +9,7 @@ import {
   mostrarAlerta, limpiarAlerta, errorAmigable, aplicarAnchos, abrirModal, cerrarModal, imgModulo
 } from "./ip-core.js";
 import { MODULOS, nombreCapitulo } from "./ip-modulos.js";
+import { GUIAS } from "./ip-guias.js";
 
 const params = new URLSearchParams(location.search);
 const mod = MODULOS[params.get("m")];
@@ -25,7 +26,28 @@ function iniciarModulo({ user, perfil, contrato }) {
   const titulo = mod.porCapitulo ? `${mod.label} — ${nombreCapitulo(cap)}` : mod.label;
   pintarEncabezado(`${imgModulo(cap === "ambiental" && mod.id === "capacitaciones" ? "capacitaciones-ambiental" : mod.id, "ip-h1-foto")} ${esc(titulo)}`, contrato);
   document.title = `${titulo} — Interventoría PRO`;
-  document.getElementById("ipDescripcion").textContent = mod.desc || "";
+  // Guía del módulo: qué se controla, cómo y qué revisa el aplicativo solo.
+  // Plegable; si la persona la cierra, se recuerda en este navegador.
+  const guia = GUIAS[mod.id];
+  const descEl = document.getElementById("ipDescripcion");
+  if (guia) {
+    const claveGuia = `ip-guia-cerrada-${mod.id}`;
+    let cerrada = false;
+    try { cerrada = localStorage.getItem(claveGuia) === "1"; } catch (e) { /* sin almacenamiento */ }
+    const det = document.createElement("details");
+    det.className = "card ip-guia";
+    det.open = !cerrada;
+    det.innerHTML = `<summary>📘 Qué se controla y cómo</summary>
+      <div class="ip-guia-cuerpo">
+        <div><h3>Qué se controla</h3><p>${esc(guia.que)}</p>${guia.ejemplo ? `<p class="text-muted ip-guia-ejemplo">${esc(guia.ejemplo)}</p>` : ""}</div>
+        <div><h3>Cómo se controla</h3><ol>${guia.como.map((p) => `<li>${esc(p)}</li>`).join("")}</ol></div>
+        <div><h3>Lo que el aplicativo revisa solo</h3><p>${esc(guia.automatico)}</p></div>
+      </div>`;
+    det.addEventListener("toggle", () => { try { localStorage.setItem(claveGuia, det.open ? "0" : "1"); } catch (e) { /* sin almacenamiento */ } });
+    descEl.replaceWith(det);
+  } else {
+    descEl.textContent = mod.desc || "";
+  }
 
   const resumenEl = document.getElementById("ipResumen");
   const alertasEl = document.getElementById("ipAlertas");
@@ -196,6 +218,9 @@ function iniciarModulo({ user, perfil, contrato }) {
       case "textarea": control = `<textarea id="${id}" rows="${c.filas || 3}" ${req} placeholder="${esc(c.placeholder || "")}">${esc(v)}</textarea>`; break;
       case "select": {
         const ops = c.opcionesObj || c.opciones.map((o) => ({ valor: o, texto: o }));
+        // Un valor guardado que ya no está en la lista (ej. una opción
+        // renombrada) se conserva para no perderlo al editar.
+        if (v && !ops.some((o) => o.valor === v)) ops.push({ valor: v, texto: v });
         control = `<select id="${id}" ${req}><option value="">— Elige —</option>${ops.map((o) => `<option value="${esc(o.valor)}" ${o.valor === v ? "selected" : ""}>${esc(o.texto)}</option>`).join("")}</select>`;
         break;
       }
@@ -350,14 +375,13 @@ function iniciarModulo({ user, perfil, contrato }) {
   if (mod.plantilla) {
     const btnPlantilla = document.getElementById("ipPlantillaBtn");
     btnPlantilla.classList.remove("hidden");
-    btnPlantilla.textContent = `📋 Cargar lista base (${mod.plantilla.length})`;
+    // Los ítems marcados "*" se repiten por cada frente del contrato.
+    const listaBase = mod.expandir ? mod.expandir(mod.plantilla, frentesContrato()) : mod.plantilla;
+    btnPlantilla.textContent = `📋 Cargar lista base (${listaBase.length})`;
     btnPlantilla.addEventListener("click", async () => {
       const clave = mod.claveUnica;
       const existentes = new Set(ctx.registros.map((r) => String(r[clave] || "").trim()));
-      const frentes = frentesContrato();
-      // Ítems por frente cuyo frente no existe en este contrato se omiten
-      // (ej. "Sur" en un contrato que no tiene ese frente).
-      const nuevos = mod.plantilla.filter((p) => !existentes.has(p[clave].trim()) && (p.proyecto === "General" || !frentes.length || frentes.includes(p.proyecto)));
+      const nuevos = listaBase.filter((p) => !existentes.has(p[clave].trim()));
       if (!nuevos.length) { alert("La lista base ya está completa en este contrato."); return; }
       if (!confirm(`Se agregarán ${nuevos.length} requisito(s) de la lista base. Los que ya existen no se duplican. ¿Continuar?`)) return;
       btnPlantilla.disabled = true;

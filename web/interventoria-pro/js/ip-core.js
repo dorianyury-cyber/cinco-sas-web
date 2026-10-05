@@ -168,7 +168,14 @@ function esperarUsuario() {
   });
 }
 
+// Cierra todos los capítulos del menú lateral (se llama al abrir el
+// aplicativo: bienvenida e ingreso).
+export function reiniciarMenu() {
+  try { sessionStorage.removeItem(CLAVE_GRUPOS); } catch (e) { /* sin almacenamiento */ }
+}
+
 export async function cerrarSesion() {
+  reiniciarMenu();
   try { localStorage.removeItem(CLAVE_CONTRATO); } catch (e) { /* sin almacenamiento */ }
   await signOut(auth);
   window.location.href = "index.html";
@@ -294,8 +301,11 @@ function pintarMenu({ user, perfil, esGestor, contratos, contrato }) {
     return { cap, items, contieneActivo };
   });
 
+  // Los capítulos arrancan plegados (pedido del usuario): solo quedan
+  // abiertos los que la persona abrió a mano durante esta visita. Al
+  // entrar de nuevo al aplicativo (bienvenida o ingreso) se olvidan — ver
+  // reiniciarMenu().
   const abiertos = leerGrupos();
-  grupos.forEach((g) => { if (g.contieneActivo) abiertos.add(g.cap.id); });
 
   aside.innerHTML = `
     <a href="bienvenida.html" class="brand">
@@ -312,6 +322,7 @@ function pintarMenu({ user, perfil, esGestor, contratos, contrato }) {
     <nav>
       ${enlace("inicio.html", "inicio", "Inicio")}
       ${enlace("contratos.html", "contratos", esGestor ? "Contratos" : "Mis contratos")}
+      ${enlace("generalidades.html", "generalidades", "Generalidades")}
       ${contrato ? enlace("informe.html", "informe", "Informe mensual") : ""}
       ${grupos.map((g, i) => `
         <div class="nav-group ip-nav-cap ip-nav-cap-${i % 4}">

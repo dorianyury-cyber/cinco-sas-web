@@ -2122,3 +2122,30 @@ html.ip-preparando .main::before {
 .ip-acciones-celda .badge { margin-right: 4px; }
 .ip-acciones-celda .btn.ip-btn-mini { margin: 0 2px; }
 .ip-visor-barra .btn { align-self: center; }
+
+/* Informe mensual: casillas de secciones */
+.ip-chk-seccion, .ip-chk-cap { width: 16px; height: 16px; margin: 0 6px 0 0; accent-color: var(--cinco-orange-dark); cursor: pointer; vertical-align: middle; flex-shrink: 0; }
+.ip-informe-lista li { display: flex; align-items: center; gap: 4px; flex-wrap: wrap; }
+.ip-cap-excluido { opacity: 0.6; }
+.ip-barra-seleccion { gap: 8px 12px; }
+.ip-ayuda-inline { font-size: 12px; flex-basis: 100%; text-align: center; }
+
+/* Guía de cada módulo: qué se controla y cómo */
+.ip-guia { padding: 0; margin-bottom: 18px; overflow: hidden; }
+.ip-guia > summary { cursor: pointer; padding: 12px 18px; font-weight: 700; font-size: 14px; color: var(--text); list-style-position: inside; }
+.ip-guia[open] > summary { border-bottom: 1px solid var(--border); }
+.ip-guia-cuerpo { display: grid; grid-template-columns: 1fr 1.3fr 1fr; gap: 18px; padding: 14px 18px 16px; }
+.ip-guia-cuerpo h3 { margin: 0 0 6px; font-size: 12px; text-transform: uppercase; letter-spacing: 0.05em; color: var(--cinco-orange-dark); }
+.ip-guia-cuerpo p, .ip-guia-cuerpo li { margin: 0 0 6px; font-size: 13px; line-height: 1.45; }
+.ip-guia-cuerpo ol { margin: 0; padding-left: 18px; }
+.ip-guia-ejemplo { font-size: 12px; font-style: italic; }
+@media (max-width: 900px) { .ip-guia-cuerpo { grid-template-columns: 1fr; } }
+
+/* Generalidades */
+.ip-gen-intro p { font-size: 14px; line-height: 1.55; margin: 0; }
+.ip-gen-lista { margin: 0; padding-left: 18px; }
+.ip-gen-lista li { font-size: 13px; line-height: 1.5; margin-bottom: 6px; }
+.ip-gen-flujo { margin: 0; padding-left: 20px; }
+.ip-gen-flujo li { font-size: 13.5px; line-height: 1.55; margin-bottom: 8px; }
+.ip-gen-sub { margin-top: 16px; }
+.ip-gen-titulo { text-align: center; margin: 26px 0 4px; font-size: 18px; }

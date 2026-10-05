@@ -41,13 +41,13 @@ function anchosProporcionales(encabezados, filas) {
   return pct.map((p) => (p / suma) * 100);
 }
 
-export async function generarInformeMensual({ contrato, ym, datos, elaboradoPor, cargo }) {
+export async function generarInformeMensual({ contrato, ym, datos, elaboradoPor, cargo, incluir = null }) {
   const {
     Document, Packer, Paragraph, TextRun, ImageRun, Table, TableRow, TableCell, ShadingType, WidthType,
     Header, Footer, AlignmentType, PageNumber, VerticalAlign, HeadingLevel, LevelFormat, BorderStyle, TableOfContents, PageBreak
   } = window.docx;
 
-  const { bloques } = await construirInforme({ contrato, ym, datos, elaboradoPor, cargo });
+  const { bloques } = await construirInforme({ contrato, ym, datos, elaboradoPor, cargo, incluir });
   const esObra = contrato.tipo === "Obra";
   const corte = finDeMes(ym);
   const titulo = tituloInforme(contrato);

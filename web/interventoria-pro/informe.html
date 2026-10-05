@@ -13,7 +13,7 @@
     <aside class="sidebar" id="sidebar"></aside>
     <main class="main">
       <header id="ipHeader"></header>
-      <p class="text-muted ip-descripcion">Elige el mes: verás qué información hay registrada en cada capítulo y podrás generar el informe en Word con la estructura del informe mensual (tablas, curva S y registro fotográfico del mes).</p>
+      <p class="text-muted ip-descripcion">Elige el mes y marca las secciones que quieres en el informe. Cada sección muestra cuántos registros tiene en ese mes; con los botones generas la vista previa, el PDF (portada oscura o clara) o el Word.</p>
       <div class="card ip-barra">
         <label for="informeMes" class="ip-label-inline">Mes del informe</label>
         <select id="informeMes" class="ip-filtro-mes"></select>
@@ -28,6 +28,13 @@
         <button type="button" class="btn" id="generarInformeBtn">📄 Word</button>
       </div>
       <div class="alert" id="informeAlerta"></div>
+      <div class="card ip-barra ip-barra-centro ip-barra-seleccion">
+        <strong>Contenido del informe:</strong>
+        <span class="text-muted" id="informeConteo"></span>
+        <button type="button" class="btn secondary" id="seleccionTodoBtn">Marcar todo</button>
+        <button type="button" class="btn secondary" id="seleccionNadaBtn">Desmarcar todo</button>
+        <span class="text-muted ip-ayuda-inline">Marca las casillas de lo que quieres incluir. La casilla junto al título incluye o quita el capítulo completo.</span>
+      </div>
       <div id="informeContenido"><div class="card"><p class="text-muted ip-sin-margen">Cargando la información del contrato…</p></div></div>
     </main>
   </div>

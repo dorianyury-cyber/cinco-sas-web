@@ -6,6 +6,11 @@ import { db, iniciarPagina, pintarEncabezado, esc, mesLargo, mesActual, mesesDel
 import { MODULOS, CAPITULOS, activoEnMes } from "./ip-modulos.js";
 import { generarInformeMensual } from "./ip-informe-docx.js";
 import { generarInformeMensualPDF } from "./ip-informe-pdf.js";
+import { claveSeccion } from "./ip-informe-contenido.js";
+
+// Secciones que no forman parte del informe clásico: por defecto entran
+// solo si el contrato ya tiene información en ellas.
+const OPCIONALES = new Set(["actainicio", "requerimientos", "suministros", "cambios", "consignaciones", "entregables", "noconformidades", "observaciones:calidad", "anexos:calidad", "observaciones:juridico", "anexos:juridico"]);
 
 const ctx = await iniciarPagina();
 if (ctx) iniciar(ctx);
@@ -49,28 +54,83 @@ async function iniciar({ user, perfil, contrato }) {
     return campo ? regs.filter((r) => String(r[campo.key] || "").startsWith(ym)).length : regs.length;
   }
 
+  // ---------------------------------------------------------- selección de secciones
+  // Cada ítem del menú es una sección del informe con su casilla; la
+  // selección se recuerda por contrato en este navegador.
+  const visibles = (cap) => cap.items.filter((it) => !(it.m && MODULOS[it.m].soloObra && contrato.tipo !== "Obra"));
+  const todasLasClaves = ["intro", ...CAPITULOS.flatMap((cap) => visibles(cap).map(claveSeccion))];
+  const CLAVE_SEL = `ip-informe-secciones-${contrato.id}`;
+  function seleccionInicial() {
+    try {
+      const guardada = JSON.parse(localStorage.getItem(CLAVE_SEL) || "null");
+      if (Array.isArray(guardada)) return new Set(guardada.filter((k) => todasLasClaves.includes(k)));
+    } catch (e) { /* sin almacenamiento */ }
+    return new Set(todasLasClaves.filter((k) => {
+      if (!OPCIONALES.has(k)) return true;
+      const [m, cap] = k.split(":");
+      const regs = datos[MODULOS[m].coleccion] || [];
+      return regs.some((r) => !cap || r.capitulo === cap);
+    }));
+  }
+  const seleccion = seleccionInicial();
+  const guardarSeleccion = () => { try { localStorage.setItem(CLAVE_SEL, JSON.stringify([...seleccion])); } catch (e) { /* sin almacenamiento */ } };
+
+  const casilla = (clave) => `<input type="checkbox" class="ip-chk-seccion" data-clave="${esc(clave)}" ${seleccion.has(clave) ? "checked" : ""} title="Incluir en el informe">`;
+  function tarjeta(i, foto, titulo, claves, itemsHtml) {
+    const todas = claves.every((k) => seleccion.has(k));
+    const algunas = claves.some((k) => seleccion.has(k));
+    const parcial = !todas && algunas ? ' data-parcial="1"' : "";
+    return `<div class="card cinta cinta-${i % 4}${algunas ? "" : " ip-cap-excluido"}">
+      <h2><input type="checkbox" class="ip-chk-cap" data-claves="${claves.join(",")}" ${todas ? "checked" : ""}${parcial} title="Incluir o quitar todo el capítulo">${imgModulo(foto, "ip-capitulo-foto")} ${titulo}</h2>
+      <ul class="ip-informe-lista">${itemsHtml}</ul></div>`;
+  }
   function pintar() {
     const ym = selMes.value;
-    cont.innerHTML = `<div class="ip-informe-grid">${CAPITULOS.map((cap, i) => {
-      const items = cap.items.filter((it) => !(it.m && MODULOS[it.m].soloObra && contrato.tipo !== "Obra")).map((it) => {
-        if (it.href) return `<li><span class="badge ok">✓</span> <a href="${it.href}">${esc(it.label)}</a></li>`;
+    const intro = tarjeta(3, "informe", "Introducción", ["intro"], `<li>${casilla("intro")} Objetivo y alcance <span class="text-muted">(de la información del contrato)</span></li>`);
+    const caps = CAPITULOS.map((cap, i) => {
+      const its = visibles(cap);
+      const items = its.map((it) => {
+        const k = claveSeccion(it);
+        if (it.href) return `<li>${casilla(k)} <span class="badge ok">✓</span> <a href="${it.href}">${esc(it.label)}</a></li>`;
         const mod = MODULOS[it.m];
         const n = delMes(mod, it.cap, ym);
-        const acumulado = mod.sinFiltroMes || mod.acumulaEnInforme || ["personal"].includes(mod.id);
-        return `<li><span class="badge ${n ? "ok" : "warn"}">${n}</span> <a href="${hrefModulo(it.m, it.cap)}">${esc(it.label || mod.label)}</a>${acumulado ? ' <span class="text-muted">(acumulado)</span>' : ""}</li>`;
+        const acumulado = mod.sinFiltroMes || mod.acumulaEnInforme || mod.id === "personal";
+        const marca = acumulado ? ' <span class="text-muted">(acumulado)</span>' : "";
+        return `<li>${casilla(k)} <span class="badge ${n ? "ok" : "warn"}">${n}</span> <a href="${hrefModulo(it.m, it.cap)}">${esc(it.label || mod.label)}</a>${marca}</li>`;
       }).join("");
-      return `<div class="card cinta cinta-${i % 4}"><h2>${imgModulo(`cap-${cap.id}`, "ip-capitulo-foto")} ${cap.numero}. ${esc(cap.label)}</h2><ul class="ip-informe-lista">${items}</ul></div>`;
-    }).join("")}</div>`;
+      return tarjeta(i, `cap-${cap.id}`, `${cap.numero}. ${esc(cap.label)}`, its.map(claveSeccion), items);
+    }).join("");
+    cont.innerHTML = `<div class="ip-informe-grid">${intro}${caps}</div>`;
+    cont.querySelectorAll("input[data-parcial]").forEach((chk) => { chk.indeterminate = true; });
+    document.getElementById("informeConteo").textContent = `${seleccion.size} de ${todasLasClaves.length} secciones seleccionadas`;
   }
+  cont.addEventListener("change", (e) => {
+    const t = e.target;
+    if (t.classList.contains("ip-chk-seccion")) {
+      if (t.checked) seleccion.add(t.dataset.clave); else seleccion.delete(t.dataset.clave);
+    } else if (t.classList.contains("ip-chk-cap")) {
+      t.dataset.claves.split(",").forEach((k) => { if (t.checked) seleccion.add(k); else seleccion.delete(k); });
+    } else return;
+    guardarSeleccion();
+    pintar();
+  });
+  document.getElementById("seleccionTodoBtn").addEventListener("click", () => { todasLasClaves.forEach((k) => seleccion.add(k)); guardarSeleccion(); pintar(); });
+  document.getElementById("seleccionNadaBtn").addEventListener("click", () => { seleccion.clear(); guardarSeleccion(); pintar(); });
   selMes.addEventListener("change", pintar);
   pintar();
+  const sinSeleccion = () => {
+    if (seleccion.size) return false;
+    mostrarAlerta(alerta, "Selecciona al menos una sección para incluir en el informe.");
+    return true;
+  };
 
   // ---------------------------------------------------------- PDF y visor
   const opciones = () => ({
     contrato, ym: selMes.value, datos,
     elaboradoPor: document.getElementById("informeElaborado").value.trim(),
     cargo: document.getElementById("informeCargo").value.trim(),
-    radicado: document.getElementById("informeRadicado").value.trim()
+    radicado: document.getElementById("informeRadicado").value.trim(),
+    incluir: new Set(seleccion)
   });
   const nombreArchivo = (ext) => `Informe ${contrato.tipo === "Obra" ? "de Interventoría" : "de seguimiento"} ${mesLargo(selMes.value)} (Contrato ${String(contrato.numero || "").replace(/[\/:*?"<>|]/g, "-")}).${ext}`;
   function descargar(url, nombre) {
@@ -83,6 +143,7 @@ async function iniciar({ user, perfil, contrato }) {
   }
   async function conEspera(boton, texto, tarea) {
     limpiarAlerta(alerta);
+    if (sinSeleccion()) return;
     if (!window.jspdf) { mostrarAlerta(alerta, "No se pudo cargar el generador de PDF. Recarga la página."); return; }
     const original = boton.textContent;
     boton.disabled = true;
@@ -126,6 +187,7 @@ async function iniciar({ user, perfil, contrato }) {
   btn.addEventListener("click", async () => {
     limpiarAlerta(alerta);
     if (!window.docx) { mostrarAlerta(alerta, "No se pudo cargar el generador de Word. Recarga la página."); return; }
+    if (sinSeleccion()) return;
     const ym = selMes.value;
     btn.disabled = true;
     btn.textContent = "Generando…";
@@ -133,7 +195,8 @@ async function iniciar({ user, perfil, contrato }) {
       const blob = await generarInformeMensual({
         contrato, ym, datos,
         elaboradoPor: document.getElementById("informeElaborado").value.trim(),
-        cargo: document.getElementById("informeCargo").value.trim()
+        cargo: document.getElementById("informeCargo").value.trim(),
+        incluir: new Set(seleccion)
       });
       const a = document.createElement("a");
       a.href = URL.createObjectURL(blob);
