@@ -12,7 +12,7 @@ import { claveSeccion } from "./ip-informe-contenido.js";
 // solo si el contrato ya tiene información en ellas.
 const OPCIONALES = new Set(["actainicio", "requerimientos", "suministros", "cambios", "consignaciones", "entregables", "noconformidades", "observaciones:calidad", "anexos:calidad", "observaciones:juridico", "anexos:juridico"]);
 
-const ctx = await iniciarPagina();
+const ctx = await iniciarPagina({ permiso: "generarInforme" });
 if (ctx) iniciar(ctx);
 
 async function iniciar({ user, perfil, contrato }) {

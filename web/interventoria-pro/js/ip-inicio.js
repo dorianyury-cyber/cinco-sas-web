@@ -8,7 +8,7 @@ import { cargarDatosContrato, resumirContrato } from "./ip-resumen.js";
 const ctx = await iniciarPagina();
 if (ctx) iniciar(ctx);
 
-async function iniciar({ contrato }) {
+async function iniciar({ contrato, puede }) {
   pintarEncabezado(`${imgModulo("inicio", "ip-h1-foto")} Inicio`, contrato);
 
   const datos = await cargarDatosContrato(contrato.id);
@@ -32,7 +32,7 @@ async function iniciar({ contrato }) {
   document.getElementById("inicioAlertas").innerHTML = `<h2>⚠️ Para revisar (${todas.length})</h2>` + (todas.length
     ? `<ul class="ip-alertas">${todas.map((a) => `<li class="ip-alerta-${a.nivel}"><a href="${hrefModulo(a.modulo.id)}">${esc(a.modulo.label)}</a> — ${esc(a.texto)}</li>`).join("")}</ul>`
     : `<p class="ip-sin-margen">✅ Todo al día: ningún módulo tiene alertas.</p>`)
-    + `<div class="ip-acciones-centro"><a class="btn secondary" href="avisos.html">📧 Avisar al gestor por correo</a></div>`;
+    + (puede.enviarAvisos ? `<div class="ip-acciones-centro"><a class="btn secondary" href="avisos.html">📧 Avisar al gestor por correo</a></div>` : "");
 
   // ---------------------------------------------------------- capítulos
   document.getElementById("inicioCapitulos").innerHTML = `<h2>📚 Capítulos del informe</h2><div class="ip-capitulos">${CAPITULOS.map((c) => {

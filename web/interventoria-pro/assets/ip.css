@@ -2447,3 +2447,11 @@ textarea { font-family: inherit; }
 .ip-rol-selector button { width: auto; margin: 0; padding: 4px 12px; border: 0; background: var(--card-bg); color: var(--text-muted); font: inherit; font-size: 11.5px; font-weight: 700; cursor: pointer; }
 .ip-rol-selector button + button { border-left: 1px solid var(--border); }
 .ip-rol-selector button.activo { background: #1f2732; color: #feb209; }
+
+/* Matriz de permisos por rol (Equipo de interventoría → Roles y permisos) */
+.ip-permisos-tabla .ip-permisos-col-texto { width: 58%; }
+.ip-permisos-tabla td { vertical-align: middle; }
+.ip-permisos-tabla td .text-muted { font-size: 11.5px; font-weight: 400; }
+.ip-permisos-tabla input[type="checkbox"] { width: 18px; height: 18px; margin: 0; accent-color: var(--cinco-orange-dark); cursor: pointer; }
+.ip-permisos-tabla input:disabled { cursor: default; }
+.ip-rol-selector button { padding: 4px 9px; }

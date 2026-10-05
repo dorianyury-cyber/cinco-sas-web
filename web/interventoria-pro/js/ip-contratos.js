@@ -16,14 +16,13 @@ import {
 const ctx = await iniciarPagina({ requiereContrato: false });
 if (ctx) iniciar(ctx);
 
-async function iniciar({ user, perfil, esGestor, contratos, contrato }) {
+async function iniciar({ user, perfil, esGestor, puede, contratos, contrato }) {
   pintarEncabezado(`${imgModulo("contratos", "ip-h1-foto")} ${esGestor ? "Contratos" : "Mis contratos"}`, null);
   const form = document.getElementById("contratoForm");
   const alerta = document.getElementById("contratoAlerta");
-  const esAdmin = perfil.rol === "admin";
   let editandoId = null;
 
-  if (esGestor) document.getElementById("nuevoContratoBtn").classList.remove("hidden");
+  if (puede.crearContratos) document.getElementById("nuevoContratoBtn").classList.remove("hidden");
 
   // ---------------------------------------------------------- formulario
   const CAMPOS = ["numero", "tipo", "estado", "objeto", "municipio", "objetivo", "alcance", "frentes", "contratante", "contratista", "supervisor", "director", "valorInicial", "anticipoPct", "fechaInicio", "fechaFin", "plazo", "smmlv"];
@@ -38,7 +37,7 @@ async function iniciar({ user, perfil, esGestor, contratos, contrato }) {
     limpiarAlerta(alerta);
     document.getElementById("contratoFormTitulo").textContent = c ? `Editar contrato ${c.numero || ""}` : "Nuevo contrato";
     CAMPOS.forEach((k) => { document.getElementById(`c_${k}`).value = c?.[k] ?? (k === "estado" ? "Activo" : k === "tipo" ? "Servicios" : k === "contratista" ? "CINCO S.A.S." : ""); });
-    document.getElementById("contratoEliminarBtn").classList.toggle("hidden", !(c && esAdmin));
+    document.getElementById("contratoEliminarBtn").classList.toggle("hidden", !(c && puede.eliminarContratos));
     abrirModal("contratoModal");
   }
 
@@ -102,9 +101,9 @@ async function iniciar({ user, perfil, esGestor, contratos, contrato }) {
 
   // Lista con semáforo + ficha del seleccionado (ip-tablero.js). El gestor
   // edita desde la ficha.
-  montarTablero({ contratos, activo: contrato, esGestor, onEditar: abrirFormulario });
+  montarTablero({ contratos, activo: contrato, esGestor: puede.crearContratos, onEditar: abrirFormulario });
   const editar = new URLSearchParams(location.search).get("editar");
-  if (editar && esGestor) {
+  if (editar && puede.crearContratos) {
     const c = contratos.find((x) => x.id === editar);
     if (c) abrirFormulario(c);
   }

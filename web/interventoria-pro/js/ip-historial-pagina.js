@@ -5,7 +5,7 @@ import { iniciarPagina, pintarEncabezado, esc, imgModulo, errorAmigable } from "
 import { refHistorial, ACCIONES, fechaHora } from "./ip-historial.js";
 import { mostrarLibro } from "./ip-visor.js";
 
-const ctx = await iniciarPagina();
+const ctx = await iniciarPagina({ permiso: "verHistorial" });
 if (ctx) iniciar(ctx);
 
 async function iniciar({ contrato }) {

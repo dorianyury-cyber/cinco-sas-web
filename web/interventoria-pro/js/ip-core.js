@@ -4,6 +4,8 @@
 // sus perfiles: la cuenta es la misma del módulo interno (o la de Cinco
 // Conecta, vía iniciarSesionConConecta) y el perfil sale de la colección
 // "empleados". Quién ve qué:
+//   (Roles y permisos actuales: ver ip-permisos.js — administrador
+//   principal, admin / gestor / equipo y la matriz de permisos.)
 //   - Gestor de Interventoría PRO: empleados.rol === "admin" o
 //     empleados.gestionaInterventoriaPro === true. Ve TODOS los contratos,
 //     los crea/edita y define su equipo.
@@ -22,6 +24,7 @@ import { signOut, onAuthStateChanged } from "https://www.gstatic.com/firebasejs/
 import { collection, query, where, getDocs, doc, getDoc } from "https://www.gstatic.com/firebasejs/10.7.1/firebase-firestore.js";
 import { auth, db, storage, obtenerPerfil } from "../../js/control/firebase-control.js";
 import { CAPITULOS, MODULOS } from "./ip-modulos.js";
+import { cargarConfig, permisosUsuario, ETIQUETA_ROL } from "./ip-permisos.js";
 
 export { auth, db, storage };
 
@@ -200,7 +203,9 @@ export async function cargarContratosVisibles(user, esGestor) {
 
 // Arranque común de cada página interna. Devuelve null si no hay acceso
 // (ya mostró el aviso o redirigió).
-export async function iniciarPagina({ requiereContrato = true, conMenu = true } = {}) {
+// permiso: si la página exige uno (ej. "generarInforme") y el rol no lo
+// tiene, se muestra el aviso en vez de la página.
+export async function iniciarPagina({ requiereContrato = true, conMenu = true, permiso = null } = {}) {
   const user = await esperarUsuario();
   if (!user) {
     window.location.href = "index.html";
@@ -211,7 +216,12 @@ export async function iniciarPagina({ requiereContrato = true, conMenu = true } 
     mostrarSinAcceso("Tu cuenta no tiene un perfil activo en Cinco S.A.S. Pídele a un administrador que te registre en Empleados.");
     return null;
   }
-  const esGestor = perfil.rol === "admin" || perfil.gestionaInterventoriaPro === true;
+  // Rol y permisos propios de Interventoría PRO (ip-permisos.js; la barrera
+  // real está en firestore.rules). esGestor queda como "ve todos los
+  // contratos" para las páginas que solo distinguen eso.
+  const config = await cargarConfig(db);
+  const puede = permisosUsuario(user.email, perfil, config);
+  const esGestor = puede.verTodos;
   const contratos = await cargarContratosVisibles(user, esGestor);
 
   const deUrl = new URLSearchParams(location.search).get("contrato");
@@ -227,9 +237,15 @@ export async function iniciarPagina({ requiereContrato = true, conMenu = true } 
     return null;
   }
 
-  const ctx = { user, perfil, esGestor, contratos, contrato };
+  const ctx = { user, perfil, esGestor, puede, config, contratos, contrato };
   if (conMenu) pintarMenu(ctx);
   document.documentElement.classList.remove("ip-preparando");
+  if (permiso && !puede[permiso]) {
+    const main = document.querySelector("main.main");
+    if (main) main.innerHTML = `<header id="ipHeader"></header><div class="card"><p class="ip-sin-margen">🔒 Tu rol (${esc(ETIQUETA_ROL[puede.rol] || puede.rol)}) no tiene permiso para esta página. Si lo necesitas, pídeselo al administrador de Interventoría PRO; los permisos de cada rol se ven en <a href="equipo.html">Equipo de interventoría → Roles y permisos</a>.</p></div>`;
+    import("./ip-ayuda.js").then((m) => m.montarAyuda()).catch(() => {});
+    return null;
+  }
   // Botón de Ayuda con buscador (se carga aparte: importa las guías).
   import("./ip-ayuda.js").then((m) => m.montarAyuda()).catch(() => {});
   return ctx;
@@ -287,7 +303,7 @@ function guardarGrupos(set) {
 
 // Menú lateral igual al de Copropiedad Saludable: marca arriba, Inicio, un
 // grupo plegable por capítulo del informe y la caja de usuario abajo.
-function pintarMenu({ user, perfil, esGestor, contratos, contrato }) {
+function pintarMenu({ user, perfil, esGestor, puede, contratos, contrato }) {
   const aside = document.getElementById("sidebar");
   if (!aside) return;
   const actual = location.pathname.split("/").pop() + location.search.replace(/&?contrato=[^&]*/, "");
@@ -355,10 +371,10 @@ function pintarMenu({ user, perfil, esGestor, contratos, contrato }) {
         ${enlace("contratos.html", "contratos", esGestor ? "Contratos" : "Mis contratos")}
         ${enlace("equipo.html", "equipo", "Equipo de interventoría")}
         ${enlace("inicio.html", "inicio", "Inicio")}
-        ${contrato ? enlace("campo.html", "campo", "Registro en campo") : ""}
-        ${contrato ? enlace("avisos.html", "avisos", "Avisos por correo") : ""}
-        ${contrato ? enlace("informe.html", "informe", "Informe mensual") : ""}
-        ${contrato ? enlace("historial.html", "historial", "Historial de cambios") : ""}
+        ${contrato && puede.registrar ? enlace("campo.html", "campo", "Registro en campo") : ""}
+        ${contrato && puede.enviarAvisos ? enlace("avisos.html", "avisos", "Avisos por correo") : ""}
+        ${contrato && puede.generarInforme ? enlace("informe.html", "informe", "Informe mensual") : ""}
+        ${contrato && puede.verHistorial ? enlace("historial.html", "historial", "Historial de cambios") : ""}
         </div>
       </div>
       <div class="nav-pilar nav-pilar-1">
@@ -380,7 +396,7 @@ function pintarMenu({ user, perfil, esGestor, contratos, contrato }) {
     <div class="spacer"></div>
     <div class="user-box">
       <div id="userName">${esc(perfil.nombre || user.email)}</div>
-      <div class="text-muted ip-user-rol">${esGestor ? "Gestor de Interventoría PRO" : "Equipo del contrato"}</div>
+      <div class="text-muted ip-user-rol">${puede.esDueno ? "Administrador principal" : `${ETIQUETA_ROL[puede.rol] || "Equipo"} de Interventoría PRO`}</div>
       <div class="ip-cuenta-botones">
         <a href="../control/cambiar-clave.html" class="ip-btn-cuenta">🔒 Cambiar contraseña</a>
         <button type="button" class="ip-btn-cuenta" id="logoutBtn">⏻ Cerrar sesión</button>

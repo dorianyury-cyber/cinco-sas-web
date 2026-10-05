@@ -27,7 +27,8 @@ if (ctxPagina && !mod) {
   iniciarModulo(ctxPagina);
 }
 
-function iniciarModulo({ user, perfil, contrato, esGestor }) {
+function iniciarModulo({ user, perfil, contrato, puede }) {
+  const esGestor = puede.eliminarRegistros; // (solo decide si se ve "Eliminar")
   const titulo = mod.porCapitulo ? `${mod.label} — ${nombreCapitulo(cap)}` : mod.label;
   const tituloModulo = titulo;
   pintarEncabezado(`${imgModulo(cap === "ambiental" && mod.id === "capacitaciones" ? "capacitaciones-ambiental" : mod.id, "ip-h1-foto")} ${esc(titulo)}`, contrato);
@@ -372,6 +373,13 @@ function iniciarModulo({ user, perfil, contrato, esGestor }) {
   document.getElementById("ipCancelarBtn").addEventListener("click", () => cerrarModal("ipModal"));
   document.getElementById("ipModal").addEventListener("click", (e) => { if (e.target.id === "ipModal") cerrarModal("ipModal"); });
   document.addEventListener("keydown", (e) => { if (e.key === "Escape") cerrarModal("ipModal"); });
+
+  // Sin el permiso "registrar" el módulo queda en consulta: se pueden abrir
+  // los registros pero no crear, guardar, importar ni cargar listas.
+  if (!puede.registrar) {
+    ["ipNuevoBtn", "ipImportarBtn", "ipPlantillaBtn", "ipGuardarBtn"].forEach((id) => document.getElementById(id)?.classList.add("hidden"));
+    document.getElementById("ipResumen").insertAdjacentHTML("beforebegin", '<div class="alert info ip-alerta-fija">👁 Tu rol solo permite consultar este módulo. Para registrar información pídele al administrador el permiso «Registrar y editar».</div>');
+  }
 
   // ---------------------------------------------------------- Excel
   // Todas las columnas del formulario (no solo las de la tabla), con ancho

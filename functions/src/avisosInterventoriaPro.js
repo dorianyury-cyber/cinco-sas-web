@@ -178,6 +178,26 @@ function armarCorreo(contrato, avisos, hoy, { nota = "", remitente = "" } = {}) 
   return { asunto: `${rojos ? "⚠ " : ""}Interventoría PRO · ${titulo}: ${avisos.length} aviso(s)`, html, texto };
 }
 
+// ------------------------------------------------------------ roles y permisos
+const DUENO_IP = "gerencia.cincoltda@hotmail.com";
+const PERMISOS_IP = ["verTodos", "registrar", "eliminarRegistros", "crearContratos", "asignarEquipo", "eliminarContratos", "verHistorial", "generarInforme", "enviarAvisos", "recibirAvisos", "cambiarRoles"];
+const todosIp = (v) => Object.fromEntries(PERMISOS_IP.map((p) => [p, v]));
+const PERMISOS_IP_DEFECTO = {
+  admin: todosIp(true),
+  gestor: { ...todosIp(true), eliminarContratos: false, cambiarRoles: false },
+  equipo: { ...todosIp(false), registrar: true, verHistorial: true, generarInforme: true, enviarAvisos: true }
+};
+async function leerConfigIp(db) {
+  const [r, p] = await Promise.all([db.collection("ipConfig").doc("roles").get(), db.collection("ipConfig").doc("permisos").get()]);
+  return { roles: (r.exists && r.data().roles) || {}, permisos: p.exists ? p.data() : null };
+}
+function permisoIp(email, empleado, config, permiso) {
+  if (!empleado || empleado.estado !== "activo") return false;
+  if (email === DUENO_IP) return true;
+  const rol = config.roles[email] || (empleado.rol === "admin" || empleado.gestionaInterventoriaPro === true ? "gestor" : "equipo");
+  return ((config.permisos || PERMISOS_IP_DEFECTO)[rol] || {})[permiso] === true;
+}
+
 // ------------------------------------------------------------ función
 exports.enviarAvisosInterventoriaPro = onCall(async (request) => {
   const email = request.auth?.token?.email;
@@ -191,23 +211,24 @@ exports.enviarAvisosInterventoriaPro = onCall(async (request) => {
   const snap = await ref.get();
   if (!snap.exists) throw new HttpsError("not-found", "No se encontró el contrato.");
   const contrato = { id: snap.id, ...snap.data() };
-  const esGestor = emp.rol === "admin" || emp.gestionaInterventoriaPro === true;
-  if (!esGestor && !(contrato.miembros || []).includes(email)) throw new HttpsError("permission-denied", "No perteneces al equipo de este contrato.");
+  // Roles y permisos propios de Interventoría PRO: misma lógica de
+  // firestore.rules (ipRol / ipPuede) y de web/interventoria-pro/js/ip-permisos.js.
+  const config = await leerConfigIp(db);
+  const puede = (correo, empleado, permiso) => permisoIp(correo, empleado, config, permiso);
+  if (!puede(email, emp, "enviarAvisos")) throw new HttpsError("permission-denied", "Tu rol no tiene permiso para enviar avisos por correo.");
+  if (!puede(email, emp, "verTodos") && !(contrato.miembros || []).includes(email)) throw new HttpsError("permission-denied", "No perteneces al equipo de este contrato.");
 
   const hoy = hoyBogota();
   const avisos = calcularAvisos(contrato, await leerContrato(ref), hoy);
 
-  // Los avisos son internos: van dirigidos a los gestores de Interventoría
-  // PRO (y, si se quiere, a miembros del equipo del contrato). No se
-  // permiten correos externos.
-  const [porPermiso, porRol] = await Promise.all([
-    db.collection("empleados").where("gestionaInterventoriaPro", "==", true).get(),
-    db.collection("empleados").where("rol", "==", "admin").get()
-  ]);
+  // Los avisos son internos: van a quienes tengan el permiso "recibir
+  // avisos" (por defecto, gestores y administradores) y, si se quiere, a
+  // miembros del equipo del contrato. No se permiten correos externos.
+  const activos = await db.collection("empleados").where("estado", "==", "activo").get();
   const gestoresMap = new Map();
-  [...porPermiso.docs, ...porRol.docs].forEach((d) => {
+  activos.docs.forEach((d) => {
     const e = d.data();
-    if (e.estado === "activo") gestoresMap.set(d.id.toLowerCase(), { email: d.id.toLowerCase(), nombre: e.nombre || d.id });
+    if (puede(d.id, e, "recibirAvisos")) gestoresMap.set(d.id.toLowerCase(), { email: d.id.toLowerCase(), nombre: e.nombre || d.id });
   });
   const gestores = [...gestoresMap.values()];
   const equipo = (await Promise.all((contrato.miembros || []).map(async (m) => {

@@ -9,7 +9,7 @@ reiniciarMenu();
 
 const ctx = await iniciarPagina({ requiereContrato: false, conMenu: false });
 if (ctx) {
-  const { user, perfil, esGestor, contratos, contrato } = ctx;
+  const { user, perfil, esGestor, puede, contratos, contrato } = ctx;
   document.getElementById("bienvenidaNombre").textContent = `Hola, ${perfil.nombre || user.email}`;
   document.getElementById("logoutBtn").addEventListener("click", cerrarSesion);
 
@@ -41,6 +41,9 @@ if (ctx) {
     { href: "informe.html", foto: "informe", label: "Informe mensual", desc: "Elige el mes, marca las secciones y genera el informe en PDF o Word" },
     { href: "historial.html", foto: "historial", label: "Historial de cambios", desc: "Quién registró o cambió cada dato, cuándo y qué cambió" }
   ];
+  // Solo las herramientas que el rol puede usar.
+  const PERMISO_HERRAMIENTA = { "informe.html": "generarInforme", "historial.html": "verHistorial", "avisos.html": "enviarAvisos", "campo.html": "registrar" };
+  const herramientasVisibles = herramientas.filter((t) => !PERMISO_HERRAMIENTA[t.href] || puede[PERMISO_HERRAMIENTA[t.href]]);
   const capitulos = CAPITULOS.map((c) => ({ href: c.items[0].href || hrefModulo(c.items[0].m, c.items[0].cap), foto: `cap-${c.id}`, label: `${c.numero}. ${c.label}`, desc: c.desc }));
   // Sin contratos todavía, las tarjetas llevan a Contratos (no hay dónde
   // registrar nada) — pero se ven normales; el aviso de arriba explica qué
@@ -53,12 +56,12 @@ if (ctx) {
       <span class="modulo-desc">${esc(t.desc)}</span>
     </a>`;
   };
-  document.getElementById("bienvenidaHerramientas").innerHTML = herramientas.map(tarjeta).join("");
+  document.getElementById("bienvenidaHerramientas").innerHTML = herramientasVisibles.map(tarjeta).join("");
   document.getElementById("bienvenidaCapitulos").innerHTML = capitulos.map(tarjeta).join("");
   const conoce = SECCIONES_GENERALIDADES.map((s) => ({ href: `generalidades.html#${s.id}`, foto: s.foto, label: s.label, desc: s.desc }));
   document.getElementById("bienvenidaConoce").innerHTML = conoce.map(tarjeta).join("");
   document.getElementById("cuentaConoce").textContent = `${conoce.length} temas`;
-  document.getElementById("cuentaHerramientas").textContent = `${herramientas.length} herramientas`;
+  document.getElementById("cuentaHerramientas").textContent = `${herramientasVisibles.length} herramientas`;
   document.getElementById("cuentaCapitulos").textContent = `${capitulos.length} capítulos`;
 
   // Solo se ven las dos tarjetas de grupo; al tocar una se despliegan sus

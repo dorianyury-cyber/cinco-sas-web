@@ -12,7 +12,7 @@ import { app } from "../../js/control/firebase-control.js";
 import { db, iniciarPagina, pintarEncabezado, esc, imgModulo, hrefModulo, mostrarAlerta, limpiarAlerta, errorAmigable } from "./ip-core.js";
 import { fechaHora } from "./ip-historial.js";
 
-const ctx = await iniciarPagina();
+const ctx = await iniciarPagina({ permiso: "enviarAvisos" });
 if (ctx) iniciar(ctx);
 
 async function iniciar({ contrato }) {

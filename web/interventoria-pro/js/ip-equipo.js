@@ -4,23 +4,20 @@
 // guarda todo junto; cada contrato que cambia actualiza su lista
 // "miembros" y deja su entrada en el historial (quién entra / quién sale).
 // El resto del equipo la ve en modo consulta, solo con sus contratos.
-import { collection, getDocs, doc, writeBatch, serverTimestamp, updateDoc } from "https://www.gstatic.com/firebasejs/10.7.1/firebase-firestore.js";
+import { collection, getDocs, doc, writeBatch, serverTimestamp, setDoc } from "https://www.gstatic.com/firebasejs/10.7.1/firebase-firestore.js";
 import { db, iniciarPagina, pintarEncabezado, esc, imgModulo, mostrarAlerta, limpiarAlerta, errorAmigable, hoyISO } from "./ip-core.js";
 import { anotarEnLote } from "./ip-historial.js";
-import { mostrarLibro, mostrarTabla } from "./ip-visor.js";
+import { mostrarLibro } from "./ip-visor.js";
+import { DUENO, ROLES, ETIQUETA_ROL as ETIQUETAS, PERMISOS, rolDe as rolSegun, permisosDe } from "./ip-permisos.js";
 
 const INACTIVOS = ["Terminado", "Liquidado"];
-const RESUMEN_ROL = {
-  admin: "Administrador: todo lo del gestor, más eliminar contratos y cambiar roles. Se asigna en Empleados del módulo interno.",
-  gestor: "Gestor: ve todos los contratos, los crea y edita, asigna equipos, elimina registros y recibe los avisos por correo.",
-  equipo: "Equipo: ve y registra información solo en los contratos donde está marcado; no elimina registros ni edita el contrato.",
-  inactivo: "No está activo en Empleados: no puede ingresar."
-};
 
 const ctx = await iniciarPagina({ requiereContrato: false });
 if (ctx) iniciar(ctx);
 
-async function iniciar({ user, perfil, esGestor, contratos }) {
+async function iniciar({ user, perfil, puede, config, contratos }) {
+  // Las casillas de asignación las maneja quien pueda asignar equipos.
+  const esGestor = puede.asignarEquipo;
   pintarEncabezado(`${imgModulo("equipo", "ip-h1-foto")} Equipo de interventoría`, null);
   const matrizEl = document.getElementById("eqMatriz");
   const alerta = document.getElementById("eqAlerta");
@@ -36,12 +33,12 @@ async function iniciar({ user, perfil, esGestor, contratos }) {
   const empleados = snap.docs.map((d) => ({ email: d.id, ...d.data() }))
     .filter((e) => e.estado === "activo")
     .sort((a, b) => String(a.nombre || a.email).localeCompare(String(b.nombre || b.email), "es"));
-  // Roles de Interventoría PRO (ver ROLES abajo). El de administrador viene
-  // del rol "admin" en Empleados y no se cambia aquí; gestor = casilla
-  // gestionaInterventoriaPro de Empleados, que solo el administrador puede
-  // cambiar (firestore.rules: empleados solo los edita esAdmin()).
-  const rolDe = (e) => (e.inactivo ? "inactivo" : e.rol === "admin" ? "admin" : e.gestionaInterventoriaPro === true ? "gestor" : "equipo");
-  const puedeCambiarRoles = perfil.rol === "admin";
+  // Roles propios de Interventoría PRO (ip-permisos.js / ipConfig/roles):
+  // el administrador principal es fijo; los demás los cambia quien tenga el
+  // permiso "cambiarRoles". La matriz de permisos solo la edita el
+  // administrador principal.
+  const rolDe = (e) => (e.inactivo ? "inactivo" : rolSegun(e.email, e, config));
+  const puedeCambiarRoles = puede.cambiarRoles;
 
   // Asignaciones: original (lo guardado) y actual (con los cambios sin guardar).
   const original = new Map(contratos.map((c) => [c.id, new Set(c.miembros || [])]));
@@ -59,54 +56,97 @@ async function iniciar({ user, perfil, esGestor, contratos }) {
   }).filter((x) => x.entran.length || x.salen.length);
 
   // ---------------------------------------------------------- roles
-  const ETIQUETA_ROL = { admin: "Administrador", gestor: "Gestor", equipo: "Equipo", inactivo: "Inactivo" };
+  const ETIQUETA_ROL = { ...ETIQUETAS, inactivo: "Inactivo" };
+  const resumenRol = (rol) => {
+    if (rol === "inactivo") return "No está activo en Empleados: no puede ingresar.";
+    const p = permisosDe(rol, config);
+    return `${ETIQUETA_ROL[rol]}: ${PERMISOS.filter((x) => p[x.id]).map((x) => x.texto.toLowerCase()).join("; ") || "solo consulta"}.`;
+  };
   function celdaRol(e) {
+    if (e.email === DUENO) return `<span class="ip-rol ip-rol-admin" title="Administrador principal: tiene todos los permisos y es el único que define los permisos de cada rol. No se puede cambiar.">👑 Administrador principal</span>`;
     const rol = rolDe(e);
-    if (rol === "admin" || rol === "inactivo" || !puedeCambiarRoles) {
-      return `<span class="ip-rol ip-rol-${rol}" title="${esc(RESUMEN_ROL[rol] || "")}">${ETIQUETA_ROL[rol]}</span>`;
+    if (rol === "inactivo" || !puedeCambiarRoles) {
+      return `<span class="ip-rol ip-rol-${rol}" title="${esc(resumenRol(rol))}">${ETIQUETA_ROL[rol]}</span>`;
     }
-    // Solo el administrador: dos botones, el activo resaltado.
+    // Quien puede cambiar roles: tres botones, el activo resaltado.
     return `<div class="ip-rol-selector" role="group" aria-label="Rol de ${esc(e.nombre || e.email)}">
-      ${["equipo", "gestor"].map((r) => `<button type="button" class="${rol === r ? "activo" : ""}" data-rol="${r}" data-email="${esc(e.email)}" title="${esc(RESUMEN_ROL[r])}">${ETIQUETA_ROL[r]}</button>`).join("")}
+      ${["equipo", "gestor", "admin"].map((r) => `<button type="button" class="${rol === r ? "activo" : ""}" data-rol="${r}" data-email="${esc(e.email)}" title="${esc(resumenRol(r))}">${ETIQUETA_ROL[r]}</button>`).join("")}
     </div>`;
   }
   async function cambiarRol(email, nuevo) {
     const e = empleados.find((x) => x.email === email);
-    if (!e || rolDe(e) === nuevo) return;
-    const texto = nuevo === "gestor"
-      ? `¿Hacer a ${e.nombre || email} GESTOR de Interventoría PRO?\n\nPodrá ver TODOS los contratos, crearlos y editarlos, asignar equipos y eliminar registros.`
-      : `¿Quitarle a ${e.nombre || email} el rol de gestor?\n\nQuedará como EQUIPO: solo verá y registrará información en los contratos donde esté marcado.`;
-    if (!confirm(texto)) return;
+    if (!e || email === DUENO || rolDe(e) === nuevo) return;
+    const p = permisosDe(nuevo, config);
+    const lista = PERMISOS.map((x) => `${p[x.id] ? "✅" : "—"} ${x.texto}`).join("\n");
+    if (!confirm(`¿Cambiar el rol de ${e.nombre || email} a ${ETIQUETA_ROL[nuevo].toUpperCase()}?\n\nCon ese rol podrá:\n${lista}`)) return;
     limpiarAlerta(alerta);
     try {
-      await updateDoc(doc(db, "empleados", email), { gestionaInterventoriaPro: nuevo === "gestor" });
-      e.gestionaInterventoriaPro = nuevo === "gestor";
+      // Se guarda la tabla completa de roles (los correos llevan puntos y
+      // no sirven como ruta de campo en un update parcial).
+      const roles = { ...config.roles, [email]: nuevo };
+      await setDoc(doc(db, "ipConfig", "roles"), { roles, actualizadoPor: user.email, actualizadoEn: serverTimestamp() });
+      config.roles = roles;
       mostrarAlerta(alerta, `${e.nombre || email} ahora es ${ETIQUETA_ROL[nuevo].toLowerCase()} de Interventoría PRO.`, "success");
       pintar();
     } catch (err) {
       mostrarAlerta(alerta, `No se pudo cambiar el rol: ${errorAmigable(err)}`);
     }
   }
+
+  // Roles y permisos: matriz de casillas (permiso × rol). Solo el
+  // administrador principal la edita; los demás la ven.
   document.getElementById("eqRolesBtn").addEventListener("click", () => {
-    const si = "✅ Sí", no = "—";
-    mostrarTabla({
-      titulo: "Roles y permisos de Interventoría PRO",
-      nota: `${puedeCambiarRoles ? "Como administrador, cambias el rol con los botones Equipo / Gestor de cada colaborador." : "El rol lo asigna el administrador."} Para que alguien aparezca aquí debe estar activo en Empleados del módulo interno de Cinco S.A.S.`,
-      columnas: ["Qué puede hacer", "Administrador", "Gestor", "Equipo del contrato"],
-      filas: [
-        ["Ver contratos", "Todos", "Todos", "Solo donde está marcado"],
-        ["Registrar y editar información en los módulos", si, si, "Solo en sus contratos"],
-        ["Tomar y subir fotos, Registro en campo", si, si, "Solo en sus contratos"],
-        ["Generar el informe mensual (PDF / Word)", si, si, "Solo de sus contratos"],
-        ["Enviar avisos por correo al gestor", si, si, "Solo de sus contratos"],
-        ["Ver el historial de cambios", si, si, "Solo de sus contratos"],
-        ["Crear contratos y editar su información básica", si, si, no],
-        ["Asignar el equipo de cada contrato", si, si, no],
-        ["Eliminar registros (queda en el historial)", si, si, no],
-        ["Recibir los avisos por correo como gestor", si, si, no],
-        ["Eliminar un contrato completo", si, no, no],
-        ["Cambiar el rol de los colaboradores", si, no, no]
-      ]
+    const editable = puede.esDueno;
+    const actualP = Object.fromEntries(ROLES.map((r) => [r, permisosDe(r, config)]));
+    const fondo = document.createElement("div");
+    fondo.className = "modal-backdrop open ip-visor-fondo";
+    fondo.innerHTML = `<div class="modal ip-modal-ancho ip-visor-modal" role="dialog" aria-label="Roles y permisos">
+      <h2>Roles y permisos de Interventoría PRO</h2>
+      <p class="text-muted ip-visor-nota">${editable
+        ? "Marca o desmarca lo que puede hacer cada rol y guarda. Aplica de inmediato a todas las personas con ese rol (la base de datos lo hace cumplir, no solo la pantalla). El administrador principal siempre tiene todos los permisos."
+        : "Lo que puede hacer cada rol. Solo el administrador principal (gerencia) cambia estos permisos."}
+        El rol de cada persona se elige en la columna «Rol». «Equipo» solo trabaja en los contratos donde está marcado, aunque tenga permisos.</p>
+      <div class="ip-visor-tabla"><table class="tabla-compacta ip-permisos-tabla">
+        <colgroup><col class="ip-permisos-col-texto"><col><col><col></colgroup>
+        <thead><tr><th>Qué puede hacer</th>${ROLES.map((r) => `<th class="ip-num">${ETIQUETA_ROL[r]}</th>`).join("")}</tr></thead>
+        <tbody>${PERMISOS.map((p) => `<tr><td><strong>${esc(p.texto)}</strong>${p.ayuda ? `<br><span class="text-muted">${esc(p.ayuda)}</span>` : ""}${p.interfaz ? '<br><span class="text-muted">(control de pantalla)</span>' : ""}</td>
+          ${ROLES.map((r) => `<td class="ip-num"><input type="checkbox" data-rol="${r}" data-p="${p.id}" ${actualP[r][p.id] ? "checked" : ""} ${editable ? "" : "disabled"} aria-label="${esc(`${p.texto} — ${ETIQUETA_ROL[r]}`)}"></td>`).join("")}</tr>`).join("")}</tbody>
+      </table></div>
+      <div class="alert" id="eqPermAlerta"></div>
+      <div class="ip-form-acciones ip-visor-acciones">
+        ${editable ? '<button type="button" class="btn" id="eqPermGuardar">💾 Guardar permisos</button><button type="button" class="btn secondary" id="eqPermDefecto">Restaurar valores por defecto</button>' : ""}
+        <button type="button" class="btn secondary" id="eqPermCerrar">Cerrar</button>
+      </div>
+    </div>`;
+    document.body.appendChild(fondo);
+    const cerrarV = () => fondo.remove();
+    fondo.addEventListener("click", (ev) => { if (ev.target === fondo) cerrarV(); });
+    fondo.querySelector("#eqPermCerrar").addEventListener("click", cerrarV);
+    if (!editable) return;
+    const leer = () => {
+      const t = Object.fromEntries(ROLES.map((r) => [r, {}]));
+      fondo.querySelectorAll("input[data-p]").forEach((chk) => { t[chk.dataset.rol][chk.dataset.p] = chk.checked; });
+      return t;
+    };
+    const guardarPermisos = async (tabla) => {
+      const al = fondo.querySelector("#eqPermAlerta");
+      try {
+        await setDoc(doc(db, "ipConfig", "permisos"), { ...tabla, actualizadoPor: user.email, actualizadoEn: serverTimestamp() });
+        config.permisos = tabla;
+        mostrarAlerta(al, "Permisos guardados. Cada persona los verá aplicados al recargar el aplicativo.", "success");
+        pintar();
+      } catch (err) {
+        mostrarAlerta(al, `No se pudieron guardar: ${errorAmigable(err)}`);
+      }
+    };
+    fondo.querySelector("#eqPermGuardar").addEventListener("click", () => {
+      const tabla = leer();
+      if (!tabla.admin.cambiarRoles && !confirm("Ningún administrador (aparte de ti) podrá cambiar roles. ¿Continuar?")) return;
+      guardarPermisos(tabla);
+    });
+    fondo.querySelector("#eqPermDefecto").addEventListener("click", async () => {
+      const { PERMISOS_DEFECTO } = await import("./ip-permisos.js");
+      fondo.querySelectorAll("input[data-p]").forEach((chk) => { chk.checked = !!PERMISOS_DEFECTO[chk.dataset.rol][chk.dataset.p]; });
     });
   });
 

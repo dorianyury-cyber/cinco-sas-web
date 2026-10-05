@@ -86,7 +86,7 @@ function conLimite(promesa, ms, texto) {
 }
 
 // ------------------------------------------------------------ página
-const ctxPagina = await iniciarPagina();
+const ctxPagina = await iniciarPagina({ permiso: "registrar" });
 if (ctxPagina) iniciar(ctxPagina);
 
 async function iniciar({ user, perfil, contrato, contratos }) {

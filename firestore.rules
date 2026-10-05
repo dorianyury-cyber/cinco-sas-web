@@ -286,43 +286,89 @@ service cloud.firestore {
     }
 
     // ---- Interventoría PRO (web/interventoria-pro/*) ----
-    // Gestor = admin o empleado con gestionaInterventoriaPro: ve, crea y
-    // edita todos los contratos y su equipo. Miembro = empleado activo
-    // cuyo correo está en ipContratos/{id}.miembros: ve el contrato y
-    // registra/edita la información de TODOS sus módulos (subcolecciones),
-    // pero no cambia los datos básicos ni el equipo. Borrar un contrato
-    // queda solo para admin.
-    function gestionaInterventoriaPro() {
-      return esAdmin() || (esEmpleadoActivo() && empleadoDoc().get('gestionaInterventoriaPro', false) == true);
+    // Roles y permisos PROPIOS de Interventoría PRO (no dependen del rol del
+    // módulo interno):
+    // - Administrador principal fijo: gerencia.cincoltda@hotmail.com —
+    //   siempre admin con todos los permisos; es el único que edita la
+    //   matriz de permisos (ipConfig/permisos).
+    // - Rol de cada persona en ipConfig/roles.roles[email] ("admin",
+    //   "gestor", "equipo"). Sin asignación: gestor si tenía el permiso
+    //   anterior (admin del módulo interno o gestionaInterventoriaPro),
+    //   si no, equipo.
+    // - Qué puede hacer cada rol: ipConfig/permisos.{rol}.{permiso}; si
+    //   ese documento no existe, valen los permisos por defecto de abajo.
+    // Miembro = correo en ipContratos/{id}.miembros: ve ese contrato aunque
+    // su rol no tenga "verTodos". Las mismas reglas se repiten en
+    // web/interventoria-pro/js/ip-permisos.js (interfaz) y en
+    // functions/src/avisosInterventoriaPro.js (correos).
+    function ipDueno() {
+      return request.auth != null && request.auth.token.email == 'gerencia.cincoltda@hotmail.com';
+    }
+    function ipRol() {
+      let rutaRoles = /databases/$(database)/documents/ipConfig/roles;
+      let email = request.auth.token.email;
+      let asignado = exists(rutaRoles) ? get(rutaRoles).data.get('roles', {}).get(email, '') : '';
+      return ipDueno() ? 'admin'
+        : asignado != '' ? asignado
+        : (esAdmin() || empleadoDoc().get('gestionaInterventoriaPro', false) == true) ? 'gestor'
+        : 'equipo';
+    }
+    function ipPermisoDefecto(rol, permiso) {
+      return {
+        'admin': { 'verTodos': true, 'registrar': true, 'eliminarRegistros': true, 'crearContratos': true, 'asignarEquipo': true, 'eliminarContratos': true, 'verHistorial': true, 'cambiarRoles': true },
+        'gestor': { 'verTodos': true, 'registrar': true, 'eliminarRegistros': true, 'crearContratos': true, 'asignarEquipo': true, 'eliminarContratos': false, 'verHistorial': true, 'cambiarRoles': false },
+        'equipo': { 'verTodos': false, 'registrar': true, 'eliminarRegistros': false, 'crearContratos': false, 'asignarEquipo': false, 'eliminarContratos': false, 'verHistorial': true, 'cambiarRoles': false }
+      }[rol].get(permiso, false);
+    }
+    function ipPuede(permiso) {
+      let rutaPermisos = /databases/$(database)/documents/ipConfig/permisos;
+      let rol = ipRol();
+      return esEmpleadoActivo() && (ipDueno()
+        || (exists(rutaPermisos)
+          ? get(rutaPermisos).data.get(rol, {}).get(permiso, false) == true
+          : ipPermisoDefecto(rol, permiso)));
     }
     function miembroIp(datosContrato) {
       return esEmpleadoActivo() && request.auth.token.email in datosContrato.get('miembros', []);
     }
+    function veContratoIp(contratoId) {
+      return ipPuede('verTodos')
+        || miembroIp(get(/databases/$(database)/documents/ipContratos/$(contratoId)).data);
+    }
+
+    // Configuración de roles y permisos: la lee cualquier empleado activo
+    // (la interfaz la necesita); los roles los cambia quien tenga
+    // "cambiarRoles"; la matriz de permisos, solo el administrador principal.
+    match /ipConfig/{docId} {
+      allow read: if esEmpleadoActivo();
+      allow write: if (docId == 'roles' && (ipDueno() || ipPuede('cambiarRoles')))
+        || (docId == 'permisos' && ipDueno());
+    }
+
     match /ipContratos/{contratoId} {
-      allow read: if gestionaInterventoriaPro() || miembroIp(resource.data);
-      allow create, update: if gestionaInterventoriaPro();
-      allow delete: if esAdmin();
+      allow read: if ipPuede('verTodos') || miembroIp(resource.data);
+      allow create: if ipPuede('crearContratos');
+      // Asignar equipo = cambiar solo la lista de miembros.
+      allow update: if ipPuede('crearContratos')
+        || (ipPuede('asignarEquipo')
+          && request.resource.data.diff(resource.data).affectedKeys().hasOnly(['miembros', 'actualizadoEn', 'actualizadoPor']));
+      allow delete: if ipPuede('eliminarContratos');
 
       // Historial de cambios: solo se AGREGA (nunca se edita ni se borra),
       // a nombre de quien hace el cambio y con la hora del servidor.
       match /historial/{entradaId} {
-        allow read: if gestionaInterventoriaPro()
-          || miembroIp(get(/databases/$(database)/documents/ipContratos/$(contratoId)).data);
-        allow create: if (gestionaInterventoriaPro()
-            || miembroIp(get(/databases/$(database)/documents/ipContratos/$(contratoId)).data))
+        allow read: if ipPuede('verHistorial') && veContratoIp(contratoId);
+        allow create: if veContratoIp(contratoId)
           && request.resource.data.usuario == request.auth.token.email
           && request.resource.data.fecha == request.time;
         allow update, delete: if false;
       }
 
-      // Registros de los módulos: el equipo crea y edita; eliminar queda
-      // solo para el gestor (queda constancia en el historial).
+      // Registros de los módulos (quedan en el historial).
       match /{coleccion}/{registroId} {
-        allow read: if coleccion != 'historial' && (gestionaInterventoriaPro()
-          || miembroIp(get(/databases/$(database)/documents/ipContratos/$(contratoId)).data));
-        allow create, update: if coleccion != 'historial' && (gestionaInterventoriaPro()
-          || miembroIp(get(/databases/$(database)/documents/ipContratos/$(contratoId)).data));
-        allow delete: if coleccion != 'historial' && gestionaInterventoriaPro();
+        allow read: if coleccion != 'historial' && veContratoIp(contratoId);
+        allow create, update: if coleccion != 'historial' && ipPuede('registrar') && veContratoIp(contratoId);
+        allow delete: if coleccion != 'historial' && ipPuede('eliminarRegistros') && veContratoIp(contratoId);
       }
     }
   }
