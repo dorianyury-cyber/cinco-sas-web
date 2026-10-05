@@ -763,15 +763,30 @@ export async function generarOfertaPDF(oferta) {
     doc.setDrawColor(...AMBER);
     doc.setLineWidth(0.6);
     doc.line(margenX, 16, anchoPagina - margenX, 16);
+    let anchoLogo = 0;
     if (logo) {
       const altoLogo = 8;
-      const anchoLogo = altoLogo * (logo.ancho / logo.alto);
+      anchoLogo = altoLogo * (logo.ancho / logo.alto);
       doc.addImage(logo.dataUrl, "PNG", margenX, 6, anchoLogo, altoLogo);
     }
+    // El título puede ser largo — se ajusta al espacio que queda a la
+    // derecha del logo (hasta 2 líneas y, si aún no cabe, letra más
+    // pequeña), igual que en informes-pdf.js, para que nunca quede montado
+    // sobre el logo.
     doc.setFont("helvetica", "normal");
-    doc.setFontSize(8);
     doc.setTextColor(...TEXT_MUTED);
-    doc.text(oferta.titulo || "", anchoPagina - margenX, 11, { align: "right" });
+    const anchoDisponibleTitulo = anchoPagina - margenX - (margenX + anchoLogo + 4);
+    let tamanoTitulo = 8;
+    doc.setFontSize(tamanoTitulo);
+    let lineasTitulo = doc.splitTextToSize(oferta.titulo || "", anchoDisponibleTitulo);
+    while (lineasTitulo.length > 2 && tamanoTitulo > 6) {
+      tamanoTitulo -= 0.5;
+      doc.setFontSize(tamanoTitulo);
+      lineasTitulo = doc.splitTextToSize(oferta.titulo || "", anchoDisponibleTitulo);
+    }
+    if (lineasTitulo.length > 2) lineasTitulo = [lineasTitulo[0], `${lineasTitulo[1].replace(/\s*\S*$/, "")}…`];
+    const yInicioTitulo = lineasTitulo.length > 1 ? 8 : 11;
+    lineasTitulo.forEach((linea, i) => doc.text(linea, anchoPagina - margenX, yInicioTitulo + i * 3.6, { align: "right" }));
 
     doc.setFillColor(...GRIS_CLARO);
     doc.rect(0, altoPagina - 14, anchoPagina, 14, "F");
