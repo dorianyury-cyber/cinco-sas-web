@@ -1,7 +1,7 @@
 // Pantalla de bienvenida (igual que en Copropiedad Saludable): un botón
 // grande por cada capítulo del informe, más Inicio y Contratos. Es la
 // primera pantalla después de ingresar.
-import { iniciarPagina, esc, cerrarSesion, fijarContratoActivo, hrefModulo, fotoModulo, reiniciarMenu } from "./ip-core.js";
+import { iniciarPagina, esc, cerrarSesion, fijarContratoActivo, hrefModulo, fotoModulo, reiniciarMenu, SECCIONES_GENERALIDADES } from "./ip-core.js";
 import { CAPITULOS } from "./ip-modulos.js";
 
 // Abrir el aplicativo deja todos los capítulos del menú lateral cerrados.
@@ -37,14 +37,13 @@ if (ctx) {
     { href: "contratos.html", foto: "contratos", label: esGestor ? "Contratos" : "Mis contratos", desc: esGestor ? "Todos los contratos con su semáforo y alertas; crea y edita contratos y su equipo" : "Tus contratos con su semáforo, alertas e información básica" },
     { href: "historial.html", foto: "historial", label: "Historial de cambios", desc: "Quién registró o cambió cada dato, cuándo y qué cambió" },
     { href: "avisos.html", foto: "avisos", label: "Avisos por correo", desc: "Envía al gestor lo vencido o por vencer, cuando la interventoría lo decida" },
-    { href: "generalidades.html", foto: "generalidades", label: "Generalidades", desc: "Qué es el aplicativo, cómo se usa y qué controla cada módulo" }
   ];
   const capitulos = CAPITULOS.map((c) => ({ href: c.items[0].href || hrefModulo(c.items[0].m, c.items[0].cap), foto: `cap-${c.id}`, label: `${c.numero}. ${c.label}`, desc: c.desc }));
   // Sin contratos todavía, las tarjetas llevan a Contratos (no hay dónde
   // registrar nada) — pero se ven normales; el aviso de arriba explica qué
   // hacer primero.
   const tarjeta = (t, i) => {
-    const destino = sinContrato && t.href !== "generalidades.html" ? "contratos.html" : t.href;
+    const destino = sinContrato && !t.href.startsWith("generalidades.html") ? "contratos.html" : t.href;
     return `<a class="modulo-card cinta cinta-${i % 4}" href="${destino}">
       <span class="modulo-icon"><img src="${fotoModulo(t.foto)}" alt=""></span>
       <span class="modulo-label">${esc(t.label)}</span>
@@ -53,12 +52,15 @@ if (ctx) {
   };
   document.getElementById("bienvenidaHerramientas").innerHTML = herramientas.map(tarjeta).join("");
   document.getElementById("bienvenidaCapitulos").innerHTML = capitulos.map(tarjeta).join("");
+  const conoce = SECCIONES_GENERALIDADES.map((s) => ({ href: `generalidades.html#${s.id}`, foto: s.foto, label: s.label, desc: s.desc }));
+  document.getElementById("bienvenidaConoce").innerHTML = conoce.map(tarjeta).join("");
+  document.getElementById("cuentaConoce").textContent = `${conoce.length} temas`;
   document.getElementById("cuentaHerramientas").textContent = `${herramientas.length} herramientas`;
   document.getElementById("cuentaCapitulos").textContent = `${capitulos.length} capítulos`;
 
   // Solo se ven las dos tarjetas de grupo; al tocar una se despliegan sus
   // opciones debajo (y se pliega la otra, para no alargar la página).
-  const grupos = { herramientas: "grupoHerramientas", capitulos: "grupoCapitulos" };
+  const grupos = { conoce: "grupoConoce", herramientas: "grupoHerramientas", capitulos: "grupoCapitulos" };
   document.querySelectorAll(".ip-bienv-grupo-btn").forEach((btn) => btn.addEventListener("click", () => {
     const abrir = btn.getAttribute("aria-expanded") !== "true";
     document.querySelectorAll(".ip-bienv-grupo-btn").forEach((b) => {

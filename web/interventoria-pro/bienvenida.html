@@ -35,6 +35,15 @@
 
       <div class="alert" id="bienvenidaAviso"></div>
       <div class="ip-bienv-grupos">
+        <button type="button" class="ip-bienv-grupo-btn ip-bienv-grupo-2" data-grupo="conoce" aria-expanded="false">
+          <img src="assets/modulos/grupo-conoce.jpg" alt="">
+          <span class="ip-bienv-grupo-texto">
+            <strong>Conoce el aplicativo</strong>
+            <span class="text-muted">Para empezar: qué es, cómo se usa, quién hace qué y qué controla cada capítulo.</span>
+            <span class="ip-bienv-grupo-cuenta" id="cuentaConoce"></span>
+          </span>
+          <span class="chevron">▾</span>
+        </button>
         <button type="button" class="ip-bienv-grupo-btn ip-bienv-grupo-0" data-grupo="herramientas" aria-expanded="false">
           <img src="assets/modulos/grupo-herramientas.jpg" alt="">
           <span class="ip-bienv-grupo-texto">
@@ -54,6 +63,9 @@
           <span class="chevron">▾</span>
         </button>
       </div>
+      <section class="ip-bienv-grupo ip-bienv-grupo-2 hidden" id="grupoConoce">
+        <div class="bienvenida-modulos" id="bienvenidaConoce"></div>
+      </section>
       <section class="ip-bienv-grupo ip-bienv-grupo-0 hidden" id="grupoHerramientas">
         <div class="bienvenida-modulos" id="bienvenidaHerramientas"></div>
       </section>

@@ -2303,3 +2303,31 @@ textarea { font-family: inherit; }
 @media (max-width: 900px) { .ip-tablero-detalle .ip-datos { grid-template-columns: 1fr 1fr; } }
 @media (max-width: 560px) { .ip-tablero-detalle .ip-datos { grid-template-columns: 1fr; } }
 .ip-tablero-detalle .ip-dato-objeto { margin: 0 0 10px; }
+
+/* Tercer grupo "Conoce el aplicativo" (naranja Cinco), antes de
+   Herramientas y Capítulos del informe. */
+.sidebar .nav-pilar-2 { --pilar: #d9820b; --pilar-texto: #c06f00; }
+:root[data-theme="dark"] .sidebar .nav-pilar-2 { --pilar-texto: #f5a623; }
+.ip-bienv-grupos { grid-template-columns: repeat(3, minmax(0, 1fr)); }
+@media (max-width: 1000px) { .ip-bienv-grupos { grid-template-columns: 1fr; } }
+.ip-bienv-grupo-btn { padding: 18px; gap: 14px; }
+.ip-bienv-grupo-btn img { width: 64px; height: 64px; }
+.ip-bienv-grupo-btn.ip-bienv-grupo-2 { border-left-color: #d9820b; }
+.ip-bienv-grupo-btn.ip-bienv-grupo-2.abierto { box-shadow: 0 0 0 2px #d9820b, var(--shadow); }
+.ip-bienv-grupo-2 .ip-bienv-grupo-texto strong { color: #c06f00; }
+:root[data-theme="dark"] .ip-bienv-grupo-2 .ip-bienv-grupo-texto strong { color: #f5a623; }
+.ip-bienv-grupo.ip-bienv-grupo-2 { border-left-color: #d9820b; }
+#gen-que, #gen-roles, #gen-flujo, #gen-convenciones, #gen-capitulos { scroll-margin-top: 16px; }
+
+/* Generalidades: rutina diaria / semanal / mensual del grupo interventor */
+.ip-rutina { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 16px; }
+@media (max-width: 1000px) { .ip-rutina { grid-template-columns: 1fr; } }
+.ip-rutina .card { margin: 0; }
+.ip-rutina-desc { margin: -4px 0 10px; font-size: 12.5px; }
+.ip-rutina-lista { list-style: none; margin: 0; padding: 0; }
+.ip-rutina-lista li { position: relative; padding: 7px 0 7px 24px; border-bottom: 1px solid var(--border); font-size: 13px; line-height: 1.45; }
+.ip-rutina-lista li:last-child { border-bottom: 0; }
+.ip-rutina-lista li::before { content: "☐"; position: absolute; left: 2px; top: 6px; color: var(--cinco-orange-dark); }
+.ip-rutina-lista a { color: var(--text); text-decoration: none; }
+.ip-rutina-lista a:hover { color: var(--cinco-orange-dark); text-decoration: underline; }
+#gen-rutina { scroll-margin-top: 16px; margin-bottom: 16px; }

@@ -325,5 +325,33 @@ export const GENERALIDADES = {
     "Registro en campo: lo registrado desde el celular se guarda primero en el teléfono y se sube solo cuando hay señal; mientras tanto aparece en «Pendientes por subir». Conviene abrir la página con señal antes de salir a la obra.",
     "Las fechas se muestran en formato día/mes/año y los valores en pesos colombianos.",
     "Cada módulo se puede exportar a Excel con todos sus campos e importar desde Excel con su plantilla (vista previa antes de guardar; en Personal y Actividades, la cédula o el ítem existentes se actualizan en vez de duplicarse)."
+  ],
+  // Rutina sugerida al grupo interventor: [texto, enlace (opcional)].
+  rutina: [
+    { periodo: "Cada día", icono: "☀️", desc: "Lo que ocurre en la obra se registra el mismo día.", items: [
+      ["Revisar en Inicio las alertas rojas del contrato y atender primero las vencidas.", "inicio.html"],
+      ["Registrar desde la obra lo ocurrido: fotos con su observación, inspecciones, accidentes o incidentes, novedades de personal y charlas de seguridad.", "campo.html"],
+      ["Verificar que quien ingresa a la obra esté en el Listado de personal, con seguridad social y examen de ingreso.", "modulo.html?m=personal"],
+      ["Revisar los requerimientos con plazo de respuesta próximo a vencer.", "modulo.html?m=requerimientos"],
+      ["Confirmar que en Registro en campo no queden registros «pendientes por subir».", "campo.html"]
+    ] },
+    { periodo: "Cada semana", icono: "📅", desc: "Seguimiento del avance y de lo que está por vencer.", items: [
+      ["Actualizar el avance de las actividades y compararlo con lo programado en la curva S.", "modulo.html?m=actividades"],
+      ["Revisar entregables del contratista, solicitudes de cambio y no conformidades pendientes de respuesta o de cierre.", "modulo.html?m=entregables"],
+      ["Revisar pólizas, exámenes ocupacionales y otros documentos que vencen en los próximos 30 días.", "modulo.html?m=garantias"],
+      ["Verificar el plan de consignaciones y las pruebas de equipos (FAT/SAT) de la semana siguiente, cuando apliquen.", "modulo.html?m=consignaciones"],
+      ["Registrar las observaciones del comité o reunión de seguimiento (ej. comité semanal de obra).", "modulo.html?m=observaciones&cap=tecnico"],
+      ["Si hay vencimientos sin atender, enviar los avisos por correo al gestor.", "avisos.html"],
+      ["Gestor: revisar en Contratos el semáforo de todos los contratos.", "contratos.html"]
+    ] },
+    { periodo: "Cada mes", icono: "🗓️", desc: "Cierre del periodo e informe mensual.", items: [
+      ["Verificar la planilla de seguridad social del mes anterior de todo el personal activo.", "modulo.html?m=segsocial"],
+      ["Registrar el avance acumulado del mes de cada actividad y las actas de pago del periodo.", "modulo.html?m=financiero"],
+      ["Revisar los indicadores de SST y ambientales del mes y actualizar la matriz de riesgos.", "modulo.html?m=riesgos"],
+      ["Escribir las observaciones del mes en cada capítulo del informe.", "modulo.html?m=observaciones&cap=administrativo"],
+      ["Seleccionar las fotos más representativas del periodo en el registro fotográfico.", "modulo.html?m=fotos"],
+      ["Generar el informe mensual, revisarlo y radicarlo en el plazo del contrato.", "informe.html"],
+      ["Revisar en el Historial de cambios lo modificado durante el mes.", "historial.html"]
+    ] }
   ]
 };

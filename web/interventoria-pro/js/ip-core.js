@@ -261,6 +261,17 @@ export function imgModulo(nombre, clase = "nav-icon-img") {
   return `<img class="${clase}" src="${fotoModulo(nombre)}" alt="" loading="lazy">`;
 }
 
+// Secciones de Generalidades: forman el grupo "Conoce el aplicativo" del
+// menú lateral y de la bienvenida.
+export const SECCIONES_GENERALIDADES = [
+  { id: "gen-que", foto: "gen-que", label: "¿Qué es Interventoría PRO?", desc: "Para qué sirve y qué abarca el seguimiento del contrato" },
+  { id: "gen-roles", foto: "gen-roles", label: "Principios y roles", desc: "Cómo se usa y quién hace qué: gestor y equipo del contrato" },
+  { id: "gen-flujo", foto: "gen-flujo", label: "Flujo de trabajo", desc: "Qué hacer al iniciar el contrato, cada mes, al cierre y al finalizar" },
+  { id: "gen-rutina", foto: "gen-rutina", label: "Rutina de la interventoría", desc: "Qué revisar cada día, cada semana y cada mes" },
+  { id: "gen-convenciones", foto: "gen-convenciones", label: "Convenciones", desc: "Semáforo, alertas, fechas, Excel y registro en campo" },
+  { id: "gen-capitulos", foto: "gen-capitulos", label: "Qué controla cada capítulo", desc: "Los módulos de cada capítulo del informe y lo que controlan" }
+];
+
 export function hrefModulo(m, cap) {
   return `modulo.html?m=${m}${cap ? `&cap=${cap}` : ""}`;
 }
@@ -324,6 +335,14 @@ function pintarMenu({ user, perfil, esGestor, contratos, contrato }) {
       </select>
     </div>
     <nav>
+      <div class="nav-pilar nav-pilar-2">
+        <div class="collapsible-toggle nav-group-toggle ip-pilar-toggle" data-target="ipGrupo-conoce">
+          <span>${imgModulo("grupo-conoce")}Conoce el aplicativo</span><span class="chevron">▾</span>
+        </div>
+        <div class="nav-group-body" id="ipGrupo-conoce">
+        ${SECCIONES_GENERALIDADES.map((s) => enlace(`generalidades.html#${s.id}`, s.foto, s.label)).join("")}
+        </div>
+      </div>
       <div class="nav-pilar nav-pilar-0">
         <div class="collapsible-toggle nav-group-toggle ip-pilar-toggle" data-target="ipGrupo-herramientas">
           <span>${imgModulo("grupo-herramientas")}Herramientas</span><span class="chevron">▾</span>
@@ -335,7 +354,6 @@ function pintarMenu({ user, perfil, esGestor, contratos, contrato }) {
         ${enlace("contratos.html", "contratos", esGestor ? "Contratos" : "Mis contratos")}
         ${contrato ? enlace("historial.html", "historial", "Historial de cambios") : ""}
         ${contrato ? enlace("avisos.html", "avisos", "Avisos por correo") : ""}
-        ${enlace("generalidades.html", "generalidades", "Generalidades")}
         </div>
       </div>
       <div class="nav-pilar nav-pilar-1">
