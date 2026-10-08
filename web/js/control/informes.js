@@ -72,6 +72,22 @@ const selectContrato = document.getElementById("contratoRelacionado");
 const bloquesEditor = document.getElementById("bloquesEditor");
 const inputImagen = document.getElementById("inputImagen");
 
+// "💾 Guardar avance" de cada bloque: dispara el mismo guardado del botón
+// Guardar (form submit) y refleja el resultado en ese botón.
+function guardarDesdeBloque(boton) {
+  if (boton.disabled) return;
+  // Si falta un campo obligatorio (ej. el título) el navegador no dispara el
+  // guardado: se muestra qué falta en vez de dejar el botón en "Guardando...".
+  if (!form.checkValidity()) { form.reportValidity(); return; }
+  boton.disabled = true;
+  boton.textContent = "Guardando...";
+  form.addEventListener("informe-guardado", (e) => {
+    boton.textContent = e.detail.ok ? "✅ Guardado" : "⚠️ No se guardó";
+    setTimeout(() => { boton.disabled = false; boton.textContent = "💾 Guardar avance"; }, 2500);
+  }, { once: true });
+  form.requestSubmit();
+}
+
 function mostrarAlerta(texto, tipo) {
   alertBox.textContent = texto;
   alertBox.className = `form-alert show ${tipo}`;
@@ -378,7 +394,17 @@ function renderBloques() {
     quitar.className = "control-btn-danger";
     quitar.textContent = "Quitar";
     quitar.addEventListener("click", () => quitarBloque(i));
-    controles.append(subir, bajar, quitar);
+    // "Guardar avance" junto a cada bloque (mismo patrón que Informes de
+    // Gestión en Cinco Conecta): guarda todo el informe sin salir del
+    // bloque que se está editando, y muestra el resultado en el propio
+    // botón porque el aviso general queda lejos, arriba del formulario.
+    const guardarAqui = document.createElement("button");
+    guardarAqui.type = "button";
+    guardarAqui.className = "control-btn-mini";
+    guardarAqui.textContent = "💾 Guardar avance";
+    guardarAqui.title = "Guarda todo el informe y sigue editando aquí";
+    guardarAqui.addEventListener("click", () => guardarDesdeBloque(guardarAqui));
+    controles.append(subir, bajar, quitar, guardarAqui);
     fila.appendChild(controles);
 
     bloquesEditor.appendChild(fila);
@@ -653,8 +679,8 @@ function renderTablaEditor(bloque) {
   // botones se llenan más abajo, una vez que negritaBtn/combinarBtn/etc. ya
   // existen — solo repiten el clic de esos mismos botones.
   const flotante = document.createElement("div");
-  flotante.className = "control-tabla-flotante hidden";
-  cont.style.position = "relative";
+  flotante.className = "control-tabla-flotante inactiva";
+  flotante.title = "Selecciona (arrastra sobre) las celdas y usa estos botones";
   cont.appendChild(flotante);
 
   // Pinta el rango [bloque._selA.._selB] (si hay uno activo) como
@@ -668,14 +694,10 @@ function renderTablaEditor(bloque) {
       const sel = !!rango && fi >= rango.fMin && fi <= rango.fMax && ci >= rango.cMin && ci <= rango.cMax;
       campo.classList.toggle("control-celda-sel", sel);
     });
-    if (!rango) { flotante.classList.add("hidden"); return; }
-    const celdaB = bloque._selB && grid.querySelector(`[data-fi="${bloque._selB.fi}"][data-ci="${bloque._selB.ci}"]`);
-    if (!celdaB) { flotante.classList.add("hidden"); return; }
-    flotante.classList.remove("hidden");
-    const rectCelda = celdaB.getBoundingClientRect();
-    const rectCont = cont.getBoundingClientRect();
-    flotante.style.top = `${rectCelda.bottom - rectCont.top + 4}px`;
-    flotante.style.left = `${Math.max(0, rectCelda.left - rectCont.left)}px`;
+    // La barra ya no flota junto a la celda (tapaba el texto que se estaba
+    // leyendo): queda fija encima de la cuadrícula y solo se atenúa cuando
+    // no hay celdas seleccionadas.
+    flotante.classList.toggle("inactiva", !rango);
   }
 
   bloque.filas.forEach((fila, fi) => {
@@ -1466,6 +1488,7 @@ requireAuth(async (user) => {
 
   form.addEventListener("submit", async (e) => {
     e.preventDefault();
+    let guardadoOk = false;
     setDisabled(guardarBtn, true);
     const enEdicion = !!informeIdEnEdicion.value;
     setTexto(guardarBtn, "Guardando...");
@@ -1613,11 +1636,13 @@ requireAuth(async (user) => {
       if (codigoSgc) mensaje += ` Registrado en el SGC como ${codigoSgc}.`;
       if (errorSgc) mensaje += ` (No se pudo registrar en el SGC: ${errorSgc} — hazlo manualmente en Documentos.)`;
       mostrarAlerta(mensaje, errorSgc ? "error" : "ok");
+      guardadoOk = true;
     } catch (err) {
       mostrarAlerta(err.message || "No se pudo guardar el informe.", "error");
     } finally {
       setDisabled(guardarBtn, false);
       setTexto(guardarBtn, informeIdEnEdicion.value ? "Guardar cambios" : "Guardar");
+      form.dispatchEvent(new CustomEvent("informe-guardado", { detail: { ok: guardadoOk } }));
     }
   });
 

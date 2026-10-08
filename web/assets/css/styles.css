@@ -1914,16 +1914,18 @@ form.pqr-form .control-rich-color { padding: 2px; border-radius: 6px; }
    usadas que la barra fija de abajo, para no tener que bajar hasta allá
    cada vez, como en Excel. */
 .control-tabla-flotante {
-  position: absolute;
-  display: flex;
+  display: inline-flex;
+  margin: 0 0 8px;
   gap: 4px;
   background: var(--card-bg);
   border: 1px solid var(--cinco-amber);
   border-radius: 8px;
   padding: 4px;
   box-shadow: 0 4px 14px rgba(0, 0, 0, 0.2);
-  z-index: 20;
 }
+.control-tabla-flotante.inactiva { opacity: 0.45; }
+.control-tabla-flotante { align-self: flex-start; width: auto; }
+form.pqr-form .control-tabla-flotante button { width: auto; min-width: 34px; margin-top: 0; }
 .control-tabla-botones { display: flex; gap: 8px; align-items: center; flex-wrap: wrap; }
 .control-tabla-color {
   width: 34px;

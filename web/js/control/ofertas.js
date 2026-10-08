@@ -400,8 +400,8 @@ function renderTablaEditor(bloque) {
   // botones se llenan más abajo, una vez que centrarBtn/combinarBtn/etc.
   // ya existen — solo repiten el clic de esos mismos botones.
   const flotante = document.createElement("div");
-  flotante.className = "control-tabla-flotante hidden";
-  cont.style.position = "relative";
+  flotante.className = "control-tabla-flotante inactiva";
+  flotante.title = "Selecciona (arrastra sobre) las celdas y usa estos botones";
   cont.appendChild(flotante);
 
   // Pinta el rango [bloque._selA.._selB] (si hay uno activo) como
@@ -415,14 +415,10 @@ function renderTablaEditor(bloque) {
       const sel = !!rango && fi >= rango.fMin && fi <= rango.fMax && ci >= rango.cMin && ci <= rango.cMax;
       input.classList.toggle("control-celda-sel", sel);
     });
-    if (!rango) { flotante.classList.add("hidden"); return; }
-    const celdaB = bloque._selB && grid.querySelector(`[data-fi="${bloque._selB.fi}"][data-ci="${bloque._selB.ci}"]`);
-    if (!celdaB) { flotante.classList.add("hidden"); return; }
-    flotante.classList.remove("hidden");
-    const rectCelda = celdaB.getBoundingClientRect();
-    const rectCont = cont.getBoundingClientRect();
-    flotante.style.top = `${rectCelda.bottom - rectCont.top + 4}px`;
-    flotante.style.left = `${Math.max(0, rectCelda.left - rectCont.left)}px`;
+    // La barra ya no flota junto a la celda (tapaba el texto que se estaba
+    // leyendo): queda fija encima de la cuadrícula y solo se atenúa cuando
+    // no hay celdas seleccionadas.
+    flotante.classList.toggle("inactiva", !rango);
   }
 
   bloque.filas.forEach((fila, fi) => {
