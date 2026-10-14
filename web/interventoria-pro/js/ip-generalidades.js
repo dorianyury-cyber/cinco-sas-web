@@ -31,6 +31,9 @@ if (ctx) {
     <div class="card cinta cinta-3" id="gen-flujo"><h2>Flujo de trabajo</h2>
       <ol class="ip-gen-flujo">${G.flujo.map(([e, d]) => `<li><strong>${esc(e)}.</strong> ${esc(d)}</li>`).join("")}</ol>
     </div>
+    <div class="card cinta cinta-1" id="gen-inicio"><h2>Empezar un contrato paso a paso</h2>
+      <ol class="ip-gen-flujo">${G.inicio.map(([t, d, href]) => `<li><strong><a href="${href}">${esc(t)}</a>.</strong> ${esc(d)}</li>`).join("")}</ol>
+    </div>
     <div id="gen-rutina">
       <h2 class="ip-gen-titulo">Rutina de la interventoría</h2>
       <p class="text-muted ip-descripcion">Lo que el grupo interventor debería revisar cada día, cada semana y cada mes. Cada actividad lleva al módulo donde se hace.</p>

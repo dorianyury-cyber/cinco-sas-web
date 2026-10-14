@@ -288,8 +288,9 @@ export function imgModulo(nombre, clase = "nav-icon-img") {
 // menú lateral y de la bienvenida.
 export const SECCIONES_GENERALIDADES = [
   { id: "gen-que", foto: "gen-que", label: "¿Qué es Interventoría PRO?", desc: "Para qué sirve y qué abarca el seguimiento del contrato" },
-  { id: "gen-roles", foto: "gen-roles", label: "Principios y roles", desc: "Cómo se usa y quién hace qué: gestor y equipo del contrato" },
+  { id: "gen-roles", foto: "gen-roles", label: "Principios y roles", desc: "Cómo se usa y quién hace qué: administrador, gestor y equipo" },
   { id: "gen-flujo", foto: "gen-flujo", label: "Flujo de trabajo", desc: "Qué hacer al iniciar el contrato, cada mes, al cierre y al finalizar" },
+  { id: "gen-inicio", foto: "contratos", label: "Empezar un contrato paso a paso", desc: "Crear el contrato, su equipo, los requisitos del acta de inicio y el plan de actuaciones" },
   { id: "gen-rutina", foto: "gen-rutina", label: "Rutina de la interventoría", desc: "Qué revisar cada día, cada semana y cada mes" },
   { id: "gen-convenciones", foto: "gen-convenciones", label: "Convenciones", desc: "Semáforo, alertas, fechas, Excel y registro en campo" },
   { id: "gen-capitulos", foto: "gen-capitulos", label: "Qué controla cada capítulo", desc: "Los módulos de cada capítulo del informe y lo que controlan" }

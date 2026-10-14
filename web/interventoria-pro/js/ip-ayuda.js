@@ -12,7 +12,7 @@ import { GUIAS, GENERALIDADES as G } from "./ip-guias.js";
 
 // Preguntas frecuentes: los "¿cómo hago…?" que no están en una sola guía.
 const FAQ = [
-  { t: "¿Cómo creo un contrato nuevo?", pasos: ["Entra a Contratos (grupo Herramientas).", "Usa «+ Nuevo contrato» (solo el gestor de Interventoría PRO lo ve).", "Llena la información básica y los proyectos o frentes (uno por línea).", "Guarda: el contrato queda como contrato en uso. Luego asigna su equipo en Equipo de interventoría."], href: "contratos.html", ir: "Ir a Contratos" },
+  { t: "¿Cómo creo un contrato nuevo?", pasos: ["Entra a Contratos (grupo Herramientas).", "Usa «+ Nuevo contrato» (solo el gestor de Interventoría PRO lo ve).", "Llena la información básica y los proyectos o frentes (uno por línea): sin frentes no se pueden asociar ni importar registros por frente.", "Luego carga los requisitos del acta de inicio y el plan de actuaciones (Generalidades → «Empezar un contrato paso a paso»).", "Guarda: el contrato queda como contrato en uso. Luego asigna su equipo en Equipo de interventoría."], href: "contratos.html", ir: "Ir a Contratos" },
   { t: "¿Cómo cambio de contrato?", pasos: ["En el menú lateral, elige el contrato en el selector «Contrato» de arriba.", "También desde Contratos: selecciona el contrato y usa «Usar este contrato».", "En Registro en campo hay un selector propio a la vista."], href: "contratos.html", ir: "Ir a Contratos" },
   { t: "¿Cómo asigno colaboradores a un contrato?", pasos: ["Entra a Equipo de interventoría (grupo Herramientas).", "Cada fila es un colaborador activo y cada columna un contrato: marca o desmarca la casilla (solo el gestor).", "Usa «💾 Guardar cambios»: quienes entran ven el contrato y registran información; quienes salen dejan de verlo. Queda constancia en el historial.", "Los gestores ven todos los contratos aunque no estén marcados."], href: "equipo.html", ir: "Ir a Equipo de interventoría" },
   { t: "¿Quién puede eliminar registros?", pasos: ["Solo el gestor de Interventoría PRO (permiso en Empleados del módulo interno).", "Lo eliminado queda guardado en el Historial de cambios con su contenido, la persona y la fecha."], href: "historial.html", ir: "Ver el historial" },
@@ -67,6 +67,7 @@ function construirIndice() {
   G.principios.forEach((p) => idx.push({ tipo: "Generalidades · Principios", titulo: p.split(":")[0], texto: p, href: gen("gen-roles"), ir: "Ver en Generalidades" }));
   G.roles.forEach(([r, d]) => idx.push({ tipo: "Generalidades · Roles", titulo: `Rol: ${r}`, texto: d, href: gen("gen-roles"), ir: "Ver en Generalidades" }));
   G.flujo.forEach(([e, d]) => idx.push({ tipo: "Generalidades · Flujo de trabajo", titulo: e, texto: d, href: gen("gen-flujo"), ir: "Ver en Generalidades" }));
+  G.inicio.forEach(([t, d]) => idx.push({ tipo: "Generalidades · Empezar un contrato", titulo: t, texto: d, href: gen("gen-inicio"), ir: "Ver en Generalidades" }));
   (G.rutina || []).forEach((r) => idx.push({ tipo: "Rutina de la interventoría", titulo: `Qué revisar ${r.periodo.toLowerCase()}`, texto: r.desc, pasos: r.items.map(([t]) => t), href: gen("gen-rutina"), ir: "Ver la rutina" }));
   G.convenciones.forEach((c) => idx.push({ tipo: "Generalidades · Convenciones", titulo: c.split(/[:.]/)[0].slice(0, 70), texto: c, href: gen("gen-convenciones"), ir: "Ver en Generalidades" }));
   idx.forEach((e) => {

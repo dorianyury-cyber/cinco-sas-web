@@ -312,42 +312,58 @@ export const GUIAS = {
 
 // Textos de Generalidades (generalidades.html).
 export const GENERALIDADES = {
-  proposito: "Interventoría PRO es la herramienta de Cinco S.A.S. para llevar, en un solo lugar y mes a mes, el seguimiento técnico, administrativo, financiero, jurídico, de seguridad y salud en el trabajo, social, ambiental y de calidad de los contratos que la firma interviene o supervisa, y para producir con esa misma información el informe mensual.",
+  proposito: "Interventoría PRO es la herramienta de Cinco S.A.S. para llevar, en un solo lugar y mes a mes, el seguimiento técnico, administrativo, financiero, jurídico, de seguridad y salud en el trabajo, social, ambiental y de calidad de los contratos que la firma interviene o supervisa, junto con el plan de actuaciones de la propia interventoría, y para producir con esa misma información el informe mensual.",
   principios: [
     "Registrar una vez y usar muchas: lo que se registra en los módulos alimenta las alertas, los resúmenes, el Excel y el informe mensual.",
-    "Controlar con evidencia: cada registro puede llevar el enlace a su soporte para dejar trazabilidad.",
+    "Planear lo propio: el Plan de actuaciones dice qué debe hacer la interventoría y cuándo; cada actuación enlaza al módulo donde queda su dato, para no registrar lo mismo dos veces.",
+    "Controlar con evidencia: cada registro puede llevar fotos, documentos PDF y el enlace a su soporte, y cada requisito su fuente y la cláusula o numeral que lo exige.",
     "Anticipar: las alertas avisan lo vencido o por vencer antes de que se convierta en incumplimiento.",
-    "Trazabilidad: cada creación, edición o eliminación queda en el Historial de cambios con la persona, la fecha y los valores antes y después; el historial no se puede modificar y solo el gestor puede eliminar registros.",
+    "Trazabilidad: cada creación, edición o eliminación queda en el Historial de cambios con la persona, la fecha y los valores antes y después; el historial no se puede modificar.",
     "Separar por contrato y por frente: cada contrato es independiente y, dentro de él, los registros pueden asociarse a un proyecto o frente (ej. una subestación, un tramo o un sector)."
   ],
   roles: [
-    ["Gestor", "Crea contratos, define su información básica, sus frentes y su equipo, y es el único que puede eliminar registros. Ve todos los contratos."],
-    ["Miembro del equipo", "Registra, edita y consulta la información de los contratos en los que participa; no puede eliminar registros."]
+    ["Administrador principal", "Tiene todos los permisos y es el único que define qué puede hacer cada rol (botón «Roles y permisos» en Equipo de interventoría)."],
+    ["Administrador", "Por defecto puede todo: crear y eliminar contratos, asignar equipos, cambiar roles, registrar, eliminar registros, generar informes y enviar avisos."],
+    ["Gestor", "Por defecto ve todos los contratos, los crea y edita, asigna su equipo, registra, elimina registros, genera informes y envía y recibe avisos; no elimina contratos ni cambia roles."],
+    ["Equipo", "Por defecto ve solo los contratos donde está asignado, registra y edita información, consulta el historial, genera el informe y envía avisos; no elimina registros."]
   ],
   flujo: [
-    ["Al iniciar el contrato", "Crea el contrato, define sus frentes y equipo, carga la lista de requisitos del acta de inicio y verifica cada requisito hasta el 100 %."],
-    ["Durante cada mes", "Registra en cada módulo lo ocurrido: personal y seguridad social, avance de actividades, actas y pagos, entregables, inspecciones, fotos y observaciones. Atiende las alertas de Inicio. Lo que ocurre en la obra (fotos, inspecciones, accidentes, novedades, charlas) se puede registrar desde el celular en Registro en campo."],
-    ["Al cierre del mes", "En Informe mensual elige el mes, marca las secciones a incluir, revisa la vista previa y genera el PDF o el Word."],
-    ["Al finalizar el contrato", "Verifica el recibo final, la vigencia de las garantías posteriores y el cierre de no conformidades, requerimientos y pendientes."]
+    ["Al iniciar el contrato", "Crea el contrato con sus frentes y asígnale el equipo. Carga o importa los requisitos del acta de inicio y el plan de actuaciones de la interventoría con sus fechas. Verifica cada requisito hasta el 100 % antes de firmar el acta (ver «Empezar un contrato paso a paso»)."],
+    ["Durante cada mes", "Registra en cada módulo lo ocurrido: personal y seguridad social, avance de actividades, actas y pagos, entregables, inspecciones, fotos y observaciones. Marca como cumplidas las actuaciones del plan (las únicas e hitos con su fecha y cada vencimiento de las periódicas). Atiende las alertas de Inicio. Lo que ocurre en la obra se puede registrar desde el celular en Registro en campo."],
+    ["Al cierre del mes", "En Informe mensual elige el mes, marca las secciones a incluir (también el plan de actuaciones), elige las fotos, revisa la vista previa y genera el PDF o el Word."],
+    ["Al finalizar el contrato", "Verifica el recibo final, la vigencia de las garantías posteriores, el cierre de no conformidades, requerimientos y pendientes, y prepara el acta de cierre y balance (o liquidación) y la re-evaluación del proveedor."]
+  ],
+  // Paso a paso para dejar listo un contrato nuevo: [título, detalle, enlace].
+  inicio: [
+    ["Crear el contrato", "En Contratos usa «+ Nuevo contrato»: número, tipo (servicios u obra), objeto, partes, valor, anticipo, fechas y supervisor. En «Proyectos / frentes» escribe uno por línea (ej. cada subestación o tramo): sin frentes no se pueden asociar ni importar registros por frente.", "contratos.html"],
+    ["Asignar el equipo", "En Equipo de interventoría marca quiénes trabajan en el contrato; solo ellos lo verán si su rol no permite ver todos los contratos.", "equipo.html"],
+    ["Cargar los requisitos del acta de inicio", "En Requisitos acta de inicio usa «Ver y cargar lista base» (lista general) o «Importar Excel» con la lista propia del contrato, con la fuente y el soporte (cláusula o numeral) de cada requisito. Si la lista propia ya trae todo, no cargues también la base, para no duplicar.", "modulo.html?m=actainicio"],
+    ["Cargar el plan de actuaciones", "En Plan de actuaciones de la interventoría usa «Ver y cargar lista base» o «Importar Excel». Ponle fechas a cada actuación; en las periódicas elige la frecuencia y, si aplica, el día límite del mes; en «Dónde se registra» elige el módulo que guarda su evidencia.", "modulo.html?m=actuaciones"],
+    ["Registrar las garantías y el personal", "Registra las pólizas aprobadas y el personal del contratista con su seguridad social; el aplicativo avisará vencimientos y faltantes.", "modulo.html?m=garantias"],
+    ["Firmar el acta de inicio", "Cuando los requisitos estén al 100 % («Aprobado» o «No aplica»), registra el acta en Cronología de actas y ajusta la fecha de inicio del contrato si cambió.", "modulo.html?m=cronologia"]
   ],
   convenciones: [
     "Semáforo de validación: verde = al día, amarillo = pendiente o por vencer, rojo = vencido, rechazado o con observaciones.",
     "«Para revisar» agrupa las alertas de cada módulo; en Inicio aparecen todas las del contrato.",
     "Contratos: muestra todos los contratos en una vista con su semáforo general — en riesgo (alertas rojas, plazo vencido o avance técnico más de 5 puntos atrás de lo programado), atención (solo alertas amarillas) o al día.",
+    "Plan de actuaciones: «Única» se cumple una vez entre su inicio y su fin; «Hito» es una fecha clave; «Periódica» se repite y el aplicativo genera cada vencimiento, que se marca al cumplirlo; «Eventual» se hace cuando se presente. La curva S del plan cuenta solo las únicas e hitos cumplidos.",
     "Registro en campo: lo registrado desde el celular se guarda primero en el teléfono y se sube solo cuando hay señal; mientras tanto aparece en «Pendientes por subir». Conviene abrir la página con señal antes de salir a la obra.",
     "Las fechas se muestran en formato día/mes/año y los valores en pesos colombianos.",
-    "Cada módulo se puede exportar a Excel con todos sus campos e importar desde Excel con su plantilla (vista previa antes de guardar; en Personal y Actividades, la cédula o el ítem existentes se actualizan en vez de duplicarse)."
+    "Cada módulo se puede exportar a Excel con todos sus campos e importar desde Excel con su plantilla (vista previa antes de guardar). Al importar de nuevo se actualiza en vez de duplicar: en Personal por cédula, en Actividades y en el Plan de actuaciones por ítem, y en Requisitos del acta de inicio por el texto del requisito. Las celdas vacías no borran datos.",
+    "Al importar, los frentes se reconocen aunque estén escritos de forma parecida (ej. «Seboruco» encuentra «SE Seboruco»)."
   ],
   // Rutina sugerida al grupo interventor: [texto, enlace (opcional)].
   rutina: [
     { periodo: "Cada día", icono: "☀️", desc: "Lo que ocurre en la obra se registra el mismo día.", items: [
       ["Revisar en Inicio las alertas rojas del contrato y atender primero las vencidas.", "inicio.html"],
+      ["Revisar en el Plan de actuaciones lo que vence en los próximos 15 días y marcar lo que se cumplió.", "modulo.html?m=actuaciones"],
       ["Registrar desde la obra lo ocurrido: fotos con su observación, inspecciones, accidentes o incidentes, novedades de personal y charlas de seguridad.", "campo.html"],
       ["Verificar que quien ingresa a la obra esté en el Listado de personal, con seguridad social y examen de ingreso.", "modulo.html?m=personal"],
       ["Revisar los requerimientos con plazo de respuesta próximo a vencer.", "modulo.html?m=requerimientos"],
       ["Confirmar que en Registro en campo no queden registros «pendientes por subir».", "campo.html"]
     ] },
     { periodo: "Cada semana", icono: "📅", desc: "Seguimiento del avance y de lo que está por vencer.", items: [
+      ["Marcar en el Plan de actuaciones los vencimientos semanales cumplidos (ej. comité de obra, visitas, inspecciones).", "modulo.html?m=actuaciones"],
       ["Actualizar el avance de las actividades y compararlo con lo programado en la curva S.", "modulo.html?m=actividades"],
       ["Revisar entregables del contratista, solicitudes de cambio y no conformidades pendientes de respuesta o de cierre.", "modulo.html?m=entregables"],
       ["Revisar pólizas, exámenes ocupacionales y otros documentos que vencen en los próximos 30 días.", "modulo.html?m=garantias"],
@@ -359,6 +375,7 @@ export const GENERALIDADES = {
     { periodo: "Cada mes", icono: "🗓️", desc: "Cierre del periodo e informe mensual.", items: [
       ["Verificar la planilla de seguridad social del mes anterior de todo el personal activo.", "modulo.html?m=segsocial"],
       ["Registrar el avance acumulado del mes de cada actividad y las actas de pago del periodo.", "modulo.html?m=financiero"],
+      ["Marcar los vencimientos mensuales y trimestrales del Plan de actuaciones y revisar su curva S.", "modulo.html?m=actuaciones"],
       ["Revisar los indicadores de SST y ambientales del mes y actualizar la matriz de riesgos.", "modulo.html?m=riesgos"],
       ["Escribir las observaciones del mes en cada capítulo del informe.", "modulo.html?m=observaciones&cap=administrativo"],
       ["Seleccionar las fotos más representativas del periodo en el registro fotográfico.", "modulo.html?m=fotos"],
