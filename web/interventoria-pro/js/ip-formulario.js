@@ -88,7 +88,22 @@ export function htmlCampo(c, valor, { contrato, personal = [], camara = false, r
         </div>
         <div class="ip-fotos-prev" id="${id}_prev"></div>`;
       break;
+    // Cantidad ejecutada en cada mes del contrato (no acumulada).
+    case "cantMes": {
+      const meses = mesesDelContrato(contrato);
+      const total = Object.values(v || {}).reduce((s, x) => s + (Number(x) || 0), 0);
+      control = `<div class="ip-avance-grid">${meses.map((ym) => `
+        <label class="ip-avance-mes"><span>${mesCorto(ym)}</span>
+          <input type="number" min="0" step="any" data-cant-mes="${ym}" value="${esc(v?.[ym] ?? "")}"></label>`).join("")}</div>
+        <p class="text-muted ip-ayuda">Acumulado registrado: ${total.toLocaleString("es-CO")}.</p>`;
+      break;
+    }
     case "avance": {
+      // Avance calculado con los ítems del presupuesto: solo lectura.
+      if (registro?._avanceDeItems) {
+        control = `<p class="text-muted ip-sin-margen">⚙ Calculado con las cantidades ejecutadas de ${registro._avanceDeItems} ítem(s) del presupuesto (Presupuesto y cantidades por ítem): ${Object.entries(v || {}).sort().map(([ym, x]) => `${mesCorto(ym)} ${x} %`).join(" · ") || "sin ejecución registrada"}.</p>`;
+        break;
+      }
       const meses = mesesDelContrato(contrato);
       control = `<div class="ip-avance-grid">${meses.map((ym) => `
         <label class="ip-avance-mes"><span>${mesCorto(ym)}</span>
@@ -108,7 +123,7 @@ export function htmlCampo(c, valor, { contrato, personal = [], camara = false, r
     }
     default: control = `<input type="text" id="${id}" value="${esc(v)}" ${req} placeholder="${esc(c.placeholder || "")}">`;
   }
-  return `<div class="ip-campo ${c.ancho || ["textarea", "avance", "imagen", "fotos", "documentos", "periodos"].includes(c.type) ? "ip-campo-ancho" : ""}">
+  return `<div class="ip-campo ${c.ancho || ["textarea", "avance", "cantMes", "imagen", "fotos", "documentos", "periodos"].includes(c.type) ? "ip-campo-ancho" : ""}">
     <label for="${id}">${esc(c.label)}${c.required ? " *" : ""}</label>${control}
     ${c.ayuda ? `<p class="text-muted ip-ayuda">${esc(c.ayuda)}</p>` : ""}</div>`;
 }
@@ -277,7 +292,17 @@ export function leerFormulario(campos, contenedor) {
   const datos = {};
   for (const c of campos) {
     if (c.type === "imagen" || c.type === "fotos" || c.type === "documentos") continue;
+    if (c.type === "cantMes") {
+      const mapa = {};
+      contenedor.querySelectorAll("[data-cant-mes]").forEach((inp) => {
+        if (inp.value !== "") mapa[inp.dataset.cantMes] = Math.max(0, Number(inp.value));
+      });
+      datos[c.key] = mapa;
+      continue;
+    }
     if (c.type === "avance") {
+      // Si el avance lo calculan los ítems, no hay casillas: no se toca.
+      if (!contenedor.querySelector("[data-avance-mes]")) continue;
       const mapa = {};
       contenedor.querySelectorAll("[data-avance-mes]").forEach((inp) => {
         if (inp.value !== "") mapa[inp.dataset.avanceMes] = Math.min(100, Math.max(0, Number(inp.value)));

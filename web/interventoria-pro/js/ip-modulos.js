@@ -313,6 +313,41 @@ export function curvaPlan(actuaciones, hasta = mesActual()) {
   });
 }
 
+// ------------------------------------------------------------ presupuesto por ítems
+// Cada ítem: cantidad contratada × valor unitario; cada mes se registra la
+// cantidad ejecutada en el mes (la del acta). Las actividades de la curva S
+// que tienen ítems asignados calculan su avance real con ellos.
+export const valorItem = (it) => (Number(it.cantidad) || 0) * (Number(it.valorUnitario) || 0);
+export function ejecutadoItem(it, hasta = "9999-12") {
+  return Object.entries(it.ejecutado || {}).filter(([ym, v]) => ym <= hasta && v !== "" && v != null).reduce((s, [, v]) => s + (Number(v) || 0), 0);
+}
+export const valorEjecutadoItem = (it, hasta) => ejecutadoItem(it, hasta) * (Number(it.valorUnitario) || 0);
+export const pctItem = (it, hasta) => { const c = Number(it.cantidad) || 0; return c ? (ejecutadoItem(it, hasta) / c) * 100 : 0; };
+// Actividades con ítems asignados: su avance mensual (% acumulado) sale del
+// valor ejecutado de sus ítems sobre su valor contratado. Las demás quedan
+// con el avance digitado.
+export function actividadesConItems(actividades = [], items = []) {
+  const porAct = new Map();
+  items.forEach((it) => {
+    const k = Number(it.actividad);
+    if (!k) return;
+    if (!porAct.has(k)) porAct.set(k, []);
+    porAct.get(k).push(it);
+  });
+  return actividades.map((a) => {
+    const its = porAct.get(Number(a.item));
+    if (!its || !its.length) return a;
+    const total = its.reduce((s, it) => s + valorItem(it), 0);
+    const meses = [...new Set(its.flatMap((it) => Object.keys(it.ejecutado || {})))].sort();
+    const avance = {};
+    meses.forEach((ym) => {
+      const ej = its.reduce((s, it) => s + valorEjecutadoItem(it, ym), 0);
+      avance[ym] = total ? Math.min(100, Math.round((ej / total) * 1000) / 10) : 0;
+    });
+    return { ...a, avance, _avanceDeItems: its.length };
+  });
+}
+
 // Estado financiero: valor total (inicial + adiciones - reducciones),
 // ejecutado (actas/constancias de cumplimiento) y saldo.
 export function estadoFinanciero(contrato, movimientos) {
@@ -408,8 +443,8 @@ export const CAPITULOS = [
     { m: "indicadores" }, { m: "incidentesamb" },
     { m: "observaciones", cap: "ambiental" }, { m: "anexos", cap: "ambiental" }
   ] },
-  { id: "tecnico", numero: "7", label: "Técnico", icon: "📐", desc: "Avance y curva S, equipos FAT/SAT, consignaciones, cantidades y cambios", items: [
-    { m: "actividades" }, { m: "suministros" }, { m: "consignaciones" }, { m: "cantidades" }, { m: "cambios" }, { m: "observaciones", cap: "tecnico", label: "Resumen y observaciones" }, { m: "anexos", cap: "tecnico" }
+  { id: "tecnico", numero: "7", label: "Técnico", icon: "📐", desc: "Avance y curva S, presupuesto y cantidades por ítem, equipos FAT/SAT, consignaciones y cambios", items: [
+    { m: "actividades" }, { m: "items" }, { m: "suministros" }, { m: "consignaciones" }, { m: "cantidades" }, { m: "cambios" }, { m: "observaciones", cap: "tecnico", label: "Resumen y observaciones" }, { m: "anexos", cap: "tecnico" }
   ] },
   { id: "riesgos", numero: "8", label: "Matriz de riesgos", icon: "⚠️", desc: "Riesgos del contrato, impacto y monitoreo", items: [
     { m: "riesgos" }
@@ -968,6 +1003,8 @@ export const MODULOS = {
     claveImport: "item",
     sinFiltroMes: true,
     label: "Avance de actividades", icon: "📊", coleccion: "actividades",
+    necesita: ["items"],
+    preparar: (registros, datos) => actividadesConItems(registros, datos.items || []),
     desc: "Actividades del contrato con su peso y fechas. Registra el avance acumulado (%) de cada mes: el sistema calcula el avance ponderado y lo compara con lo programado a hoy.",
     campos: [
       { key: "item", label: "Ítem", type: "number", required: true },
@@ -982,7 +1019,7 @@ export const MODULOS = {
     ],
     columnas: [
       { key: "item", ancho: 6 }, { key: "actividad", ancho: 38 }, { key: "proyecto", label: "Frente", ancho: 9 }, { key: "peso", ancho: 8 }, { key: "fechaFin", label: "Termina", ancho: 11 },
-      { key: "_real", label: "Real", ancho: 9, render: (r) => `${numero(avanceReal(r), 0)}%` },
+      { key: "_real", label: "Real", ancho: 9, render: (r) => `${numero(avanceReal(r), 0)}%${r._avanceDeItems ? ` <span class="text-muted" title="Calculado con las cantidades ejecutadas de ${r._avanceDeItems} ítem(s)">⚙</span>` : ""}` },
       { key: "_prog", label: "Programado", ancho: 11, render: (r) => { const p = avanceProgramado(r); return p == null ? "-" : `${p}%`; } }
     ],
     orden: { key: "item", dir: 1, numerico: true },
@@ -1017,6 +1054,106 @@ export const MODULOS = {
     alertas(ctx) {
       return ctx.registros.map((a) => ({ a, v: MODULOS.actividades.validar(a) })).filter((x) => x.v.nivel === "danger")
         .map((x) => ({ nivel: "danger", texto: `Actividad ${x.a.item} (${x.a.actividad}): ${x.v.texto.toLowerCase()}.` }));
+    }
+  },
+
+  items: {
+    label: "Presupuesto y cantidades por ítem", icon: "🧮", coleccion: "items", sinFiltroMes: true,
+    desc: "Todos los ítems del presupuesto contratado (código, descripción, unidad, cantidad y valor unitario) con la cantidad ejecutada de cada mes, su valor y su saldo. Cada ítem se asigna a una actividad de la curva S, que toma de aquí su avance real.",
+    claveImport: ["proyecto", "codigo"],
+    necesita: ["actividades"],
+    campos: [
+      { key: "proyecto", label: "Proyecto / frente", type: "frente", required: true },
+      { key: "codigo", label: "Código del ítem", type: "text", required: true, placeholder: "Ej. 1.2.1" },
+      { key: "bloque", label: "Bloque", type: "select", opciones: ["Suministro de equipos", "Montaje y obra eléctrica", "Obra civil", "Otro"] },
+      { key: "capitulo", label: "Capítulo", type: "text", ancho: true, placeholder: "Ej. 1.2 Cable de potencia aislado" },
+      { key: "descripcion", label: "Descripción", type: "textarea", required: true, ancho: true },
+      { key: "unidad", label: "Unidad", type: "text" },
+      { key: "cantidad", label: "Cantidad contratada", type: "number", required: true },
+      { key: "valorUnitario", label: "Valor unitario", type: "money", required: true, ayuda: "Costo directo unitario del presupuesto contratado." },
+      { key: "actividad", label: "Actividad de la curva (N.º de ítem en Avance de actividades)", type: "number", ayuda: "La actividad de la curva S que agrupa este ítem; su avance real se calcula con las cantidades ejecutadas." },
+      { key: "ejecutado", label: "Cantidad ejecutada en cada mes", type: "cantMes", ancho: true, ayuda: "La cantidad del acta o medición de cada mes (no acumulada)." },
+      { key: "observacion", label: "Observación", type: "textarea", ancho: true }
+    ],
+    columnas: [
+      { key: "proyecto", label: "Frente", ancho: 8 }, { key: "codigo", label: "Código", ancho: 6 }, { key: "descripcion", ancho: 34 }, { key: "unidad", label: "Und.", ancho: 5 },
+      { key: "cantidad", label: "Contratada", ancho: 8 },
+      { key: "_ejec", label: "Ejecutada", ancho: 8, render: (r) => numero(ejecutadoItem(r), ejecutadoItem(r) % 1 ? 2 : 0) },
+      { key: "_valor", label: "Valor contratado", ancho: 11, render: (r) => moneda(valorItem(r)) },
+      { key: "_pct", label: "% ejec.", ancho: 6, render: (r) => `${numero(pctItem(r), 0)}%` },
+      { key: "actividad", label: "Act.", ancho: 4 }
+    ],
+    orden: { key: "_orden", dir: 1 },
+    preparar: (registros) => registros.map((r) => ({ ...r, _orden: `${r.proyecto || ""}|${String(r.codigo || "").split(".").map((n) => n.padStart(4, "0")).join(".")}` })),
+    validar(r) {
+      const c = Number(r.cantidad) || 0, e = ejecutadoItem(r);
+      if (c && e > c + 1e-9) return { nivel: "danger", texto: "Mayor cantidad" };
+      if (c && e >= c) return { nivel: "ok", texto: "Ejecutado" };
+      if (e > 0) return { nivel: "ok", texto: "En ejecución" };
+      return { nivel: "warn", texto: "Sin ejecutar" };
+    },
+    resumen(ctx) {
+      if (!ctx.registros.length) return `<div class="card"><p class="ip-sin-margen">Carga el presupuesto con «📑 Importar propuesta del contratista» (formato del presupuesto oficial: hojas por proyecto con No., descripción, unidad, cantidad y valores) o con «Importar Excel» y la plantilla del módulo.</p></div>`;
+      const tot = ctx.registros.reduce((s, r) => s + valorItem(r), 0);
+      const ejec = ctx.registros.reduce((s, r) => s + valorEjecutadoItem(r), 0);
+      const mayores = ctx.registros.filter((r) => MODULOS.items.validar(r).texto === "Mayor cantidad").length;
+      const sinAct = ctx.registros.filter((r) => !Number(r.actividad)).length;
+      const frentes = [...new Set(ctx.registros.map((r) => r.proyecto || "General"))];
+      const filasFrente = frentes.map((f) => {
+        const regs = ctx.registros.filter((r) => (r.proyecto || "General") === f);
+        const t = regs.reduce((s, r) => s + valorItem(r), 0), e = regs.reduce((s, r) => s + valorEjecutadoItem(r), 0);
+        return `<tr><td>${esc(f)}</td><td class="ip-num">${regs.length}</td><td class="ip-num">${moneda(t)}</td><td class="ip-num">${moneda(e)}</td><td class="ip-num">${numero(t ? (e / t) * 100 : 0, 1)}%</td><td class="ip-num">${moneda(t - e)}</td></tr>`;
+      }).join("");
+      // Agrupación en actividades de la curva: por frente y capítulo.
+      const acts = [...(ctx.datos.actividades || [])].sort((a, b) => (Number(a.item) || 0) - (Number(b.item) || 0));
+      const grupos = new Map();
+      ctx.registros.forEach((r) => {
+        const k = `${r.proyecto || "General"}||${r.capitulo || "(sin capítulo)"}`;
+        if (!grupos.has(k)) grupos.set(k, []);
+        grupos.get(k).push(r);
+      });
+      const nombreAct = (n) => { const a = acts.find((x) => Number(x.item) === Number(n)); return a ? `${a.item}. ${a.actividad}` : n ? `${n} (no existe)` : "— Sin asignar —"; };
+      const filasGrupo = [...grupos.entries()].sort(([a], [b]) => a.localeCompare(b, "es", { numeric: true })).map(([k, regs], i) => {
+        const [frente, cap] = k.split("||");
+        const asignadas = [...new Set(regs.map((r) => Number(r.actividad) || 0))];
+        const actual = asignadas.length === 1 ? nombreAct(asignadas[0]) : "Varias";
+        const opciones = acts.filter((a) => !a.proyecto || a.proyecto === frente || a.proyecto === "General")
+          .map((a) => `<option value="${a.item}">${esc(`${a.item}. ${String(a.actividad).slice(0, 70)}`)}</option>`).join("");
+        return `<tr><td>${esc(frente)}</td><td>${esc(cap)}</td><td class="ip-num">${regs.length}</td><td class="ip-num">${moneda(regs.reduce((s, r) => s + valorItem(r), 0))}</td><td>${esc(actual)}</td>
+          <td><select class="ip-agrupar-sel" data-grupo="${i}"><option value="">— Cambiar a —</option>${opciones}<option value="0">Quitar asignación</option></select></td></tr>`;
+      }).join("");
+      ctx._gruposItems = [...grupos.entries()].sort(([a], [b]) => a.localeCompare(b, "es", { numeric: true })).map(([, regs]) => regs.map((r) => r.id));
+      return tarjetas([
+        { icon: "🧮", valor: moneda(tot), label: `Valor contratado (costo directo, ${ctx.registros.length} ítems)` },
+        { icon: "✅", valor: `${numero(tot ? (ejec / tot) * 100 : 0, 1)}%`, label: `Ejecutado: ${moneda(ejec)}`, cinta: 3 },
+        { icon: "⚠️", valor: mayores, label: "Ítems con mayor cantidad que la contratada", cinta: 1 },
+        { icon: "🔗", valor: sinAct, label: "Ítems sin actividad de la curva", cinta: 2 }
+      ]) + `<div class="card"><h2>Por proyecto o frente</h2><div class="tabla-scroll"><table class="tabla-compacta ip-matriz">
+          <thead><tr><th>Proyecto / frente</th><th class="ip-num">Ítems</th><th class="ip-num">Valor contratado</th><th class="ip-num">Valor ejecutado</th><th class="ip-num">% ejecutado</th><th class="ip-num">Saldo</th></tr></thead><tbody>${filasFrente}</tbody></table></div></div>
+        <details class="card ip-agrupar"><summary>🔗 Agrupar ítems en actividades de la curva S (por capítulo)</summary>
+          <p class="text-muted">Cada capítulo del presupuesto se asigna a una actividad de <a href="modulo.html?m=actividades">Avance de actividades</a>; su avance real se calcula con las cantidades ejecutadas de esos ítems. Elige la actividad y se aplica a todos los ítems del capítulo (queda en el historial). También se puede cambiar ítem por ítem.</p>
+          ${acts.length ? "" : '<div class="alert info ip-alerta-fija">Primero registra o importa las actividades en Avance de actividades.</div>'}
+          <div class="tabla-scroll"><table class="tabla-compacta ip-matriz"><thead><tr><th>Frente</th><th>Capítulo</th><th class="ip-num">Ítems</th><th class="ip-num">Valor</th><th>Actividad actual</th><th>Asignar</th></tr></thead><tbody>${filasGrupo}</tbody></table></div>
+        </details>`;
+    },
+    // Después de pintar el resumen: la asignación por capítulo.
+    montarResumen(el, ctx, api) {
+      el.querySelectorAll(".ip-agrupar-sel").forEach((sel) => sel.addEventListener("change", async () => {
+        if (sel.value === "") return;
+        const ids = ctx._gruposItems[Number(sel.dataset.grupo)] || [];
+        const n = Number(sel.value);
+        if (!confirm(`¿Asignar ${ids.length} ítem(s) ${n ? `a la actividad ${n}` : "sin actividad"}?`)) { sel.value = ""; return; }
+        sel.disabled = true;
+        try { await api.actualizarVarios(ids, { actividad: n || null }); } catch (err) { alert(err.message || err); sel.disabled = false; }
+      }));
+    },
+    alertas(ctx) {
+      const out = [];
+      const mayores = ctx.registros.filter((r) => MODULOS.items.validar(r).texto === "Mayor cantidad");
+      if (mayores.length) out.push({ nivel: "danger", texto: `${mayores.length} ítem(s) con cantidad ejecutada mayor que la contratada (requiere acta de mayores cantidades o modificación): ${mayores.slice(0, 3).map((r) => `${r.proyecto || ""} ${r.codigo}`).join(", ")}${mayores.length > 3 ? "…" : ""}.` });
+      const sinAct = ctx.registros.filter((r) => !Number(r.actividad)).length;
+      if (sinAct && ctx.registros.length) out.push({ nivel: "warn", texto: `${sinAct} ítem(s) del presupuesto sin actividad de la curva S asignada.` });
+      return out;
     }
   },
 

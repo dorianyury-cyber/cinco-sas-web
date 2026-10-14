@@ -12,6 +12,7 @@ import { MODULOS, nombreCapitulo, textoOpcion } from "./ip-modulos.js";
 import { GUIAS } from "./ip-guias.js";
 import { anotarEnLote, diferencias, identificar, refHistorial, fechaHora, ACCIONES } from "./ip-historial.js";
 import { configurarImportacion } from "./ip-importar.js";
+import { configurarPropuesta } from "./ip-presupuesto.js";
 import { htmlCampo, leerFormulario, frentesContrato, controlFotos, controlDocumentos } from "./ip-formulario.js";
 const controlFotosVacio = () => ({ archivo: () => null, fotos: () => ({ conservadas: [], nuevas: [] }), camposFotos: () => [] });
 import { mostrarLibro, mostrarTabla } from "./ip-visor.js";
@@ -88,6 +89,7 @@ function iniciarModulo({ user, perfil, contrato, puede }) {
   cargarNecesarios().then(() => {
     onSnapshot(consulta, (snap) => {
       ctx.registros = snap.docs.map((d) => ({ id: d.id, ...d.data() }));
+      if (mod.preparar) ctx.registros = mod.preparar(ctx.registros, ctx.datos);
       if (mod.coleccion === "personal") ctx.datos.personal = ctx.registros;
       pintar();
     }, (err) => {
@@ -160,6 +162,7 @@ function iniciarModulo({ user, perfil, contrato, puede }) {
   function pintar() {
     resumenEl.innerHTML = mod.resumen ? mod.resumen(ctx) : "";
     aplicarAnchos(resumenEl);
+    if (mod.montarResumen && puede.registrar) mod.montarResumen(resumenEl, ctx, { actualizarVarios });
 
     const alertas = mod.alertas ? mod.alertas(ctx) : [];
     alertasEl.innerHTML = alertas.length ? `<div class="card ip-alertas-card cinta cinta-1"><h2>⚠️ Para revisar (${alertas.length})</h2><ul class="ip-alertas">${alertas.map((a) => `<li class="ip-alerta-${a.nivel}">${esc(a.texto)}</li>`).join("")}</ul></div>` : "";
@@ -211,6 +214,22 @@ function iniciarModulo({ user, perfil, contrato, puede }) {
   }
 
   buscarEl.addEventListener("input", pintar);
+
+  // Cambia los mismos campos en varios registros a la vez (con su historial).
+  async function actualizarVarios(ids, cambios) {
+    for (let i = 0; i < ids.length; i += 200) {
+      const lote = writeBatch(db);
+      ids.slice(i, i + 200).forEach((id) => {
+        const antes = ctx.registros.find((r) => r.id === id) || {};
+        const datos = { ...cambios, actualizadoPor: perfil.nombre || user.email, actualizadoEn: serverTimestamp() };
+        const dif = diferencias(mod.campos, antes, datos, ctx.datos.personal || []);
+        if (!dif.length) return;
+        lote.update(doc(coleccionRef, id), datos);
+        anotarEnLote(lote, contrato.id, { user, perfil, modulo: mod.id, moduloLabel: tituloModulo, registroId: id, accion: "editar", resumen: identificar(mod, { ...antes, ...datos }), cambios: dif });
+      });
+      await lote.commit();
+    }
+  }
 
   // ---------------------------------------------------------- formulario
   const frentesDelContrato = () => frentesContrato(contrato);
@@ -351,6 +370,7 @@ function iniciarModulo({ user, perfil, contrato, puede }) {
 
   // Importación desde Excel (plantilla, vista previa y guardado con historial).
   configurarImportacion({ mod, contrato, ctx, user, perfil, coleccionRef, cap, frentesContrato: frentesDelContrato, titulo: tituloModulo });
+  if (mod.id === "items" && puede.registrar) configurarPropuesta({ mod, contrato, ctx, user, perfil, coleccionRef, frentes: frentesDelContrato, titulo: tituloModulo });
 
   // ---------------------------------------------------------- plantilla
   // Módulos con lista base (ej. requisitos del acta de inicio): agrega de
@@ -418,7 +438,7 @@ function iniciarModulo({ user, perfil, contrato, puede }) {
   document.getElementById("ipExcelBtn").addEventListener("click", async () => {
     const ExcelJS = window.ExcelJS;
     if (!ExcelJS) { alert("No se pudo cargar el generador de Excel."); return; }
-    const campos = mod.campos.filter((c) => !["imagen", "avance", "fotos", "documentos", "periodos"].includes(c.type));
+    const campos = mod.campos.filter((c) => !["imagen", "avance", "fotos", "documentos", "periodos", "cantMes"].includes(c.type));
     const wb = new ExcelJS.Workbook();
     const ws = wb.addWorksheet(mod.label.slice(0, 31));
     ws.columns = [...campos.map((c) => ({ header: c.label, key: c.key })), ...(mod.validar ? [{ header: "Validación", key: "_estado" }] : [])];

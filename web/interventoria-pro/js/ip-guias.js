@@ -261,12 +261,24 @@ export const GUIAS = {
     ],
     automatico: "Avisa las consignaciones sin cierre y las ejecutadas con retraso."
   },
+  items: {
+    que: "Todos los ítems del presupuesto contratado (código, descripción, unidad, cantidad y valor unitario) con la cantidad ejecutada de cada mes, su valor ejecutado y su saldo, por proyecto o frente.",
+    como: [
+      "Carga el presupuesto con «📑 Importar propuesta del contratista» (la propuesta económica en el formato del presupuesto oficial, guardada como .xlsx: una hoja por proyecto) o con «Importar Excel» y la plantilla del módulo. Frente + código identifican cada ítem: al volver a importar se actualiza sin duplicar.",
+      "Agrupa los ítems en las actividades de la curva S con «🔗 Agrupar ítems en actividades» (por capítulo) o ítem por ítem en el campo «Actividad de la curva».",
+      "Cada mes registra la cantidad ejecutada de cada ítem (la del acta o medición del mes, no acumulada); se puede importar desde Excel con la columna del mes.",
+      "Revisa las alertas de mayores cantidades antes de aprobar el acta."
+    ],
+    automatico: "Calcula el valor contratado, ejecutado y el saldo por ítem y por frente, avisa los ítems con cantidad ejecutada mayor que la contratada y los que no tienen actividad asignada, y entrega a Avance de actividades el avance real de cada actividad (valor ejecutado de sus ítems sobre su valor contratado). El informe mensual trae el valor ejecutado por frente y los ítems con movimiento en el mes.",
+    ejemplo: "Ej.: el ítem 1.2.1 «Tendido de cable 750 MCM» (150 m) de una subestación queda en la actividad «Montaje electromecánico»; al registrar 60 m en un mes, esa actividad avanza según el valor de esos 60 m."
+  },
   actividades: {
     que: "El avance físico del contrato por actividad y su comparación con lo programado (curva S), en total y por proyecto o frente.",
     como: [
       "Registra o importa cada actividad del cronograma con su fecha de inicio y de terminación, su proyecto o frente y su valor (o su peso %).",
+      "Si la actividad tiene ítems del presupuesto asignados (Presupuesto y cantidades por ítem), su avance real se calcula solo con las cantidades ejecutadas (⚙); si no, se digita cada mes.",
       "Si todas las actividades tienen valor, el avance se pondera por valor (avance físico valorizado); si no, por el peso (%), que idealmente suma 100 %.",
-      "Cada mes registra el avance acumulado (%) de cada actividad.",
+      "Cada mes registra el avance acumulado (%) de las actividades que no tienen ítems asignados.",
       "Cuando cambie el cronograma, vuelve a importar el archivo con las fechas nuevas: el ítem identifica cada actividad y no se pierde el avance registrado."
     ],
     automatico: "Calcula el avance real contra el programado a hoy, dibuja la curva S total y una por frente (pestañas), avisa las actividades atrasadas y lleva la curva y el avance por frente al informe mensual.",

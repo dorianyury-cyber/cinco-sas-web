@@ -20,7 +20,7 @@
 import { moneda, numero, fecha, mesCorto, mesLargo, mesesDelContrato, diasEntre } from "./ip-core.js";
 import {
   MODULOS, curvaS, svgCurvaS, estadoFinanciero, indicadoresSST, INDICADORES_SST,
-  activoEnMes, avanceReal, inicioActividad, frentesDeActividades, periodosActuacion, cumplimientoPeriodica, validarActuacion, curvaPlan
+  activoEnMes, avanceReal, inicioActividad, frentesDeActividades, actividadesConItems, valorItem, ejecutadoItem, periodosActuacion, cumplimientoPeriodica, validarActuacion, curvaPlan
 } from "./ip-modulos.js";
 
 // Día siguiente (los vencimientos del día de corte cuentan como debidos).
@@ -142,7 +142,7 @@ export async function construirInforme({ contrato, ym, datos, elaboradoPor, carg
     for (const [, fn] of activas) await fn();
   }
   const ef = estadoFinanciero(contrato, hasta("financiero"));
-  const acts = [...(datos.actividades || [])].sort((a, c) => (Number(a.item) || 0) - (Number(c.item) || 0));
+  const acts = actividadesConItems(datos.actividades || [], datos.items || []).sort((a, c) => (Number(a.item) || 0) - (Number(c.item) || 0));
 
   // ================================================================ 1. INTRODUCCIÓN
   await capitulo("Introducción", [
@@ -351,6 +351,28 @@ export async function construirInforme({ contrato, ym, datos, elaboradoPor, carg
           const c = Number(r.cantidadContratada) || 0, e = Number(r.cantidadEjecutada) || 0;
           return [r.componente, r.tipo || "-", r.especificacion, r.unidad, numero(c, c % 1 ? 2 : 0), numero(e, e % 1 ? 2 : 0), c ? `${Math.round((e / c) * 100)}%` : "-", r.estado || "-"];
         }), { titulo: "Cantidades de obra", tam: 14, alinearNum: [4, 5, 6] }, "Sin cantidades de obra registradas.");
+    }],
+    ["items", () => {
+      H2("Presupuesto y cantidades de obra por ítem");
+      const its = datos.items || [];
+      if (!its.length) { nota("Sin presupuesto por ítems registrado."); return; }
+      const vu = (it) => Number(it.valorUnitario) || 0;
+      const frentes = [...new Set(its.map((it) => it.proyecto || "General"))];
+      const fila = (nombre, regs) => {
+        const t = regs.reduce((s, it) => s + valorItem(it), 0);
+        const mes = regs.reduce((s, it) => s + (Number(it.ejecutado?.[ym]) || 0) * vu(it), 0);
+        const acum = regs.reduce((s, it) => s + ejecutadoItem(it, ym) * vu(it), 0);
+        return [nombre, moneda(t), moneda(mes), moneda(acum), `${numero(t ? (acum / t) * 100 : 0, 1)}%`, moneda(t - acum)];
+      };
+      tabla(["Proyecto / frente", "Valor contratado", "Ejecutado en el mes", "Ejecutado acumulado", "% ejecutado", "Saldo"],
+        [...frentes.map((f) => fila(f, its.filter((it) => (it.proyecto || "General") === f))), ...(frentes.length > 1 ? [fila("Total", its)] : [])],
+        { titulo: `Valor ejecutado por proyecto o frente a ${mesLargo(ym)} (costo directo)`, anchos: [20, 17, 16, 17, 12, 18], tam: 14, alinearNum: [1, 2, 3, 4, 5] });
+      const conMov = its.filter((it) => Number(it.ejecutado?.[ym]) > 0).sort((a, b) => `${a.proyecto}|${a.codigo}`.localeCompare(`${b.proyecto}|${b.codigo}`, "es", { numeric: true }));
+      tabla(["Frente", "Ítem", "Descripción", "Und.", "Contratada", "Del mes", "Acumulada", "% ejec."],
+        conMov.map((it) => { const c2 = Number(it.cantidad) || 0, ac = ejecutadoItem(it, ym); return [it.proyecto || "-", it.codigo, String(it.descripcion).slice(0, 160), it.unidad || "-", numero(c2, c2 % 1 ? 2 : 0), numero(Number(it.ejecutado[ym]), Number(it.ejecutado[ym]) % 1 ? 2 : 0), numero(ac, ac % 1 ? 2 : 0), `${numero(c2 ? (ac / c2) * 100 : 0, 0)}%`]; }),
+        { titulo: `Ítems con cantidades ejecutadas en ${mesLargo(ym)}`, anchos: [10, 7, 39, 6, 10, 9, 10, 9], tam: 12, alinearNum: [4, 5, 6, 7] }, "Sin cantidades ejecutadas en el periodo.");
+      const mayores = its.filter((it) => ejecutadoItem(it, ym) > (Number(it.cantidad) || 0) + 1e-9);
+      if (mayores.length) P(`Ítems con cantidad ejecutada mayor que la contratada: ${mayores.map((it) => `${it.proyecto || ""} ${it.codigo}`).join(", ")}. Requieren acta de mayores cantidades o la modificación contractual correspondiente.`);
     }],
     ["suministros", () => {
       H2("Equipos y suministros: pruebas FAT y SAT");

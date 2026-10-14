@@ -6,7 +6,7 @@ import { db, diasEntre, hoyISO } from "./ip-core.js";
 import { MODULOS, avancePonderado, estadoFinanciero } from "./ip-modulos.js";
 
 const CON_ALERTAS = Object.values(MODULOS).filter((m) => m.alertas && !m.porCapitulo);
-const COLECCIONES = new Set(["personal", "actividades", "financiero", "garantias"]);
+const COLECCIONES = new Set(["personal", "actividades", "items", "financiero", "garantias"]);
 CON_ALERTAS.forEach((m) => { COLECCIONES.add(m.coleccion); (m.necesita || []).forEach((c) => COLECCIONES.add(c)); });
 
 // Lee una vez cada colección que necesitan los indicadores y las alertas.
@@ -21,7 +21,7 @@ export async function cargarDatosContrato(contratoId) {
 
 export function resumirContrato(contrato, datos) {
   const hoy = hoyISO();
-  const tecnico = avancePonderado(datos.actividades);
+  const tecnico = avancePonderado(MODULOS.actividades.preparar(datos.actividades, datos));
   const ef = estadoFinanciero(contrato, datos.financiero);
   const tiempo = contrato.fechaInicio && contrato.fechaFin
     ? Math.max(0, Math.min(100, Math.round((diasEntre(contrato.fechaInicio, hoy) / (diasEntre(contrato.fechaInicio, contrato.fechaFin) || 1)) * 100)))
@@ -32,7 +32,8 @@ export function resumirContrato(contrato, datos) {
 
   const alertas = [];
   CON_ALERTAS.forEach((m) => {
-    (m.alertas({ contrato, registros: datos[m.coleccion] || [], datos }) || []).forEach((a) => alertas.push({ ...a, modulo: m }));
+    const regs = m.preparar ? m.preparar(datos[m.coleccion] || [], datos) : datos[m.coleccion] || [];
+    (m.alertas({ contrato, registros: regs, datos }) || []).forEach((a) => alertas.push({ ...a, modulo: m }));
   });
   alertas.sort((a, b) => (a.nivel === "danger" ? 0 : 1) - (b.nivel === "danger" ? 0 : 1));
   const rojas = alertas.filter((a) => a.nivel === "danger").length;

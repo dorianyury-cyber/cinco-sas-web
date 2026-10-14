@@ -31,6 +31,10 @@ function columnasImportables(mod, contrato) {
       mesesDelContrato(contrato).forEach((ym) => cols.push({ ...c, key: `${c.key}.${ym}`, label: `Avance ${mesCorto(ym)} (%)`, type: "pctMes", padre: c.key, ym }));
       continue;
     }
+    if (c.type === "cantMes") {
+      mesesDelContrato(contrato).forEach((ym) => cols.push({ ...c, key: `${c.key}.${ym}`, label: `Ejecutado ${mesCorto(ym)}`, type: "cantMesCol", padre: c.key, ym, required: false }));
+      continue;
+    }
     cols.push(c);
   }
   return cols;
@@ -44,7 +48,7 @@ function opcionesDe(c, frentes) {
 
 const AYUDA_TIPO = {
   text: "Texto", textarea: "Texto (puede ser largo)", url: "Enlace (https://…)", number: "Número",
-  money: "Valor en pesos, sin signos (ej. 1250000)", pct: "Porcentaje de 0 a 100", pctMes: "Avance acumulado de 0 a 100",
+  money: "Valor en pesos, sin signos (ej. 1250000)", pct: "Porcentaje de 0 a 100", pctMes: "Avance acumulado de 0 a 100", cantMesCol: "Cantidad ejecutada en el mes (no acumulada)",
   date: "Fecha (dd/mm/aaaa o celda de fecha)", month: "Mes (mm/aaaa)", select: "Una de las opciones de la lista",
   frente: "Proyecto / frente del contrato", persona: "Nombre o cédula de alguien del Listado de personal"
 };
@@ -92,8 +96,8 @@ export async function descargarPlantilla({ mod, contrato, frentes, titulo }) {
   inst.addRow([`Plantilla de importación — ${titulo}`]).font = { bold: true, size: 13 };
   inst.addRow([`Contrato ${contrato.numero || ""}. Llena la hoja «Datos» a partir de la fila 2 (una fila por registro). Las columnas en naranja (*) son obligatorias. No cambies los encabezados.`]);
   if (mod.claveImport) {
-    const campoClave = mod.campos.find((c) => c.key === mod.claveImport);
-    inst.addRow([`Si «${campoClave?.label}» ya existe en el aplicativo, la fila ACTUALIZA ese registro en lugar de crear uno nuevo.`]);
+    const nombres = [].concat(mod.claveImport).map((k) => mod.campos.find((c) => c.key === k)?.label).join(" + ");
+    inst.addRow([`Si «${nombres}» ya existe en el aplicativo, la fila ACTUALIZA ese registro en lugar de crear uno nuevo.`]);
   }
   inst.addRow([]);
   const h = inst.addRow(["Columna", "Obligatoria", "Qué escribir", "Opciones válidas"]);
@@ -194,6 +198,13 @@ export async function leerArchivo(archivo, { mod, contrato, frentes, personal, e
       const crudo = row.getCell(i).value;
       const texto = textoCelda(crudo);
       if (texto !== "" || crudo instanceof Date || typeof crudo === "number") vacia = false;
+      if (c.type === "cantMesCol") {
+        const v = aNumero(typeof crudo === "number" ? crudo : texto);
+        if (v == null) continue;
+        if (Number.isNaN(v) || v < 0) { errores.push(`${c.label}: debe ser un número mayor o igual a 0`); continue; }
+        datos[c.padre] = { ...(datos[c.padre] || {}), [c.ym]: v };
+        continue;
+      }
       if (c.type === "pctMes") {
         const v = aNumero(crudo instanceof Object && !(crudo instanceof Date) ? crudo : texto || crudo);
         if (v == null) continue;
@@ -243,15 +254,16 @@ export async function leerArchivo(archivo, { mod, contrato, frentes, personal, e
     }
     if (vacia) return;
     for (const c of cols) {
-      if (!c.required || c.type === "pctMes") continue;
+      if (!c.required || c.type === "pctMes" || c.type === "cantMesCol") continue;
       const v = datos[c.key];
       if ((v == null || v === "") && !errores.some((e) => e.startsWith(c.label))) errores.push(`${c.label}: obligatorio`);
     }
     // ¿Actualiza un registro existente?
     let existente = null;
-    if (mod.claveImport && datos[mod.claveImport] != null && datos[mod.claveImport] !== "") {
-      const norm = (x) => (mod.claveImport === "cedula" ? cedulaNorm(x) : sinTildes(x));
-      existente = existentes.find((r) => norm(r[mod.claveImport]) === norm(datos[mod.claveImport])) || null;
+    const claves = [].concat(mod.claveImport || []);
+    if (claves.length && claves.every((k) => datos[k] != null && datos[k] !== "")) {
+      const norm = (k, x) => (k === "cedula" ? cedulaNorm(x) : sinTildes(x));
+      existente = existentes.find((r) => claves.every((k) => norm(k, r[k]) === norm(k, datos[k]))) || null;
     }
     // Campos sin columna en el archivo: no se tocan al actualizar; al crear
     // toman su valor por defecto.
@@ -278,9 +290,10 @@ export async function importarFilas({ filas, mod, contrato, coleccionRef, cap, u
         // campo que identifica el registro (ej. la cédula) conserva su
         // formato original.
         for (const k of Object.keys(datos)) {
-          if (datos[k] === "" || datos[k] == null || k === mod.claveImport) delete datos[k];
+          if (datos[k] === "" || datos[k] == null || [].concat(mod.claveImport || []).includes(k)) delete datos[k];
         }
         if (f.existente.avance && datos.avance) datos.avance = { ...f.existente.avance, ...datos.avance };
+        if (f.existente.ejecutado && datos.ejecutado) datos.ejecutado = { ...f.existente.ejecutado, ...datos.ejecutado };
         const cambios = diferencias(mod.campos, f.existente, datos, personal);
         if (!cambios.length) continue;
         lote.update(doc(coleccionRef, f.existente.id), datos);
@@ -316,7 +329,7 @@ export function configurarImportacion({ mod, contrato, ctx, user, perfil, colecc
   btn.addEventListener("click", () => {
     reiniciar();
     document.getElementById("ipImportTitulo").textContent = `Importar desde Excel — ${titulo}`;
-    const clave = mod.claveImport ? mod.campos.find((c) => c.key === mod.claveImport)?.label : null;
+    const clave = mod.claveImport ? [].concat(mod.claveImport).map((k) => mod.campos.find((c) => c.key === k)?.label).join(" + ") : null;
     document.getElementById("ipImportNota").textContent = clave
       ? `Si «${clave}» ya existe, la fila actualiza ese registro en lugar de crear uno nuevo.`
       : "Cada fila del archivo crea un registro nuevo.";
