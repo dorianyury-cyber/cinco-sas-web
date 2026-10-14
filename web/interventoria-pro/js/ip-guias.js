@@ -262,13 +262,15 @@ export const GUIAS = {
     automatico: "Avisa las consignaciones sin cierre y las ejecutadas con retraso."
   },
   actividades: {
-    que: "El avance físico del contrato por actividad y su comparación con lo programado (curva S).",
+    que: "El avance físico del contrato por actividad y su comparación con lo programado (curva S), en total y por proyecto o frente.",
     como: [
-      "Registra cada actividad del cronograma con su peso (%), duración y fecha de terminación.",
+      "Registra o importa cada actividad del cronograma con su fecha de inicio y de terminación, su proyecto o frente y su valor (o su peso %).",
+      "Si todas las actividades tienen valor, el avance se pondera por valor (avance físico valorizado); si no, por el peso (%), que idealmente suma 100 %.",
       "Cada mes registra el avance acumulado (%) de cada actividad.",
-      "Lo ideal es que los pesos sumen 100 %."
+      "Cuando cambie el cronograma, vuelve a importar el archivo con las fechas nuevas: el ítem identifica cada actividad y no se pierde el avance registrado."
     ],
-    automatico: "Calcula el avance ponderado real contra el programado a hoy, dibuja la curva S y avisa las actividades atrasadas."
+    automatico: "Calcula el avance real contra el programado a hoy, dibuja la curva S total y una por frente (pestañas), avisa las actividades atrasadas y lleva la curva y el avance por frente al informe mensual.",
+    ejemplo: "Ej.: en una obra con tres subestaciones, cada subestación es un frente y cada actividad agrupa capítulos del presupuesto (suministro de equipos, obra civil, montaje, control y protección, pruebas y puesta en servicio)."
   },
 
   // ---------------------------------------------------------------- Riesgos, fotos y calidad

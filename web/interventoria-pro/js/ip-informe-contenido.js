@@ -20,7 +20,7 @@
 import { moneda, numero, fecha, mesCorto, mesLargo, mesesDelContrato, diasEntre } from "./ip-core.js";
 import {
   MODULOS, curvaS, svgCurvaS, estadoFinanciero, indicadoresSST, INDICADORES_SST,
-  activoEnMes, avanceReal, inicioActividad, periodosActuacion, cumplimientoPeriodica, validarActuacion, curvaPlan
+  activoEnMes, avanceReal, inicioActividad, frentesDeActividades, periodosActuacion, cumplimientoPeriodica, validarActuacion, curvaPlan
 } from "./ip-modulos.js";
 
 // Día siguiente (los vencimientos del día de corte cuentan como debidos).
@@ -390,6 +390,25 @@ export async function construirInforme({ contrato, ym, datos, elaboradoPor, carg
           puntos.filter((p) => p.ym <= ym).map((p) => [mesLargo(p.ym), `${numero(p.programado, 1)}%`, p.ejecutado == null ? "–" : `${numero(p.ejecutado, 1)}%`, p.ejecutado == null ? "–" : numero(p.ejecutado - p.programado, 1)]),
           { titulo: "Curva S — avance acumulado mes a mes", anchos: [34, 22, 22, 22], tam: 15, alinearNum: [1, 2, 3] });
         P(`A ${mesLargo(ym)} el contrato registra un avance ejecutado acumulado de ${numero(enCorte.ejecutado ?? 0, 1)}% frente a un avance programado de ${numero(enCorte.programado, 1)}%.`);
+        // Con varios proyectos o frentes: avance de cada uno y su propia curva S.
+        const frentes = frentesDeActividades(acts);
+        if (frentes.length > 1) {
+          H2("Avance por proyecto o frente");
+          const porFrente = frentes.map((f) => {
+            const regs = acts.filter((a) => a.proyecto === f);
+            const pts = curvaS(regs, contrato, ym);
+            return { f, regs, pts, corte: pts.find((p) => p.ym === ym) || { programado: 0, ejecutado: 0 } };
+          });
+          tabla(["Proyecto / frente", "Valor", "Programado acumulado", "Ejecutado acumulado", "Diferencia (pts)"],
+            porFrente.map((x) => [x.f, moneda(x.regs.reduce((t, r) => t + (Number(r.valor) || 0), 0)), `${numero(x.corte.programado, 1)}%`, `${numero(x.corte.ejecutado ?? 0, 1)}%`, numero((x.corte.ejecutado ?? 0) - x.corte.programado, 1)]),
+            { titulo: `Avance por proyecto o frente a ${mesLargo(ym)}`, anchos: [28, 24, 16, 16, 16], tam: 15, alinearNum: [1, 2, 3, 4] });
+          for (const x of porFrente) {
+            try {
+              const png = await svgADataUrl(svgCurvaS(x.pts, { ancho: 760, alto: 300 }));
+              b.push({ tipo: "imagen", dataUrl: png.dataUrl, url: png.dataUrl, ancho: png.ancho, alto: png.alto, tamano: 85, nombre: `Curva S — ${x.f}: avance programado contra ejecutado a ${mesLargo(ym)}` });
+            } catch (e) { nota(`No se pudo dibujar la curva S de ${x.f}.`); }
+          }
+        }
       } else nota("Registra las actividades del contrato para obtener la curva S.");
       H2("Observaciones al avance del contrato");
       const atrasadas = acts.filter((a) => {
@@ -398,7 +417,7 @@ export async function construirInforme({ contrato, ym, datos, elaboradoPor, carg
         const prog = corte < ini ? 0 : corte >= a.fechaFin ? 100 : Math.round((diasEntre(ini, corte) / (diasEntre(ini, a.fechaFin) || 1)) * 100);
         return avanceReal(a, ym) < prog - 10;
       });
-      if (atrasadas.length) atrasadas.forEach((a) => P(`• ${a.actividad}: avance ejecutado ${avanceReal(a, ym)}%, por debajo de lo programado a la fecha de corte.`));
+      if (atrasadas.length) atrasadas.forEach((a) => P(`• ${a.proyecto && a.proyecto !== "General" ? `${a.proyecto} — ` : ""}${a.actividad}: avance ejecutado ${avanceReal(a, ym)}%, por debajo de lo programado a la fecha de corte.`));
       else if (acts.length) P("Las actividades avanzan de acuerdo con lo programado a la fecha de corte.");
     }],
     ["observaciones:tecnico", () => { H2("Resumen y observaciones técnicas"); observaciones("tecnico"); }],

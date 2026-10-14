@@ -2081,6 +2081,29 @@ html.ip-preparando .main::before {
 .ip-barra select.ip-filtro-mes { width: auto; min-width: 170px; padding: 9px 10px; }
 .ip-curva-s { width: 100%; overflow-x: auto; margin-bottom: 12px; }
 .ip-curva-s svg { display: block; width: 100%; max-width: 900px; height: auto; margin: 0 auto; }
+/* Pestañas Total / frentes de la curva S (radios + CSS) */
+.ip-tabs { position: relative; }
+.ip-tabs > input[type="radio"] { position: absolute; left: 0; top: 0; width: 1px; height: 1px; margin: 0; opacity: 0; pointer-events: none; }
+.ip-tabs-barra { display: flex; flex-wrap: wrap; gap: 6px; margin: 14px 0 10px; }
+.ip-tabs-barra label { margin: 0; padding: 6px 14px; border: 1px solid var(--border); border-radius: 999px; font-size: 12.5px; font-weight: 700; cursor: pointer; background: #fff; color: var(--text-muted); }
+.ip-tabs-barra label::before { content: none; display: none; }
+.ip-tab-panel { display: none; }
+.ip-tabs > input:nth-of-type(1):checked ~ .ip-tabs-paneles > .ip-tab-panel:nth-child(1),
+.ip-tabs > input:nth-of-type(2):checked ~ .ip-tabs-paneles > .ip-tab-panel:nth-child(2),
+.ip-tabs > input:nth-of-type(3):checked ~ .ip-tabs-paneles > .ip-tab-panel:nth-child(3),
+.ip-tabs > input:nth-of-type(4):checked ~ .ip-tabs-paneles > .ip-tab-panel:nth-child(4),
+.ip-tabs > input:nth-of-type(5):checked ~ .ip-tabs-paneles > .ip-tab-panel:nth-child(5),
+.ip-tabs > input:nth-of-type(6):checked ~ .ip-tabs-paneles > .ip-tab-panel:nth-child(6),
+.ip-tabs > input:nth-of-type(7):checked ~ .ip-tabs-paneles > .ip-tab-panel:nth-child(7),
+.ip-tabs > input:nth-of-type(8):checked ~ .ip-tabs-paneles > .ip-tab-panel:nth-child(8) { display: block; }
+.ip-tabs > input:nth-of-type(1):checked ~ .ip-tabs-barra label:nth-child(1),
+.ip-tabs > input:nth-of-type(2):checked ~ .ip-tabs-barra label:nth-child(2),
+.ip-tabs > input:nth-of-type(3):checked ~ .ip-tabs-barra label:nth-child(3),
+.ip-tabs > input:nth-of-type(4):checked ~ .ip-tabs-barra label:nth-child(4),
+.ip-tabs > input:nth-of-type(5):checked ~ .ip-tabs-barra label:nth-child(5),
+.ip-tabs > input:nth-of-type(6):checked ~ .ip-tabs-barra label:nth-child(6),
+.ip-tabs > input:nth-of-type(7):checked ~ .ip-tabs-barra label:nth-child(7),
+.ip-tabs > input:nth-of-type(8):checked ~ .ip-tabs-barra label:nth-child(8) { background: var(--cinco-orange-dark); border-color: var(--cinco-orange-dark); color: #fff; }
 .ip-formula { font-size: 11px; }
 
 /* Informe mensual */

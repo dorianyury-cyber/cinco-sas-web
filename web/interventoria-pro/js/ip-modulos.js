@@ -71,11 +71,28 @@ function pctCantidad(r) {
 
 function curvaSHtml(ctx) {
   if (!ctx.registros.length) return "";
-  const puntos = curvaS(ctx.registros, ctx.contrato);
-  const filas = puntos.map((p) => `<tr><td>${mesCorto(p.ym)}</td><td class="ip-num">${numero(p.programado, 1)}%</td><td class="ip-num">${p.ejecutado == null ? "–" : numero(p.ejecutado, 1) + "%"}</td><td class="ip-num">${p.ejecutado == null ? "–" : (p.ejecutado - p.programado >= 0 ? "+" : "") + numero(p.ejecutado - p.programado, 1)}</td></tr>`).join("");
-  return `<div class="card"><h2>Avance gráfico del contrato — Curva S</h2>
-    <div class="ip-curva-s">${svgCurvaS(puntos)}</div>
-    <div class="tabla-scroll"><table class="tabla-compacta ip-matriz"><thead><tr><th>Mes</th><th class="ip-num">Programado acumulado</th><th class="ip-num">Ejecutado acumulado</th><th class="ip-num">Diferencia (pts)</th></tr></thead><tbody>${filas}</tbody></table></div></div>`;
+  const panel = (regs) => {
+    const puntos = curvaS(regs, ctx.contrato);
+    const filas = puntos.map((p) => `<tr><td>${mesCorto(p.ym)}</td><td class="ip-num">${numero(p.programado, 1)}%</td><td class="ip-num">${p.ejecutado == null ? "–" : numero(p.ejecutado, 1) + "%"}</td><td class="ip-num">${p.ejecutado == null ? "–" : (p.ejecutado - p.programado >= 0 ? "+" : "") + numero(p.ejecutado - p.programado, 1)}</td></tr>`).join("");
+    return `<div class="ip-curva-s">${svgCurvaS(puntos)}</div>
+      <div class="tabla-scroll"><table class="tabla-compacta ip-matriz"><thead><tr><th>Mes</th><th class="ip-num">Programado acumulado</th><th class="ip-num">Ejecutado acumulado</th><th class="ip-num">Diferencia (pts)</th></tr></thead><tbody>${filas}</tbody></table></div>`;
+  };
+  const frentes = frentesDeActividades(ctx.registros);
+  const porValor = pesoActividad(ctx.registros)({ valor: 1, peso: 0 }) === 1;
+  const nota = `<p class="text-muted ip-leyenda">Ponderación por ${porValor ? "valor de cada actividad (avance físico valorizado)" : "peso (%) de cada actividad"}; programado lineal entre el inicio y la terminación de cada actividad.</p>`;
+  if (frentes.length < 2) return `<div class="card"><h2>Avance gráfico del contrato — Curva S</h2>${nota}${panel(ctx.registros)}</div>`;
+  // Pestañas: Total y una por frente (radios + CSS; la política del sitio no permite estilos en línea).
+  const grupos = [["Total", ctx.registros], ...frentes.map((f) => [f, ctx.registros.filter((a) => a.proyecto === f)])];
+  const resumenFrentes = `<div class="tabla-scroll"><table class="tabla-compacta ip-matriz"><thead><tr><th>Proyecto / frente</th><th class="ip-num">Valor</th><th class="ip-num">Programado a hoy</th><th class="ip-num">Real</th><th class="ip-num">Diferencia (pts)</th></tr></thead><tbody>${grupos.map(([f, regs]) => {
+    const a = avancePonderado(regs);
+    const valor = regs.reduce((s, r) => s + (Number(r.valor) || 0), 0);
+    return `<tr><td>${f === "Total" ? "<strong>Total</strong>" : esc(f)}</td><td class="ip-num">${valor ? moneda(valor) : "-"}</td><td class="ip-num">${numero(a.programado, 1)}%</td><td class="ip-num">${numero(a.real, 1)}%</td><td class="ip-num">${(a.real - a.programado >= 0 ? "+" : "") + numero(a.real - a.programado, 1)}</td></tr>`;
+  }).join("")}</tbody></table></div>`;
+  return `<div class="card"><h2>Avance gráfico del contrato — Curva S</h2>${nota}${resumenFrentes}
+    <div class="ip-tabs">${grupos.map(([f], i) => `<input type="radio" name="ipCurvaFrente" id="ipCurva${i}" ${i === 0 ? "checked" : ""}>`).join("")}
+      <div class="ip-tabs-barra">${grupos.map(([f], i) => `<label for="ipCurva${i}">${esc(f)}</label>`).join("")}</div>
+      <div class="ip-tabs-paneles">${grupos.map(([, regs]) => `<div class="ip-tab-panel">${panel(regs)}</div>`).join("")}</div>
+    </div></div>`;
 }
 
 function indicadoresHtml(ctx) {
@@ -129,19 +146,30 @@ export function avanceProgramado(act, fechaISO = hoyISO()) {
   return Math.round((diasEntre(ini, fechaISO) / total) * 100);
 }
 
+// Ponderación de las actividades: si TODAS tienen valor ($), pesan por su
+// valor (avance físico valorizado); si no, por su peso (%).
+export function pesoActividad(lista) {
+  const porValor = lista.length > 0 && lista.every((a) => Number(a.valor) > 0);
+  return (a) => (porValor ? Number(a.valor) : Number(a.peso) || 0);
+}
+export function frentesDeActividades(lista) {
+  return [...new Set(lista.map((a) => a.proyecto).filter((f) => f && f !== "General"))];
+}
+
 // Curva S: avance acumulado ponderado del contrato, mes a mes — programado
 // (cronograma de cada actividad, repartido linealmente entre su inicio y
 // su terminación y ponderado por su peso) contra ejecutado (avance
 // acumulado reportado de cada actividad, ponderado). El ejecutado se
 // calcula solo hasta el mes "hasta" (por defecto el actual).
 export function curvaS(actividades, contrato, hasta = mesActual()) {
-  const pesoTotal = actividades.reduce((s, a) => s + (Number(a.peso) || 0), 0);
+  const peso = pesoActividad(actividades);
+  const pesoTotal = actividades.reduce((s, a) => s + peso(a), 0);
   const meses = mesesDelContrato(contrato);
   return meses.map((ym) => {
     const corte = finDeMes(ym);
     let prog = 0, ejec = 0;
     actividades.forEach((a) => {
-      const w = pesoTotal ? (Number(a.peso) || 0) / pesoTotal : 0;
+      const w = pesoTotal ? peso(a) / pesoTotal : 0;
       prog += w * (avanceProgramado(a, corte) ?? 0);
       ejec += w * avanceReal(a, ym);
     });
@@ -182,11 +210,12 @@ export function svgCurvaS(puntos, { ancho = 760, alto = 320, fondo = "#ffffff" }
   </svg>`;
 }
 export function avancePonderado(actividades) {
-  const pesoTotal = actividades.reduce((s, a) => s + (Number(a.peso) || 0), 0);
+  const peso = pesoActividad(actividades);
+  const pesoTotal = actividades.reduce((s, a) => s + peso(a), 0);
   if (!pesoTotal) return { real: 0, programado: 0 };
   let real = 0, prog = 0;
   actividades.forEach((a) => {
-    const w = (Number(a.peso) || 0) / pesoTotal;
+    const w = peso(a) / pesoTotal;
     real += w * avanceReal(a);
     prog += w * (avanceProgramado(a) ?? 0);
   });
@@ -943,14 +972,16 @@ export const MODULOS = {
     campos: [
       { key: "item", label: "Ítem", type: "number", required: true },
       { key: "actividad", label: "Actividad", type: "text", required: true, ancho: true },
-      { key: "peso", label: "Peso (%) dentro del contrato", type: "pct", required: true, ayuda: "Lo que pesa esta actividad en el avance total. Lo ideal es que los pesos sumen 100%." },
+      { key: "proyecto", label: "Proyecto / frente", type: "frente", ayuda: "Con dos o más frentes, la curva S se ve también por frente (pestañas)." },
+      { key: "valor", label: "Valor de la actividad", type: "money", ayuda: "Si TODAS las actividades tienen valor, el avance se pondera por valor (avance físico valorizado) y el peso (%) queda solo como referencia." },
+      { key: "peso", label: "Peso (%) dentro del contrato", type: "pct", ayuda: "Lo que pesa esta actividad en el avance total si no se usa el valor. Lo ideal es que los pesos sumen 100%." },
       { key: "duracionSemanas", label: "Duración (semanas)", type: "number", ayuda: "Si no registras la fecha de inicio, se calcula como fecha de terminación menos esta duración." },
       { key: "fechaInicio", label: "Fecha de inicio", type: "date" },
       { key: "fechaFin", label: "Fecha de terminación", type: "date", required: true },
       { key: "avance", label: "Avance acumulado (%) por mes", type: "avance", ancho: true }
     ],
     columnas: [
-      { key: "item", ancho: 6 }, { key: "actividad", ancho: 42 }, { key: "peso", ancho: 9 }, { key: "fechaFin", label: "Termina", ancho: 12 },
+      { key: "item", ancho: 6 }, { key: "actividad", ancho: 38 }, { key: "proyecto", label: "Frente", ancho: 9 }, { key: "peso", ancho: 8 }, { key: "fechaFin", label: "Termina", ancho: 11 },
       { key: "_real", label: "Real", ancho: 9, render: (r) => `${numero(avanceReal(r), 0)}%` },
       { key: "_prog", label: "Programado", ancho: 11, render: (r) => { const p = avanceProgramado(r); return p == null ? "-" : `${p}%`; } }
     ],
@@ -965,7 +996,8 @@ export const MODULOS = {
     },
     resumen(ctx) {
       const { real, programado } = avancePonderado(ctx.registros);
-      const pesoTotal = ctx.registros.reduce((s, a) => s + (Number(a.peso) || 0), 0);
+      const porValor = pesoActividad(ctx.registros)({ valor: 1, peso: 0 }) === 1;
+      const pesoTotal = porValor ? 100 : ctx.registros.reduce((s, a) => s + (Number(a.peso) || 0), 0);
       const barras = [...ctx.registros].sort((a, b) => (Number(a.item) || 0) - (Number(b.item) || 0)).map((a) => {
         const r = avanceReal(a); const p = avanceProgramado(a) ?? 0;
         return `<div class="ip-barra-fila"><div class="ip-barra-label">${esc(a.item)}. ${esc(a.actividad)}</div>
