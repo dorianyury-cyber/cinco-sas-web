@@ -23,7 +23,14 @@ export const CATEGORIAS_ACTA = [
   "6. Anticipo",
   "7. SST y ambiental",
   "8. Instalaciones y sitio",
-  "9. Interventoría"
+  "9. Interventoría",
+  "10. Contrato de interventoría"
+];
+
+// De dónde sale cada exigencia (la cláusula o numeral exacto va en "soporte").
+export const FUENTES_REQUISITO = [
+  "Contrato", "Términos de referencia", "Contrato y términos de referencia", "Contrato de interventoría",
+  "Manual de seguimiento del contratante", "Norma", "Buenas prácticas"
 ];
 
 const L = (categoria, requisito, soporte, responsable, proyecto = "General") => ({ categoria, requisito, soporte, responsable, proyecto });
@@ -123,6 +130,67 @@ export const LISTA_ACTA_INICIO = [
   L(IN, "Bitácora o libro de obra abierto por frente.", "Buenas prácticas", I),
   L(IN, "Régimen de multas y cláusula penal del contrato explicado en la reunión de inicio.", "Contrato", I)
 ];
+
+// PLAN_ACTUACIONES: lo que la propia interventoría debe hacer y cuándo, de
+// la designación al cierre. Base general: cada contrato le pone fechas y la
+// ajusta. Tipos: "Única" (tiene inicio y fin), "Hito" (fecha clave),
+// "Periódica" (se repite con una frecuencia: el aplicativo genera cada
+// vencimiento) y "Eventual" (cuando se presente, sin fecha fija).
+// registro = módulo donde queda el dato y la evidencia de esa actuación.
+export const FASES_PLAN = [
+  "0. Alistamiento", "1. Requisitos del acta de inicio", "2. Arranque y anticipo", "3. Ingeniería y suministros",
+  "4. Ejecución", "5. Pruebas, puesta en servicio y entrega", "6. Cierre", "Permanente"
+];
+export const TIPOS_ACTUACION = ["Única", "Hito", "Periódica", "Eventual (cuando se presente)"];
+export const FRECUENCIAS = ["Semanal", "Quincenal", "Mensual", "Trimestral"];
+
+const [F0, F1, F2, F3, F4, F5, F6, FP] = FASES_PLAN;
+const U = "Única", H = "Hito", P = "Periódica", EV = "Eventual (cuando se presente)";
+const A = (fase, actuacion, tipo, entregable, responsable, registro = "", frecuencia = "") => ({ fase, actuacion, tipo, entregable, responsable, registro, frecuencia });
+
+export const PLAN_ACTUACIONES = [
+  A(F0, "Recibir la designación formal de la interventoría y reunirse con el supervisor para acordar canales, formatos y fechas.", U, "Acta de reunión con el supervisor", "Director de interventoría", "cronologia"),
+  A(F0, "Conformar el equipo exigido y entregar las hojas de vida al contratante para su aprobación.", U, "Hojas de vida aprobadas", "Director de interventoría"),
+  A(F0, "Declarar la ausencia de conflictos de interés, inhabilidades e incompatibilidades.", U, "Declaraciones firmadas", "Asesor jurídico"),
+  A(F0, "Estudiar el contrato, los términos de referencia, los anexos y la propuesta, y elaborar la matriz de obligaciones.", U, "Matriz de obligaciones", "Director de interventoría"),
+  A(F0, "Elaborar el plan de trabajo, la metodología de control y los formatos de la interventoría.", U, "Plan de trabajo y formatos", "Director de interventoría"),
+  A(F0, "Revisar la matriz de riesgos del contrato y agregar los riesgos de la ejecución.", U, "Matriz de riesgos actualizada", "Director de interventoría", "riesgos"),
+  A(F1, "Requerir al contratista los documentos para el acta de inicio con la lista de chequeo.", U, "Oficio de requerimiento", "Director de interventoría", "actainicio"),
+  A(F1, "Revisar las garantías del contratista (amparos, valores, vigencias y beneficiarios).", U, "Concepto de revisión de garantías", "Asesor jurídico", "garantias"),
+  A(F1, "Verificar el personal mínimo frente a la propuesta.", U, "Matriz de verificación de personal", "Director de interventoría", "personal"),
+  A(F1, "Revisar y aprobar el plan de calidad del contratista.", U, "Plan de calidad aprobado", "Director de interventoría", "entregables"),
+  A(F1, "Revisar el cronograma de ejecución y el programa de suministros de larga entrega.", U, "Concepto sobre el cronograma", "Residente", "entregables"),
+  A(F1, "Revisar el SG-SST y el plan de manejo ambiental del contratista.", U, "Concepto SST y ambiental", "Profesional HSEQ", "entregables"),
+  A(F1, "Suscribir el acta de inicio con todos los requisitos cumplidos.", H, "Acta de inicio", "Director de interventoría", "cronologia"),
+  A(F2, "Realizar la reunión de inicio: comités, aprobaciones, plazos de respuesta y régimen sancionatorio.", U, "Acta de reunión de inicio", "Director de interventoría"),
+  A(F2, "Levantar el acta de replanteo y el acta de vecindad con registro fotográfico.", U, "Actas de replanteo y vecindad", "Residente", "fotos"),
+  A(F2, "Gestionar la socialización del proyecto con la comunidad antes de iniciar las obras.", U, "Registro de socialización", "Profesional social / HSEQ", "socializacion"),
+  A(F2, "Revisar el plan de inversión, la cuenta y los soportes para el pago del anticipo.", H, "Visto bueno del anticipo", "Profesional financiero", "anticipo"),
+  A(F3, "Revisar los diseños, planos y memorias del contratista y emitir concepto.", U, "Concepto de diseños", "Residente", "entregables"),
+  A(F3, "Revisar fichas técnicas y certificados de conformidad de equipos y materiales antes de fabricar o comprar.", U, "Fichas técnicas aprobadas", "Residente", "suministros"),
+  A(F3, "Asistir a las pruebas en fábrica (FAT) de los equipos principales.", H, "Actas de FAT", "Residente", "suministros"),
+  A(F3, "Recibir los equipos en sitio y supervisar las pruebas de recepción (SAT).", U, "Actas de recibo y SAT", "Residente", "suministros"),
+  A(F3, "Tramitar los cambios de diseño o de especificaciones que proponga el contratista.", EV, "Conceptos de cambio", "Residente", "cambios"),
+  A(F4, "Supervisar la obra civil y el montaje según diseños, especificaciones y normas.", U, "Registros de inspección", "Residente", "fotos"),
+  A(F4, "Revisar y coordinar consignaciones, ventanas de trabajo y maniobras con el operador.", EV, "Consignaciones aprobadas", "Residente", "consignaciones"),
+  A(F5, "Supervisar las pruebas, la puesta en servicio y la energización.", H, "Actas de pruebas y energización", "Director de interventoría"),
+  A(F5, "Verificar la certificación de la obra (ej. dictamen RETIE) antes de energizar.", H, "Certificación de la obra", "Residente", "entregables"),
+  A(F5, "Revisar los entregables finales: planos as-built, manuales, protocolos y dossier.", U, "Entregables finales aprobados", "Residente", "entregables"),
+  A(F5, "Suscribir el acta de entrega y recibo final.", H, "Acta de entrega y recibo final", "Director de interventoría", "cronologia"),
+  A(F5, "Elaborar el informe final de interventoría.", U, "Informe final", "Director de interventoría", "informe"),
+  A(F6, "Preparar y suscribir el acta de cierre y balance (o liquidación) del contrato.", H, "Acta de cierre y balance", "Director de interventoría", "cronologia"),
+  A(F6, "Presentar la re-evaluación del proveedor en el formato del contratante.", U, "Informe de re-evaluación", "Director de interventoría"),
+  A(FP, "Realizar el comité de obra con el contratista y el contratante.", P, "Acta de comité", "Director de interventoría", "", "Semanal"),
+  A(FP, "Visitar cada frente para verificar avance, calidad y seguridad, con registro fotográfico.", P, "Registro de visita y fotos", "Residente", "fotos", "Semanal"),
+  A(FP, "Verificar SST y ambiental en campo: EPP, permisos de trabajo, inspecciones y residuos.", P, "Inspecciones SST", "Profesional HSEQ", "inspecciones", "Semanal"),
+  A(FP, "Presentar el informe mensual de interventoría al contratante.", P, "Informe mensual", "Director de interventoría", "informe", "Mensual"),
+  A(FP, "Revisar y suscribir las actas parciales de pago con sus soportes.", P, "Actas parciales", "Profesional financiero", "financiero", "Mensual"),
+  A(FP, "Verificar el pago de nómina, seguridad social y parafiscales del contratista.", P, "Planillas verificadas", "Profesional HSEQ", "segsocial", "Mensual"),
+  A(FP, "Controlar la inversión y amortización del anticipo.", P, "Conciliación del anticipo", "Profesional financiero", "anticipo", "Mensual"),
+  A(FP, "Actualizar la matriz de riesgos y el seguimiento al cronograma.", P, "Matriz y cronograma actualizados", "Director de interventoría", "riesgos", "Mensual"),
+  A(FP, "Controlar la vigencia y el valor de las garantías del contratista.", P, "Control de garantías", "Asesor jurídico", "garantias", "Trimestral"),
+  A(FP, "Requerir al contratista ante incumplimientos y adelantar el procedimiento de multas.", EV, "Requerimientos", "Director de interventoría", "requerimientos")
+].map((a, i) => ({ item: i + 1, ...a }));
 
 // Expande la lista para un contrato: los requisitos con proyecto "*" se
 // repiten por cada frente ("Requisito — Frente"); sin frentes, quedan como

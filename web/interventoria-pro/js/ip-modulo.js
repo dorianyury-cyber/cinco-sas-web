@@ -8,7 +8,7 @@ import {
   db, storage, iniciarPagina, pintarEncabezado, esc, moneda, numero, fecha, fechaCorta, mesCorto, mesLargo, mesesDelContrato,
   mostrarAlerta, limpiarAlerta, errorAmigable, aplicarAnchos, abrirModal, cerrarModal, imgModulo
 } from "./ip-core.js";
-import { MODULOS, nombreCapitulo } from "./ip-modulos.js";
+import { MODULOS, nombreCapitulo, textoOpcion } from "./ip-modulos.js";
 import { GUIAS } from "./ip-guias.js";
 import { anotarEnLote, diferencias, identificar, refHistorial, fechaHora, ACCIONES } from "./ip-historial.js";
 import { configurarImportacion } from "./ip-importar.js";
@@ -110,7 +110,7 @@ function iniciarModulo({ user, perfil, contrato, puede }) {
       case "persona": return esc((ctx.datos.personal || []).find((p) => p.id === v)?.nombre || "-");
       case "frente": return esc(v);
       case "url": return `<a href="${esc(v)}" target="_blank" rel="noopener" class="ip-link-celda">🔗 Abrir</a>`;
-      case "select": return esc(campo.opcionesObj ? nombreCapitulo(v) : v);
+      case "select": return esc(textoOpcion(campo, v));
       default: return esc(v);
     }
   }
@@ -220,7 +220,7 @@ function iniciarModulo({ user, perfil, contrato, puede }) {
 
     limpiarAlerta(formAlerta);
     document.getElementById("ipFormTitulo").textContent = registro ? `Editar — ${mod.label}` : `Nuevo — ${mod.label}`;
-    formCampos.innerHTML = mod.campos.map((c) => htmlCampo(c, registro ? registro[c.key] : (c.porDefecto ? c.porDefecto() : ""), { contrato, personal: ctx.datos.personal })).join("");
+    formCampos.innerHTML = mod.campos.map((c) => htmlCampo(c, registro ? registro[c.key] : (c.porDefecto ? c.porDefecto() : ""), { contrato, personal: ctx.datos.personal, registro })).join("");
     eliminarBtn.classList.toggle("hidden", !registro || !esGestor);
     pintarHistorialRegistro(registro);
     // Tomar foto / elegir de galería, ya comprimidas al elegirlas.
@@ -367,17 +367,17 @@ function iniciarModulo({ user, perfil, contrato, puede }) {
       const existentes = new Set(ctx.registros.map((r) => String(r[clave] || "").trim()));
       const nuevos = listaBase.filter((p) => !existentes.has(p[clave].trim()));
       // Vista previa de toda la lista base: qué se agregaría y qué ya está.
-      const cols = ["categoria", "requisito", "proyecto", "responsable", "soporte"].filter((k) => listaBase.some((p) => p[k]));
-      const etiqueta = (k) => mod.campos.find((c) => c.key === k)?.label || { categoria: "Categoría", requisito: "Requisito", proyecto: "Proyecto / frente", responsable: "Responsable", soporte: "Soporte" }[k];
+      const cols = (mod.plantillaColumnas || ["categoria", "requisito", "proyecto", "responsable", "soporte"]).filter((k) => listaBase.some((p) => p[k] != null && p[k] !== ""));
+      const etiqueta = (k) => mod.campos.find((c) => c.key === k)?.label || k;
       mostrarTabla({
         titulo: `Lista base — ${tituloModulo}`,
         nota: nuevos.length
-          ? `${listaBase.length} requisito(s) en la lista base: ${nuevos.length} se agregarían y ${listaBase.length - nuevos.length} ya están en el contrato (en gris; no se duplican). Después de cargarla puedes editar cada requisito o marcarlo «No aplica».`
-          : `Los ${listaBase.length} requisito(s) de la lista base ya están en este contrato.`,
+          ? `${listaBase.length} ítem(s) en la lista base: ${nuevos.length} se agregarían y ${listaBase.length - nuevos.length} ya están en el contrato (en gris; no se duplican). Después de cargarla puedes editar cada ítem o marcarlo «No aplica».`
+          : `Los ${listaBase.length} ítem(s) de la lista base ya están en este contrato.`,
         columnas: ["", ...cols.map(etiqueta)],
-        filas: listaBase.map((p) => [existentes.has(p[clave].trim()) ? "Ya está" : "Nuevo", ...cols.map((k) => p[k] || "")]),
+        filas: listaBase.map((p) => [existentes.has(p[clave].trim()) ? "Ya está" : "Nuevo", ...cols.map((k) => String(p[k] ?? ""))]),
         marcar: (f) => (f[0] === "Ya está" ? "ip-visor-existente" : ""),
-        accion: nuevos.length ? { texto: `Agregar ${nuevos.length} requisito(s)`, fn: () => cargarLista(nuevos) } : null
+        accion: nuevos.length ? { texto: `Agregar ${nuevos.length} ítem(s)`, fn: () => cargarLista(nuevos) } : null
       });
     });
     async function cargarLista(nuevos) {
@@ -386,7 +386,7 @@ function iniciarModulo({ user, perfil, contrato, puede }) {
       try {
         for (let i = 0; i < nuevos.length; i += 400) {
           const lote = writeBatch(db);
-          if (i === 0) anotarEnLote(lote, contrato.id, { user, perfil, modulo: mod.id, moduloLabel: tituloModulo, accion: "lista", resumen: `${nuevos.length} requisito(s) agregados desde la lista base` });
+          if (i === 0) anotarEnLote(lote, contrato.id, { user, perfil, modulo: mod.id, moduloLabel: tituloModulo, accion: "lista", resumen: `${nuevos.length} ítem(s) agregados desde la lista base` });
           nuevos.slice(i, i + 400).forEach((p) => {
             const base = {};
             mod.campos.forEach((c) => { if (c.porDefecto) base[c.key] = c.porDefecto(); });
@@ -418,7 +418,7 @@ function iniciarModulo({ user, perfil, contrato, puede }) {
   document.getElementById("ipExcelBtn").addEventListener("click", async () => {
     const ExcelJS = window.ExcelJS;
     if (!ExcelJS) { alert("No se pudo cargar el generador de Excel."); return; }
-    const campos = mod.campos.filter((c) => !["imagen", "avance", "fotos", "documentos"].includes(c.type));
+    const campos = mod.campos.filter((c) => !["imagen", "avance", "fotos", "documentos", "periodos"].includes(c.type));
     const wb = new ExcelJS.Workbook();
     const ws = wb.addWorksheet(mod.label.slice(0, 31));
     ws.columns = [...campos.map((c) => ({ header: c.label, key: c.key })), ...(mod.validar ? [{ header: "Validación", key: "_estado" }] : [])];
@@ -429,7 +429,7 @@ function iniciarModulo({ user, perfil, contrato, puede }) {
         if (v == null || v === "") { fila[c.key] = ""; return; }
         if (["money", "number", "pct"].includes(c.type)) fila[c.key] = Number(v);
         else if (c.type === "persona") fila[c.key] = (ctx.datos.personal || []).find((p) => p.id === v)?.nombre || "";
-        else if (c.opcionesObj) fila[c.key] = nombreCapitulo(v);
+        else if (c.opcionesObj) fila[c.key] = textoOpcion(c, v);
         else fila[c.key] = String(v);
       });
       if (mod.validar) fila._estado = mod.validar(r, ctx).texto;

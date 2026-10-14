@@ -14,10 +14,22 @@ export const GUIAS = {
       "Carga la lista base con el botón «Cargar lista base» y ajústala a lo que exige el contrato (agrega, edita o marca «No aplica»).",
       "A medida que el contratista o la entidad entregan cada soporte, cambia el estado a «Recibido» y, una vez revisado, a «Aprobado» o «Con observaciones».",
       "Anota la fecha de verificación y el enlace a la evidencia para dejar trazabilidad.",
+      "En «Fuente» y «Soporte» deja de qué documento sale cada exigencia y su cláusula o numeral exacto (contrato, términos de referencia, contrato de interventoría, manual del contratante, norma).",
       "Firma el acta solo cuando el cumplimiento llegue al 100 % (todo «Aprobado» o «No aplica»)."
     ],
     automatico: "Calcula el porcentaje de cumplimiento total y por categoría, y avisa si el acta de inicio se registró en la cronología con requisitos aún sin aprobar.",
     ejemplo: "Ej.: garantías aprobadas por la entidad, hojas de vida del personal ofertado, plan de calidad aprobado, cuenta conjunta del anticipo."
+  },
+  actuaciones: {
+    que: "Lo que la propia interventoría debe hacer y cuándo, desde la designación hasta el cierre: actuaciones únicas (con inicio y fin), hitos (fechas clave), periódicas (comités, visitas, informe mensual, actas de pago) y eventuales (cuando se presenten).",
+    como: [
+      "Carga el plan base con «Ver y cargar lista base» o importa el plan del contrato desde Excel (el ítem identifica cada actuación y evita duplicados).",
+      "Ponle fechas a cada actuación; en las periódicas elige la frecuencia y, si aplica, el día límite del mes (ej. 7 para un informe que se entrega dentro de los primeros 7 días).",
+      "En «Dónde se registra» elige el módulo que guarda el dato y la evidencia: desde la tabla se abre con un clic, para no registrar lo mismo dos veces.",
+      "Cuando se cumpla una única o un hito, márcala «Cumplida» con su fecha; en las periódicas marca cada vencimiento cumplido."
+    ],
+    automatico: "Genera los vencimientos de las periódicas, avisa en Inicio lo vencido y lo que vence pronto, calcula el cumplimiento de las periódicas y dibuja la curva S del plan con lo cumplido (sin porcentajes estimados). El informe mensual trae una sección con lo que vencía en el mes.",
+    ejemplo: "Ej.: aprobar el plan de calidad antes del acta de inicio (única), asistir a la FAT del transformador (hito), comité de obra (semanal), informe mensual a más tardar el día 7 (mensual)."
   },
   cronologia: {
     que: "La línea de tiempo de los hitos administrativos del contrato.",

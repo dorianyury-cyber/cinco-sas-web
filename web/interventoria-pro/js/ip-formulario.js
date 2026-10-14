@@ -1,7 +1,8 @@
 // Formulario de un registro a partir de los campos de un módulo
 // (ip-modulos.js). Lo usan la página de módulo (modulo.html) y el
 // Registro en campo (campo.html), para que ambos pidan y guarden igual.
-import { esc, mesCorto, mesesDelContrato } from "./ip-core.js";
+import { esc, mesCorto, mesesDelContrato, fechaCorta, hoyISO, sumarDiasISO } from "./ip-core.js";
+import { periodosActuacion } from "./ip-modulos.js";
 
 export function frentesContrato(contrato) {
   return String(contrato?.frentes || "").split(/[\n,;]+/).map((x) => x.trim()).filter(Boolean);
@@ -14,7 +15,7 @@ function opcionesPersona(personal, valor) {
 
 // camara: en el celular ofrece "Tomar foto" (abre la cámara) además de
 // elegir una de la galería.
-export function htmlCampo(c, valor, { contrato, personal = [], camara = false } = {}) {
+export function htmlCampo(c, valor, { contrato, personal = [], camara = false, registro = null } = {}) {
   const id = `f_${c.key}`;
   const req = c.required ? "required" : "";
   const v = valor ?? "";
@@ -94,9 +95,20 @@ export function htmlCampo(c, valor, { contrato, personal = [], camara = false } 
           <input type="number" min="0" max="100" step="0.1" data-avance-mes="${ym}" value="${esc(v?.[ym] ?? "")}"></label>`).join("")}</div>`;
       break;
     }
+    // Vencimientos de una actuación periódica: una casilla por vencimiento
+    // hasta un mes adelante (los ya marcados se ven siempre).
+    case "periodos": {
+      const hechos = new Set(Array.isArray(v) ? v : []);
+      const limite = sumarDiasISO(hoyISO(), 31);
+      const fechas = registro ? periodosActuacion(registro).filter((f) => f <= limite || hechos.has(f)) : [];
+      control = fechas.length
+        ? `<div class="ip-periodos">${fechas.slice().reverse().map((f) => `<label class="ip-periodo ${!hechos.has(f) && f < hoyISO() ? "ip-periodo-vencido" : ""}"><input type="checkbox" data-periodo="${f}" ${hechos.has(f) ? "checked" : ""}> ${fechaCorta(f)}</label>`).join("")}</div>`
+        : `<p class="text-muted ip-sin-margen">${registro?.tipo === "Periódica" ? "Aún no hay vencimientos (revisa frecuencia y fechas, y guarda)." : "Aplica solo a actuaciones periódicas con frecuencia y fechas guardadas."}</p>`;
+      break;
+    }
     default: control = `<input type="text" id="${id}" value="${esc(v)}" ${req} placeholder="${esc(c.placeholder || "")}">`;
   }
-  return `<div class="ip-campo ${c.ancho || ["textarea", "avance", "imagen", "fotos", "documentos"].includes(c.type) ? "ip-campo-ancho" : ""}">
+  return `<div class="ip-campo ${c.ancho || ["textarea", "avance", "imagen", "fotos", "documentos", "periodos"].includes(c.type) ? "ip-campo-ancho" : ""}">
     <label for="${id}">${esc(c.label)}${c.required ? " *" : ""}</label>${control}
     ${c.ayuda ? `<p class="text-muted ip-ayuda">${esc(c.ayuda)}</p>` : ""}</div>`;
 }
@@ -271,6 +283,12 @@ export function leerFormulario(campos, contenedor) {
         if (inp.value !== "") mapa[inp.dataset.avanceMes] = Math.min(100, Math.max(0, Number(inp.value)));
       });
       datos[c.key] = mapa;
+      continue;
+    }
+    if (c.type === "periodos") {
+      // Sin casillas en pantalla (no es periódica): no se toca lo guardado.
+      const cajas = [...contenedor.querySelectorAll("[data-periodo]")];
+      if (cajas.length) datos[c.key] = cajas.filter((x) => x.checked).map((x) => x.dataset.periodo).sort();
       continue;
     }
     const el = contenedor.querySelector(`#f_${c.key}`);

@@ -15,7 +15,7 @@
 import { doc, writeBatch, serverTimestamp } from "https://www.gstatic.com/firebasejs/10.7.1/firebase-firestore.js";
 import { db, esc, mesCorto, mesesDelContrato, abrirModal, cerrarModal, mostrarAlerta, limpiarAlerta, errorAmigable } from "./ip-core.js";
 import { anotarEnLote, diferencias, identificar } from "./ip-historial.js";
-import { nombreCapitulo } from "./ip-modulos.js";
+import { nombreCapitulo, textoOpcion } from "./ip-modulos.js";
 import { mostrarLibro } from "./ip-visor.js";
 
 const sinTildes = (t) => String(t ?? "").normalize("NFD").replace(/[̀-ͯ]/g, "").toLowerCase().replace(/\s+/g, " ").trim();
@@ -26,7 +26,7 @@ const cedulaNorm = (t) => String(t ?? "").replace(/[^\dA-Za-z]/g, "");
 function columnasImportables(mod, contrato) {
   const cols = [];
   for (const c of mod.campos) {
-    if (["imagen", "fotos", "documentos"].includes(c.type)) continue;
+    if (["imagen", "fotos", "documentos", "periodos"].includes(c.type)) continue;
     if (c.type === "avance") {
       mesesDelContrato(contrato).forEach((ym) => cols.push({ ...c, key: `${c.key}.${ym}`, label: `Avance ${mesCorto(ym)} (%)`, type: "pctMes", padre: c.key, ym }));
       continue;
@@ -221,7 +221,13 @@ export async function leerArchivo(archivo, { mod, contrato, frentes, personal, e
         }
         case "frente": {
           if (!texto) { v = ""; break; }
+          // Exacto o, si no, el único frente que contiene el texto (ej.
+          // «Seboruco» → «SE Seboruco»).
           v = frentesNorm.get(sinTildes(texto));
+          if (!v) {
+            const parecidos = [...frentesNorm.entries()].filter(([k]) => k.includes(sinTildes(texto)) || sinTildes(texto).includes(k));
+            if (parecidos.length === 1) v = parecidos[0][1];
+          }
           if (!v) { errores.push(`${c.label}: «${texto}» no es un frente del contrato`); v = ""; }
           break;
         }
@@ -338,7 +344,7 @@ export function configurarImportacion({ mod, contrato, ctx, user, perfil, colecc
         const campo = mod.campos.find((x) => x.key === c.key) || {};
         const v = f.datos[c.key];
         if (campo.type === "persona") return (ctx.datos.personal || []).find((p) => p.id === v)?.nombre || "";
-        if (campo.opcionesObj) return nombreCapitulo(v);
+        if (campo.opcionesObj) return textoOpcion(campo, v);
         return v ?? "";
       };
       previa.innerHTML = `

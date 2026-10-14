@@ -13,8 +13,8 @@
 // comprimida a Storage) y avance (avance acumulado % mes a mes del
 // contrato).
 
-import { esc, moneda, numero, fecha, mesCorto, hoyISO, mesActual, diasEntre, mesesDelContrato } from "./ip-core.js";
-import { LISTA_ACTA_INICIO, CATEGORIAS_ACTA, expandirPorFrentes } from "./ip-plantillas.js";
+import { esc, moneda, numero, fecha, fechaCorta, mesCorto, hoyISO, mesActual, diasEntre, mesesDelContrato } from "./ip-core.js";
+import { LISTA_ACTA_INICIO, CATEGORIAS_ACTA, FUENTES_REQUISITO, expandirPorFrentes, PLAN_ACTUACIONES, FASES_PLAN, TIPOS_ACTUACION, FRECUENCIAS } from "./ip-plantillas.js";
 
 // ------------------------------------------------------------ utilidades
 
@@ -193,6 +193,97 @@ export function avancePonderado(actividades) {
   return { real: Math.round(real * 10) / 10, programado: Math.round(prog * 10) / 10 };
 }
 
+// ------------------------------------------------------------ plan de actuaciones
+// Única / Hito: se cumplen una vez (estado + fecha). Periódica: el aplicativo
+// genera cada vencimiento según la frecuencia y se marca cumplido cada uno.
+// Eventual: cuando se presente, sin vencimientos.
+const esPeriodica = (r) => r.tipo === "Periódica";
+const esEventual = (r) => String(r.tipo || "").startsWith("Eventual");
+const fechaISO = (d) => `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}-${String(d.getDate()).padStart(2, "0")}`;
+function diaDelMes(a, m, dia) {
+  const ultimo = new Date(a, m + 1, 0).getDate();
+  return fechaISO(new Date(a, m, Math.min(Number(dia) || ultimo, ultimo), 12));
+}
+// Vencimientos de una actuación periódica entre su inicio y su fin.
+export function periodosActuacion(r) {
+  if (!esPeriodica(r) || !r.fechaInicio || !r.fechaFin || r.fechaFin < r.fechaInicio) return [];
+  const out = [];
+  const paso = { Semanal: 7, Quincenal: 15 }[r.frecuencia];
+  if (paso) {
+    for (let f = sumarDias(r.fechaInicio, paso - 1); f <= r.fechaFin && out.length < 400; f = sumarDias(f, paso)) out.push(f);
+    return out;
+  }
+  const saltoMeses = r.frecuencia === "Trimestral" ? 3 : 1;
+  const [a0, m0] = r.fechaInicio.split("-").map(Number);
+  for (let k = 0; out.length < 400; k += saltoMeses) {
+    const d = new Date(a0, m0 - 1 + k + (saltoMeses === 3 ? 2 : 0), 1, 12);
+    const f = diaDelMes(d.getFullYear(), d.getMonth(), r.diaLimite);
+    if (f > r.fechaFin) break;
+    if (f >= r.fechaInicio) out.push(f);
+  }
+  return out;
+}
+// Cumplimiento de una periódica a una fecha de corte: vencimientos que ya
+// debían cumplirse, cuántos se marcaron y cuáles faltan.
+export function cumplimientoPeriodica(r, corte = hoyISO()) {
+  const hechos = new Set(r.cumplidos || []);
+  const esperados = periodosActuacion(r).filter((f) => f < corte || f === corte && hechos.has(f));
+  const faltan = esperados.filter((f) => !hechos.has(f));
+  const proximo = periodosActuacion(r).find((f) => f >= corte && !hechos.has(f)) || null;
+  return { esperados: esperados.length, cumplidos: esperados.length - faltan.length, faltan, proximo };
+}
+export function validarActuacion(r, corte = hoyISO()) {
+  if (r.estado === "No aplica") return { nivel: "ok", texto: "No aplica" };
+  if (esEventual(r)) return { nivel: "ok", texto: "Cuando se presente" };
+  if (esPeriodica(r)) {
+    if (!r.fechaInicio || !r.fechaFin || !r.frecuencia) return { nivel: "warn", texto: "Sin fechas" };
+    const c = cumplimientoPeriodica(r, corte);
+    if (c.faltan.length) return { nivel: "danger", texto: `${c.faltan.length} sin cumplir` };
+    if (c.proximo && diasEntre(corte, c.proximo) <= 7) return { nivel: "warn", texto: `Vence ${fechaCorta(c.proximo).slice(0, 5)}` };
+    return { nivel: "ok", texto: c.esperados ? "Al día" : "Programada" };
+  }
+  if (r.estado === "Cumplida") return { nivel: "ok", texto: "Cumplida" };
+  if (!r.fechaFin) return { nivel: "warn", texto: "Sin fechas" };
+  if (r.fechaFin < corte) return { nivel: "danger", texto: "Vencida" };
+  const dias = diasEntre(corte, r.fechaFin);
+  if (dias <= 15) return { nivel: "warn", texto: dias ? `Vence en ${dias} d` : "Vence hoy" };
+  if ((r.fechaInicio || r.fechaFin) <= corte) return { nivel: "warn", texto: r.estado === "En curso" ? "En curso" : "Por iniciar" };
+  return { nivel: "ok", texto: "Programada" };
+}
+function mesesEntre(desde, hasta) {
+  const out = [];
+  let [a, m] = desde.slice(0, 7).split("-").map(Number);
+  const fin = hasta.slice(0, 7);
+  while (out.length < 120) {
+    const ym = `${a}-${String(m).padStart(2, "0")}`;
+    if (ym > fin) break;
+    out.push(ym);
+    if (++m > 12) { m = 1; a++; }
+  }
+  return out;
+}
+// Curva S del plan: solo actuaciones únicas e hitos con fechas. Programado =
+// avance lineal entre inicio y fin, ponderado por su peso (o su duración);
+// ejecutado = lo cumplido (0 % o 100 %, sin porcentajes estimados).
+export function curvaPlan(actuaciones, hasta = mesActual()) {
+  const acts = actuaciones.filter((r) => ["Única", "Hito"].includes(r.tipo) && r.fechaFin && r.estado !== "No aplica");
+  if (!acts.length) return [];
+  const peso = (r) => Number(r.peso) || Math.max(1, diasEntre(r.fechaInicio || r.fechaFin, r.fechaFin) + 1);
+  const total = acts.reduce((s, r) => s + peso(r), 0);
+  const ini = acts.map((r) => r.fechaInicio || r.fechaFin).sort()[0];
+  const fin = acts.map((r) => r.fechaFin).sort().pop();
+  return mesesEntre(ini, fin).map((ym) => {
+    const corte = finDeMes(ym);
+    let prog = 0, ejec = 0;
+    acts.forEach((r) => {
+      const w = peso(r) / total;
+      prog += w * (avanceProgramado(r, corte) ?? 0);
+      if (r.estado === "Cumplida" && (r.fechaCumplida || r.fechaFin) <= corte) ejec += w * 100;
+    });
+    return { ym, programado: Math.round(prog * 10) / 10, ejecutado: ym <= hasta ? Math.round(ejec * 10) / 10 : null };
+  });
+}
+
 // Estado financiero: valor total (inicial + adiciones - reducciones),
 // ejecutado (actas/constancias de cumplimiento) y saldo.
 export function estadoFinanciero(contrato, movimientos) {
@@ -252,6 +343,11 @@ const CAPITULO_LABEL = {
 };
 export const CAPITULOS_OPCIONES = Object.entries(CAPITULO_LABEL).map(([valor, texto]) => ({ valor, texto }));
 export function nombreCapitulo(id) { return CAPITULO_LABEL[id] || id || "-"; }
+// Texto visible de una opción de lista (las de capítulo y las de módulo).
+export function textoOpcion(campo, v) {
+  if (!campo?.opcionesObj) return v;
+  return campo.opcionesObj.find((o) => o.valor === v)?.texto || nombreCapitulo(v);
+}
 
 // Menú lateral / pantalla de bienvenida: capítulos del informe en su orden
 // (la numeración es la del informe mensual). Dentro de cada capítulo, los
@@ -260,8 +356,8 @@ export function nombreCapitulo(id) { return CAPITULO_LABEL[id] || id || "-"; }
 // y al final observaciones y anexos. El orden del informe NO sale de aquí
 // (ip-informe-contenido.js tiene el suyo).
 export const CAPITULOS = [
-  { id: "administrativo", numero: "1", label: "Administrativo", icon: "🗂️", desc: "Información del contrato, acta de inicio, cronología de actas y anexos", items: [
-    { href: "contratos.html", label: "Información del contrato", foto: "info-contrato" }, { m: "actainicio" }, { m: "cronologia" }, { m: "observaciones", cap: "administrativo" }, { m: "anexos", cap: "administrativo" }
+  { id: "administrativo", numero: "1", label: "Administrativo", icon: "🗂️", desc: "Información del contrato, acta de inicio, plan de actuaciones, cronología de actas y anexos", items: [
+    { href: "contratos.html", label: "Información del contrato", foto: "info-contrato" }, { m: "actainicio" }, { m: "actuaciones" }, { m: "cronologia" }, { m: "observaciones", cap: "administrativo" }, { m: "anexos", cap: "administrativo" }
   ] },
   { id: "financiero", numero: "2", label: "Financiero", icon: "💰", desc: "Inversión del anticipo, estado financiero y actas de pago", items: [
     { m: "anticipo" }, { m: "financiero" }, { m: "observaciones", cap: "financiero" }, { m: "anexos", cap: "financiero" }
@@ -993,11 +1089,13 @@ export const MODULOS = {
     plantilla: LISTA_ACTA_INICIO,
     expandir: expandirPorFrentes,
     claveUnica: "requisito",
+    claveImport: "requisito",
     campos: [
       { key: "categoria", label: "Categoría", type: "select", opciones: CATEGORIAS_ACTA, required: true },
       { key: "proyecto", label: "Proyecto / frente", type: "frente" },
       { key: "requisito", label: "Requisito", type: "textarea", required: true, ancho: true },
-      { key: "soporte", label: "Soporte (numeral TDR / norma)", type: "text" },
+      { key: "fuente", label: "Fuente", type: "select", opciones: FUENTES_REQUISITO, ayuda: "De qué documento sale la exigencia." },
+      { key: "soporte", label: "Soporte (cláusula / numeral / norma)", type: "text", ancho: true, ayuda: "Ubicación exacta en cada documento, ej. «Contrato cl. 12 · TDR 4.5 · Manual art. 5-II-22»." },
       { key: "responsable", label: "Responsable", type: "select", opciones: ["Contratista", "Contratante", "Interventoría"], required: true },
       { key: "estado", label: "Estado", type: "select", opciones: ["Pendiente", "Recibido", "Con observaciones", "Aprobado", "No aplica"], required: true, porDefecto: () => "Pendiente" },
       { key: "fecha", label: "Fecha de recibo / verificación", type: "date" },
@@ -1039,6 +1137,86 @@ export const MODULOS = {
       return [];
     },
     necesita: ["cronologia"]
+  },
+
+  // ======================= 1. ADMINISTRATIVO — plan de actuaciones de la interventoría
+  actuaciones: {
+    label: "Plan de actuaciones de la interventoría", icon: "🧭", coleccion: "actuaciones", sinFiltroMes: true,
+    desc: "Lo que la interventoría debe hacer y cuándo, de la designación al cierre: actuaciones únicas, hitos, periódicas (comités, visitas, informe mensual) y eventuales. Cada una indica dónde se registra su dato y su evidencia.",
+    plantilla: PLAN_ACTUACIONES,
+    claveUnica: "actuacion",
+    claveImport: "item",
+    plantillaColumnas: ["item", "fase", "actuacion", "tipo", "frecuencia", "responsable", "entregable"],
+    campos: [
+      { key: "item", label: "Ítem", type: "number", required: true },
+      { key: "fase", label: "Fase", type: "select", opciones: FASES_PLAN, required: true },
+      { key: "actuacion", label: "Actuación", type: "textarea", required: true, ancho: true },
+      { key: "tipo", label: "Tipo", type: "select", opciones: TIPOS_ACTUACION, required: true, porDefecto: () => "Única", ayuda: "Única: se cumple una vez entre su inicio y su fin. Hito: fecha clave. Periódica: se repite (se marca cada vencimiento). Eventual: cuando se presente." },
+      { key: "frecuencia", label: "Frecuencia (si es periódica)", type: "select", opciones: FRECUENCIAS },
+      { key: "diaLimite", label: "Día límite del mes (mensual o trimestral)", type: "number", ayuda: "Ej. 7 si debe cumplirse a más tardar el día 7 de cada mes. Vacío = último día del mes." },
+      { key: "proyecto", label: "Proyecto / frente", type: "frente" },
+      { key: "fechaInicio", label: "Fecha de inicio", type: "date" },
+      { key: "fechaFin", label: "Fecha de terminación", type: "date", ayuda: "En las periódicas, hasta cuándo se repite." },
+      { key: "responsable", label: "Responsable (rol en la interventoría)", type: "text" },
+      { key: "entregable", label: "Producto / entregable", type: "text", ancho: true },
+      { key: "soporte", label: "Soporte (cláusula / numeral / norma)", type: "text", ancho: true },
+      { key: "registro", label: "Dónde se registra", type: "select", opcionesObj: [], ayuda: "Módulo donde queda el dato y la evidencia de esta actuación (se abre desde la tabla)." },
+      { key: "peso", label: "Peso en la curva S", type: "number", ayuda: "Solo cuentan las únicas e hitos. Vacío = pesa según su duración en días." },
+      { key: "estado", label: "Estado (única o hito)", type: "select", opciones: ["Pendiente", "En curso", "Cumplida", "No aplica"], required: true, porDefecto: () => "Pendiente" },
+      { key: "fechaCumplida", label: "Fecha en que se cumplió", type: "date" },
+      { key: "cumplidos", label: "Vencimientos cumplidos (periódica)", type: "periodos", ancho: true },
+      { key: "observacion", label: "Observación", type: "textarea", ancho: true }
+    ],
+    columnas: [
+      { key: "item", ancho: 5 }, { key: "actuacion", ancho: 40 }, { key: "tipo", ancho: 9, render: (r) => esc(esPeriodica(r) ? `${r.frecuencia || "Periódica"}` : esEventual(r) ? "Eventual" : r.tipo || "-") },
+      { key: "proyecto", label: "Frente", ancho: 8 },
+      { key: "fechaFin", label: "Fecha / próximo", ancho: 11, render: (r) => {
+        if (esPeriodica(r)) { const c = cumplimientoPeriodica(r); return c.proximo ? fechaCorta(c.proximo) : "-"; }
+        return r.fechaFin ? fechaCorta(r.fechaFin) : "-";
+      } },
+      { key: "responsable", ancho: 13 },
+      { key: "registro", label: "Registro", ancho: 10, render: (r) => (r.registro ? `<a href="${r.registro === "informe" ? "informe.html" : `modulo.html?m=${esc(r.registro)}`}" class="ip-link-celda">${esc(nombreRegistro(r.registro))} →</a>` : "-") }
+    ],
+    orden: { key: "item", dir: 1, numerico: true },
+    validar(r) { return validarActuacion(r); },
+    resumen(ctx) {
+      if (!ctx.registros.length) return "";
+      const hoy = hoyISO();
+      const unicas = ctx.registros.filter((r) => ["Única", "Hito"].includes(r.tipo) && r.estado !== "No aplica");
+      const cumplidas = unicas.filter((r) => r.estado === "Cumplida").length;
+      const vencidas = unicas.filter((r) => validarActuacion(r).texto === "Vencida").length;
+      let esp = 0, hechos = 0;
+      ctx.registros.filter(esPeriodica).forEach((r) => { const c = cumplimientoPeriodica(r); esp += c.esperados; hechos += c.cumplidos; });
+      const proximas = ctx.registros.map((r) => {
+        if (r.estado === "No aplica" || esEventual(r)) return null;
+        const f = esPeriodica(r) ? cumplimientoPeriodica(r).proximo : r.estado === "Cumplida" ? null : r.fechaFin;
+        return f && f >= hoy && diasEntre(hoy, f) <= 15 ? { r, f } : null;
+      }).filter(Boolean).sort((a, b) => a.f.localeCompare(b.f));
+      const puntos = curvaPlan(ctx.registros);
+      const tablaProx = proximas.length
+        ? `<div class="tabla-scroll"><table class="tabla-compacta ip-matriz"><thead><tr><th>Fecha</th><th>Actuación</th><th>Responsable</th></tr></thead><tbody>${proximas.map((x) => `<tr><td>${fechaCorta(x.f)}</td><td>${esc(x.r.actuacion)}</td><td>${esc(x.r.responsable || "-")}</td></tr>`).join("")}</tbody></table></div>`
+        : `<p class="text-muted ip-sin-margen">Nada vence en los próximos 15 días.</p>`;
+      return tarjetas([
+        { icon: "🏁", valor: `${cumplidas}/${unicas.length}`, label: "Únicas e hitos cumplidos", cinta: 3 },
+        { icon: "⏰", valor: vencidas, label: "Únicas e hitos vencidos", cinta: 1 },
+        { icon: "🔁", valor: esp ? `${Math.round((hechos / esp) * 100)}%` : "–", label: `Cumplimiento de periódicas (${hechos} de ${esp} vencimientos)`, cinta: 0 },
+        { icon: "📅", valor: proximas.length, label: "Vencen en los próximos 15 días", cinta: 2 }
+      ]) + `<div class="card"><h2>Próximos 15 días</h2>${tablaProx}</div>`
+        + (puntos.length ? `<div class="card"><h2>Curva S del plan — únicas e hitos (programado vs. cumplido)</h2><div class="ip-curva-s">${svgCurvaS(puntos)}</div></div>` : "");
+    },
+    alertas(ctx) {
+      if (!ctx.registros.length) return [{ nivel: "warn", texto: "No se ha cargado el plan de actuaciones de la interventoría." }];
+      const out = [];
+      const val = ctx.registros.map((r) => ({ r, v: validarActuacion(r) }));
+      const nombres = (xs) => xs.slice(0, 3).map((x) => `«${String(x.r.actuacion).slice(0, 60)}»`).join(", ") + (xs.length > 3 ? "…" : "");
+      const venc = val.filter((x) => x.v.texto === "Vencida");
+      if (venc.length) out.push({ nivel: "danger", texto: `${venc.length} actuación(es) de la interventoría vencida(s): ${nombres(venc)}.` });
+      const sinCumplir = val.filter((x) => esPeriodica(x.r) && x.v.nivel === "danger");
+      if (sinCumplir.length) out.push({ nivel: "danger", texto: `${sinCumplir.length} actuación(es) periódica(s) con vencimientos sin cumplir: ${nombres(sinCumplir)}.` });
+      const pronto = val.filter((x) => x.v.nivel === "warn" && /^Vence/.test(x.v.texto));
+      if (pronto.length) out.push({ nivel: "warn", texto: `${pronto.length} actuación(es) vencen pronto: ${nombres(pronto)}.` });
+      return out;
+    }
   },
 
   // ======================= 3. JURÍDICO — requerimientos e incumplimientos
@@ -1254,6 +1432,15 @@ export const MODULOS = {
 };
 
 Object.entries(MODULOS).forEach(([id, m]) => { m.id = id; });
+
+// "Dónde se registra" de cada actuación: cualquier módulo del contrato (sin
+// los de observaciones y anexos, que van por capítulo) o el informe mensual.
+const OPCIONES_REGISTRO = [
+  ...Object.values(MODULOS).filter((m) => !m.porCapitulo && m.id !== "actuaciones").map((m) => ({ valor: m.id, texto: m.label })),
+  { valor: "informe", texto: "Informe mensual" }
+].sort((a, b) => a.texto.localeCompare(b.texto, "es"));
+MODULOS.actuaciones.campos.find((c) => c.key === "registro").opcionesObj = OPCIONES_REGISTRO;
+export function nombreRegistro(v) { return OPCIONES_REGISTRO.find((o) => o.valor === v)?.texto || v || "-"; }
 
 // Fotos de evidencia en todos los módulos (pedido del usuario): desde el
 // computador o desde el celular (tomar foto o elegir de la galería). El

@@ -28,6 +28,7 @@ export function textoValor(campo, v, personal = []) {
     case "imagen": return "(foto)";
     case "fotos": return v.length ? `${v.length} foto(s)` : "—";
     case "documentos": return v.length ? v.map((d) => d.nombre).join(", ") : "—";
+    case "periodos": return v.length ? `${v.length} vencimiento(s) cumplido(s)` : "—";
     case "avance": return Object.entries(v || {}).sort().map(([m, x]) => `${m}: ${x} %`).join(" · ") || "—";
     default: return String(v);
   }
@@ -60,7 +61,7 @@ export function anotarEnLote(lote, contratoId, { user, perfil, modulo, moduloLab
 
 // Texto corto que identifica un registro (para el resumen del historial).
 export function identificar(mod, r = {}) {
-  const preferidos = ["requisito", "documento", "equipo", "descripcion", "nombre", "actividad", "obligacion", "amparo", "indicador", "riesgo", "tema", "concepto", "observacion", "texto", "componente", "trabajo", "norma"];
+  const preferidos = ["requisito", "actuacion", "documento", "equipo", "descripcion", "nombre", "actividad", "obligacion", "amparo", "indicador", "riesgo", "tema", "concepto", "observacion", "texto", "componente", "trabajo", "norma"];
   const k = preferidos.find((p) => r[p]);
   const base = k ? String(r[k]) : "";
   const f = r.fecha || r.mes || "";

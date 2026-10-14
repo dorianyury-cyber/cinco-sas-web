@@ -88,6 +88,11 @@ export function hoyISO() {
 export function mesActual() {
   return hoyISO().slice(0, 7);
 }
+export function sumarDiasISO(iso, dias) {
+  const d = new Date(`${iso}T12:00:00`);
+  d.setDate(d.getDate() + dias);
+  return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}-${String(d.getDate()).padStart(2, "0")}`;
+}
 export function diasEntre(desdeISO, hastaISO) {
   const a = new Date(`${desdeISO}T12:00:00`);
   const b = new Date(`${hastaISO}T12:00:00`);

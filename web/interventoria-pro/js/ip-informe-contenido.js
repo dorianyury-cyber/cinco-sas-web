@@ -20,9 +20,15 @@
 import { moneda, numero, fecha, mesCorto, mesLargo, mesesDelContrato, diasEntre } from "./ip-core.js";
 import {
   MODULOS, curvaS, svgCurvaS, estadoFinanciero, indicadoresSST, INDICADORES_SST,
-  activoEnMes, avanceReal, inicioActividad
+  activoEnMes, avanceReal, inicioActividad, periodosActuacion, cumplimientoPeriodica, validarActuacion, curvaPlan
 } from "./ip-modulos.js";
 
+// Día siguiente (los vencimientos del día de corte cuentan como debidos).
+function sumarDia(iso) {
+  const d = new Date(`${iso}T12:00:00`);
+  d.setDate(d.getDate() + 1);
+  return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}-${String(d.getDate()).padStart(2, "0")}`;
+}
 export function finDeMes(ym) {
   const [a, m] = ym.split("-").map(Number);
   return `${ym}-${String(new Date(a, m, 0).getDate()).padStart(2, "0")}`;
@@ -170,6 +176,34 @@ export async function construirInforme({ contrato, ym, datos, elaboradoPor, carg
       tabla(["Categoría", "Requisito", "Frente", "Responsable", "Estado"],
         [...regs].sort((a, c) => String(a.categoria).localeCompare(String(c.categoria), "es", { numeric: true })).map((r) => [r.categoria, r.requisito, r.proyecto || "-", r.responsable || "-", r.estado || "Pendiente"]),
         { titulo: "Requisitos del acta de inicio", tam: 13 }, "Sin lista de requisitos del acta de inicio.");
+    }],
+    ["actuaciones", async () => {
+      H2("Plan de actuaciones de la interventoría");
+      const regs = [...(datos.actuaciones || [])].filter((r) => r.estado !== "No aplica").sort((a, c) => (Number(a.item) || 0) - (Number(c.item) || 0));
+      if (!regs.length) { nota("Sin plan de actuaciones registrado."); return; }
+      const unicas = regs.filter((r) => ["Única", "Hito"].includes(r.tipo));
+      const debidas = unicas.filter((r) => r.fechaFin && r.fechaFin <= corte);
+      const cumplidasAlCorte = debidas.filter((r) => r.estado === "Cumplida" && (r.fechaCumplida || r.fechaFin) <= corte);
+      let esp = 0, hechos = 0;
+      regs.filter((r) => r.tipo === "Periódica").forEach((r) => { const c = cumplimientoPeriodica(r, sumarDia(corte)); esp += c.esperados; hechos += c.cumplidos; });
+      P(`Al corte de ${mesLargo(ym)}, la interventoría cumplió ${cumplidasAlCorte.length} de ${debidas.length} actuaciones únicas e hitos que debían estar cumplidos${esp ? ` y ${hechos} de ${esp} vencimientos de sus actuaciones periódicas (${Math.round((hechos / esp) * 100)} %)` : ""}.`);
+      // Lo que vencía en el mes: únicas e hitos que terminaban en el mes y vencimientos periódicos del mes.
+      const filas = [];
+      unicas.filter((r) => String(r.fechaFin || "").startsWith(ym)).forEach((r) => filas.push([r.actuacion, r.tipo, fecha(r.fechaFin), r.estado === "Cumplida" ? `Cumplida${r.fechaCumplida ? ` (${fecha(r.fechaCumplida)})` : ""}` : validarActuacion(r, sumarDia(corte)).texto, r.responsable || "-"]));
+      regs.filter((r) => r.tipo === "Periódica").forEach((r) => {
+        const delMes = periodosActuacion(r).filter((f) => f.startsWith(ym));
+        if (!delMes.length) return;
+        const ok = delMes.filter((f) => (r.cumplidos || []).includes(f)).length;
+        filas.push([r.actuacion, `Periódica (${(r.frecuencia || "").toLowerCase()})`, delMes.map((f) => f.slice(8)).join(", "), `${ok} de ${delMes.length} cumplido(s)`, r.responsable || "-"]);
+      });
+      tabla(["Actuación", "Tipo", "Fecha(s)", "Cumplimiento", "Responsable"], filas, { titulo: `Actuaciones de la interventoría con vencimiento en ${mesLargo(ym)}`, anchos: [44, 13, 13, 16, 14], tam: 13 }, "Sin actuaciones con vencimiento en el periodo.");
+      const puntos = curvaPlan(regs, ym);
+      if (puntos.length) {
+        try {
+          const png = await svgADataUrl(svgCurvaS(puntos, { ancho: 760, alto: 320 }));
+          b.push({ tipo: "imagen", dataUrl: png.dataUrl, url: png.dataUrl, ancho: png.ancho, alto: png.alto, tamano: 100, nombre: `Curva S del plan de actuaciones (únicas e hitos): programado contra cumplido a ${mesLargo(ym)}` });
+        } catch (e) { nota("No se pudo dibujar la curva S del plan."); }
+      }
     }],
     ["cronologia", () => {
       H2("Resumen cronológico de actividades administrativas");
