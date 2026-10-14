@@ -20,7 +20,7 @@
 import { moneda, numero, fecha, mesCorto, mesLargo, mesesDelContrato, diasEntre } from "./ip-core.js";
 import {
   MODULOS, curvaS, svgCurvaS, estadoFinanciero, indicadoresSST, INDICADORES_SST,
-  activoEnMes, avanceReal, inicioActividad, frentesDeActividades, actividadesConItems, valorItem, ejecutadoItem, periodosActuacion, cumplimientoPeriodica, validarActuacion, curvaPlan
+  activoEnMes, avanceReal, inicioActividad, frentesDeActividades, actividadesConItems, valorItem, ejecutadoItem, periodosActuacion, cumplimientoPeriodica, validarActuacion, curvaPlan, nivelRiesgo
 } from "./ip-modulos.js";
 
 // Día siguiente (los vencimientos del día de corte cuentan como debidos).
@@ -449,9 +449,15 @@ export async function construirInforme({ contrato, ym, datos, elaboradoPor, carg
   // ================================================================ 9. RIESGOS
   await capitulo("Seguimiento a la matriz de riesgos", [
     ["riesgos", () => {
-      tabla(["Ítem", "Riesgo", "Probabilidad", "Impacto", "Monitoreo y revisión", "Estado"],
-        [...(datos.riesgos || [])].sort((a, c) => (Number(a.item) || 0) - (Number(c.item) || 0)).map((r) => [String(r.item ?? ""), `${r.categoria}: ${r.riesgo}`, r.probabilidad, r.impacto, r.monitoreo || "-", r.estado || "-"]),
+      // Valoración: probabilidad + impacto (1 a 5 cada uno); inherente = antes
+      // del tratamiento, residual = después.
+      const nv = (p, i) => { const n = nivelRiesgo(p, i); return n ? `${n.valor} ${n.categoria}` : "-"; };
+      const lista = [...(datos.riesgos || [])].sort((a, c) => (Number(a.item) || 0) - (Number(c.item) || 0));
+      tabla(["N°", "Riesgo", "Inherente", "Tratamiento / control", "Residual", "Responsable", "Seguimiento de la interventoría", "Estado"],
+        lista.map((r) => [String(r.item ?? ""), `${r.categoria}: ${r.riesgo}`, nv(r.probabilidad, r.impacto), r.tratamiento || "-", nv(r.probResidual, r.impactoResidual), r.responsable || "-", r.seguimiento || r.monitoreo || "-", r.estado || "-"]),
         { titulo: "Matriz de riesgos", tam: 15 }, "Sin riesgos registrados en la matriz.");
+      const mat = lista.filter((r) => r.estado === "Materializado");
+      if (mat.length) P(`Riesgos materializados: ${mat.map((r) => `N° ${r.item} (${r.riesgo})`).join("; ")}.`);
     }]
   ]);
 

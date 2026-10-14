@@ -287,13 +287,13 @@ export const GUIAS = {
 
   // ---------------------------------------------------------------- Riesgos, fotos y calidad
   riesgos: {
-    que: "Los riesgos del contrato, su nivel y las medidas de monitoreo.",
+    que: "La matriz de riesgos del contrato (ej. el anexo de matriz de riesgos del proceso) y el seguimiento de la interventoría a cada riesgo.",
     como: [
-      "Registra cada riesgo con su categoría, probabilidad e impacto.",
-      "Define la medida de monitoreo y el responsable.",
-      "Revísalo periódicamente y actualiza su estado (abierto, mitigado, cerrado)."
+      "Carga la matriz del proceso con «Importar desde Excel» (una fila por riesgo, identificada por el N°) o registra cada riesgo a mano.",
+      "Por cada riesgo: clase, fuente, etapa, tipo, descripción, consecuencia, probabilidad e impacto (1 a 5), tratamiento, valoración después del tratamiento, responsable, cómo y cada cuánto se monitorea.",
+      "En cada revisión actualiza el estado (abierto, materializado, mitigado, cerrado), escribe el seguimiento de la interventoría y la fecha de la revisión."
     ],
-    automatico: "Calcula el nivel (probabilidad × impacto) y avisa los riesgos abiertos de nivel alto."
+    automatico: "Calcula la valoración (probabilidad + impacto) y su categoría: 2 a 4 bajo, 5 medio, 6 y 7 alto, 8 a 10 extremo, antes y después del tratamiento. El semáforo sigue el riesgo residual; avisa los materializados y los de nivel residual alto o extremo, y el informe mensual trae la matriz con su seguimiento."
   },
   fotos: {
     que: "La evidencia fotográfica de las actividades del periodo.",

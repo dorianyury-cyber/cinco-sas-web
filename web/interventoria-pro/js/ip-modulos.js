@@ -459,6 +459,26 @@ export const CAPITULOS = [
 
 // ------------------------------------------------------------ módulos
 
+// Valoración de riesgos (Colombia Compra Eficiente): probabilidad e impacto
+// de 1 a 5, valoración = suma; 2-4 bajo, 5 medio, 6-7 alto, 8-10 extremo.
+// Acepta también los valores antiguos del módulo (Alta/Media/Baja).
+export const PROBABILIDAD_RIESGO = [
+  { valor: "1", texto: "1 - Raro" }, { valor: "2", texto: "2 - Improbable" }, { valor: "3", texto: "3 - Posible" },
+  { valor: "4", texto: "4 - Probable" }, { valor: "5", texto: "5 - Casi cierto" }
+];
+export const IMPACTO_RIESGO = [
+  { valor: "1", texto: "1 - Insignificante" }, { valor: "2", texto: "2 - Menor" }, { valor: "3", texto: "3 - Moderado" },
+  { valor: "4", texto: "4 - Mayor" }, { valor: "5", texto: "5 - Catastrófico" }
+];
+const ESCALA_ANTIGUA = { alta: 4, alto: 4, media: 3, medio: 3, baja: 2, bajo: 2 };
+export function nivelRiesgo(p, i) {
+  const a = (x) => Number(x) || ESCALA_ANTIGUA[String(x || "").toLowerCase()] || 0;
+  const vp = a(p), vi = a(i);
+  if (!vp || !vi) return null;
+  const valor = vp + vi;
+  return { valor, categoria: valor <= 4 ? "Bajo" : valor === 5 ? "Medio" : valor <= 7 ? "Alto" : "Extremo" };
+}
+
 export const MODULOS = {
   // ======================= 1. ADMINISTRATIVO
   cronologia: {
@@ -1195,45 +1215,78 @@ export const MODULOS = {
   },
 
   // ======================= 8. RIESGOS
+  // Matriz con la metodología de Colombia Compra Eficiente (la que usan los
+  // anexos de matriz de riesgos de los procesos): probabilidad e impacto de
+  // 1 a 5, valoración = suma, categoría por rangos. Se registra el riesgo
+  // inherente (antes del tratamiento) y el residual (después del tratamiento);
+  // el semáforo sigue el residual, que es lo que la interventoría vigila.
   riesgos: {
     sinFiltroMes: true,
+    claveImport: "item",
     label: "Matriz de riesgos", icon: "🧭", coleccion: "riesgos",
-    desc: "Riesgos del contrato con su probabilidad, impacto, medida de monitoreo y responsable.",
+    desc: "Riesgos del contrato (ej. los del anexo de matriz de riesgos del proceso) con su valoración antes y después del tratamiento, el responsable, cómo se monitorea y el seguimiento de la interventoría.",
     campos: [
-      { key: "item", label: "Ítem", type: "number" },
-      { key: "categoria", label: "Categoría", type: "select", opciones: ["Regulatorio", "Técnico", "Financiero", "Operativo", "Seguridad y salud", "Ambiental", "Social", "Contractual", "Otro"], required: true },
-      { key: "riesgo", label: "Riesgo", type: "textarea", required: true, ancho: true },
-      { key: "probabilidad", label: "Probabilidad", type: "select", opciones: ["Alta", "Media", "Baja"], required: true },
-      { key: "impacto", label: "Impacto", type: "select", opciones: ["Alto", "Medio", "Bajo"], required: true },
-      { key: "monitoreo", label: "Monitoreo y revisión (medida)", type: "textarea", ancho: true },
-      { key: "responsable", label: "Responsable", type: "text" },
-      { key: "estado", label: "Estado", type: "select", opciones: ["Abierto", "Mitigado", "Cerrado"], porDefecto: () => "Abierto" },
+      { key: "item", label: "N°", type: "number", required: true },
+      { key: "clase", label: "Clase", type: "select", opciones: ["General", "Específico"] },
+      { key: "fuente", label: "Fuente", type: "select", opciones: ["Interno", "Externo"] },
+      { key: "etapa", label: "Etapa", type: "select", opciones: ["Planeación", "Selección", "Contratación", "Ejecución", "Liquidación o cierre"] },
+      { key: "categoria", label: "Tipo", type: "select", opciones: ["Operacional", "Natural", "Regulatorio", "Económico", "Financiero", "Técnico", "Seguridad y salud", "Ambiental", "Social", "Predial", "Tecnológico", "Contractual", "Otro"], required: true },
+      { key: "riesgo", label: "Descripción del riesgo", type: "textarea", required: true, ancho: true },
+      { key: "consecuencia", label: "Consecuencia de la ocurrencia", type: "textarea", ancho: true },
+      { key: "probabilidad", label: "Probabilidad", type: "select", opcionesObj: PROBABILIDAD_RIESGO, required: true },
+      { key: "impacto", label: "Impacto", type: "select", opcionesObj: IMPACTO_RIESGO, required: true },
+      { key: "asignado", label: "¿A quién se le asigna?", type: "text" },
+      { key: "tratamiento", label: "Tratamiento / control a implementar", type: "textarea", ancho: true },
+      { key: "probResidual", label: "Probabilidad después del tratamiento", type: "select", opcionesObj: PROBABILIDAD_RIESGO },
+      { key: "impactoResidual", label: "Impacto después del tratamiento", type: "select", opcionesObj: IMPACTO_RIESGO },
+      { key: "afectaEjecucion", label: "¿Afecta la ejecución del contrato?", type: "select", opciones: ["Sí", "No"] },
+      { key: "responsable", label: "Responsable de implementar el tratamiento", type: "text" },
+      { key: "inicioTratamiento", label: "Inicio del tratamiento", type: "text", ayuda: "Momento o fecha (ej. «Acta de inicio», «Desde que se detectan los hechos»)." },
+      { key: "finTratamiento", label: "Fin del tratamiento", type: "text", ayuda: "Momento o fecha (ej. «Liquidación del contrato»)." },
+      { key: "monitoreo", label: "¿Cómo se realiza el monitoreo?", type: "textarea", ancho: true },
+      { key: "periodicidad", label: "Periodicidad del monitoreo", type: "select", opciones: ["Diario", "Semanal", "Quincenal", "Mensual", "Trimestral", "Permanente", "Eventual", "Una vez ocurra el evento"] },
+      { key: "estado", label: "Estado", type: "select", opciones: ["Abierto", "Materializado", "Mitigado", "Cerrado"], porDefecto: () => "Abierto", ayuda: "Materializado: el evento ocurrió; registra en el seguimiento qué se hizo." },
+      { key: "seguimiento", label: "Seguimiento de la interventoría", type: "textarea", ancho: true, ayuda: "Qué se verificó en la última revisión, evidencias y acciones pendientes." },
       { key: "fechaRevision", label: "Última revisión", type: "date" }
     ],
-    columnas: [{ key: "item", ancho: 6 }, { key: "categoria", ancho: 14 }, { key: "riesgo", ancho: 40 }, { key: "probabilidad", ancho: 10 }, { key: "impacto", ancho: 10 }, { key: "estado", ancho: 10 }],
+    columnas: [
+      { key: "item", ancho: 4 },
+      { key: "categoria", ancho: 9 },
+      { key: "riesgo", ancho: 34 },
+      { key: "_inherente", label: "Inherente", ancho: 9, render: (r) => { const n = nivelRiesgo(r.probabilidad, r.impacto); return n ? `${n.valor} · ${n.categoria}` : "-"; } },
+      { key: "_residual", label: "Residual", ancho: 9, render: (r) => { const n = nivelRiesgo(r.probResidual, r.impactoResidual); return n ? `${n.valor} · ${n.categoria}` : "-"; } },
+      { key: "responsable", ancho: 14 },
+      { key: "periodicidad", ancho: 9 },
+      { key: "estado", ancho: 8 }
+    ],
     orden: { key: "item", dir: 1, numerico: true },
     validar(r) {
       if (r.estado === "Cerrado") return { nivel: "ok", texto: "Cerrado" };
-      const p = { Alta: 3, Media: 2, Baja: 1 }[r.probabilidad] || 1;
-      const i = { Alto: 3, Medio: 2, Bajo: 1 }[r.impacto] || 1;
-      const nivel = p * i;
-      if (nivel >= 6) return { nivel: "danger", texto: "Nivel alto" };
-      if (nivel >= 3) return { nivel: "warn", texto: "Nivel medio" };
-      return { nivel: "ok", texto: "Nivel bajo" };
+      if (r.estado === "Materializado") return { nivel: "danger", texto: "Materializado" };
+      const n = nivelRiesgo(r.probResidual, r.impactoResidual) || nivelRiesgo(r.probabilidad, r.impacto);
+      if (!n) return { nivel: "warn", texto: "Sin valorar" };
+      const nivel = n.categoria === "Bajo" ? "ok" : n.categoria === "Medio" ? "warn" : "danger";
+      return { nivel, texto: `Riesgo ${n.categoria.toLowerCase()}` };
     },
     resumen(ctx) {
       const abiertos = ctx.registros.filter((r) => r.estado !== "Cerrado");
-      const cuenta = (n) => abiertos.filter((r) => MODULOS.riesgos.validar(r).texto === n).length;
+      const cuenta = (t) => abiertos.filter((r) => MODULOS.riesgos.validar(r).texto === t).length;
       return tarjetas([
-        { icon: "🔴", valor: cuenta("Nivel alto"), label: "Riesgos de nivel alto", cinta: 1 },
-        { icon: "🟠", valor: cuenta("Nivel medio"), label: "Riesgos de nivel medio", cinta: 2 },
-        { icon: "🟢", valor: cuenta("Nivel bajo"), label: "Riesgos de nivel bajo", cinta: 3 },
+        { icon: "⛔", valor: cuenta("Riesgo extremo") + cuenta("Riesgo alto"), label: "Residual alto o extremo", cinta: 1 },
+        { icon: "🟠", valor: cuenta("Riesgo medio"), label: "Residual medio", cinta: 2 },
+        { icon: "🟢", valor: cuenta("Riesgo bajo"), label: "Residual bajo", cinta: 3 },
+        { icon: "⚡", valor: cuenta("Materializado"), label: "Materializados", cinta: 1 },
         { icon: "✔️", valor: ctx.registros.length - abiertos.length, label: "Cerrados", cinta: 0 }
       ]);
     },
     alertas(ctx) {
-      const n = ctx.registros.filter((r) => MODULOS.riesgos.validar(r).texto === "Nivel alto").length;
-      return n ? [{ nivel: "warn", texto: `${n} riesgo(s) abierto(s) de nivel alto en la matriz.` }] : [];
+      const v = ctx.registros.map((r) => MODULOS.riesgos.validar(r).texto);
+      const altos = v.filter((t) => t === "Riesgo alto" || t === "Riesgo extremo").length;
+      const mat = v.filter((t) => t === "Materializado").length;
+      return [
+        ...(mat ? [{ nivel: "danger", texto: `${mat} riesgo(s) materializado(s) en la matriz.` }] : []),
+        ...(altos ? [{ nivel: "warn", texto: `${altos} riesgo(s) con nivel residual alto o extremo en la matriz.` }] : [])
+      ];
     }
   },
 
