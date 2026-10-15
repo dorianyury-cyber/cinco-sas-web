@@ -2514,3 +2514,4 @@ textarea { font-family: inherit; }
 .ip-fotos-inf-item img { width: 100%; aspect-ratio: 4 / 3; object-fit: cover; border-radius: 6px; }
 .ip-fotos-inf-item input { position: absolute; top: 10px; left: 10px; width: 18px; height: 18px; margin: 0; accent-color: var(--cinco-orange-dark); }
 .ip-fotos-inf-item span { line-height: 1.3; }
+.ip-obs-marca { color: var(--warning, #b86f00); font-weight: bold; cursor: help; }

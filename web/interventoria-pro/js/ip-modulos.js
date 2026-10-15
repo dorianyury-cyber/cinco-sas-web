@@ -1096,7 +1096,7 @@ export const MODULOS = {
       { key: "observacion", label: "Observación", type: "textarea", ancho: true }
     ],
     columnas: [
-      { key: "proyecto", label: "Frente", ancho: 8 }, { key: "codigo", label: "Código", ancho: 6 }, { key: "descripcion", ancho: 34 }, { key: "unidad", label: "Und.", ancho: 5 },
+      { key: "proyecto", label: "Frente", ancho: 8 }, { key: "codigo", label: "Código", ancho: 6, render: (r) => `${esc(r.codigo || "-")}${r.observacion ? ` <span class="ip-obs-marca" title="${esc(r.observacion)}">⚠</span>` : ""}` }, { key: "descripcion", ancho: 34 }, { key: "unidad", label: "Und.", ancho: 5 },
       { key: "cantidad", label: "Contratada", ancho: 8 },
       { key: "_ejec", label: "Ejecutada", ancho: 8, render: (r) => numero(ejecutadoItem(r), ejecutadoItem(r) % 1 ? 2 : 0) },
       { key: "_valor", label: "Valor contratado", ancho: 11, render: (r) => moneda(valorItem(r)) },
@@ -1173,6 +1173,9 @@ export const MODULOS = {
       if (mayores.length) out.push({ nivel: "danger", texto: `${mayores.length} ítem(s) con cantidad ejecutada mayor que la contratada (requiere acta de mayores cantidades o modificación): ${mayores.slice(0, 3).map((r) => `${r.proyecto || ""} ${r.codigo}`).join(", ")}${mayores.length > 3 ? "…" : ""}.` });
       const sinAct = ctx.registros.filter((r) => !Number(r.actividad)).length;
       if (sinAct && ctx.registros.length) out.push({ nivel: "warn", texto: `${sinAct} ítem(s) del presupuesto sin actividad de la curva S asignada.` });
+      // Ítems con observación (ej. inconsistencias de la propuesta por aclarar).
+      const conObs = ctx.registros.filter((r) => String(r.observacion || "").trim());
+      if (conObs.length) out.push({ nivel: "warn", texto: `${conObs.length} ítem(s) con observación (⚠ en la tabla; ábrelos para leerla): ${conObs.slice(0, 6).map((r) => `${r.proyecto || ""} ${r.codigo}`.trim()).join(", ")}${conObs.length > 6 ? "…" : ""}.` });
       return out;
     }
   },
