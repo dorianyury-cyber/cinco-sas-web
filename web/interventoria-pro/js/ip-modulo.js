@@ -209,8 +209,68 @@ function iniciarModulo({ user, perfil, contrato, puede }) {
             ${r.foto ? `<img src="${esc(r.foto)}" alt="" loading="lazy">` : '<div class="ip-foto-vacia">Sin foto</div>'}
             <span class="ip-foto-texto"><strong>${fecha(r.fecha)}</strong> · ${esc(nombreCapitulo(r.capitulo))}</span>
             <span class="ip-foto-obs">${esc(r.observacion || "")}</span>
+            ${seleccionando ? `<span class="ip-foto-check" aria-hidden="true">${seleccion.has(r.id) ? "✔" : ""}</span>` : ""}
           </button>`).join("")}</div>`;
-    listaEl.querySelectorAll(".ip-foto-card").forEach((b) => b.addEventListener("click", () => abrirFormulario(ctx.registros.find((r) => r.id === b.dataset.id))));
+    listaEl.querySelectorAll(".ip-foto-card").forEach((b) => {
+      b.classList.toggle("ip-foto-seleccionable", seleccionando);
+      b.classList.toggle("ip-foto-elegida", seleccion.has(b.dataset.id));
+      b.addEventListener("click", () => {
+        if (!seleccionando) return abrirFormulario(ctx.registros.find((r) => r.id === b.dataset.id));
+        if (seleccion.has(b.dataset.id)) seleccion.delete(b.dataset.id); else seleccion.add(b.dataset.id);
+        actualizarSeleccion();
+        pintar();
+      });
+    });
+  }
+
+  // Galería: seleccionar varias fotos y eliminarlas de una vez (solo quien
+  // tiene permiso de eliminar). Cada una queda en el historial de cambios.
+  let seleccionando = false;
+  const seleccion = new Set();
+  const selBtn = document.createElement("button");
+  const borrarSelBtn = document.createElement("button");
+  if (mod.vista === "galeria" && esGestor) {
+    selBtn.type = borrarSelBtn.type = "button";
+    selBtn.className = "btn secondary ip-btn-excel";
+    selBtn.textContent = "🗑 Eliminar fotos";
+    selBtn.title = "Elige las fotos que quieres eliminar";
+    borrarSelBtn.className = "btn danger hidden";
+    document.getElementById("ipNuevoBtn").after(selBtn, borrarSelBtn);
+    selBtn.addEventListener("click", () => {
+      seleccionando = !seleccionando;
+      seleccion.clear();
+      actualizarSeleccion();
+      pintar();
+    });
+    borrarSelBtn.addEventListener("click", async () => {
+      const ids = [...seleccion].filter((id) => ctx.registros.some((r) => r.id === id));
+      if (!ids.length || !confirm(`¿Eliminar ${ids.length} foto(s)? Esta acción no se puede deshacer; quedará constancia en el historial.`)) return;
+      borrarSelBtn.disabled = true;
+      try {
+        for (let i = 0; i < ids.length; i += 200) {
+          const lote = writeBatch(db);
+          ids.slice(i, i + 200).forEach((id) => {
+            const antes = ctx.registros.find((r) => r.id === id) || {};
+            lote.delete(doc(coleccionRef, id));
+            anotarEnLote(lote, contrato.id, { user, perfil, modulo: mod.id, moduloLabel: tituloModulo, registroId: id, accion: "eliminar", resumen: identificar(mod, antes), cambios: diferencias(mod.campos, {}, antes, ctx.datos.personal || []) });
+          });
+          await lote.commit();
+        }
+        seleccionando = false;
+        seleccion.clear();
+        actualizarSeleccion();
+      } catch (err) {
+        alert(errorAmigable(err));
+      } finally {
+        borrarSelBtn.disabled = false;
+      }
+    });
+  }
+  function actualizarSeleccion() {
+    selBtn.textContent = seleccionando ? "Cancelar" : "🗑 Eliminar fotos";
+    borrarSelBtn.classList.toggle("hidden", !seleccionando);
+    borrarSelBtn.disabled = !seleccion.size;
+    borrarSelBtn.textContent = seleccion.size ? `Eliminar ${seleccion.size} seleccionada(s)` : "Toca las fotos a eliminar";
   }
 
   buscarEl.addEventListener("input", pintar);

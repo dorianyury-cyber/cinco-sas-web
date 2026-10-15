@@ -299,7 +299,8 @@ export const GUIAS = {
     que: "La evidencia fotográfica de las actividades del periodo.",
     como: [
       "Sube la foto con la fecha, el capítulo relacionado y una observación clara de lo que muestra.",
-      "Prefiere fotos que evidencien avance, cumplimiento o hallazgos."
+      "Prefiere fotos que evidencien avance, cumplimiento o hallazgos.",
+      "Para quitar fotos de prueba o que no corresponden: «🗑 Eliminar fotos», toca las fotos a quitar y «Eliminar seleccionadas» (solo con permiso de eliminar; quedan en el historial de cambios)."
     ],
     automatico: "Las fotos se comprimen al subirlas y las del mes elegido forman el registro fotográfico del informe."
   },

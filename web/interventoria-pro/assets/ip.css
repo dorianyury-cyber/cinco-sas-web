@@ -1962,6 +1962,12 @@ html.ip-preparando .main::before {
 .ip-foto-card img, .ip-foto-vacia { width: 100%; aspect-ratio: 4 / 3; object-fit: cover; background: var(--sidebar-bg); }
 .ip-foto-vacia { display: flex; align-items: center; justify-content: center; color: var(--text-muted); }
 .ip-foto-texto, .ip-foto-obs { padding: 0 12px; font-size: 12.5px; }
+.ip-foto-card { position: relative; }
+.ip-foto-check { position: absolute; top: 8px; right: 8px; width: 28px; height: 28px; border-radius: 50%; border: 2px solid #fff; background: rgba(0, 0, 0, .35); color: #fff; font-weight: bold; display: flex; align-items: center; justify-content: center; box-shadow: 0 1px 4px rgba(0, 0, 0, .4); }
+.ip-foto-seleccionable img { opacity: .85; }
+.ip-foto-elegida { border: 3px solid var(--danger); }
+.ip-foto-elegida img { opacity: 1; }
+.ip-foto-elegida .ip-foto-check { background: var(--danger); }
 .ip-foto-obs { color: var(--text-muted); display: -webkit-box; -webkit-line-clamp: 3; -webkit-box-orient: vertical; overflow: hidden; }
 
 /* Ingreso */
