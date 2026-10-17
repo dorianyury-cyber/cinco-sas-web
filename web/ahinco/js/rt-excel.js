@@ -1,8 +1,9 @@
-// Libro de Excel formulado de AHÍNCO: un solo archivo con la portada, los
-// literales a) a x) del RETIE, una hoja por cálculo y la hoja "Tablas" con
-// las tablas normativas. Las celdas amarillas son datos de entrada y las
-// demás son fórmulas vivas: el ingeniero puede cambiar un dato y Excel
-// recalcula la memoria (también las verificaciones "Cumple / No cumple").
+// Libro de Excel formulado de AHÍNCO: un solo archivo con la portada (índice y
+// guía de uso), los literales a) a x) del RETIE, los hallazgos, una hoja por
+// cálculo y la hoja "Tablas" con las tablas normativas. Cada hoja de cálculo
+// explica qué calcula, sus normas y constantes; las celdas amarillas son datos
+// de entrada (desbloqueadas) y las grises son fórmulas vivas protegidas, con su
+// explicación en palabras; al final, un resumen de la selección.
 import * as N from "./rt-normas.js";
 import { MODULOS } from "./rt-modulos.js";
 import { LITERALES, FUENTE_LITERALES } from "./rt-literales.js";
@@ -78,65 +79,317 @@ function hojaTablas(wb) {
   return ws;
 }
 
-// ---------------------------------------------------------------- utilidades de hoja
+// ---------------------------------------------------------------- estilo del libro
+// Convención (la misma en todas las hojas):
+//   amarillo con letra azul  = dato de entrada (desbloqueado, se puede cambiar)
+//   gris con letra negra     = fórmula (bloqueada: se ve pero no se cambia)
+//   verde / rojo             = resultado de una verificación (Cumple / No cumple)
+const CLAVE_PROTECCION = "cinco";
+const C_NAVY = "FF1F2732", C_NARANJA = "FFF5A623", C_AMARILLO = "FFFFF4CC", C_AZUL = "FF1F4E9A", C_GRIS = "FFF2F3F5", C_GRIS_TXT = "FF5C6570";
+const C_SECCION = "FFE8ECF2", C_RESUMEN = "FFEAF6EE", C_VERDE_TXT = "FF1E7B45";
+const relleno = (argb) => ({ type: "pattern", pattern: "solid", fgColor: { argb } });
+
+// Formato numérico según la unidad (en vez de "General", que muestra 10 decimales).
+function formatoUnidad(u = "") {
+  const t = String(u);
+  if (/^(A|V|kgf|N|h)$/.test(t)) return "#,##0.0";
+  if (/^(kV|kVA|kW|kA|MVA|m|mm|°C|kV\/µs|N\/m|kg\/m|Pa|% rotura|p\.u\.)$/.test(t)) return "#,##0.00";
+  if (t === "%") return "0.0";
+  if (/^(Ω|Ω·m|s)$/.test(t)) return "0.0000";
+  if (/^(m²|mm²)$/.test(t)) return "#,##0.0";
+  if (t === "/año") return "0.00E+00";
+  return "General";
+}
+
+// Constantes y factores fijos que usan las fórmulas de cada hoja: se explican
+// en el encabezado para que nadie tenga que adivinar de dónde sale un número.
+const CONSTANTES = {
+  cargas: [["0,25", "", "Se suma el 25 % de la corriente del motor más grande a la corriente del alimentador", "NTC 2050 430-24"], ["0,90", "", "Factor de potencia mínimo de referencia (por debajo se cobra energía reactiva)", "Res. CREG 015 de 2018"], ["1000", "W/kW", "Conversión de vatios a kilovatios", ""]],
+  conductores: [["1,25", "", "Las cargas continuas (3 h o más) se dimensionan al 125 %", "NTC 2050 210-19 y 215-2"], ["60 / 75 / 90", "°C", "Columnas de temperatura de la tabla de capacidad de corriente", "NTC 2050 Tabla 310-16"], ["Factores Ft y Fa", "", "Corrección por temperatura ambiente y por más de 3 conductores portadores en la misma canalización", "NTC 2050 Tabla 310-16 y 310-15(b)(2)"]],
+  regulacion: [["√3 / 2", "", "Factor del sistema en la caída de tensión: √3 trifásico, 2 monofásico (ida y vuelta)", ""], ["3 / 2", "", "Número de conductores con pérdidas: 3 trifásico, 2 monofásico", ""]],
+  canalizaciones: [["53 / 31 / 40", "%", "Llenado máximo: 1 conductor 53 %, 2 conductores 31 %, más de 2 conductores 40 %", "NTC 2050 Cap. 9 Tabla 1"]],
+  transformador: [["1,5", "", "El fusible primario tipo K se elige cerca de 1,5 veces la corriente nominal primaria", "Práctica del operador de red"], ["1,25", "", "La protección del secundario no debe superar el 125 % de la corriente nominal", "NTC 2050 450-3(b)"]],
+  trafoPotencia: [["c = 1,1", "", "Factor de tensión para el cortocircuito máximo en media y alta tensión", "IEC 60909-0 Tabla 1"], ["1,2", "", "Un TC soporta en forma permanente el 120 % de su corriente nominal (corriente térmica extendida)", "IEC 61869-2"], ["ALF", "", "Factor límite de precisión: un TC 5P20 mide bien hasta 20 veces su corriente nominal", "IEC 61869-2"]],
+  cortocircuito: [["c", "", "Factor de tensión: 1,05 en BT (tolerancia +6 %) o 1,10 (BT +10 %, media y alta tensión)", "IEC 60909-0 Tabla 1"], ["1,1 (cmax)", "", "Factor de tensión máximo usado para la red equivalente y la corrección KT", "IEC 60909-0"], ["0,95 y 0,6", "", "Constantes de la corrección KT de la impedancia del transformador", "IEC 60909-0 ec. 12a"], ["1,02 / 0,98 / 3", "", "Constantes del factor κ para la corriente pico", "IEC 60909-0 ec. 55"], ["4", "", "La impedancia de secuencia cero de un cable se aproxima a 4 veces la de secuencia positiva", "IEC 60909-2"]],
+  cableMT: [["K = 143 / 94", "A·√s/mm²", "Constante adiabática para conductor de cobre / aluminio con aislamiento XLPE o EPR (90 °C → 250 °C)", "IEC 60949"], ["K = 115 / 76", "A·√s/mm²", "Constante adiabática para aislamiento PVC (cobre / aluminio)", "IEC 60949"], ["0,017241 / 0,028264", "Ω·mm²/m", "Resistividad del cobre / aluminio a 20 °C (para la resistencia a 90 °C)", "IEC 60228"]],
+  coordinacion: [["k y α", "", "Constantes de cada curva: SI 0,14 y 0,02; VI 13,5 y 1; EI 80 y 2; LTI 120 y 1", "IEC 60255-151"], ["CTI", "s", "Margen mínimo entre la protección principal y su respaldo (típico 0,2 a 0,4 s)", "IEEE 242"]],
+  malla: [["1000", "Ω", "Resistencia del cuerpo humano", "IEEE 80-2013 §7"], ["0,116 / 0,157", "", "Constante de la persona de 50 kg / 70 kg en las tensiones tolerables", "IEEE 80-2013 ec. 29 a 32"], ["1,5 y 6", "", "Factores de la resistencia de los pies en contacto y en paso", "IEEE 80-2013"], ["0,09", "m", "Constante del factor Cs de la capa superficial", "IEEE 80-2013 ec. 27"], ["60", "Hz", "Frecuencia del sistema (constante de tiempo Ta = X/(2π·60·R))", ""], ["0,644 y 0,148", "", "Constantes del factor de irregularidad Ki", "IEEE 80-2013 ec. 89"]],
+  rayos: [["3H", "m", "El área colectiva se extiende 3 veces la altura de la estructura", "IEC 62305-2 Anexo A"], ["40 · LL", "m²", "Área colectiva de la línea de servicio", "IEC 62305-2 Anexo A"], ["10⁻⁶", "", "Conversión de m² a km² (NG está en descargas por km² al año)", ""], ["8760", "h", "Horas de un año", ""], ["10⁻⁵", "", "Riesgo tolerable de pérdida de vidas humanas (R1)", "IEC 62305-2 Tabla 7"]],
+  apantallamiento: [["2,2", "", "Constante de la corriente crítica Ic = 2,2 × BIL / Zs", "IEEE 998"], ["8 · k", "", "Distancia de impacto S = 8 k Ic^0,65 (k = 1,2 mástiles, 1 cables de guarda)", "IEEE 998"]],
+  aislamiento: [["k", "", "Factor de falla a tierra: 1,3 neutro sólido, 1,4 efectivo, 1,73 aislado o no efectivo", "IEC 60071-2"], ["8150", "m", "Constante de la corrección por altitud Ka = e^(H/8150)", "IEC 60071-2"], ["300", "m/µs", "Velocidad de la onda en la línea", "IEC 60071-2"], ["20", "%", "Margen de protección mínimo recomendado", "IEEE C62.22"]],
+  distancias: [["1,25 %", "", "Por cada 100 m por encima de 1000 m de altitud la distancia aumenta 1,25 %", "RETIE"]],
+  mecanico: [["9,80665", "m/s²", "Gravedad: convierte kgf a N", ""], ["24", "", "Constante de la ecuación de cambio de estado (método parabólico)", ""], ["8", "", "Flecha parabólica f = w L² / (8 T)", ""], ["50", "%", "Tensión máxima admisible: la mitad de la carga de rotura (factor de seguridad 2)", "Criterio de diseño"]]
+};
+
+// Nombres legibles de los rangos de la hoja "Tablas" para las explicaciones.
+const NOMBRE_TABLA = { cond: "tabla de conductores (hoja Tablas)", temp: "factores de temperatura (hoja Tablas)", tempDesde: "rangos de temperatura (hoja Tablas)", agr: "factores de agrupamiento (hoja Tablas)", agrDesde: "rangos de agrupamiento (hoja Tablas)", prot: "corrientes normalizadas de protecciones (hoja Tablas)", fusK: "fusibles tipo K normalizados (hoja Tablas)", tub: "áreas de tuberías (hoja Tablas)", curvas: "curvas IEC (hoja Tablas)" };
+const FUNCIONES = [["IFERROR", "SI.ERROR"], ["SUMPRODUCT", "SUMAPRODUCTO"], ["SUMIF", "SUMAR.SI"], ["COUNTIF", "CONTAR.SI"], ["VLOOKUP", "BUSCARV"], ["INDEX", "INDICE"], ["MATCH", "COINCIDIR"], ["ISNUMBER", "ESNUMERO"], ["ISTEXT", "ESTEXTO"], ["SEARCH", "HALLAR"], ["AVERAGE", "PROMEDIO"], ["ROUND", "REDONDEAR"], ["SQRT", "√"], ["EXP", "e^"], ["LN", "ln"], ["LEN", "LARGO"], ["AND", "Y"], ["OR", "O"], ["IF", "SI"], ["MAX", "MÁX"], ["MIN", "MÍN"], ["SUM", "SUMA"]];
+
+// Traduce una fórmula de Excel a una explicación legible: las celdas se
+// reemplazan por el nombre de la variable y las funciones por su nombre en
+// español. cols = {letra: encabezado} cuando la fórmula es de una tabla.
+function traducir(formula, hoja, { r = 0, cols = null } = {}) {
+  const partes = String(formula).split('"');
+  const nombres = [];
+  const marca = (t) => `\u0001${nombres.push(t) - 1}\u0002`;
+  const out = partes.map((p, i) => {
+    if (i % 2) return marca(`"${p}"`); // texto entre comillas: intacto
+    let s = p;
+    for (const [k, ref] of Object.entries(T)) if (ref) s = s.split(ref).join(marca(`«${NOMBRE_TABLA[k] || k}»`));
+    s = s.replace(/\$([A-Z]{1,2})\$(\d+)/g, (m, c, nn) => marca(`[${hoja.nombreCelda(c, Number(nn))}]`));
+    s = s.replace(/\$([A-Z]{1,2})(\d+)/g, "$1$2"); // referencias mixtas ($E12)
+    if (cols) {
+      s = s.replace(/\b([A-Z]{1,2}):\1\b/g, (m, c) => (cols[c] ? marca(`[columna ${cols[c]}]`) : m));
+      s = s.replace(/\b([A-Z]{1,2})(\d+)\b/g, (m, c, nn) => (cols[c] ? marca(`[${cols[c]}${Number(nn) === r ? "" : Number(nn) < r ? ", fila anterior" : `, fila ${nn}`}]`) : m));
+    }
+    s = s.replace(/PI\(\)/g, "π").replace(/\bFALSE\b/g, "FALSO").replace(/\bTRUE\b/g, "VERDADERO");
+    for (const [en, es] of FUNCIONES) s = s.replace(new RegExp(`\\b${en}\\(`, "g"), `${es}(`);
+    s = s.replace(/<=/g, " ≤ ").replace(/>=/g, " ≥ ").replace(/<>/g, " ≠ ").replace(/(?<![≤≥≠])([<>])(?!\s)/g, " $1 ").replace(/(?<![≤≥])=/g, " = ");
+    s = s.replace(/\*/g, " × ").replace(/\//g, " ÷ ");
+    s = s.replace(/,/g, "; ").replace(/(\d)\.(\d)/g, "$1,$2").replace(/1E-9/g, "0").replace(/\s+/g, " ");
+    return s;
+  });
+  return out.join("").replace(/\u0001(\d+)\u0002/g, (m, k) => nombres[Number(k)]).trim();
+}
+
+// ---------------------------------------------------------------- hoja de cálculo con formato
 // Identificación del cálculo que se está escribiendo (un módulo puede tener
-// varios cálculos en el proyecto: la hoja lleva su etiqueta).
-let etiquetaActual = "";
+// varios cálculos en el proyecto: la hoja lleva su etiqueta) y su módulo.
+let etiquetaActual = "", moduloActual = "", proyectoActual = "";
+const hojasCreadas = [];
+const ULT = 8; // la explicación ocupa de la columna D a la H
+
 class Hoja {
-  constructor(wb, nombre, titulo, anchos = [44, 18, 14, 50]) {
+  constructor(wb, nombre, titulo, anchos = [46, 16, 11, 16, 14, 14, 14, 14]) {
     const limpio = (t) => String(t).replace(/[\\/?*[\]:]/g, "-");
     const base = limpio(etiquetaActual ? `${nombre} ${etiquetaActual}` : nombre).slice(0, 31);
     let nombreHoja = base, k = 2;
     while (wb.getWorksheet(nombreHoja)) nombreHoja = `${base.slice(0, 27)} (${k++})`;
-    this.ws = wb.addWorksheet(nombreHoja);
-    this.ws.columns = anchos.map((w) => ({ width: w }));
-    this.r = 1;
-    const c = this.ws.getCell("A1");
-    c.value = etiquetaActual ? `${titulo} — ${etiquetaActual}` : titulo; c.font = { bold: true, size: 13, color: { argb: NAVY } };
+    const ws = (this.ws = wb.addWorksheet(nombreHoja, { properties: { tabColor: { argb: C_NARANJA } }, pageSetup: { orientation: "landscape", fitToPage: true, fitToWidth: 1, fitToHeight: 0, paperSize: 9, margins: { left: 0.4, right: 0.4, top: 0.5, bottom: 0.5, header: 0.3, footer: 0.3 } } }));
+    ws.columns = anchos.map((w) => ({ width: w }));
+    this.etq = new Map(); this.celdas = new Map(); this.altos = []; this.verifs = []; this.necesitaEncabezado = false;
+    hojasCreadas.push(this);
+    const mod = MODULOS[moduloActual] || {};
+    // Franja de título.
+    ws.mergeCells(1, 1, 1, ULT);
+    const t = ws.getCell("A1");
+    t.value = etiquetaActual ? `${titulo} — ${etiquetaActual}` : titulo;
+    t.font = { bold: true, size: 14, color: { argb: "FFFFFFFF" } }; t.fill = relleno(C_NAVY); t.alignment = { vertical: "middle", indent: 1 };
+    ws.getRow(1).height = 30;
+    ws.mergeCells(2, 1, 2, ULT);
+    const s = ws.getCell("A2");
+    s.value = proyectoActual; s.font = { italic: true, size: 10, color: { argb: C_GRIS_TXT } }; s.alignment = { indent: 1 };
     this.r = 3;
+    this.parrafo("¿Qué calcula esta hoja?", mod.objeto || "");
+    this.parrafo("Normas aplicadas", (mod.normas || []).join(" · "));
+    // Leyenda de colores.
+    const lr = this.r++;
+    ws.getCell(`A${lr}`).value = "Cómo leer esta hoja"; ws.getCell(`A${lr}`).font = { bold: true, size: 10, color: { argb: C_NAVY } }; ws.getCell(`A${lr}`).alignment = { vertical: "middle" };
+    const muestra = (col, txt, fill, color) => { const c = ws.getCell(`${col}${lr}`); c.value = txt; c.fill = relleno(fill); c.font = { size: 9, bold: true, color: { argb: color } }; c.alignment = { horizontal: "center", vertical: "middle" }; c.border = BORDES; };
+    muestra("B", "Dato de entrada", C_AMARILLO, C_AZUL); muestra("C", "Fórmula", C_GRIS, "FF000000");
+    ws.mergeCells(lr, 4, lr, ULT);
+    const ley = ws.getCell(`D${lr}`);
+    ley.value = "Cambie solo las celdas amarillas: las grises se recalculan solas y están protegidas. «Cumple» sale en verde y «No cumple» en rojo. La columna «Cómo se calcula» explica cada fórmula con el nombre de sus variables.";
+    ley.font = { size: 9, color: { argb: C_GRIS_TXT } }; ley.alignment = { wrapText: true, vertical: "middle" };
+    this.altos.push({ row: lr, texto: ley.value, desde: 4, size: 9 });
+    // Constantes de la hoja.
+    const cons = CONSTANTES[moduloActual];
+    if (cons?.length) {
+      this.banda("Constantes y factores que usan las fórmulas");
+      this.encabezado(["Constante o factor", "Unidad", "", "Qué significa y de dónde sale"]);
+      ws.mergeCells(this.r - 1, 2, this.r - 1, 3);
+      cons.forEach(([valor, unidad, sig, fuente]) => {
+        const rr = this.r++;
+        ws.getCell(`A${rr}`).value = valor; ws.getCell(`B${rr}`).value = unidad;
+        ws.mergeCells(rr, 2, rr, 3);
+        ws.mergeCells(rr, 4, rr, ULT);
+        const d = ws.getCell(`D${rr}`); d.value = fuente ? `${sig} (${fuente})` : sig;
+        [1, 2, 3, 4].forEach((ci) => { const c = ws.getCell(rr, ci); c.border = BORDES; c.font = { size: 9 }; c.alignment = { wrapText: true, vertical: "top" }; });
+        ws.getCell(`A${rr}`).font = { size: 9.5, bold: true };
+        ws.getCell(`B${rr}`).alignment = { horizontal: "center", vertical: "top" };
+        this.altos.push({ row: rr, texto: d.value, desde: 4, size: 9 });
+      });
+    }
+    this.banda("Datos de entrada");
+    this.necesitaEncabezado = true;
+    this.inicioDatos = this.r;
   }
-  nota(texto) { const c = this.ws.getCell(`A${this.r}`); c.value = texto; c.font = { italic: true, size: 9, color: { argb: "FF5C6570" } }; this.r++; }
-  seccion(texto) { this.r++; const c = this.ws.getCell(`A${this.r}`); c.value = texto; c.font = { bold: true, color: { argb: NAVY } }; this.r++; }
-  // Fila "Parámetro | valor | unidad | nota" — devuelve la dirección del valor.
-  fila(etiqueta, valor, unidad = "", nota = "", entrada = false) {
-    const r = this.r++;
-    this.ws.getCell(`A${r}`).value = etiqueta;
-    const c = this.ws.getCell(`B${r}`);
-    c.value = typeof valor === "string" && valor.startsWith("=") ? { formula: valor.slice(1) } : valor;
-    c.fill = { type: "pattern", pattern: "solid", fgColor: { argb: entrada ? AMARILLO : GRIS } };
-    c.numFmt = typeof valor === "string" && !valor.startsWith("=") ? "@" : "General";
-    this.ws.getCell(`C${r}`).value = unidad;
-    if (nota) { const x = this.ws.getCell(`D${r}`); x.value = nota; x.font = { size: 9, color: { argb: "FF5C6570" } }; }
-    [`A${r}`, `B${r}`, `C${r}`, `D${r}`].forEach((a) => { this.ws.getCell(a).border = BORDES; });
-    return `$B$${r}`;
+  parrafo(titulo, texto) {
+    const ws = this.ws, rr = this.r++;
+    ws.getCell(`A${rr}`).value = titulo; ws.getCell(`A${rr}`).font = { bold: true, size: 10, color: { argb: C_NAVY } }; ws.getCell(`A${rr}`).alignment = { vertical: "top" };
+    ws.mergeCells(rr, 2, rr, ULT);
+    const c = ws.getCell(`B${rr}`); c.value = texto; c.font = { size: 10 }; c.alignment = { wrapText: true, vertical: "top" };
+    this.altos.push({ row: rr, texto, desde: 2, size: 10 });
+  }
+  banda(texto) {
+    const ws = this.ws;
+    this.r++;
+    const rr = this.r++;
+    ws.mergeCells(rr, 1, rr, ULT);
+    const c = ws.getCell(`A${rr}`);
+    c.value = texto; c.font = { bold: true, size: 11, color: { argb: C_NAVY } }; c.fill = relleno(C_SECCION); c.alignment = { vertical: "middle", indent: 1 };
+    c.border = { left: { style: "thick", color: { argb: C_NARANJA } } };
+    ws.getRow(rr).height = 20;
+  }
+  encabezado(textos) {
+    const ws = this.ws, rr = this.r++;
+    textos.forEach((t, i) => {
+      const c = ws.getCell(rr, i + 1); c.value = t;
+      c.font = { bold: true, size: 9, color: { argb: "FFFFFFFF" } }; c.fill = relleno(C_NAVY); c.alignment = { wrapText: true, vertical: "middle" }; c.border = BORDES;
+    });
+    if (textos.length === 4) ws.mergeCells(rr, 4, rr, ULT);
+  }
+  nota(texto) {
+    const ws = this.ws, rr = this.r++;
+    ws.mergeCells(rr, 1, rr, ULT);
+    const c = ws.getCell(`A${rr}`); c.value = `ℹ ${texto}`; c.font = { italic: true, size: 9, color: { argb: C_GRIS_TXT } }; c.alignment = { wrapText: true };
+    this.altos.push({ row: rr, texto, desde: 1, size: 9 });
+  }
+  seccion(texto) { this.banda(texto); this.necesitaEncabezado = true; }
+  nombreCelda(c, fila) { return c === "B" && this.etq.has(fila) ? this.etq.get(fila) : this.celdas.get(`${c}${fila}`) || `${c}${fila}`; }
+  // Fila "Parámetro | valor | unidad | cómo se calcula" — devuelve la dirección del valor.
+  fila(etiqueta, valor, unidad = "", nota = "", entrada = false, explicacion = null) {
+    const ws = this.ws;
+    if (this.necesitaEncabezado) { this.encabezado(["Parámetro", "Valor", "Unidad", "Cómo se calcula / observaciones"]); this.necesitaEncabezado = false; }
+    const rr = this.r++;
+    const esFormula = typeof valor === "string" && valor.startsWith("=");
+    this.etq.set(rr, String(etiqueta).replace(/\s+/g, " "));
+    const a = ws.getCell(`A${rr}`); a.value = etiqueta; a.alignment = { wrapText: true, vertical: "top" }; a.font = { size: 10 };
+    const c = ws.getCell(`B${rr}`);
+    c.value = esFormula ? { formula: valor.slice(1) } : valor;
+    c.fill = relleno(entrada ? C_AMARILLO : C_GRIS);
+    c.font = entrada ? { bold: true, color: { argb: C_AZUL }, size: 10 } : { size: 10 };
+    c.numFmt = typeof valor === "string" && !esFormula ? "@" : esFormula && !unidad ? "[<0.001]0.00E+00;#,##0.0000" : formatoUnidad(unidad);
+    c.alignment = { horizontal: "right", vertical: "top" };
+    if (entrada) c.protection = { locked: false };
+    const u = ws.getCell(`C${rr}`); u.value = unidad; u.alignment = { horizontal: "center", vertical: "top" }; u.font = { size: 9, color: { argb: C_GRIS_TXT } };
+    ws.mergeCells(rr, 4, rr, ULT);
+    const d = ws.getCell(`D${rr}`);
+    const expl = explicacion ?? (esFormula ? `= ${traducir(valor.slice(1), this)}` : "Dato de entrada");
+    d.value = [expl, nota].filter(Boolean).join(" — ");
+    d.font = { size: 9, color: { argb: esFormula ? "FF333A44" : C_GRIS_TXT } }; d.alignment = { wrapText: true, vertical: "top" };
+    [1, 2, 3, 4].forEach((ci) => { ws.getCell(rr, ci).border = BORDES; });
+    this.altos.push({ row: rr, texto: d.value, desde: 4, size: 9, etiqueta: String(etiqueta) });
+    return `$B$${rr}`;
   }
   dato(etiqueta, valor, unidad, nota) { return this.fila(etiqueta, valor, unidad, nota, true); }
   calc(etiqueta, formula, unidad, nota) { return this.fila(etiqueta, `=${formula}`, unidad, nota, false); }
-  verif(etiqueta, condicion, nota) { return this.calc(etiqueta, `IF(${condicion},"Cumple","No cumple")`, "", nota); }
-  // Tabla por filas. columnas: [{t: encabezado, ancho, v: (fila, r) => valor | "=fórmula", entrada}]
+  verif(etiqueta, condicion, nota) {
+    const ref = this.fila(etiqueta, `=IF(${condicion},"Cumple","No cumple")`, "", nota, false, `Se cumple cuando ${traducir(condicion, this)}`);
+    this.ws.getCell(ref.replace(/\$/g, "")).font = { bold: true, size: 10 };
+    this.ws.getCell(ref.replace(/\$/g, "")).alignment = { horizontal: "center", vertical: "top" };
+    this.verifs.push(ref);
+    return ref;
+  }
+  // Tabla por filas. columnas: [{t: encabezado, ancho, v: (fila, r) => valor | "=fórmula", entrada, fmt, lista}]
   tabla(columnas, datos) {
-    const ws = this.ws, r0 = this.r;
+    const ws = this.ws;
+    this.necesitaEncabezado = false;
+    const r0 = this.r;
+    const cols = {};
     columnas.forEach((c, i) => {
+      cols[col(i)] = c.t;
       const cel = ws.getCell(r0, i + 1);
       cel.value = c.t; cel.font = { bold: true, color: { argb: "FFFFFFFF" }, size: 9 };
-      cel.fill = { type: "pattern", pattern: "solid", fgColor: { argb: NAVY } };
-      cel.alignment = { wrapText: true, vertical: "middle" }; cel.border = BORDES;
+      cel.fill = relleno(c.entrada ? "FF2E5A9C" : C_NAVY);
+      cel.alignment = { wrapText: true, vertical: "middle", horizontal: "center" }; cel.border = BORDES;
       if (c.ancho && (ws.getColumn(i + 1).width || 0) < c.ancho) ws.getColumn(i + 1).width = c.ancho;
     });
+    ws.getRow(r0).height = 32;
     datos.forEach((d, k) => {
       const r = r0 + 1 + k;
+      const nombreFila = String(columnas[0].v(d, r) ?? "").replace(/^=.*/, `fila ${k + 1}`);
       columnas.forEach((c, i) => {
         const v = c.v(d, r), cel = ws.getCell(r, i + 1);
-        cel.value = typeof v === "string" && v.startsWith("=") ? { formula: v.slice(1) } : v;
+        const esF = typeof v === "string" && v.startsWith("=");
+        this.celdas.set(`${col(i)}${r}`, `${c.t} de «${nombreFila}»`);
+        cel.value = esF ? { formula: v.slice(1) } : v;
         cel.border = BORDES;
-        cel.font = { size: 9 };
-        if (c.entrada) cel.fill = { type: "pattern", pattern: "solid", fgColor: { argb: AMARILLO } };
-        if (typeof v === "string" && !v.startsWith("=")) cel.numFmt = "@";
+        cel.font = c.entrada ? { size: 9, bold: true, color: { argb: C_AZUL } } : { size: 9 };
+        cel.fill = relleno(c.entrada ? C_AMARILLO : esF ? C_GRIS : "FFFFFFFF");
+        cel.alignment = { vertical: "top", wrapText: i === 0 || typeof v === "string" && !esF };
+        if (c.entrada) cel.protection = { locked: false };
+        if (c.lista) cel.dataValidation = { type: "list", allowBlank: true, formulae: [`"${c.lista.join(",")}"`], showErrorMessage: true, errorTitle: "Valor no válido", error: `Elija uno de: ${c.lista.join(", ")}` };
+        if (typeof v === "string" && !esF) cel.numFmt = "@";
         else if (c.fmt) cel.numFmt = c.fmt;
       });
     });
-    this.r = r0 + datos.length + 2;
-    return { r0: r0 + 1, r1: r0 + datos.length, col: (k) => col(columnas.findIndex((c) => c.k === k)) };
+    const r1 = r0 + datos.length;
+    // Columnas de resultado: entran en el estado general de la hoja.
+    columnas.forEach((c, i) => { if (/^(Resultado|≤ 50|Margen)/.test(c.t) && datos.length) this.verifs.push(`${col(i)}${r0 + 1}:${col(i)}${r1}`); });
+    this.r = r1 + 1;
+    // Cómo se calcula cada columna con fórmula (con la primera fila; si las
+    // siguientes cambian, también se explican).
+    const formulas = columnas.map((c, i) => ({ c, i })).filter(({ c }) => datos.length && typeof c.v(datos[0], r0 + 1) === "string" && String(c.v(datos[0], r0 + 1)).startsWith("="));
+    if (formulas.length) {
+      const rr = this.r++;
+      ws.mergeCells(rr, 1, rr, ULT);
+      const tt = ws.getCell(`A${rr}`); tt.value = "Cómo se calcula cada columna de la tabla:"; tt.font = { bold: true, size: 9, color: { argb: C_NAVY } };
+      formulas.forEach(({ c, i }) => {
+        const f1 = traducir(String(c.v(datos[0], r0 + 1)).slice(1), this, { r: r0 + 1, cols });
+        const f2 = datos.length > 1 ? traducir(String(c.v(datos[1], r0 + 2)).slice(1), this, { r: r0 + 2, cols }) : f1;
+        const texto = f2 !== f1 ? `primera fila: = ${f1}; filas siguientes: = ${f2}` : `= ${f1}`;
+        const fr = this.r++;
+        ws.getCell(`A${fr}`).value = `• ${c.t}`; ws.getCell(`A${fr}`).font = { size: 9, bold: true }; ws.getCell(`A${fr}`).alignment = { vertical: "top", wrapText: true };
+        ws.mergeCells(fr, 2, fr, ULT);
+        const e = ws.getCell(`B${fr}`); e.value = texto; e.font = { size: 9, color: { argb: "FF333A44" } }; e.alignment = { wrapText: true, vertical: "top" };
+        this.altos.push({ row: fr, texto, desde: 2, size: 9 });
+        void i;
+      });
+    }
+    this.r++;
+    return { r0: r0 + 1, r1, col: (k) => col(columnas.findIndex((c) => c.k === k)) };
+  }
+  // Resumen de la selección (al final de la hoja): fórmulas vivas que leen
+  // los resultados de arriba. items: [{t, f: fórmula o referencia, u, texto}]
+  resumen(items) {
+    const ws = this.ws;
+    this.banda("Resumen de la selección");
+    items.filter(Boolean).forEach((it) => {
+      const rr = this.r++;
+      const a = ws.getCell(`A${rr}`); a.value = it.t; a.font = { bold: true, size: 10 }; a.alignment = { wrapText: true, vertical: "top" };
+      const f = String(it.f).replace(/^=/, "");
+      if (it.texto) {
+        ws.mergeCells(rr, 2, rr, ULT);
+        const c = ws.getCell(`B${rr}`); c.value = it.valor !== undefined ? it.valor : { formula: f };
+        c.font = { size: 10, color: { argb: C_VERDE_TXT }, bold: true }; c.fill = relleno(C_RESUMEN); c.alignment = { wrapText: true, vertical: "top" };
+        this.altos.push({ row: rr, texto: "x".repeat(110), desde: 2, size: 10 });
+      } else {
+        const c = ws.getCell(`B${rr}`); c.value = { formula: f }; c.numFmt = it.fmt || formatoUnidad(it.u);
+        c.font = { size: 11, bold: true, color: { argb: C_VERDE_TXT } }; c.fill = relleno(C_RESUMEN); c.alignment = { horizontal: "right" };
+        ws.getCell(`C${rr}`).value = it.u || ""; ws.getCell(`C${rr}`).alignment = { horizontal: "center" };
+        ws.mergeCells(rr, 4, rr, ULT);
+        const d = ws.getCell(`D${rr}`); d.value = it.nota || ""; d.font = { size: 9, color: { argb: C_GRIS_TXT } }; d.alignment = { wrapText: true };
+      }
+      [1, 2, 3, 4].forEach((ci) => { ws.getCell(rr, ci).border = BORDES; });
+    });
+    if (this.verifs.length) {
+      const rr = this.r++;
+      const cuenta = `SUM(${this.verifs.map((v) => `COUNTIF(${v.replace(/\$/g, "")},"No cumple*")`).join(",")})`;
+      const a = ws.getCell(`A${rr}`); a.value = "Estado de las verificaciones de esta hoja"; a.font = { bold: true, size: 10 };
+      ws.mergeCells(rr, 2, rr, ULT);
+      const c = ws.getCell(`B${rr}`);
+      c.value = { formula: `IF(${cuenta}>0,"No cumple: "&${cuenta}&" criterio(s) en rojo deben revisarse","Cumple: todos los criterios verificados en esta hoja se cumplen")` };
+      c.font = { bold: true, size: 11 }; c.alignment = { wrapText: true };
+      [1, 2].forEach((ci) => { ws.getCell(rr, ci).border = BORDES; });
+    }
+  }
+  // Alturas de filas con texto largo, colores de Cumple/No cumple y vista.
+  finalizar() {
+    const ws = this.ws;
+    const ancho = (desde) => { let w = 0; for (let ci = desde; ci <= ULT; ci++) w += ws.getColumn(ci).width || 10; return w; };
+    this.altos.forEach(({ row, texto, desde, size, etiqueta }) => {
+      const lineas = Math.max(1, Math.ceil(String(texto).length / (ancho(desde) * (size >= 10 ? 1.12 : 1.32))), etiqueta ? Math.ceil(etiqueta.length / ((ws.getColumn(1).width || 40) * 1.1)) : 1);
+      ws.getRow(row).height = Math.max(ws.getRow(row).height || 0, 15 * lineas + 2);
+    });
+    const ref = `A1:${col(Math.max(ws.columnCount, ULT) - 1)}${Math.max(ws.rowCount, 1)}`;
+    ws.addConditionalFormatting({ ref, rules: [
+      { type: "expression", priority: 1, formulae: ['LEFT(A1,9)="No cumple"'], style: { font: { color: { argb: "FFB42318" }, bold: true }, fill: relleno("FFFDECEC") } },
+      { type: "expression", priority: 2, formulae: ['A1="No protegido"'], style: { font: { color: { argb: "FFB42318" }, bold: true }, fill: relleno("FFFDECEC") } },
+      { type: "expression", priority: 3, formulae: ['OR(A1="Cumple",LEFT(A1,8)="Cumple (",LEFT(A1,7)="Cumple:",A1="Protegido")'], style: { font: { color: { argb: C_VERDE_TXT }, bold: true }, fill: relleno("FFE6F4EA") } },
+      { type: "expression", priority: 4, formulae: ['LEFT(A1,13)="Captador a <="'], style: { font: { color: { argb: "FF8A5A00" }, bold: true }, fill: relleno("FFFFF4E0") } }
+    ] });
+    ws.views = [{ state: "frozen", ySplit: 2, showGridLines: false }];
   }
 }
 const sigNorm = (x, rango) => `IFERROR(INDEX(${rango},MATCH(${x}-1E-9,${rango},1)+1),INDEX(${rango},1))`;
@@ -153,9 +406,9 @@ const HOJAS = {
     const filas = vacias(e.circuitos);
     const t = h.tabla([
       { t: "Circ.", v: (f) => String(f.circuito ?? ""), entrada: true, ancho: 7 }, { t: "Descripción", v: (f) => String(f.descripcion ?? ""), entrada: true, ancho: 26 },
-      { t: "Tipo", k: "tipo", v: (f) => String(f.tipo ?? ""), entrada: true }, { t: "Cant.", k: "cant", v: (f) => n(f.cantidad, 1), entrada: true },
+      { t: "Tipo", k: "tipo", v: (f) => String(f.tipo ?? ""), entrada: true, lista: ["Alumbrado", "Tomas", "Fuerza", "Motor", "Especial"] }, { t: "Cant.", k: "cant", v: (f) => n(f.cantidad, 1), entrada: true },
       { t: "P unit. (W)", k: "pu", v: (f) => n(f.potencia), entrada: true }, { t: "fp", k: "fp", v: (f) => n(f.fp, 0.9), entrada: true },
-      { t: "FD (%)", k: "fd", v: (f) => n(f.fd, 100), entrada: true }, { t: "Fases", k: "fs", v: (f) => String(f.fases || "A"), entrada: true },
+      { t: "FD (%)", k: "fd", v: (f) => n(f.fd, 100), entrada: true }, { t: "Fases", k: "fs", v: (f) => String(f.fases || "A"), entrada: true, lista: ["A", "B", "C", "AB", "BC", "CA", "ABC"] },
       { t: "P inst. (W)", k: "p", v: (f, r) => `=D${r}*E${r}`, fmt: "#,##0" }, { t: "S inst. (VA)", k: "s", v: (f, r) => `=I${r}/F${r}`, fmt: "#,##0" },
       { t: "S dem. (VA)", k: "sd", v: (f, r) => `=J${r}*G${r}/100`, fmt: "#,##0" },
       { t: "Fase A (VA)", v: (f, r) => `=IF(ISNUMBER(SEARCH("A",H${r})),K${r}/LEN(H${r}),0)`, fmt: "#,##0" },
@@ -166,16 +419,16 @@ const HOJAS = {
     const R = (c) => `${c}${t.r0}:${c}${t.r1}`;
     h.seccion("Resultados");
     const sInst = h.calc("Carga instalada", `SUM(${R("J")})/1000`, "kVA");
-    h.calc("Demanda máxima", `SUM(${R("K")})/1000`, "kVA");
+    const demMax = h.calc("Demanda máxima", `SUM(${R("K")})/1000`, "kVA");
     const ia = h.calc("Corriente fase A", `SUM(${R("L")})/${vln}`, "A"), ib = h.calc("Corriente fase B", `SUM(${R("M")})/${vln}`, "A"), ic = h.calc("Corriente fase C", `SUM(${R("N")})/${vln}`, "A");
     const lista = `IF(LEN(${fasesSis})=1,${ia},IF(LEN(${fasesSis})=2,MAX(${ia},${ib}),MAX(${ia},${ib},${ic})))`;
     const imax = h.calc("Corriente de la fase más cargada", lista, "A");
     const des = h.calc("Desbalance entre fases", `IF(LEN(${fasesSis})=1,0,IF(LEN(${fasesSis})=2,(MAX(${ia},${ib})-MIN(${ia},${ib}))/AVERAGE(${ia},${ib}),(MAX(${ia},${ib},${ic})-MIN(${ia},${ib},${ic}))/AVERAGE(${ia},${ib},${ic})))*100`, "%");
-    h.calc("Corriente de diseño del alimentador", `${imax}+0.25*MAX(${R("O")})`, "A", "NTC 2050 430-24");
+    const ialim = h.calc("Corriente de diseño del alimentador", `${imax}+0.25*MAX(${R("O")})`, "A", "NTC 2050 430-24");
     const dmax = h.dato("Desbalance máximo admisible", n(e.desbalanceMax, 10), "%");
     h.verif("Verificación del desbalance", `${des}<=${dmax}`, "Criterio de diseño");
     h.verif("Factor de potencia promedio ≥ 0,90", `SUMPRODUCT(${R("I")},${R("G")})/100/SUM(${R("K")})>=0.9`, "Referencia Res. CREG 015 de 2018");
-    void sInst;
+    h.resumen([{ t: "Carga instalada", f: sInst, u: "kVA" }, { t: "Demanda máxima de diseño", f: demMax, u: "kVA", nota: "Base para dimensionar el transformador (literal h)" }, { t: "Corriente de diseño del alimentador", f: ialim, u: "A", nota: "Base para seleccionar el conductor y la protección del alimentador" }, { t: "Desbalance entre fases", f: des, u: "%" }]);
   },
   conductores(wb, e, r, p) {
     const h = new Hoja(wb, "k-m Conductores", "Selección de conductores y protecciones (RETIE literales k y m; NTC 2050)");
@@ -183,11 +436,11 @@ const HOJAS = {
     const sel = r?.tablas?.[0]?.filas || [];
     const filas = vacias(e.circuitos).map((f, i) => ({ ...f, cal: String(sel[i]?.[4] || "").replace(/ (AWG|kcmil)$/, "") || "4/0" }));
     const colAmp = (rr, tcol) => `IF($E${rr}="Al",4,1)+MATCH(${tcol}${rr},{60,75,90},0)`;
-    h.tabla([
+    const t = h.tabla([
       { t: "Circ.", v: (f) => String(f.circuito ?? ""), entrada: true, ancho: 7 }, { t: "Descripción", v: (f) => String(f.descripcion ?? ""), entrada: true, ancho: 22 },
-      { t: "I carga (A)", v: (f) => n(f.corriente), entrada: true }, { t: "Continua", v: (f) => String(f.continua || "Sí"), entrada: true },
-      { t: "Mat.", v: (f) => (f.material === "Al" ? "Al" : "Cu"), entrada: true }, { t: "T aisl.", v: (f) => n(f.tAisl, 90), entrada: true },
-      { t: "T term.", v: (f) => n(f.tTerm, 75), entrada: true }, { t: "Portad.", v: (f) => n(f.portadores, 3), entrada: true },
+      { t: "I carga (A)", v: (f) => n(f.corriente), entrada: true }, { t: "Continua", v: (f) => String(f.continua || "Sí"), entrada: true, lista: ["Sí", "No"] },
+      { t: "Mat.", v: (f) => (f.material === "Al" ? "Al" : "Cu"), entrada: true, lista: ["Cu", "Al"] }, { t: "T aisl.", v: (f) => n(f.tAisl, 90), entrada: true, lista: [60, 75, 90] },
+      { t: "T term.", v: (f) => n(f.tTerm, 75), entrada: true, lista: [60, 75] }, { t: "Portad.", v: (f) => n(f.portadores, 3), entrada: true },
       { t: "T amb.", v: (f) => n(f.tAmb, n(p.tempAmbiente, 30)), entrada: true }, { t: "Calibre", v: (f) => f.cal, entrada: true },
       { t: "Ft", v: (f, rr) => `=INDEX(${T.temp},MATCH(I${rr},${T.tempDesde},1),MATCH(F${rr},{60,75,90},0)+1)`, fmt: "0.00" },
       { t: "Fa", v: (f, rr) => `=INDEX(${T.agr},MATCH(H${rr},${T.agrDesde},1),2)`, fmt: "0.00" },
@@ -201,6 +454,7 @@ const HOJAS = {
       { t: "Icc (kA)", v: (f) => n(f.icc, 0), entrada: true }, { t: "Icu (kA)", v: (f) => n(f.icu, 0), entrada: true },
       { t: "Resultado", v: (f, rr) => `=IF(AND(O${rr}>=M${rr},N${rr}>=C${rr},Q${rr}<=S${rr},OR(T${rr}=0,U${rr}>=T${rr})),"Cumple","No cumple")`, ancho: 11 }
     ], filas);
+    h.resumen(filas.map((f, i) => { const rr = t.r0 + i; return { t: `Circuito ${f.circuito || i + 1}`, texto: true, f: `A${rr}&" — "&B${rr}&": conductor "&J${rr}&" "&E${rr}&" ("&F${rr}&" °C), protección de "&Q${rr}&" A; capacidad final del conductor "&ROUND(P${rr},0)&" A"` }; }));
   },
   regulacion(wb, e) {
     const h = new Hoja(wb, "o-p Regulación", "Regulación de tensión y pérdidas (RETIE literales o y p)");
@@ -223,7 +477,8 @@ const HOJAS = {
       { t: "Pérdidas (%)", v: (f, rr) => `=IF(E${rr}>0,N${rr}/(E${rr}*${fp})*100,0)`, fmt: "0.00" },
       { t: "Resultado", v: (f, rr) => `=IF(AND(L${rr}<=${lp},M${rr}<=${lt}),"Cumple","No cumple")` }
     ], filas);
-    h.calc("Pérdidas totales", `SUM(N${t.r0}:N${t.r1})`, "kW");
+    const perd = h.calc("Pérdidas totales", `SUM(N${t.r0}:N${t.r1})`, "kW");
+    h.resumen([{ t: "Regulación acumulada máxima", f: `MAX(M${t.r0}:M${t.r1})`, u: "%", nota: "Debe ser menor que el límite de regulación acumulada" }, { t: "Pérdidas totales de potencia", f: perd, u: "kW" }, ...filas.map((f, i) => ({ t: `Tramo ${f.tramo || i + 1}`, texto: true, f: `F${t.r0 + i}&" — "&D${t.r0 + i}&" m, caída "&ROUND(L${t.r0 + i},2)&" % (acumulada "&ROUND(M${t.r0 + i},2)&" %)"` }))]);
   },
   canalizaciones(wb, e, r) {
     const h = new Hoja(wb, "n Canalizaciones", "Canalizaciones — llenado de ductos (RETIE literal n; NTC 2050 Cap. 9)");
@@ -236,13 +491,14 @@ const HOJAS = {
     h.seccion("Ductos");
     const ductos = (r?.tablas?.[0]?.filas || []).map((f) => ({ ducto: f[0], tipo: Object.keys(N.TUBERIAS).find((k) => N.TUBERIAS[k].nombre === f[1]) || "PVC40", tam: String(f[7] || "").replace(/"$/, "") }));
     const rng = (c) => `$${c}$${t.r0}:$${c}$${t.r1}`;
-    h.tabla([
-      { t: "Ducto", v: (d) => d.ducto, ancho: 14 }, { t: "Tipo (EMT/IMC/PVC40)", v: (d) => d.tipo, entrada: true }, { t: "Tamaño adoptado", v: (d) => d.tam, entrada: true },
+    const t2 = h.tabla([
+      { t: "Ducto", v: (d) => d.ducto, ancho: 14 }, { t: "Tipo (EMT/IMC/PVC40)", v: (d) => d.tipo, entrada: true, lista: ["EMT", "IMC", "PVC40"] }, { t: "Tamaño adoptado", v: (d) => d.tam, entrada: true },
       { t: "N.º conductores", v: (d, rr) => `=SUMIF(${rng("A")},A${rr},${rng("C")})` }, { t: "Área cond. (mm²)", v: (d, rr) => `=SUMIF(${rng("A")},A${rr},${rng("D")})`, fmt: "0.0" },
       { t: "Llenado máx. (%)", v: (d, rr) => `=IF(D${rr}=1,53,IF(D${rr}=2,31,40))` },
       { t: "Área tubería (mm²)", v: (d, rr) => `=VLOOKUP(C${rr},${T.tub},MATCH(B${rr},{"EMT","IMC","PVC40"},0)+1,FALSE)` },
       { t: "Llenado (%)", v: (d, rr) => `=E${rr}/G${rr}*100`, fmt: "0.0" }, { t: "Resultado", v: (d, rr) => `=IF(H${rr}<=F${rr},"Cumple","No cumple")` }
     ], ductos);
+    h.resumen(ductos.map((d, i) => { const rr = t2.r0 + i; return { t: `Ducto ${d.ducto}`, texto: true, f: `"Tubería "&B${rr}&" de "&C${rr}&" pulgadas con "&D${rr}&" conductores: llenado "&ROUND(H${rr},1)&" % (máximo "&F${rr}&" %)"` }; }));
   },
   transformador(wb, e, r, p, ctx) {
     const h = new Hoja(wb, "h Transformador", "Dimensionamiento del transformador (RETIE literal h; NTC 818/819; NTC 2050 450-3)");
@@ -257,32 +513,34 @@ const HOJAS = {
     const raiz = tri ? "SQRT(3)*" : "";
     const ip = h.calc("Corriente nominal primaria", `${sn}*1000/(${raiz}${vp}*1000)`, "A"), is = h.calc("Corriente nominal secundaria", `${sn}*1000/(${raiz}${vs})`, "A");
     h.calc("Cortocircuito en bornes BT (barra infinita)", `${is}/(${z}/100)/1000`, "kA");
-    h.calc("Fusible primario tipo K (≈ 1,5 Ip)", sigNorm(`1.5*${ip}`, T.fusK), "A");
+    const fus = h.calc("Fusible primario tipo K (≈ 1,5 Ip)", sigNorm(`1.5*${ip}`, T.fusK), "A");
     const inb = h.calc("Interruptor general BT", sigNorm(is, T.prot), "A");
     const cmax = h.dato("Cargabilidad máxima admisible", n(e.cargaMax, 80), "%");
     const carga = h.calc("Cargabilidad actual", `${dem}/${sn}*100`, "%"), fut = h.calc("Cargabilidad con crecimiento", `${sreq}/${sn}*100`, "%");
     h.verif("Cargabilidad actual", `${carga}<=${cmax}`);
     h.verif("Cargabilidad con crecimiento", `${fut}<=100`);
     h.verif("Protección del secundario (450-3(b))", `${inb}<=${sigNorm(`1.25*${is}`, T.prot)}`);
+    h.resumen([{ t: "Transformador adoptado", texto: true, f: `${sn}&" kVA, "&${vp}&" kV / "&${vs}&" V, Z = "&${z}&" %"` }, { t: "Fusible primario tipo K", f: fus, u: "A" }, { t: "Interruptor general de baja tensión", f: inb, u: "A" }, { t: "Corriente nominal secundaria", f: is, u: "A" }, { t: "Cargabilidad actual", f: carga, u: "%" }]);
   },
   cortocircuito(wb, e, r, p, ctx) {
     const h = new Hoja(wb, "e Cortocircuito", "Cortocircuito según IEC 60909-0 (RETIE literales e y k)");
-    const un = h.dato("Tensión nominal BT Un", n(e.uBT, ctx.transformador?.vs ?? 208), "V");
+    const un = h.dato("Tensión nominal del secundario Un", n(e.uBT, ctx.transformador?.vs ?? 208), "V");
     const c = h.dato("Factor de tensión c", n(e.factorC, 1.05), "", "IEC 60909-0 Tabla 1");
     const umt = h.dato("Tensión nominal MT", n(e.uMT, 13.2), "kV"), sk = h.dato("S\"kQ de la red", n(e.sk, 250), "MVA"), rx = h.dato("R/X de la red", n(e.rxRed, 0.1), "");
     const sn = h.dato("Potencia del transformador", n(e.snTrafo, ctx.transformador?.sn ?? 150), "kVA");
     const uk = h.dato("ukr", n(e.uk, ctx.transformador?.z ?? 4), "%"), pk = h.dato("PkrT", n(e.pkTrafo, n(e.snTrafo, ctx.transformador?.sn ?? 150) * 0.012), "kW", "Vacío en AHÍNCO = 1,2 % de Sn");
     h.calc("Ik\" trifásica en MT", `${sk}/(SQRT(3)*${umt})`, "kA");
-    const zq = h.calc("ZQ referida a BT", `1.1*${un}^2/(${sk}*1E6)`, "Ω");
+    const zq = h.calc("ZQ referida al secundario", `1.1*${un}^2/(${sk}*1E6)`, "Ω");
     const xq = h.calc("XQ", `${zq}/SQRT(1+${rx}^2)`, "Ω"), rq = h.calc("RQ", `${rx}*${xq}`, "Ω");
     const zt = h.calc("ZT", `${uk}/100*${un}^2/(${sn}*1000)`, "Ω"), rt = h.calc("RT", `${pk}*1000*${un}^2/(${sn}*1000)^2`, "Ω");
     const xt = h.calc("XT", `SQRT(MAX(${zt}^2-${rt}^2,0))`, "Ω");
     const kt = h.calc("KT = 0,95·cmax/(1+0,6·xT)", `0.95*1.1/(1+0.6*${xt}/(${un}^2/(${sn}*1000)))`, "");
     const x0zz = n(e.x0Tierra, 0) > 0 ? h.dato("X0 del transformador zig-zag", n(e.x0Tierra), "Ω", "Secundario en delta: Z0 = la del zig-zag") : null;
     const r1 = h.calc("R1 en bornes", `${rq}+${kt}*${rt}`, "Ω"), x1 = h.calc("X1 en bornes", `${xq}+${kt}*${xt}`, "Ω");
-    h.seccion("Barras (Z0 del transformador Dyn ≈ Z1; Z0 de cables ≈ 4 Z1)");
+    h.seccion("Corrientes de cortocircuito por barra");
+    h.nota(x0zz ? "Secundario en delta con transformador zig-zag: la impedancia de secuencia cero en la barra es la del zig-zag; en los cables Z0 ≈ 4 Z1." : "Z0 del transformador Dyn o YNyn con terciario en delta ≈ Z1; en los cables Z0 ≈ 4 Z1 (aproximación IEC 60909-2).");
     const barras = [{ barra: e.nombreBornes || "Bornes BT", L: 0, R: 0, X: 0, n: 1, icu: n(e.icuBornes, 0) }, ...vacias(e.cables).map((cb) => { const z = impedanciaConductor(cb.conductor, cb.canalizacion); return { barra: cb.barra, L: n(cb.longitud), R: z.R, X: z.X, n: n(cb.paralelos, 1), icu: n(cb.icu, 0) }; })];
-    h.tabla([
+    const tb = h.tabla([
       { t: "Barra", v: (b) => String(b.barra || ""), ancho: 20 }, { t: "L (m)", v: (b) => b.L, entrada: true }, { t: "R cable (Ω/km)", v: (b) => b.R, entrada: true, fmt: "0.0000" },
       { t: "X cable (Ω/km)", v: (b) => b.X, entrada: true, fmt: "0.0000" }, { t: "Paralelos", v: (b) => b.n, entrada: true },
       { t: "R1 (Ω)", v: (b, rr) => (b === barras[0] ? `=${r1}` : `=F${rr - 1}+C${rr}*B${rr}/1000/E${rr}`), fmt: "0.00000" },
@@ -295,6 +553,7 @@ const HOJAS = {
       { t: "Ik\" 1F (kA)", v: (b, rr) => `=SQRT(3)*${c}*${un}/SQRT((2*F${rr}+H${rr})^2+(2*G${rr}+I${rr})^2)/1000`, fmt: "0.00" },
       { t: "Icu (kA)", v: (b) => b.icu, entrada: true }, { t: "Resultado", v: (b, rr) => `=IF(N${rr}=0,"Sin dato",IF(N${rr}>=J${rr},"Cumple","No cumple"))` }
     ], barras);
+    h.resumen(barras.map((b, i) => { const rr = tb.r0 + i; return { t: String(b.barra || `Barra ${i + 1}`), texto: true, f: `"Ik3 = "&ROUND(J${rr},2)&" kA; Ik1 = "&ROUND(M${rr},2)&" kA; pico ip = "&ROUND(L${rr},2)&" kA → especificar equipos con capacidad de interrupción ≥ "&ROUND(MAX(J${rr},M${rr}),1)&" kA"` }; }));
   },
   coordinacion(wb, e) {
     const h = new Hoja(wb, "m Coordinación", "Coordinación de protecciones IEC 60255-151 (RETIE literal m)");
@@ -302,7 +561,7 @@ const HOJAS = {
     h.seccion("Protecciones (de aguas abajo hacia aguas arriba)");
     const rels = vacias(e.protecciones);
     const t = h.tabla([
-      { t: "Protección", v: (f) => String(f.nombre || ""), ancho: 22 }, { t: "Curva (SI/VI/EI/LTI/DT)", v: (f) => String(f.curva || "SI"), entrada: true },
+      { t: "Protección", v: (f) => String(f.nombre || ""), ancho: 22 }, { t: "Curva (SI/VI/EI/LTI/DT)", v: (f) => String(f.curva || "SI"), entrada: true, lista: ["SI", "VI", "EI", "LTI", "DT"] },
       { t: "I arranque (A)", v: (f) => n(f.pickup), entrada: true }, { t: "TMS / t (s)", v: (f) => n(f.tms, 0.1), entrada: true },
       { t: "I inst. (A)", v: (f) => n(f.inst, 0), entrada: true }, { t: "t inst. (s)", v: (f) => n(f.tinst, 0.05), entrada: true },
       { t: "k", v: (f, rr) => `=VLOOKUP(B${rr},${T.curvas},2,FALSE)` }, { t: "α", v: (f, rr) => `=VLOOKUP(B${rr},${T.curvas},3,FALSE)` }
@@ -319,6 +578,7 @@ const HOJAS = {
       cols.push({ t: `Margen ${rels[i + 1].nombre || i + 2} − ${rels[i].nombre || i + 1}`, v: (f, r) => `=IF(OR(ISTEXT(${a}${r}),ISTEXT(${b}${r})),"—",IF(${b}${r}-${a}${r}>=${cti},"Cumple ("&ROUND(${b}${r}-${a}${r},3)&" s)","No cumple ("&ROUND(${b}${r}-${a}${r},3)&" s)"))`, ancho: 22 });
     }
     h.tabla(cols, fallas);
+    h.resumen(rels.map((rl, i) => { const rr = t.r0 + i; return { t: String(rl.nombre || `Protección ${i + 1}`), texto: true, f: `"Curva "&B${rr}&", arranque "&C${rr}&" A, TMS "&D${rr}&IF(E${rr}>0,", instantánea "&E${rr}&" A en "&F${rr}&" s","")` }; }));
   },
   malla(wb, e) {
     const h = new Hoja(wb, "i Puesta a tierra", "Malla de puesta a tierra — IEEE 80-2013 (RETIE literal i)");
@@ -344,7 +604,7 @@ const HOJAS = {
     const lc = h.calc("LC (conductor horizontal)", `(ROUND(${ly}/${D},0)+1)*${lx}+(ROUND(${lx}/${D},0)+1)*${ly}`, "m");
     const lp = h.calc("Perímetro Lp", `2*(${lx}+${ly})`, "m"), A = h.calc("Área A", `${lx}*${ly}`, "m²"), LR = h.calc("LR (varillas)", `${nr}*${lr}`, "m"), lt = h.calc("LT", `${lc}+${LR}`, "m");
     const rg = h.calc("Rg (Sverak)", `${rho}*(1/${lt}+1/SQRT(20*${A})*(1+1/(1+${hh}*SQRT(20/${A}))))`, "Ω");
-    h.calc("GPR", `${ig}*${rg}`, "V");
+    const gpr = h.calc("GPR", `${ig}*${rg}`, "V");
     const nn = h.calc("n = na·nb", `(2*${lc}/${lp})*SQRT(${lp}/(4*SQRT(${A})))`, "");
     const kii = h.calc("Kii", `IF(AND(${nr}>0,${per}=1),1,1/(2*${nn})^(2/${nn}))`, ""), kh = h.calc("Kh", `SQRT(1+${hh}/1)`, "");
     const km = h.calc("Km", `1/(2*PI())*(LN(${D}^2/(16*${hh}*${d})+(${D}+2*${hh})^2/(8*${D}*${d})-${hh}/(4*${d}))+${kii}/${kh}*LN(8/(PI()*(2*${nn}-1))))`, "");
@@ -360,6 +620,14 @@ const HOJAS = {
     h.verif("Es ≤ E paso tolerable", `${ep}<=${es}`, "IEEE 80");
     h.verif("Rg ≤ referencia RETIE", `${rg}<=${rmax}`, "RETIE");
     h.verif("Sección del conductor ≥ mínima", `${acal}>=${areq}`, "IEEE 80 ec. 37");
+    h.resumen([
+      { t: "Malla adoptada", texto: true, f: `${lx}&" m × "&${ly}&" m, espaciamiento "&${D}&" m, enterrada a "&${hh}&" m"` },
+      { t: "Conductor", texto: true, f: `"${N.etiquetaCalibre(cal)} de ${mat.nombre.toLowerCase()} ("&${acal}&" mm²; mínimo requerido "&ROUND(${areq},1)&" mm²)"` },
+      { t: "Electrodos", texto: true, f: `${nr}&" varillas de "&${lr}&" m"&IF(${per}=1," en el perímetro","")` },
+      { t: "Resistencia de la malla Rg", f: rg, u: "Ω" }, { t: "Elevación de potencial GPR", f: gpr, u: "V" },
+      { t: "Tensión de contacto / tolerable", texto: true, f: `ROUND(${em},0)&" V frente a "&ROUND(${et},0)&" V tolerables"` },
+      { t: "Tensión de paso / tolerable", texto: true, f: `ROUND(${ep},0)&" V frente a "&ROUND(${es},0)&" V tolerables"` }
+    ]);
   },
   rayos(wb, e) {
     const h = new Hoja(wb, "b Rayos", "Análisis de riesgo por rayos — R1 (RETIE literal b; NTC 4552-2 / IEC 62305-2)");
@@ -378,6 +646,7 @@ const HOJAS = {
     const ra = h.calc("RA", `${nd}*${pta}*${pb}*${la}`, ""), rb = h.calc("RB", `${nd}*${pb}*${lb}`, ""), ru = h.calc("RU", `${nl}*${pta}*${peb}*${la}`, ""), rv = h.calc("RV", `${nl}*${peb}*${lb}`, "");
     const r1 = h.calc("R1", `${ra}+${rb}+${ru}+${rv}`, "");
     h.verif("R1 ≤ 1E-5 (riesgo tolerable)", `${r1}<=1E-5`, "IEC 62305-2");
+    h.resumen([{ t: "Riesgo R1 con las medidas adoptadas", f: r1, fmt: "0.00E+00", nota: "Tolerable: ≤ 1,00E-05" }, { t: "Medidas de protección adoptadas", texto: true, valor: `${(N.PB_SIPRA[e.sipra] || N.PB_SIPRA.ninguno).nombre}; ${(N.PEB_DPS[e.dps] || N.PEB_DPS.ninguno).nombre}; ${(N.PTA_MEDIDAS[e.medidas] || N.PTA_MEDIDAS.ninguna).nombre}` }]);
   },
   aislamiento(wb, e, r, p) {
     const h = new Hoja(wb, "d Aislamiento", "Coordinación de aislamiento y DPS (RETIE literal d; IEC 60071 / 60099-5)");
@@ -392,6 +661,7 @@ const HOJAS = {
     const mp = h.calc("Margen de protección", `((${bil}/${ka})/${ve}-1)*100`, "%");
     h.seccion("Verificaciones");
     h.verif("Uc ≥ Us/√3", `${uc}>=${ucm}`); h.verif("Ur ≥ TOV/T", `${ur}>=${urm}`); h.verif("Margen ≥ 20 %", `${mp}>=20`, "IEEE C62.22");
+    h.resumen([{ t: "DPS seleccionado", texto: true, f: `"Ur = "&${ur}&" kV; Uc = "&${uc}&" kV; tensión residual a 10 kA = "&${ures}&" kV, a "&${d}&" m del equipo"` }, { t: "Ur mínima exigida", f: urm, u: "kV" }, { t: "Uc mínima exigida", f: ucm, u: "kV" }, { t: "BIL del equipo protegido", f: bil, u: "kV" }, { t: "Margen de protección obtenido", f: mp, u: "%", nota: "Mínimo recomendado: 20 %" }]);
   },
   distancias(wb, e, r, p) {
     const h = new Hoja(wb, "u Distancias", "Distancias de seguridad (RETIE literal u)");
@@ -399,11 +669,12 @@ const HOJAS = {
     const f = h.calc("Factor de altitud", `IF(${H}>1000,1+0.0125*(${H}-1000)/100,1)`, "");
     h.nota("Distancia base: tabla de distancias mínimas de seguridad del RETIE (verificar contra la versión vigente) o valor digitado.");
     const filas = vacias(e.puntos).map((x) => { const tipo = N.RETIE_DISTANCIAS.tipos[x.tipo] || N.RETIE_DISTANCIAS.tipos.e; const base = n(x.exigida, NaN); return { ...x, tipoN: tipo.nombre, base: Number.isFinite(base) ? base : tipo.v[x.tension] ?? null }; });
-    h.tabla([
+    const t = h.tabla([
       { t: "Punto", v: (x) => String(x.punto || ""), ancho: 24 }, { t: "Tensión (kV)", v: (x) => String(x.tension || "") }, { t: "Tipo de distancia", v: (x) => x.tipoN, ancho: 40 },
       { t: "Distancia base (m)", v: (x) => x.base, entrada: true }, { t: "Exigida (m)", v: (x, rr) => `=IF(D${rr}="","",D${rr}*${f})`, fmt: "0.00" },
       { t: "Diseño (m)", v: (x) => n(x.diseno), entrada: true }, { t: "Resultado", v: (x, rr) => `=IF(E${rr}="","Sin dato",IF(F${rr}>=E${rr},"Cumple","No cumple"))` }
     ], filas);
+    h.resumen(filas.map((x, i) => { const rr = t.r0 + i; return { t: String(x.punto || `Punto ${i + 1}`), texto: true, f: `"Distancia de diseño "&F${rr}&" m frente a "&IF(E${rr}="","(sin dato exigido)",ROUND(E${rr},2)&" m exigidos")` }; }));
   },
   mecanico(wb, e) {
     const h = new Hoja(wb, "l Mecánico", "Cálculo mecánico de conductores — cambio de estado (RETIE literal l)");
@@ -430,7 +701,8 @@ const HOJAS = {
     }
     const ult = col(13);
     cols.push({ t: "Tensión (kgf)", v: (x, r) => `=${ult}${r}/9.80665`, fmt: "0" }, { t: "% rotura", v: (x, r) => `=${ult}${r}/9.80665/${rot}*100`, fmt: "0.0" }, { t: "Flecha (m)", v: (x, r) => `=D${r}*${L}^2/(8*${ult}${r})`, fmt: "0.00" }, { t: "≤ 50 % rotura", v: (x, r) => `=IF(${col(15)}${r}<=50,"Cumple","No cumple")` });
-    h.tabla(cols, hip);
+    const t = h.tabla(cols, hip);
+    h.resumen([{ t: "Conductor", texto: true, valor: `${c.nombre}, vano de ${n(e.vano, 150)} m, EDS ${n(e.eds, 18)} %` }, { t: "Tensión máxima del conductor", f: `MAX(${col(14)}${t.r0}:${col(14)}${t.r1})`, u: "kgf" }, { t: "Porcentaje máximo de la rotura", f: `MAX(${col(15)}${t.r0}:${col(15)}${t.r1})`, u: "%", nota: "Máximo admisible: 50 %" }, { t: "Flecha máxima", f: `MAX(${col(16)}${t.r0}:${col(16)}${t.r1})`, u: "m" }]);
   },
   trafoPotencia(wb, e) {
     const h = new Hoja(wb, "h Trafo potencia", "Transformador de potencia (RETIE literal h; IEC 60076-5; IEC 61869-2)");
@@ -459,8 +731,8 @@ const HOJAS = {
     if (tcs.length) {
       h.seccion("Transformadores de corriente (corriente térmica extendida 120 %; ALF × Ipn ≥ Ik)");
       h.tabla([
-        { t: "TC", v: (f) => String(f.nombre || ""), ancho: 18 }, { t: "Lado (AT/MT)", v: (f) => f.lado === "AT" ? "AT" : "MT", entrada: true },
-        { t: "Función", v: (f) => String(f.funcion || "Protección"), entrada: true }, { t: "Ipn (A)", v: (f) => n(f.primaria), entrada: true }, { t: "ALF", v: (f) => n(f.alf, 20), entrada: true },
+        { t: "TC", v: (f) => String(f.nombre || ""), ancho: 18 }, { t: "Lado (AT/MT)", v: (f) => f.lado === "AT" ? "AT" : "MT", entrada: true, lista: ["AT", "MT"] },
+        { t: "Función", v: (f) => String(f.funcion || "Protección"), entrada: true, lista: ["Protección", "Medida"] }, { t: "Ipn (A)", v: (f) => n(f.primaria), entrada: true }, { t: "ALF", v: (f) => n(f.alf, 20), entrada: true },
         { t: "I máx. circuito (A)", v: (f, rr) => `=IF(B${rr}="AT",${iAT},${iMT})`, fmt: "0" }, { t: "Ik vista (kA)", v: (f, rr) => `=IF(B${rr}="AT",${ikPas},${ikMT})`, fmt: "0.00" },
         { t: "Resultado", v: (f, rr) => `=IF(AND(F${rr}<=1.2*D${rr},OR(C${rr}<>"Protección",D${rr}*E${rr}>=G${rr}*1000)),"Cumple","No cumple")` }
       ], tcs);
@@ -469,12 +741,13 @@ const HOJAS = {
     if (eq.length) {
       h.seccion("Equipos en serie con el transformador");
       h.tabla([
-        { t: "Equipo", v: (f) => String(f.equipo || ""), ancho: 24 }, { t: "Lado (AT/MT)", v: (f) => f.lado === "AT" ? "AT" : "MT", entrada: true },
+        { t: "Equipo", v: (f) => String(f.equipo || ""), ancho: 24 }, { t: "Lado (AT/MT)", v: (f) => f.lado === "AT" ? "AT" : "MT", entrada: true, lista: ["AT", "MT"] },
         { t: "In (A)", v: (f) => n(f.inom), entrada: true }, { t: "Ik equipo (kA)", v: (f) => n(f.icc), entrada: true },
         { t: "I exigida (A)", v: (f, rr) => `=IF(B${rr}="AT",${iAT},${iMT})`, fmt: "0" }, { t: "Ik exigida (kA)", v: (f, rr) => `=IF(B${rr}="AT",${ikRed},${ikMT})`, fmt: "0.00" },
         { t: "Resultado", v: (f, rr) => `=IF(AND(C${rr}>=E${rr},OR(D${rr}=0,D${rr}>=F${rr})),"Cumple","No cumple")` }
       ], eq);
     }
+    h.resumen([{ t: "Transformador", texto: true, f: `${sOnan}&"/"&${sOnaf}&" MVA, "&${uAT}&" / "&${uMT}&" kV, uk = "&${uk}&" %"` }, { t: "Corriente nominal en MT (ONAF)", f: iMT, u: "A", nota: "Corriente que deben soportar la llegada, el TC y la celda de MT" }, { t: "Corriente máxima en AT (toma extrema)", f: iAT, u: "A" }, { t: "Cortocircuito en la barra MT", f: ikMT, u: "kA", nota: "Capacidad de interrupción mínima de las celdas de MT" }, { t: "Cortocircuito pasante visto desde AT", f: ikPas, u: "kA", nota: "Debe ser menor que la soportabilidad especificada del transformador" }]);
   },
   cableMT(wb, e, r, p, ctx) {
     const h = new Hoja(wb, "k Cables MT", "Cables de media tensión (RETIE literal k; IEC 60502-2; IEC 60949)");
@@ -483,9 +756,9 @@ const HOJAS = {
     const ik3 = ctx.cortocircuito?.barras?.[0]?.ik3;
     const ikDef = ctx.trafoPotencia?.ikMT ?? (Number.isFinite(ik3) ? ik3 / 1000 : 0);
     h.nota("K adiabático (IEC 60949): Cu XLPE/EPR 143, Al XLPE/EPR 94, Cu PVC 115, Al PVC 76. R vacía en AHÍNCO = resistencia a 90 °C calculada.");
-    h.tabla([
-      { t: "Circuito", v: (f) => String(f.circuito || ""), ancho: 16 }, { t: "Mat. (Cu/Al)", v: (f) => (f.material === "Cu" ? "Cu" : "Al"), entrada: true },
-      { t: "Calibre", v: (f) => String(f.calibre || "750"), entrada: true }, { t: "Aisl.", v: (f) => String(f.aislamiento || "XLPE"), entrada: true },
+    const t = h.tabla([
+      { t: "Circuito", v: (f) => String(f.circuito || ""), ancho: 16 }, { t: "Mat. (Cu/Al)", v: (f) => (f.material === "Cu" ? "Cu" : "Al"), entrada: true, lista: ["Cu", "Al"] },
+      { t: "Calibre", v: (f) => String(f.calibre || "750"), entrada: true }, { t: "Aisl.", v: (f) => String(f.aislamiento || "XLPE"), entrada: true, lista: ["XLPE", "EPR", "PVC"] },
       { t: "S (mm²)", v: (f, rr) => `=VLOOKUP(C${rr},${T.cond},8,FALSE)`, fmt: "0.0" },
       { t: "Ampacidad base (A)", v: (f) => n(f.ampacidad), entrada: true }, { t: "Factor", v: (f) => n(f.factor, 1), entrada: true },
       { t: "Ampacidad corregida (A)", v: (f, rr) => `=F${rr}*G${rr}`, fmt: "0" }, { t: "I diseño (A)", v: (f) => n(f.corriente), entrada: true },
@@ -499,6 +772,7 @@ const HOJAS = {
       { t: "In celda (A)", v: (f) => n(f.inCelda, 0), entrada: true },
       { t: "Resultado", v: (f, rr) => `=IF(AND(I${rr}<=H${rr},O${rr}<=P${rr},Q${rr}<=${dvMax},OR(R${rr}=0,R${rr}>=I${rr})),"Cumple","No cumple")` }
     ], vacias(e.circuitos));
+    h.resumen(vacias(e.circuitos).map((f, i) => { const rr = t.r0 + i; return { t: String(f.circuito || `Circuito ${i + 1}`), texto: true, f: `"Cable "&B${rr}&" "&C${rr}&" "&D${rr}&": capacidad "&ROUND(H${rr},0)&" A para "&I${rr}&" A; soporta "&ROUND(P${rr},1)&" kA durante "&N${rr}&" s"` }; }));
   },
   apantallamiento(wb, e) {
     const h = new Hoja(wb, "b Apantallamiento", "Apantallamiento por esfera rodante (RETIE literal b; NTC 4552-3; IEEE 998)");
@@ -511,82 +785,203 @@ const HOJAS = {
       R = h.dato(`Radio de la esfera (nivel ${e.nivel || "I"})`, (N.NIVELES_SIPRA[e.nivel] || N.NIVELES_SIPRA.I).esfera, "m");
     }
     h.seccion("Elementos a proteger — r = √(hm(2R − hm)) − √(h(2R − h))");
-    h.tabla([
+    const t = h.tabla([
       { t: "Elemento", v: (f) => String(f.elemento || ""), ancho: 26 }, { t: "Captador", v: (f) => String(f.captador || ""), ancho: 14 },
       { t: "Altura captador (m)", v: (f) => n(f.hCaptador), entrada: true }, { t: "Altura elemento (m)", v: (f) => n(f.hElemento), entrada: true },
       { t: "Distancia (m)", v: (f) => (f.distancia === "" || f.distancia == null ? "" : n(f.distancia)), entrada: true },
       { t: "Radio protegido (m)", v: (f, rr) => `=IF(D${rr}>=C${rr},0,MAX(0,IF(C${rr}>=${R},${R},SQRT(C${rr}*(2*${R}-C${rr})))-IF(D${rr}>=${R},${R},SQRT(D${rr}*(2*${R}-D${rr})))))`, fmt: "0.00" },
       { t: "Resultado", v: (f, rr) => `=IF(E${rr}="","Captador a <= "&ROUND(F${rr},2)&" m",IF(E${rr}<=F${rr},"Protegido","No protegido"))` }
     ], vacias(e.elementos));
+    h.resumen([{ t: "Radio de la esfera rodante", f: R, u: "m" }, ...vacias(e.elementos).map((f, i) => { const rr = t.r0 + i; return { t: String(f.elemento || `Elemento ${i + 1}`), texto: true, f: `B${rr}&" de "&C${rr}&" m: protege un radio de "&ROUND(F${rr},2)&" m a "&D${rr}&" m de altura"` }; })]);
   }
 };
 
-export function construirLibro({ proyecto, resultados, guardados }, ExcelJS = window.ExcelJS) {
+// Descripción corta de cada hoja de cálculo para el índice de la portada.
+const DESCRIPCION_HOJA = {
+  cargas: "Carga instalada, demanda, balance de fases y corriente del alimentador",
+  conductores: "Calibre del conductor y protección de cada circuito de baja tensión",
+  regulacion: "Caída de tensión por tramo y acumulada, y pérdidas",
+  canalizaciones: "Llenado de tuberías y ductos",
+  transformador: "Potencia, protecciones y cargabilidad del transformador de distribución",
+  trafoPotencia: "Corrientes, cortocircuito pasante, TC y equipos del transformador de potencia",
+  cortocircuito: "Corrientes de cortocircuito trifásica, monofásica y pico por barra",
+  cableMT: "Capacidad, cortocircuito y caída de tensión de los cables de media tensión",
+  coordinacion: "Tiempos de operación y márgenes entre protecciones",
+  malla: "Tensiones de paso y contacto, resistencia y conductor de la malla",
+  rayos: "Riesgo de pérdida de vidas humanas R1 por rayos",
+  apantallamiento: "Zona protegida por mástiles y cables de guarda",
+  aislamiento: "Selección del DPS y margen de protección del aislamiento",
+  distancias: "Distancias mínimas de seguridad",
+  mecanico: "Tensiones y flechas del conductor por cambio de estado"
+};
+
+function bandaTitulo(ws, texto, sub, cols) {
+  ws.mergeCells(1, 1, 1, cols);
+  const t = ws.getCell("A1"); t.value = texto; t.font = { bold: true, size: 15, color: { argb: "FFFFFFFF" } }; t.fill = relleno(C_NAVY); t.alignment = { vertical: "middle", indent: 1, wrapText: true };
+  ws.getRow(1).height = 36;
+  ws.mergeCells(2, 1, 2, cols);
+  const s = ws.getCell("A2"); s.value = sub; s.font = { italic: true, size: 10, color: { argb: C_GRIS_TXT } }; s.alignment = { indent: 1 };
+}
+
+export async function construirLibro({ proyecto, resultados, guardados }, ExcelJS = window.ExcelJS) {
   const wb = new ExcelJS.Workbook();
   wb.creator = "AHÍNCO — Cinco S.A.S.";
   wb.calcProperties.fullCalcOnLoad = true;
-  // Portada.
-  const port = wb.addWorksheet("Portada");
-  port.columns = [{ width: 30 }, { width: 70 }];
+  hojasCreadas.length = 0;
   const verif = esVerificacion(proyecto);
-  port.getCell("A1").value = `${verif ? "Verificación de la memoria de cálculo" : "Memoria de cálculo"} — ${proyecto.nombre}`;
-  port.getCell("A1").font = { bold: true, size: 14, color: { argb: NAVY } };
-  [["Tipo de documento", verif ? "Verificación de interventoría" : "Diseño"], ["Cliente", proyecto.cliente], ["Ubicación", proyecto.ubicacion], ["Altitud (m s. n. m.)", proyecto.altitud], ["Temperatura ambiente (°C)", proyecto.tempAmbiente], ...(verif ? [["Diseño revisado", proyecto.autorDiseno], ["Documentos revisados", proyecto.documentosRevisados]] : []), [verif ? "Interventor que verifica" : "Diseñador", proyecto.disenador], ["Matrícula profesional", proyecto.matricula], ["Generado con", "AHÍNCO — Cinco S.A.S."], ["Convención", "Celdas amarillas = datos de entrada; celdas grises = fórmulas"]]
-    .forEach(([k, v], i) => { port.getCell(`A${i + 3}`).value = k; port.getCell(`A${i + 3}`).font = { bold: true }; port.getCell(`B${i + 3}`).value = v ?? ""; });
-  // Literales.
-  const lit = wb.addWorksheet("Literales RETIE");
-  lit.columns = [{ width: 6 }, { width: 70 }, { width: 9 }, { width: 70 }];
-  lit.getCell("A1").value = `Diseño detallado — ${FUENTE_LITERALES}`; lit.getCell("A1").font = { bold: true, color: { argb: NAVY } };
-  ["Lit.", "Contenido exigido", "Aplica", "Desarrollo / cálculo / justificación"].forEach((h, i) => { const c = lit.getCell(3, i + 1); c.value = h; c.font = { bold: true, color: { argb: "FFFFFFFF" } }; c.fill = { type: "pattern", pattern: "solid", fgColor: { argb: NAVY } }; });
+  const tituloDoc = verif ? "Verificación de la memoria de cálculo" : "Memoria de cálculo";
+  proyectoActual = `${proyecto.nombre}${proyecto.cliente ? ` · ${proyecto.cliente}` : ""}`;
+
+  // ---- portada (el índice se llena al final, cuando existen todas las hojas)
+  const port = wb.addWorksheet("Portada", { properties: { tabColor: { argb: C_NAVY } }, pageSetup: { orientation: "landscape", fitToPage: true, fitToWidth: 1, fitToHeight: 0, paperSize: 9 } });
+  port.columns = [{ width: 32 }, { width: 62 }, { width: 50 }];
+  bandaTitulo(port, `${tituloDoc} — ${proyecto.nombre}`, "Libro formulado generado con AHÍNCO — Cinco S.A.S.", 3);
+  const datos = [["Tipo de documento", verif ? "Verificación de interventoría" : "Diseño"], ["Cliente", proyecto.cliente], ["Ubicación", proyecto.ubicacion], ["Altitud (m s. n. m.)", proyecto.altitud], ["Temperatura ambiente de diseño (°C)", proyecto.tempAmbiente], ...(verif ? [["Diseño revisado", proyecto.autorDiseno], ["Documentos revisados", proyecto.documentosRevisados]] : []), [verif ? "Interventor que verifica" : "Diseñador", proyecto.disenador], ["Matrícula profesional", proyecto.matricula]];
+  let pr = 4;
+  datos.forEach(([k, v]) => {
+    const a = port.getCell(`A${pr}`); a.value = k; a.font = { bold: true, size: 10 }; a.fill = relleno(C_SECCION); a.border = BORDES;
+    port.mergeCells(pr, 2, pr, 3);
+    const b = port.getCell(`B${pr}`); b.value = v ?? ""; b.font = { size: 10 }; b.border = BORDES; b.alignment = { wrapText: true, horizontal: "left" };
+    port.getRow(pr).height = String(v ?? "").length > 110 ? 30 : 16;
+    pr++;
+  });
+  pr++;
+  const guia = [
+    ["Cómo usar este libro", ""],
+    ["1. Celdas amarillas (letra azul)", "Son los datos de entrada. Puede cambiarlos: todo el libro se recalcula solo."],
+    ["2. Celdas grises", "Son fórmulas. Están protegidas: se pueden ver y seleccionar, pero no modificar."],
+    ["3. Columna «Cómo se calcula»", "Explica cada fórmula con el nombre de sus variables, para seguir el cálculo sin descifrar referencias de celdas."],
+    ["4. Constantes", "Al inicio de cada hoja hay una tabla con los factores fijos que usan las fórmulas, su significado y la norma de donde salen."],
+    ["5. Verde y rojo", "«Cumple» aparece en verde y «No cumple» en rojo. Si cambia un dato, el color cambia con el resultado."],
+    ["6. Resumen de la selección", "Al final de cada hoja se resumen los equipos, componentes y especificaciones seleccionados, y el estado general de la hoja."],
+    ["7. Hoja «Tablas»", "Contiene las tablas normativas (conductores, factores, protecciones, tuberías, curvas) que consultan las fórmulas."]
+  ];
+  guia.forEach(([a, b], i) => {
+    const ca = port.getCell(`A${pr}`); ca.value = a;
+    if (i === 0) { port.mergeCells(pr, 1, pr, 3); ca.font = { bold: true, size: 12, color: { argb: C_NAVY } }; ca.fill = relleno(C_SECCION); ca.border = { left: { style: "thick", color: { argb: C_NARANJA } } }; }
+    else { ca.font = { bold: true, size: 10 }; port.mergeCells(pr, 2, pr, 3); const cb = port.getCell(`B${pr}`); cb.value = b; cb.font = { size: 10 }; cb.alignment = { wrapText: true }; }
+    pr++;
+  });
+  if (i0Muestras(port, pr - guia.length + 1)) { /* muestras de color en la guía */ }
+  pr++;
+  const filaIndice = pr;
+
+  // ---- literales
+  const lit = wb.addWorksheet("Literales RETIE", { properties: { tabColor: { argb: C_NAVY } }, pageSetup: { orientation: "landscape", fitToPage: true, fitToWidth: 1, fitToHeight: 0, paperSize: 9 } });
+  lit.columns = [{ width: 6 }, { width: 62 }, { width: 9 }, { width: 80 }];
+  bandaTitulo(lit, "Diseño detallado según el RETIE: literales a) a x)", FUENTE_LITERALES, 4);
+  ["Lit.", "Contenido exigido", "Aplica", "Desarrollo / cálculo / justificación"].forEach((h, i) => { const c = lit.getCell(4, i + 1); c.value = h; c.font = { bold: true, color: { argb: "FFFFFFFF" }, size: 10 }; c.fill = relleno(C_NAVY); c.border = BORDES; c.alignment = { vertical: "middle" }; });
   LITERALES.forEach((l, i) => {
     const d = proyecto.literales?.[l.l] || {};
     const mods = Object.entries(resultados).filter(([k, r]) => l.modulos.includes(r.modulo ?? k)).map(([k, r]) => `${MODULOS[r.modulo ?? k].titulo}${r.etiqueta ? ` — ${r.etiqueta}` : ""}`);
-    const fila = lit.getRow(4 + i);
-    fila.values = [`${l.l})`, l.texto, d.aplica === "No" ? "No" : "Sí", d.aplica === "No" ? `No aplica: ${d.texto || ""}` : [mods.length ? `Ver hoja: ${mods.join("; ")}` : "", d.texto || ""].filter(Boolean).join(" — ") || "Pendiente"];
+    const fila = lit.getRow(5 + i);
+    const texto = d.aplica === "No" ? `No aplica: ${d.texto || ""}` : [mods.length ? `Ver hoja: ${mods.join("; ")}` : "", d.texto || ""].filter(Boolean).join(" — ") || "Pendiente";
+    fila.values = [`${l.l})`, l.texto, d.aplica === "No" ? "No" : "Sí", texto];
     fila.alignment = { wrapText: true, vertical: "top" };
+    fila.eachCell((c) => { c.border = BORDES; c.font = { size: 9.5 }; });
+    lit.getCell(5 + i, 1).font = { bold: true, size: 10 };
+    lit.getCell(5 + i, 3).alignment = { horizontal: "center", vertical: "top" };
+    lit.getCell(5 + i, 3).fill = relleno(d.aplica === "No" ? "FFEDEFF2" : "FFE6F4EA");
+    if (i % 2) [1, 2, 4].forEach((ci) => { lit.getCell(5 + i, ci).fill = relleno("FFFAFBFC"); });
+    fila.height = Math.max(16, 13 * Math.max(Math.ceil(l.texto.length / 60), Math.ceil(texto.length / 78)) + 4);
   });
-  // Hallazgos (o pendientes) y supuestos, como valores: resumen para el oficio.
+  lit.views = [{ state: "frozen", ySplit: 4, showGridLines: false }];
+
+  // ---- hallazgos (o pendientes) y supuestos, como valores: resumen para el oficio
   const hall = hallazgos(proyecto, resultados), sup = supuestos(proyecto, guardados || {});
   if (hall.length || sup.length) {
-    const hs = wb.addWorksheet(verif ? "Hallazgos" : "Pendientes");
+    const hs = wb.addWorksheet(verif ? "Hallazgos" : "Pendientes", { properties: { tabColor: { argb: "FFD64545" } }, pageSetup: { orientation: "landscape", fitToPage: true, fitToWidth: 1, fitToHeight: 0, paperSize: 9 } });
     hs.columns = [{ width: 7 }, { width: 30 }, { width: 46 }, { width: 16 }, { width: 22 }, { width: 40 }, { width: 8 }];
-    hs.getCell("A1").value = verif ? "Hallazgos de la interventoría" : "Pendientes por corregir"; hs.getCell("A1").font = { bold: true, size: 13, color: { argb: NAVY } };
-    const enc = (fila, textos) => textos.forEach((t, i) => { const c = hs.getCell(fila, i + 1); c.value = t; c.font = { bold: true, color: { argb: "FFFFFFFF" }, size: 9 }; c.fill = { type: "pattern", pattern: "solid", fgColor: { argb: NAVY } }; c.border = BORDES; });
-    let f = 3;
+    bandaTitulo(hs, verif ? "Hallazgos de la interventoría" : "Pendientes por corregir", verif ? "Criterios que no cumplen en el diseño revisado: el contratista debe aclararlos o corregirlos." : "Criterios que todavía no cumplen: corríjalos antes de entregar la memoria.", 7);
+    const enc = (fila, textos) => textos.forEach((t, i) => { const c = hs.getCell(fila, i + 1); c.value = t; c.font = { bold: true, color: { argb: "FFFFFFFF" }, size: 9 }; c.fill = relleno(C_NAVY); c.border = BORDES; c.alignment = { wrapText: true, vertical: "middle" }; });
+    let f = 4;
     enc(f++, ["N.º", "Cálculo", "Criterio", "Valor", "Límite", "Norma o referencia", "Lit."]);
-    hall.forEach((h) => { hs.getRow(f).values = [h.codigo, h.calculo, h.criterio, h.valor, h.limite, h.norma, h.literales]; hs.getRow(f).alignment = { wrapText: true, vertical: "top" }; hs.getRow(f).eachCell((c) => { c.border = BORDES; c.font = { size: 9 }; }); f++; });
+    hall.forEach((h) => {
+      hs.getRow(f).values = [h.codigo, h.calculo, h.criterio, h.valor, h.limite, h.norma, h.literales];
+      hs.getRow(f).alignment = { wrapText: true, vertical: "top" };
+      hs.getRow(f).eachCell((c) => { c.border = BORDES; c.font = { size: 9 }; });
+      hs.getCell(f, 1).font = { bold: true, size: 9, color: { argb: "FFB42318" } };
+      hs.getRow(f).height = 13 * Math.max(2, Math.ceil(h.criterio.length / 44), Math.ceil(h.norma.length / 38)) + 4;
+      f++;
+    });
     if (sup.length) {
-      f++; hs.getCell(f, 1).value = "Supuestos y datos pendientes"; hs.getCell(f, 1).font = { bold: true, color: { argb: NAVY } }; f++;
-      enc(f++, ["", "Origen", "Supuesto"]);
-      sup.forEach((x) => { hs.getRow(f).values = ["", x.origen, x.texto]; hs.mergeCells(f, 3, f, 7); hs.getRow(f).alignment = { wrapText: true, vertical: "top" }; f++; });
+      f++;
+      hs.mergeCells(f, 1, f, 7);
+      const st = hs.getCell(f, 1); st.value = "Supuestos y datos pendientes (valores marcados «(S)»)"; st.font = { bold: true, size: 11, color: { argb: C_NAVY } }; st.fill = relleno(C_SECCION); f++;
+      enc(f, ["", "Origen", "Supuesto"]); hs.mergeCells(f, 3, f, 7); f++;
+      sup.forEach((x) => {
+        hs.getRow(f).values = ["", x.origen, x.texto]; hs.mergeCells(f, 3, f, 7);
+        hs.getRow(f).alignment = { wrapText: true, vertical: "top" };
+        [2, 3].forEach((ci) => { hs.getCell(f, ci).border = BORDES; hs.getCell(f, ci).font = { size: 9 }; });
+        hs.getRow(f).height = 13 * Math.max(1, Math.ceil(x.texto.length / 125)) + 4;
+        f++;
+      });
     }
+    hs.views = [{ state: "frozen", ySplit: 4, showGridLines: false }];
   }
   hojaTablas(wb);
-  // Hojas de cálculo en el orden de los literales.
+  const tablas = wb.getWorksheet("Tablas");
+  tablas.properties.tabColor = { argb: "FF8A94A3" };
+  tablas.views = [{ showGridLines: false }];
+
+  // ---- hojas de cálculo en el orden de los literales
   const ctx = {};
   Object.entries(resultados).forEach(([k, r]) => { const m = r.modulo ?? k; if (r.salidas && !ctx[m]) ctx[m] = r.salidas; });
   const orden = ["rayos", "apantallamiento", "cargas", "aislamiento", "cortocircuito", "transformador", "trafoPotencia", "malla", "conductores", "cableMT", "mecanico", "coordinacion", "canalizaciones", "regulacion", "distancias"];
+  const indice = [];
   for (const m of orden) {
     for (const [clave, r] of Object.entries(resultados)) {
       if ((r.modulo ?? clave) !== m || !guardados[clave]?.entradas) continue;
-      etiquetaActual = r.etiqueta || "";
+      etiquetaActual = r.etiqueta || ""; moduloActual = m;
+      const antes = hojasCreadas.length;
       HOJAS[m](wb, guardados[clave].entradas, r, proyecto, ctx);
+      if (hojasCreadas.length > antes) indice.push({ hoja: hojasCreadas[hojasCreadas.length - 1].ws.name, texto: `${MODULOS[m].titulo}${r.etiqueta ? ` — ${r.etiqueta}` : ""}`, desc: DESCRIPCION_HOJA[m] || "" });
     }
   }
-  etiquetaActual = "";
-  // "Tablas" al final.
-  wb.getWorksheet("Tablas").orderNo = 1000;
+  etiquetaActual = ""; moduloActual = "";
+  hojasCreadas.forEach((h) => h.finalizar());
+  tablas.orderNo = 1000;
+
+  // ---- índice de la portada (con enlaces a cada hoja)
+  let ir = filaIndice;
+  port.mergeCells(ir, 1, ir, 3);
+  const ti = port.getCell(`A${ir}`); ti.value = "Índice de hojas"; ti.font = { bold: true, size: 12, color: { argb: C_NAVY } }; ti.fill = relleno(C_SECCION); ti.border = { left: { style: "thick", color: { argb: C_NARANJA } } };
+  ir++;
+  ["Hoja", "Cálculo", "Qué contiene"].forEach((t, i) => { const c = port.getCell(ir, i + 1); c.value = t; c.font = { bold: true, size: 9, color: { argb: "FFFFFFFF" } }; c.fill = relleno(C_NAVY); c.border = BORDES; });
+  ir++;
+  const fijas = [{ hoja: "Literales RETIE", texto: "Literales a) a x)", desc: "Qué exige el RETIE en cada literal y dónde se desarrolla" }, ...(hall.length || sup.length ? [{ hoja: verif ? "Hallazgos" : "Pendientes", texto: verif ? "Hallazgos" : "Pendientes", desc: "Criterios que no cumplen y supuestos por confirmar" }] : [])];
+  [...fijas, ...indice, { hoja: "Tablas", texto: "Tablas normativas", desc: "Tablas que consultan las fórmulas" }].forEach((x) => {
+    const a = port.getCell(`A${ir}`); a.value = { text: x.hoja, hyperlink: `#'${x.hoja}'!A1` }; a.font = { size: 10, color: { argb: C_AZUL }, underline: true };
+    port.getCell(`B${ir}`).value = x.texto; port.getCell(`C${ir}`).value = x.desc;
+    [1, 2, 3].forEach((ci) => { port.getCell(ir, ci).border = BORDES; if (ci > 1) port.getCell(ir, ci).font = { size: 10 }; });
+    ir++;
+  });
+  port.views = [{ showGridLines: false }];
+
+  // ---- protección: las fórmulas se ven pero no se cambian (las celdas de
+  // entrada quedaron desbloqueadas al escribirlas)
+  for (const ws of wb.worksheets) {
+    await ws.protect(CLAVE_PROTECCION, { selectLockedCells: true, selectUnlockedCells: true, formatColumns: true, formatRows: true, sort: false, autoFilter: false });
+  }
   return wb;
+}
+
+// Muestras de color junto a los pasos 1 y 2 de la guía.
+function i0Muestras(ws, filaPaso1) {
+  const a = ws.getCell(`A${filaPaso1}`); a.fill = relleno(C_AMARILLO); a.font = { bold: true, size: 10, color: { argb: C_AZUL } };
+  const b = ws.getCell(`A${filaPaso1 + 1}`); b.fill = relleno(C_GRIS);
+  const v = ws.getCell(`A${filaPaso1 + 4}`); v.font = { bold: true, size: 10, color: { argb: C_VERDE_TXT } };
+  return true;
 }
 
 export async function descargarExcel(datos) {
   const { proyecto } = datos;
-  const wb = construirLibro(datos);
+  const wb = await construirLibro(datos);
   const buf = await wb.xlsx.writeBuffer();
   const blob = new Blob([buf], { type: "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet" });
   const url = URL.createObjectURL(blob);
   const a = document.createElement("a");
-  a.href = url; a.download = `Memoria de calculo formulada - ${String(proyecto.nombre || "proyecto").replace(/[\\/:*?"<>|]/g, "-").slice(0, 80)}.xlsx`;
+  a.href = url; a.download = `${esVerificacion(proyecto) ? "Verificacion" : "Memoria de calculo"} formulada - ${String(proyecto.nombre || "proyecto").replace(/[\\/:*?"<>|]/g, "-").slice(0, 80)}.xlsx`;
   document.body.appendChild(a); a.click(); a.remove();
   setTimeout(() => URL.revokeObjectURL(url), 4000);
 }
