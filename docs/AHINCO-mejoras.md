@@ -11,7 +11,7 @@ Documento para quien mantenga o amplíe AHÍNCO (`web/ahinco/`). Resume cómo es
 | `js/rt-normas.js` | Tablas normativas (NTC 2050, IEC, IEEE, RETIE). Sin dependencias. |
 | `js/rt-calculos.js` | Motor de cálculo: una función pura por módulo `f(entradas, proyecto, ctx)` que devuelve `{resumen, salidas, tablas, pasos, verificaciones, notas, conclusion}`. Sin Firebase: se puede probar con Node. |
 | `js/rt-modulos.js` | Formularios de cada módulo (campos, valores de ejemplo, normas, objeto). |
-| `js/rt-literales.js` | Literales a) a x) del RETIE y qué módulos desarrollan cada uno. |
+| `js/rt-literales.js` | Literales a) a x) del RETIE y qué módulos desarrollan cada uno. Un módulo con `literalPrincipal` (en `rt-modulos.js`) se desarrolla en ese literal y los demás remiten a él. |
 | `js/rt-alcance.js` | Alcance, validación, limitaciones y mejoras (texto para el usuario). |
 | `js/rt-hallazgos.js` | Hallazgos (criterios que no cumplen) y supuestos «(S)». Tipo de proyecto `modo`: `diseno` o `verificacion`. |
 | `js/rt-core.js` | Firebase (sesión, proyectos, cálculos), cálculo encadenado (`calcularProyecto`), instancias repetibles (`modulo-N`), importar y exportar. |
@@ -52,6 +52,10 @@ Datos en Firestore: `rtProyectos/{id}` y `rtProyectos/{id}/calculos/{clave}` (`c
 | Mecánico | Vano a nivel, parabólico; sin vano regulador ni estructuras. | `mecanico()` |
 | Conductores BT | Tabla 310-16 únicamente; sin I²t ni bandejas. | `conductores()` |
 | Cargas / transformador | Sin armónicos ni factor K. | `cargas()`, `transformador()` |
+| FV — arreglo | Strings iguales en todas las MPPT; sin varias orientaciones, sombras parciales, recorte (clipping), bifaciales ni optimizadores. | `fvArreglo()` en `rt-calculos.js` |
+| FV — producción | Energía anual con un solo valor de HSP (sin simulación horaria ni transposición al plano); simultaneidad supuesta; economía indicativa sin flujo de caja. | `fvProduccion()`; agregar HSP mensual y curva de carga |
+| FV — conductores | Incremento de temperatura por sol digitado; Tabla 310-16 para todos los casos; no dimensiona seccionador DC ni caja combinadora. | `fvConductores()` |
+| FV — conexión | Sin flujo de carga del circuito; capacidad disponible, Sk y ajustes los da el operador de red; no reemplaza el estudio de conexión simplificado (> 0,1 MW). | `fvConexion()`; `AJUSTES_IEEE1547` en `rt-normas.js` |
 | Proyecto | Sin historial de versiones (se usa «Exportar»). | `rt-core.js` (subcolección de versiones) |
 
 ## 4. Mejoras pendientes (en orden)
@@ -63,4 +67,5 @@ Datos en Firestore: `rtProyectos/{id}` y `rtProyectos/{id}/calculos/{clave}` (`c
 5. **Historial de versiones**: guardar una copia de entradas y literales al generar cada memoria (`rtProyectos/{id}/versiones`), con comparación entre revisiones.
 6. **Cortocircuito ampliado**: aporte de motores y generación, impedancias de secuencia cero del fabricante.
 7. **Coordinación ampliada**: curvas ANSI, fusibles, 51N; apantallamiento con varios captadores.
-8. **Otros**: riesgo R2 a R4, armónicos y factor K, cálculo económico de conductores (literal j), campos electromagnéticos (literal g).
+8. **Fotovoltaica avanzada**: HSP mensual (IDEAM / NASA POWER), simulación horaria con la curva de carga del usuario, varias orientaciones, sombras, bifaciales y flujo de caja con los beneficios de la Ley 1715.
+9. **Otros**: riesgo R2 a R4, armónicos y factor K, cálculo económico de conductores (literal j), campos electromagnéticos (literal g).

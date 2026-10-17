@@ -62,6 +62,22 @@ export const ALCANCE = {
     metodo: "Distancias mínimas de seguridad del RETIE en zonas con construcciones y vías, con corrección por altitud sobre 1000 m.",
     limitaciones: ["Solo están cargados algunos tipos de distancia y, para 66, 115 y 230 kV, solo la distancia vertical a vías: en los demás casos el usuario digita la distancia exigida.", "Debe confirmarse contra la tabla del RETIE vigente antes de firmar.", "No calcula franjas de servidumbre ni distancias dentro de subestaciones (use la distancia en aire del cálculo de aislamiento)."]
   },
+  fvArreglo: {
+    metodo: "Tensiones del string a la temperatura mínima (Voc) y a la temperatura máxima de celda (Vmp, método NOCT), rango de módulos en serie, corriente por MPPT con el 125 % de la NTC 2050 690-8, relación DC/AC, DPS de corriente continua y necesidad de fusibles de string (IEC 62548).",
+    limitaciones: ["Supone strings iguales (mismo número de módulos, orientación e inclinación) en todas las entradas MPPT usadas; arreglos con varias orientaciones deben calcularse como cálculos separados.", "No calcula el recorte (clipping) de potencia del inversor ni el comportamiento con sombras parciales.", "No incluye módulos bifaciales (ganancia por la cara posterior) ni microinversores u optimizadores."]
+  },
+  fvProduccion: {
+    metodo: "Energía anual = potencia pico × horas sol pico × 365 × PR, con el PR como producto de las pérdidas (temperatura de celda por el método NOCT, suciedad, sombras, dispersión, cableado, inversor e indisponibilidad), degradación anual y balance con el consumo según la CREG 174 de 2021.",
+    limitaciones: ["Cálculo anual con un solo valor de horas sol pico: no hace simulación horaria ni mensual (PVsyst, SAM o PVGIS la hacen) ni considera la transposición al plano inclinado; las HSP deben estar ya en el plano del arreglo.", "La simultaneidad entre generación y consumo es un dato supuesto; para un balance preciso se requiere la curva de carga horaria del usuario.", "La valoración económica es indicativa: no incluye inversión, impuestos, beneficios tributarios de la Ley 1715 ni flujo de caja."]
+  },
+  fvConductores: {
+    metodo: "Corriente máxima y de diseño de los circuitos DC (1,25 × 1,25 × Isc) y AC (1,25 × In) según la NTC 2050 690-8, capacidad de la Tabla 310-16 corregida por temperatura (con el incremento por exposición solar que digita el usuario) y agrupamiento, temperatura de terminales, protección, conductor de puesta a tierra (Tabla 250-122) y caída de tensión.",
+    limitaciones: ["El incremento de temperatura por exposición solar sobre cubiertas lo digita el usuario (NTC 2050 310-15(b)(3)(c)).", "Usa la Tabla 310-16 (conductores en canalización); para conductores al aire libre o en bandeja la capacidad real es mayor.", "No dimensiona el seccionador DC, la caja combinadora ni la protección diferencial; deben especificarse según la ficha del inversor y la NTC 2050 690-13 a 690-17."]
+  },
+  fvConexion: {
+    metodo: "Clasificación AGPE o GD y procedimiento de conexión (CREG 174 de 2021), elevación de tensión en el punto de conexión con la impedancia de la red ((P·R + Q·X) / U²), aporte del inversor al cortocircuito, y requisitos de anti-isla y medición bidireccional, con los ajustes de referencia de la IEEE 1547-2018.",
+    limitaciones: ["La capacidad disponible del circuito, la potencia de cortocircuito y los ajustes definitivos de protección los entrega el operador de red; los valores de este cálculo son de referencia.", "La elevación de tensión se calcula en el punto de conexión con la demanda mínima del usuario; no hace un flujo de carga del circuito con los demás generadores conectados.", "No reemplaza el estudio de conexión simplificado que exige la CREG 174 de 2021 para AGPE de más de 0,1 MW."]
+  },
   mecanico: {
     metodo: "Ecuación de cambio de estado (método parabólico) resuelta por Newton-Raphson para cada hipótesis de temperatura y viento; flecha, tensión máxima y distancia al suelo.",
     limitaciones: ["Vano a nivel y método parabólico (adecuado para vanos cortos y medianos); no calcula vanos desnivelados, vano regulador de una sección ni la catenaria exacta.", "No calcula estructuras, cimentaciones ni retenidas (también parte del literal l)."]
@@ -92,5 +108,6 @@ export const MEJORAS = [
   ["Media", "Historial de versiones del proyecto y comparación entre revisiones de la memoria."],
   ["Media", "Cortocircuito con aporte de motores y generación distribuida, e impedancias de secuencia cero del fabricante."],
   ["Media", "Coordinación con curvas ANSI, fusibles y protección de falla a tierra; protección combinada de varios captadores en el apantallamiento."],
+  ["Media", "Fotovoltaica: horas sol pico mensuales, simulación horaria con la curva de carga del usuario, varias orientaciones, sombras, módulos bifaciales y flujo de caja con los beneficios de la Ley 1715."],
   ["Baja", "Riesgo por rayos R2 a R4, armónicos y factor K, cálculo económico de conductores y campos electromagnéticos."]
 ];

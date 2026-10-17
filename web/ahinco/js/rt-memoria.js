@@ -100,7 +100,10 @@ export async function construirMemoria({ proyecto, resultados, guardados }) {
     if (d.texto) b.push(P(esc(d.texto).replace(/\n/g, "<br>")));
     const mods = calculosDe(l, resultados);
     for (const r of mods) {
-      if (yaIncluido[r.clave]) { b.push(P(`El cálculo de <b>${esc(tituloCalculo(r))}</b> se presenta en el literal ${yaIncluido[r.clave]}) de esta memoria.`)); continue; }
+      // Un cálculo con literal principal se desarrolla allí; los demás literales remiten a él.
+      const principal = MODULOS[r.modulo].literalPrincipal;
+      const donde = yaIncluido[r.clave] || (principal && principal !== l.l ? principal : null);
+      if (donde) { b.push(P(`El cálculo de <b>${esc(tituloCalculo(r))}</b> se presenta en el literal ${donde}) de esta memoria.`)); continue; }
       yaIncluido[r.clave] = l.l;
       b.push(...(await seccionModulo(r, guardados[r.clave]?.entradas || {}, 3)));
     }

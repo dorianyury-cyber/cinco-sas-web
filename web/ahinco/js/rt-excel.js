@@ -74,7 +74,13 @@ function hojaTablas(wb) {
   enc(["Curva", "k", "α"]);
   const iniC = r;
   Object.entries(N.CURVAS_IEC).forEach(([k, v]) => { ws.addRow([k, v.k, v.a]); r++; });
-  T.curvas = `Tablas!$A$${iniC}:$C$${r - 1}`;
+  T.curvas = `Tablas!$A${iniC}:$C${r - 1}`;
+  r++;
+  titulo("Conductor de puesta a tierra de equipos (NTC 2050 Tabla 250-122)");
+  enc(["Protección hasta (A)", "Calibre Cu"]);
+  const iniG = r;
+  N.TIERRA_EQUIPOS.forEach(([lim, cal]) => { ws.addRow([lim, N.etiquetaCalibre(cal)]); r++; });
+  T.tierraLim = `Tablas!$A${iniG}:$A${r - 1}`; T.tierraCal = `Tablas!$B${iniG}:$B${r - 1}`;
   ws.eachRow((row) => row.eachCell((c) => { c.border = BORDES; if (!c.font?.bold) c.font = { size: 9 }; }));
   return ws;
 }
@@ -99,6 +105,9 @@ function formatoUnidad(u = "") {
   if (/^(Ω|Ω·m|s)$/.test(t)) return "0.0000";
   if (/^(m²|mm²)$/.test(t)) return "#,##0.0";
   if (t === "/año") return "0.00E+00";
+  if (/^(kWh\/año|kWh|kWh\/kWp|W|W\/m²|\$\/kWh|años)$/.test(t)) return "#,##0";
+  if (/^(kWp|MW|MVAr|h\/día|%\/°C|%\/año)$/.test(t)) return "#,##0.00";
+  if (t === "$" || t === "COP/año") return '"$" #,##0';
   return "General";
 }
 
@@ -119,12 +128,16 @@ const CONSTANTES = {
   apantallamiento: [["2,2", "", "Constante de la corriente crítica Ic = 2,2 × BIL / Zs", "IEEE 998"], ["8 · k", "", "Distancia de impacto S = 8 k Ic^0,65 (k = 1,2 mástiles, 1 cables de guarda)", "IEEE 998"]],
   aislamiento: [["k", "", "Factor de falla a tierra: 1,3 neutro sólido, 1,4 efectivo, 1,73 aislado o no efectivo", "IEC 60071-2"], ["8150", "m", "Constante de la corrección por altitud Ka = e^(H/8150)", "IEC 60071-2"], ["300", "m/µs", "Velocidad de la onda en la línea", "IEC 60071-2"], ["20", "%", "Margen de protección mínimo recomendado", "IEEE C62.22"]],
   distancias: [["1,25 %", "", "Por cada 100 m por encima de 1000 m de altitud la distancia aumenta 1,25 %", "RETIE"]],
+  fvArreglo: [["(NOCT − 20) / 800 × 1000", "°C", "Calentamiento de la celda sobre el ambiente con 1000 W/m² (método NOCT)", "IEC 61215"], ["1,25", "", "La corriente de cortocircuito del string se multiplica por 1,25 por irradiancias mayores que la de ensayo", "NTC 2050 690-8(a)"], ["25", "°C", "Temperatura de referencia de la ficha del módulo (condiciones STC)", "IEC 61215"]],
+  fvProduccion: [["365", "días", "Días del año para la energía anual", ""], ["(NOCT − 20) / 800", "°C·m²/W", "Calentamiento de la celda por unidad de irradiancia", "IEC 61215"], ["Permuta y venta", "", "Los excedentes hasta igualar las importaciones se permutan (tarifa menos comercialización); los que las superan se venden a precio de bolsa", "CREG 174 de 2021"]],
+  fvConductores: [["1,25 × 1,25 = 1,56", "", "DC: 125 % por irradiancia y 125 % adicional para el conductor y la protección", "NTC 2050 690-8"], ["1,25", "", "AC: la corriente nominal del inversor se toma al 125 % (carga continua)", "NTC 2050 690-8 y 215-2"], ["2 / √3", "", "Factor de la caída de tensión: 2 en DC y monofásico, √3 en trifásico", ""]],
+  fvConexion: [["1 MW", "", "Potencia máxima de AGPE y GD", "CREG 174 de 2021"], ["0,1 MW", "", "Hasta esta potencia el AGPE sigue el procedimiento simplificado sin estudio de conexión", "CREG 174 de 2021"], ["1,1 a 1,5", "× In", "Aporte típico de un inversor a la corriente de cortocircuito", "Fichas de inversores / IEEE 1547"]],
   mecanico: [["9,80665", "m/s²", "Gravedad: convierte kgf a N", ""], ["24", "", "Constante de la ecuación de cambio de estado (método parabólico)", ""], ["8", "", "Flecha parabólica f = w L² / (8 T)", ""], ["50", "%", "Tensión máxima admisible: la mitad de la carga de rotura (factor de seguridad 2)", "Criterio de diseño"]]
 };
 
 // Nombres legibles de los rangos de la hoja "Tablas" para las explicaciones.
-const NOMBRE_TABLA = { cond: "tabla de conductores (hoja Tablas)", temp: "factores de temperatura (hoja Tablas)", tempDesde: "rangos de temperatura (hoja Tablas)", agr: "factores de agrupamiento (hoja Tablas)", agrDesde: "rangos de agrupamiento (hoja Tablas)", prot: "corrientes normalizadas de protecciones (hoja Tablas)", fusK: "fusibles tipo K normalizados (hoja Tablas)", tub: "áreas de tuberías (hoja Tablas)", curvas: "curvas IEC (hoja Tablas)" };
-const FUNCIONES = [["IFERROR", "SI.ERROR"], ["SUMPRODUCT", "SUMAPRODUCTO"], ["SUMIF", "SUMAR.SI"], ["COUNTIF", "CONTAR.SI"], ["VLOOKUP", "BUSCARV"], ["INDEX", "INDICE"], ["MATCH", "COINCIDIR"], ["ISNUMBER", "ESNUMERO"], ["ISTEXT", "ESTEXTO"], ["SEARCH", "HALLAR"], ["AVERAGE", "PROMEDIO"], ["ROUND", "REDONDEAR"], ["SQRT", "√"], ["EXP", "e^"], ["LN", "ln"], ["LEN", "LARGO"], ["AND", "Y"], ["OR", "O"], ["IF", "SI"], ["MAX", "MÁX"], ["MIN", "MÍN"], ["SUM", "SUMA"]];
+const NOMBRE_TABLA = { cond: "tabla de conductores (hoja Tablas)", temp: "factores de temperatura (hoja Tablas)", tempDesde: "rangos de temperatura (hoja Tablas)", agr: "factores de agrupamiento (hoja Tablas)", agrDesde: "rangos de agrupamiento (hoja Tablas)", prot: "corrientes normalizadas de protecciones (hoja Tablas)", fusK: "fusibles tipo K normalizados (hoja Tablas)", tub: "áreas de tuberías (hoja Tablas)", curvas: "curvas IEC (hoja Tablas)", tierraLim: "límites de protección (hoja Tablas)", tierraCal: "calibres de puesta a tierra (hoja Tablas)" };
+const FUNCIONES = [["_xlfn.AGGREGATE", "AGREGAR"], ["ROUNDDOWN", "REDONDEAR.MENOS"], ["ROUNDUP", "REDONDEAR.MAS"], ["LEFT", "IZQUIERDA"], ["IFERROR", "SI.ERROR"], ["SUMPRODUCT", "SUMAPRODUCTO"], ["SUMIF", "SUMAR.SI"], ["COUNTIF", "CONTAR.SI"], ["VLOOKUP", "BUSCARV"], ["INDEX", "INDICE"], ["MATCH", "COINCIDIR"], ["ISNUMBER", "ESNUMERO"], ["ISTEXT", "ESTEXTO"], ["SEARCH", "HALLAR"], ["AVERAGE", "PROMEDIO"], ["ROUND", "REDONDEAR"], ["SQRT", "√"], ["EXP", "e^"], ["LN", "ln"], ["LEN", "LARGO"], ["AND", "Y"], ["OR", "O"], ["IF", "SI"], ["MAX", "MÁX"], ["MIN", "MÍN"], ["SUM", "SUMA"]];
 
 // Traduce una fórmula de Excel a una explicación legible: las celdas se
 // reemplazan por el nombre de la variable y las funciones por su nombre en
@@ -395,6 +408,7 @@ class Hoja {
     ws.views = [{ state: "frozen", ySplit: 2, showGridLines: false }];
   }
 }
+const sigNormTierra = (x) => `IFERROR(INDEX(${T.tierraCal},MATCH(${x}-1E-9,${T.tierraLim},1)+1),INDEX(${T.tierraCal},1))`;
 const sigNorm = (x, rango) => `IFERROR(INDEX(${rango},MATCH(${x}-1E-9,${rango},1)+1),INDEX(${rango},1))`;
 const vacias = (arr) => (arr || []).filter((f) => f && Object.values(f).some((v) => v !== "" && v != null));
 
@@ -796,6 +810,151 @@ const HOJAS = {
       { t: "Resultado", v: (f, rr) => `=IF(E${rr}="","Captador a <= "&ROUND(F${rr},2)&" m",IF(E${rr}<=F${rr},"Protegido","No protegido"))` }
     ], vacias(e.elementos));
     h.resumen([{ t: "Radio de la esfera rodante", f: R, u: "m" }, ...vacias(e.elementos).map((f, i) => { const rr = t.r0 + i; return { t: String(f.elemento || `Elemento ${i + 1}`), texto: true, f: `B${rr}&" de "&C${rr}&" m: protege un radio de "&ROUND(F${rr},2)&" m a "&D${rr}&" m de altura"` }; })]);
+  },
+  fvArreglo(wb, e) {
+    const h = new Hoja(wb, "x Arreglo FV", "Arreglo fotovoltaico e inversor (RETIE literal x; NTC 2050 Sección 690; IEC 62548)");
+    h.seccion("Módulo fotovoltaico (ficha técnica)");
+    const pmod = h.dato("Potencia máxima Pmax (STC)", n(e.pmod, 550), "W"), voc = h.dato("Tensión de circuito abierto Voc", n(e.voc, 49.9), "V"), vmp = h.dato("Tensión de máxima potencia Vmp", n(e.vmp, 41.96), "V");
+    const isc = h.dato("Corriente de cortocircuito Isc", n(e.isc, 14), "A"), imp = h.dato("Corriente de máxima potencia Imp", n(e.imp, 13.11), "A");
+    const bVoc = h.dato("Coeficiente de temperatura de Voc", n(e.bVoc, -0.27), "%/°C"), bVmp = h.dato("Coeficiente de temperatura de Vmp", n(e.bVmp, -0.35), "%/°C");
+    h.dato("Coeficiente de temperatura de Pmax", n(e.gPmax, -0.35), "%/°C");
+    const noct = h.dato("NOCT", n(e.noct, 45), "°C"), vmaxMod = h.dato("Tensión máxima del sistema del módulo", n(e.vmaxMod, 1500), "V"), fusMax = h.dato("Fusible máximo en serie del módulo", n(e.fusibleMax, 25), "A");
+    h.seccion("Inversor (ficha técnica)");
+    const pac = h.dato("Potencia nominal AC", n(e.pac, 100), "kW"), vac = h.dato("Tensión AC (línea-línea en trifásico)", n(e.vac, 480), "V"), fases = h.dato("Fases (3 o 1)", e.fases === "1" ? 1 : 3, "");
+    const vdcMax = h.dato("Tensión DC máxima de entrada", n(e.vdcMax, 1100), "V"), vMin = h.dato("Tensión MPPT mínima a plena carga", n(e.vmpptMin, 550), "V"), vMax = h.dato("Tensión MPPT máxima", n(e.vmpptMax, 850), "V");
+    const idcMax = h.dato("Corriente máxima de entrada por MPPT", n(e.idcMax, 32), "A"), iscMax = h.dato("Corriente de cortocircuito máxima por MPPT", n(e.iscMax, 40), "A"), nMppt = h.dato("Número de entradas MPPT", n(e.nMppt, 10), "");
+    h.seccion("Configuración adoptada y condiciones del sitio");
+    const ns = h.dato("Módulos en serie por string", n(e.ns, 18), ""), np = h.dato("Strings en paralelo por MPPT", n(e.np, 2), ""), nUso = h.dato("Entradas MPPT utilizadas", n(e.mpptUsados, 6), "");
+    const tmin = h.dato("Temperatura ambiente mínima histórica", n(e.tmin, 15), "°C"), tmax = h.dato("Temperatura ambiente máxima de diseño", n(e.tmax, 40), "°C");
+    const ilrMin = h.dato("Relación DC/AC mínima aceptada", n(e.ilrMin, 0.9), ""), ilrMax = h.dato("Relación DC/AC máxima aceptada", n(e.ilrMax, 1.35), ""), ucpv = h.dato("Ucpv del DPS de corriente continua (0 = sin dato)", n(e.ucpv, 0), "V");
+    h.seccion("Cálculos");
+    const tc = h.calc("Temperatura máxima de celda", `${tmax}+(${noct}-20)/800*1000`, "°C");
+    const vocMax = h.calc("Voc del módulo a la temperatura mínima", `${voc}*(1+${bVoc}/100*(${tmin}-25))`, "V");
+    const vmpMin = h.calc("Vmp del módulo a la temperatura máxima de celda", `${vmp}*(1+${bVmp}/100*(${tc}-25))`, "V");
+    const vmpMax = h.calc("Vmp del módulo a la temperatura mínima", `${vmp}*(1+${bVmp}/100*(${tmin}-25))`, "V");
+    const vOc = h.calc("Voc máxima del string", `${ns}*${vocMax}`, "V"), vMpMin = h.calc("Vmp mínima del string", `${ns}*${vmpMin}`, "V"), vMpMax = h.calc("Vmp máxima del string", `${ns}*${vmpMax}`, "V");
+    const nsMaxDC = h.calc("Módulos en serie máximos por tensión DC", `ROUNDDOWN(MIN(${vdcMax},${vmaxMod})/${vocMax},0)`, ""), nsMaxMp = h.calc("Módulos en serie máximos por tensión MPPT máxima", `ROUNDDOWN(${vMax}/${vmpMax},0)`, "");
+    const nsMax = h.calc("Módulos en serie máximos", `MIN(${nsMaxDC},${nsMaxMp})`, ""), nsMin = h.calc("Módulos en serie mínimos (por tensión MPPT mínima)", `ROUNDUP(${vMin}/${vmpMin},0)`, "");
+    const iIsc = h.calc("Corriente de cortocircuito por MPPT (1,25 × Np × Isc)", `${np}*${isc}*1.25`, "A"), iImp = h.calc("Corriente de operación por MPPT", `${np}*${imp}`, "A");
+    const nMod = h.calc("Número total de módulos", `${ns}*${np}*${nUso}`, ""), pdc = h.calc("Potencia pico del arreglo", `${nMod}*${pmod}/1000`, "kWp"), ilr = h.calc("Relación DC/AC", `${pdc}/${pac}`, "");
+    const iac = h.calc("Corriente nominal AC del inversor", `IF(${fases}=3,${pac}*1000/(SQRT(3)*${vac}),${pac}*1000/${vac})`, "A");
+    const iInv = h.calc("Corriente inversa hacia un string en falla", `(${np}-1)*${isc}*1.25`, "A");
+    h.seccion("Verificaciones");
+    h.verif("Voc del string ≤ tensión DC máxima del inversor", `${vOc}<=${vdcMax}`, "IEC 62548 / NTC 2050 690-7");
+    h.verif("Voc del string ≤ tensión máxima del módulo", `${vOc}<=${vmaxMod}`, "IEC 61730");
+    h.verif("Vmp mínima del string ≥ tensión MPPT mínima", `${vMpMin}>=${vMin}`, "Ficha del inversor");
+    h.verif("Vmp máxima del string ≤ tensión MPPT máxima", `${vMpMax}<=${vMax}`, "Ficha del inversor");
+    h.verif("Corriente de cortocircuito por MPPT ≤ admisible", `${iIsc}<=${iscMax}`, "NTC 2050 690-8");
+    h.verif("Corriente de operación por MPPT ≤ admisible", `${iImp}<=${idcMax}`, "Ficha del inversor");
+    h.verif("Entradas MPPT utilizadas ≤ disponibles", `${nUso}<=${nMppt}`, "Ficha del inversor");
+    h.verif("Relación DC/AC dentro del rango aceptado", `AND(${ilr}>=${ilrMin},${ilr}<=${ilrMax})`, "Criterio de diseño");
+    h.verif("DPS DC: Ucpv ≥ Voc máxima del string (si hay dato)", `OR(${ucpv}=0,${ucpv}>=${vOc})`, "IEC 61643-31");
+    h.resumen([
+      { t: "Arreglo", texto: true, f: `${nMod}&" módulos de "&${pmod}&" W = "&ROUND(${pdc},2)&" kWp: "&${nUso}&" MPPT × "&${np}&" strings × "&${ns}&" módulos en serie"` },
+      { t: "Inversor", texto: true, f: `${pac}&" kW, "&${vac}&" V "&IF(${fases}=3,"trifásico","monofásico")&" ("&ROUND(${iac},1)&" A)"` },
+      { t: "Rango admisible de módulos en serie", texto: true, f: `${nsMin}&" a "&${nsMax}&" módulos (adoptado: "&${ns}&")"` },
+      { t: "Relación DC/AC", f: ilr, u: "" }, { t: "Voc máxima del string (especificar DPS y conductores DC)", f: vOc, u: "V" },
+      { t: "Fusibles de string", texto: true, f: `IF(${iInv}>${fusMax},"Requeridos: la corriente inversa supera el fusible máximo del módulo","No requeridos: la corriente inversa no supera el fusible máximo del módulo")` }
+    ]);
+  },
+  fvProduccion(wb, e, r, p, ctx) {
+    const h = new Hoja(wb, "x Producción FV", "Producción y balance energético (RETIE literal x; CREG 174 de 2021; IEC 61724-1)");
+    const a = ctx.fvArreglo || {};
+    const pdc = h.dato("Potencia pico del arreglo", n(e.pdc, a.pdc ?? 100), "kWp"), hsp = h.dato("Horas sol pico en el plano del arreglo", n(e.hsp, 5), "h/día");
+    const tamb = h.dato("Temperatura ambiente media en horas de sol", n(e.tambSol, 30), "°C"), g = h.dato("Irradiancia media en horas de sol", n(e.gMedia, 800), "W/m²");
+    const gP = h.dato("Coeficiente de temperatura de Pmax", n(e.gPmax, a.gPmax ?? -0.35), "%/°C"), noct = h.dato("NOCT", n(e.noct, a.noct ?? 45), "°C");
+    h.seccion("Pérdidas");
+    const ps = h.dato("Suciedad", n(e.pSuciedad, 3), "%"), pso = h.dato("Sombreado", n(e.pSombra, 0), "%"), pm = h.dato("Dispersión entre módulos (mismatch)", n(e.pMismatch, 2), "%");
+    const pdcw = h.dato("Cableado DC", n(e.pCableDC, 1.5), "%"), ef = h.dato("Eficiencia europea del inversor", n(e.efInversor, 98), "%"), pacw = h.dato("Cableado AC", n(e.pCableAC, 1), "%"), pd = h.dato("Indisponibilidad", n(e.pDisp, 1), "%");
+    const deg = h.dato("Degradación anual de los módulos", n(e.degradacion, 0.5), "%/año"), anios = h.dato("Vida útil de análisis", n(e.anios, 25), "años");
+    h.seccion("Consumo y tarifas (balance según la CREG 174 de 2021)");
+    const cons = h.dato("Consumo anual del usuario", n(e.consumo, 0), "kWh/año"), sim = h.dato("Simultaneidad (fracción consumida en el momento)", n(e.simultaneidad, 70), "%");
+    const tar = h.dato("Tarifa de energía (CU)", n(e.tarifa, 0), "$/kWh"), com = h.dato("Componente de comercialización", n(e.comercializacion, 0), "$/kWh"), bol = h.dato("Precio de bolsa de referencia", n(e.bolsa, 0), "$/kWh");
+    h.seccion("Cálculos");
+    const tc = h.calc("Temperatura media de celda", `${tamb}+(${noct}-20)/800*${g}`, "°C");
+    const pt = h.calc("Pérdida por temperatura", `MAX(0,-${gP}*(${tc}-25))`, "%");
+    const pr = h.calc("Rendimiento global PR", `(1-${pt}/100)*(1-${ps}/100)*(1-${pso}/100)*(1-${pm}/100)*(1-${pdcw}/100)*(${ef}/100)*(1-${pacw}/100)*(1-${pd}/100)`, "");
+    const e1 = h.calc("Energía del primer año", `${pdc}*${hsp}*365*${pr}`, "kWh/año"), ye = h.calc("Rendimiento específico", `${e1}/${pdc}`, "kWh/kWp");
+    const et = h.calc("Energía en la vida útil", `IF(${deg}=0,${e1}*${anios},${e1}*(1-(1-${deg}/100)^${anios})/(${deg}/100))`, "kWh");
+    const au = h.calc("Autoconsumo", `MIN(${e1}*${sim}/100,IF(${cons}>0,${cons},${e1}*${sim}/100))`, "kWh/año"), ex = h.calc("Excedentes entregados a la red", `${e1}-${au}`, "kWh/año");
+    const im = h.calc("Importaciones de la red", `MAX(0,${cons}-${au})`, "kWh/año"), pe = h.calc("Excedentes permutados", `MIN(${ex},${im})`, "kWh/año"), ve = h.calc("Excedentes vendidos", `MAX(0,${ex}-${im})`, "kWh/año");
+    const ah = h.calc("Ahorro e ingresos anuales estimados", `${au}*${tar}+${pe}*(${tar}-${com})+${ve}*${bol}`, "COP/año");
+    const cob = h.calc("Cobertura del consumo", `IF(${cons}>0,${e1}/${cons}*100,0)`, "%");
+    h.seccion("Verificaciones");
+    h.verif("PR dentro del rango típico (0,70 a 0,90)", `AND(${pr}>=0.7,${pr}<=0.9)`, "IEC 61724-1 (referencia)");
+    h.resumen([
+      { t: "Energía del primer año", f: e1, u: "kWh/año" }, { t: "Rendimiento específico", f: ye, u: "kWh/kWp" }, { t: "Rendimiento global PR", f: `${pr}*100`, u: "%" },
+      { t: "Energía en la vida útil", f: et, u: "kWh" }, { t: "Cobertura del consumo anual", f: cob, u: "%" },
+      { t: "Balance", texto: true, f: `"Autoconsumo "&ROUND(${au},0)&" kWh; excedentes "&ROUND(${ex},0)&" kWh (permutados "&ROUND(${pe},0)&", vendidos "&ROUND(${ve},0)&"); importaciones "&ROUND(${im},0)&" kWh"` },
+      { t: "Ahorro e ingresos anuales estimados (indicativo)", f: ah, u: "COP/año" }
+    ]);
+  },
+  fvConductores(wb, e, r, p, ctx) {
+    const h = new Hoja(wb, "k-m Conductores FV", "Conductores y protecciones del sistema fotovoltaico (RETIE literales k y m; NTC 2050 690-8)");
+    const a = ctx.fvArreglo || {};
+    const dvMax = h.dato("Caída de tensión máxima por circuito", n(e.dvMax, 1.5), "%"), dvTot = h.dato("Caída de tensión máxima total (DC más AC)", n(e.dvTotalMax, 3), "%");
+    const fases = h.dato("Fases del inversor (3 o 1)", a.tri === false ? 1 : 3, ""), fusReq = h.dato("Fusibles de string requeridos (1 = sí)", a.fusibles ? 1 : 0, "", "Resultado del arreglo FV"), fusMax = h.dato("Fusible máximo del módulo", a.fusMax ?? 25, "A");
+    h.seccion("Circuitos");
+    const prot = (c, iDis) => n(c.proteccion, 0) || N.PROTECCIONES_NORMALIZADAS.find((x) => x >= iDis - 1e-9) || 0;
+    const filas = vacias(e.circuitos).map((c) => {
+      const tipo = c.tipo || "DC string", dc = tipo.startsWith("DC");
+      const base = n(c.corriente, NaN);
+      const iBase = Number.isFinite(base) ? base : tipo === "DC string" ? a.isc ?? 0 : tipo === "DC agrupado" ? (a.isc ?? 0) * (a.np ?? 1) : a.iac ?? 0;
+      const V = n(c.tension, NaN);
+      return { ...c, tipo, iBase, v: Number.isFinite(V) ? V : dc ? a.vmpStr ?? 700 : a.vac ?? 480, prot: prot(c, (dc ? iBase * 1.25 : iBase) * 1.25) };
+    });
+    const t = h.tabla([
+      { t: "Circuito", v: (f) => String(f.tramo || f.tipo), ancho: 18 }, { t: "Tipo", v: (f) => f.tipo, entrada: true, lista: ["DC string", "DC agrupado", "AC"], ancho: 12 },
+      { t: "Mat.", v: (f) => (f.material === "Al" ? "Al" : "Cu"), entrada: true, lista: ["Cu", "Al"] }, { t: "Calibre", v: (f) => String(f.calibre || "10"), entrada: true },
+      { t: "I base (A)", v: (f) => f.iBase, entrada: true, fmt: "0.0" }, { t: "T amb. (°C)", v: (f) => n(f.tAmb, n(p.tempAmbiente, 30)), entrada: true },
+      { t: "+ °C por sol", v: (f) => n(f.adicional, 0), entrada: true }, { t: "Portadores", v: (f) => n(f.portadores, 2), entrada: true },
+      { t: "L (m)", v: (f) => n(f.longitud, 0), entrada: true }, { t: "V (V)", v: (f) => f.v, entrada: true, fmt: "0" }, { t: "Protección (A)", v: (f) => f.prot, entrada: true },
+      { t: "I máx. (A)", v: (f, rr) => `=IF(LEFT(B${rr},2)="DC",E${rr}*1.25,E${rr})`, fmt: "0.0" },
+      { t: "I diseño 125 % (A)", v: (f, rr) => `=L${rr}*1.25`, fmt: "0.0" },
+      { t: "Capacidad corregida 90 °C (A)", v: (f, rr) => `=VLOOKUP(D${rr},${T.cond},IF(C${rr}="Al",7,4),FALSE)*INDEX(${T.temp},MATCH(F${rr}+G${rr},${T.tempDesde},1),4)*INDEX(${T.agr},MATCH(H${rr},${T.agrDesde},1),2)`, fmt: "0.0" },
+      { t: "Capacidad 75 °C (A)", v: (f, rr) => `=VLOOKUP(D${rr},${T.cond},IF(C${rr}="Al",6,3),FALSE)`, fmt: "0" },
+      { t: "R (Ω/km)", v: (f, rr) => `=VLOOKUP(D${rr},${T.cond},IF(C${rr}="Al",11,9),FALSE)`, fmt: "0.000" },
+      { t: "ΔV (%)", v: (f, rr) => `=IF(I${rr}=0,0,IF(LEFT(B${rr},2)="DC",2,IF(${fases}=3,SQRT(3),2))*L${rr}*I${rr}/1000*P${rr}/J${rr}*100)`, fmt: "0.00" },
+      { t: "Tierra de equipos", v: (f, rr) => `=${sigNormTierra(`K${rr}`)}` },
+      { t: "Resultado", v: (f, rr) => `=IF(AND(N${rr}>=L${rr},O${rr}>=M${rr},Q${rr}<=${dvMax},IF(B${rr}="DC string",IF(${fusReq}=1,AND(K${rr}>=M${rr},K${rr}<=${fusMax}),TRUE),AND(K${rr}>=M${rr},K${rr}<=${sigNorm(`N${rr}`, T.prot)}))),"Cumple","No cumple")` }
+    ], filas);
+    const R = (c) => `${c}${t.r0}:${c}${t.r1}`;
+    const dvT = h.calc("Caída de tensión total (mayor DC más mayor AC)", `IFERROR(_xlfn.AGGREGATE(14,6,${R("Q")}/(LEFT(${R("B")},2)="DC"),1),0)+IFERROR(_xlfn.AGGREGATE(14,6,${R("Q")}/(${R("B")}="AC"),1),0)`, "%");
+    h.verif("Caída de tensión total ≤ máxima", `${dvT}<=${dvTot}`, "Criterio de diseño");
+    h.resumen(filas.map((f, i) => { const rr = t.r0 + i; return { t: String(f.tramo || f.tipo), texto: true, f: `"Conductor "&C${rr}&" "&D${rr}&" ("&B${rr}&"): capacidad "&ROUND(N${rr},1)&" A para "&ROUND(L${rr},1)&" A; protección "&IF(AND(B${rr}="DC string",${fusReq}=0),"no requerida",K${rr}&" A")&"; tierra "&R${rr}&"; caída "&ROUND(Q${rr},2)&" %"` }; }));
+  },
+  fvConexion(wb, e, r, p, ctx) {
+    const h = new Hoja(wb, "x Conexión FV", "Conexión a la red de AGPE y GD (RETIE literal x; CREG 174 de 2021; IEEE 1547)");
+    const a = ctx.fvArreglo || {};
+    const tipo = h.dato("Tipo de generador (AGPE o GD)", e.tipo === "GD" ? "GD" : "AGPE", "");
+    const pac = h.dato("Potencia nominal AC", n(e.pac, a.pac ?? 100), "kW"), v = h.dato("Tensión del punto de conexión", n(e.tension, (a.vac ?? 480) / 1000), "kV");
+    const sk = h.dato("Potencia de cortocircuito en el punto de conexión", n(e.sk, 20), "MVA"), rx = h.dato("Relación R/X de la red", n(e.rxRed, 0.5), "");
+    const dmin = h.dato("Demanda mínima del usuario en horas de sol", n(e.demandaMin, 0), "kW"), fp = h.dato("Factor de potencia de la inyección", Math.min(1, Math.max(0.8, n(e.fp, 1))), ""), dvMax = h.dato("Elevación de tensión máxima admitida", n(e.dvMax, 2), "%");
+    const cap = h.dato("Capacidad disponible publicada por el operador de red (0 = sin dato)", n(e.capacidadDisponible, 0), "kW"), icu = h.dato("Capacidad de interrupción de los equipos (0 = sin dato)", n(e.icu, 0), "kA"), ap = h.dato("Aporte del inversor al cortocircuito (veces In)", n(e.aporte, 1.2), "");
+    const ai = h.dato("Inversor con anti-isla certificada (Sí/No)", e.antiIsla === "No" ? "No" : "Sí", ""), med = h.dato("Medidor bidireccional (Sí/No)", e.medidor === "No" ? "No" : "Sí", "");
+    h.seccion("Cálculos");
+    const clase = h.calc("Clasificación y procedimiento", `IF(${tipo}="GD",IF(${pac}<=1000,"Generador distribuido (GD), hasta 1 MW","Fuera del rango de GD (más de 1 MW)"),IF(${pac}<=100,"AGPE hasta 0,1 MW: procedimiento simplificado, sin estudio de conexión",IF(${pac}<=1000,"AGPE entre 0,1 y 1 MW: requiere estudio de conexión simplificado","Autogenerador a gran escala (más de 1 MW)")))`, "");
+    const z = h.calc("Impedancia de la red Z", `${v}^2/${sk}`, "Ω"), x = h.calc("Reactancia X", `${z}/SQRT(1+${rx}^2)`, "Ω"), rr = h.calc("Resistencia R", `${rx}*${x}`, "Ω");
+    const pe = h.calc("Potencia exportada en el peor caso", `MAX(0,${pac}-${dmin})/1000`, "MW"), qe = h.calc("Potencia reactiva de la inyección", `${pe}*TAN(ACOS(${fp}))`, "MVAr");
+    const dv = h.calc("Elevación de tensión en el punto de conexión", `(${pe}*${rr}+${qe}*${x})/${v}^2*100`, "%");
+    const iac = h.calc("Corriente nominal del inversor", `${pac}*1000/(SQRT(3)*${v}*1000)`, "A");
+    const ikr = h.calc("Cortocircuito de la red", `${sk}/(SQRT(3)*${v})`, "kA"), iki = h.calc("Aporte del inversor al cortocircuito", `${ap}*${iac}/1000`, "kA"), ikt = h.calc("Cortocircuito total", `${ikr}+${iki}`, "kA");
+    const scr = h.calc("Relación de cortocircuito Sk / Pac", `${sk}*1000/${pac}`, "");
+    h.seccion("Verificaciones");
+    h.verif("Potencia dentro del límite de AGPE o GD (1 MW)", `${pac}<=1000`, "CREG 174 de 2021");
+    h.verif("Potencia ≤ capacidad disponible del operador de red (si hay dato)", `OR(${cap}=0,${pac}<=${cap})`, "CREG 174 de 2021");
+    h.verif("Elevación de tensión ≤ máxima admitida", `${dv}<=${dvMax}`, "Criterio de diseño / operador de red");
+    h.verif("Capacidad de interrupción ≥ cortocircuito total (si hay dato)", `OR(${icu}=0,${icu}>=${ikt})`, "RETIE / IEC 60909");
+    h.verif("Anti-isla certificada", `${ai}="Sí"`, "IEC 62116 / UL 1741");
+    h.verif("Medidor bidireccional", `${med}="Sí"`, "CREG 174 de 2021");
+    h.seccion("Ajustes de referencia de las protecciones de interconexión (IEEE 1547-2018, categoría II)");
+    h.tabla([{ t: "Función", v: (f) => f[0], ancho: 30 }, { t: "Ajuste", v: (f) => f[1] }, { t: "Tiempo de despeje", v: (f) => f[2] }], N.AJUSTES_IEEE1547);
+    h.resumen([
+      { t: "Clasificación", texto: true, f: clase }, { t: "Elevación de tensión en el punto de conexión", f: dv, u: "%" },
+      { t: "Cortocircuito total en el punto de conexión", f: ikt, u: "kA", nota: "Capacidad de interrupción mínima de los equipos" },
+      { t: "Relación de cortocircuito Sk / Pac", f: scr, u: "", nota: "Mientras mayor, más robusta es la red frente a la inyección" },
+      { t: "Requisitos de conexión", texto: true, valor: "Inversor con anti-isla certificada, medidor bidireccional y ajustes de protección aprobados por el operador de red; solicitud de conexión en la plataforma del operador (CREG 174 de 2021)." }
+    ]);
   }
 };
 
@@ -815,7 +974,11 @@ const DESCRIPCION_HOJA = {
   apantallamiento: "Zona protegida por mástiles y cables de guarda",
   aislamiento: "Selección del DPS y margen de protección del aislamiento",
   distancias: "Distancias mínimas de seguridad",
-  mecanico: "Tensiones y flechas del conductor por cambio de estado"
+  mecanico: "Tensiones y flechas del conductor por cambio de estado",
+  fvArreglo: "Módulos en serie y paralelo, tensiones y corrientes frente al inversor",
+  fvProduccion: "Energía anual, PR, vida útil y balance con el consumo (CREG 174)",
+  fvConductores: "Conductores, protecciones, tierra y caída de tensión DC y AC",
+  fvConexion: "Clasificación AGPE/GD, elevación de tensión y requisitos de conexión"
 };
 
 function bandaTitulo(ws, texto, sub, cols) {
@@ -930,7 +1093,7 @@ export async function construirLibro({ proyecto, resultados, guardados }, ExcelJ
   // ---- hojas de cálculo en el orden de los literales
   const ctx = {};
   Object.entries(resultados).forEach(([k, r]) => { const m = r.modulo ?? k; if (r.salidas && !ctx[m]) ctx[m] = r.salidas; });
-  const orden = ["rayos", "apantallamiento", "cargas", "aislamiento", "cortocircuito", "transformador", "trafoPotencia", "malla", "conductores", "cableMT", "mecanico", "coordinacion", "canalizaciones", "regulacion", "distancias"];
+  const orden = ["rayos", "apantallamiento", "cargas", "aislamiento", "cortocircuito", "transformador", "trafoPotencia", "malla", "conductores", "cableMT", "mecanico", "coordinacion", "canalizaciones", "regulacion", "distancias", "fvArreglo", "fvProduccion", "fvConductores", "fvConexion"];
   const indice = [];
   for (const m of orden) {
     for (const [clave, r] of Object.entries(resultados)) {

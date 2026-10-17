@@ -13,7 +13,8 @@ export const AREAS = {
   bt: { nombre: "Baja tensión", desc: "Cargas, conductores, protecciones, regulación y canalizaciones", clase: "rt-area-bt" },
   mt: { nombre: "Media tensión", desc: "Transformadores, cortocircuito y coordinación de protecciones", clase: "rt-area-mt" },
   spt: { nombre: "Puesta a tierra y rayos", desc: "Malla de puesta a tierra y análisis de riesgo por rayos", clase: "rt-area-spt" },
-  at: { nombre: "Alta tensión", desc: "Coordinación de aislamiento, distancias de seguridad y cálculo mecánico", clase: "rt-area-at" }
+  at: { nombre: "Alta tensión", desc: "Coordinación de aislamiento, distancias de seguridad y cálculo mecánico", clase: "rt-area-at" },
+  fv: { nombre: "Generación solar fotovoltaica (AGPE / GD)", desc: "Arreglo e inversor, producción y balance energético, conductores DC/AC y conexión a la red según la CREG 174 de 2021", clase: "rt-area-fv" }
 };
 
 export const MODULOS = {
@@ -346,6 +347,108 @@ export const MODULOS = {
         { elemento: "Transformador de potencia", captador: "Mástil 2", hCaptador: 18, hElemento: 6, distancia: 10 }
       ] }
     ]
+  },
+  fvArreglo: {
+    area: "fv", icono: "☀️", titulo: "Arreglo fotovoltaico e inversor", literalPrincipal: "x",
+    objeto: "Definir cuántos módulos van en serie y en paralelo para que, con las temperaturas extremas del sitio, las tensiones y corrientes del arreglo queden dentro de los límites del inversor y del módulo, y verificar la relación DC/AC, el DPS de corriente continua y la necesidad de fusibles de string.",
+    normas: ["RETIE — instalaciones de generación con fuentes no convencionales", "NTC 2050 Sección 690 (sistemas solares fotovoltaicos)", "IEC 62548 (diseño de arreglos fotovoltaicos)", "IEC 61215 / IEC 61730 (módulos)", "IEC 61643-31 (DPS de corriente continua)"],
+    campos: [
+      { key: "pmod", label: "Módulo: potencia máxima Pmax (STC)", tipo: "numero", unidad: "W", def: 550 },
+      { key: "voc", label: "Módulo: tensión de circuito abierto Voc", tipo: "numero", unidad: "V", def: 49.9 },
+      { key: "vmp", label: "Módulo: tensión de máxima potencia Vmp", tipo: "numero", unidad: "V", def: 41.96 },
+      { key: "isc", label: "Módulo: corriente de cortocircuito Isc", tipo: "numero", unidad: "A", def: 14 },
+      { key: "imp", label: "Módulo: corriente de máxima potencia Imp", tipo: "numero", unidad: "A", def: 13.11 },
+      { key: "bVoc", label: "Módulo: coeficiente de temperatura de Voc", tipo: "numero", unidad: "%/°C", def: -0.27 },
+      { key: "bVmp", label: "Módulo: coeficiente de temperatura de Vmp", tipo: "numero", unidad: "%/°C", def: -0.35 },
+      { key: "gPmax", label: "Módulo: coeficiente de temperatura de Pmax", tipo: "numero", unidad: "%/°C", def: -0.35 },
+      { key: "noct", label: "Módulo: NOCT (temperatura nominal de operación)", tipo: "numero", unidad: "°C", def: 45 },
+      { key: "vmaxMod", label: "Módulo: tensión máxima del sistema", tipo: "numero", unidad: "V", def: 1500 },
+      { key: "fusibleMax", label: "Módulo: fusible máximo en serie", tipo: "numero", unidad: "A", def: 25 },
+      { key: "pac", label: "Inversor: potencia nominal AC", tipo: "numero", unidad: "kW", def: 100 },
+      { key: "vac", label: "Inversor: tensión AC (línea-línea en trifásico)", tipo: "numero", unidad: "V", def: 480 },
+      { key: "fases", label: "Inversor: fases", tipo: "select", opciones: [{ valor: "3", texto: "Trifásico" }, { valor: "1", texto: "Monofásico" }], def: "3" },
+      { key: "vdcMax", label: "Inversor: tensión DC máxima de entrada", tipo: "numero", unidad: "V", def: 1100 },
+      { key: "vmpptMin", label: "Inversor: tensión MPPT mínima a plena carga", tipo: "numero", unidad: "V", def: 550 },
+      { key: "vmpptMax", label: "Inversor: tensión MPPT máxima", tipo: "numero", unidad: "V", def: 850 },
+      { key: "idcMax", label: "Inversor: corriente máxima de entrada por MPPT", tipo: "numero", unidad: "A", def: 32 },
+      { key: "iscMax", label: "Inversor: corriente de cortocircuito máxima por MPPT", tipo: "numero", unidad: "A", def: 40 },
+      { key: "nMppt", label: "Inversor: número de entradas MPPT", tipo: "numero", def: 10 },
+      { key: "ns", label: "Configuración: módulos en serie por string", tipo: "numero", def: 18 },
+      { key: "np", label: "Configuración: strings en paralelo por MPPT", tipo: "numero", def: 2 },
+      { key: "mpptUsados", label: "Configuración: entradas MPPT utilizadas", tipo: "numero", def: 6 },
+      { key: "tmin", label: "Sitio: temperatura ambiente mínima histórica", tipo: "numero", unidad: "°C", def: 15 },
+      { key: "tmax", label: "Sitio: temperatura ambiente máxima de diseño", tipo: "numero", unidad: "°C", def: 40 },
+      { key: "ilrMin", label: "Relación DC/AC mínima aceptada", tipo: "numero", def: 0.9 },
+      { key: "ilrMax", label: "Relación DC/AC máxima aceptada", tipo: "numero", def: 1.35 },
+      { key: "ucpv", label: "DPS DC: tensión máxima de operación continua Ucpv (opcional)", tipo: "numero", unidad: "V", def: 1000 }
+    ]
+  },
+  fvProduccion: {
+    area: "fv", icono: "📈", titulo: "Producción y balance energético", literalPrincipal: "x",
+    objeto: "Estimar la energía que produce el sistema fotovoltaico a partir del recurso solar del sitio y de las pérdidas (rendimiento global PR), su evolución en la vida útil y el balance con el consumo del usuario: autoconsumo, excedentes, permuta e importaciones según la CREG 174 de 2021.",
+    normas: ["Ley 1715 de 2014 y Ley 2099 de 2021 (fuentes no convencionales de energía)", "CREG 174 de 2021 (autogeneración a pequeña escala y generación distribuida)", "IEC 61724-1 (desempeño de sistemas fotovoltaicos)", "Atlas de Radiación Solar del IDEAM"],
+    campos: [
+      { key: "pdc", label: "Potencia pico (vacío = la del arreglo)", tipo: "numero", unidad: "kWp", def: "" },
+      { key: "hsp", label: "Horas sol pico promedio anual (IDEAM / NASA POWER) en el plano del arreglo", tipo: "numero", unidad: "h/día", def: 5 },
+      { key: "tambSol", label: "Temperatura ambiente media en horas de sol", tipo: "numero", unidad: "°C", def: 30 },
+      { key: "gMedia", label: "Irradiancia media en horas de sol", tipo: "numero", unidad: "W/m²", def: 800 },
+      { key: "gPmax", label: "Coeficiente de temperatura de Pmax (vacío = el del arreglo)", tipo: "numero", unidad: "%/°C", def: "" },
+      { key: "noct", label: "NOCT (vacío = el del arreglo)", tipo: "numero", unidad: "°C", def: "" },
+      { key: "pSuciedad", label: "Pérdida por suciedad", tipo: "numero", unidad: "%", def: 3 },
+      { key: "pSombra", label: "Pérdida por sombreado", tipo: "numero", unidad: "%", def: 0 },
+      { key: "pMismatch", label: "Pérdida por dispersión entre módulos (mismatch)", tipo: "numero", unidad: "%", def: 2 },
+      { key: "pCableDC", label: "Pérdida en cableado DC", tipo: "numero", unidad: "%", def: 1.5 },
+      { key: "efInversor", label: "Eficiencia europea del inversor", tipo: "numero", unidad: "%", def: 98 },
+      { key: "pCableAC", label: "Pérdida en cableado AC", tipo: "numero", unidad: "%", def: 1 },
+      { key: "pDisp", label: "Pérdida por indisponibilidad", tipo: "numero", unidad: "%", def: 1 },
+      { key: "degradacion", label: "Degradación anual de los módulos", tipo: "numero", unidad: "%/año", def: 0.5 },
+      { key: "anios", label: "Vida útil de análisis", tipo: "numero", unidad: "años", def: 25 },
+      { key: "consumo", label: "Consumo anual del usuario (0 = sin balance)", tipo: "numero", unidad: "kWh/año", def: 220000 },
+      { key: "simultaneidad", label: "Fracción de la generación consumida en el momento (simultaneidad)", tipo: "numero", unidad: "%", def: 75 },
+      { key: "tarifa", label: "Tarifa de energía del usuario (CU)", tipo: "numero", unidad: "$/kWh", def: 850 },
+      { key: "comercializacion", label: "Componente de comercialización de la tarifa", tipo: "numero", unidad: "$/kWh", def: 90 },
+      { key: "bolsa", label: "Precio de bolsa de referencia para excedentes vendidos", tipo: "numero", unidad: "$/kWh", def: 300 }
+    ]
+  },
+  fvConductores: {
+    area: "fv", icono: "🔆", titulo: "Conductores y protecciones del sistema FV", literalPrincipal: "k",
+    objeto: "Seleccionar los conductores y las protecciones de los circuitos de corriente continua (strings y agrupados) y de corriente alterna (salida del inversor) con los factores del 125 % de la NTC 2050 Sección 690, la corrección por temperatura, la temperatura de terminales, el conductor de puesta a tierra de equipos y la caída de tensión.",
+    normas: ["RETIE — instalaciones de generación con fuentes no convencionales", "NTC 2050 690-8, 690-9 y 690-31 (circuitos fotovoltaicos)", "NTC 2050 Tabla 310-16 y Tabla 250-122", "IEC 62548 (diseño de arreglos fotovoltaicos)"],
+    campos: [
+      { key: "dvMax", label: "Caída de tensión máxima por circuito", tipo: "numero", unidad: "%", def: 1.5 },
+      { key: "dvTotalMax", label: "Caída de tensión máxima total (DC más AC)", tipo: "numero", unidad: "%", def: 3 },
+      { key: "circuitos", label: "Circuitos (I base vacía = la del arreglo: Isc del string, Np × Isc del agrupado o In del inversor)", tipo: "tabla", columnas: [
+        { key: "tramo", label: "Circuito", tipo: "texto", ancho: 14 }, { key: "tipo", label: "Tipo", tipo: "select", opciones: lista(["DC string", "DC agrupado", "AC"]), ancho: 11 },
+        { key: "material", label: "Mat.", tipo: "select", opciones: lista(["Cu", "Al"]), ancho: 6 }, { key: "calibre", label: "Calibre", tipo: "select", opciones: CALIBRES_OP, ancho: 10 },
+        { key: "corriente", label: "I base (A)", tipo: "numero", ancho: 7 }, { key: "tAmb", label: "T amb. (°C)", tipo: "numero", ancho: 7 },
+        { key: "adicional", label: "+ °C por sol", tipo: "numero", ancho: 7 }, { key: "portadores", label: "Portad.", tipo: "numero", ancho: 6 },
+        { key: "longitud", label: "L (m)", tipo: "numero", ancho: 7 }, { key: "tension", label: "V (vacío = arreglo)", tipo: "numero", ancho: 8 },
+        { key: "proteccion", label: "Protección (A, opc.)", tipo: "numero", ancho: 8 }
+      ], nueva: { tipo: "DC string", material: "Cu", calibre: "10", tAmb: 35, adicional: 0, portadores: 2 }, def: [
+        { tramo: "String típico", tipo: "DC string", material: "Cu", calibre: "10", corriente: "", tAmb: 35, adicional: 17, portadores: 2, longitud: 40, tension: "", proteccion: "" },
+        { tramo: "Salida del inversor", tipo: "AC", material: "Cu", calibre: "3/0", corriente: "", tAmb: 35, adicional: 0, portadores: 3, longitud: 30, tension: "", proteccion: "" }
+      ] }
+    ]
+  },
+  fvConexion: {
+    area: "fv", icono: "🔌", titulo: "Conexión a la red (CREG 174 de 2021)", literalPrincipal: "x",
+    objeto: "Clasificar el sistema como autogenerador a pequeña escala (AGPE) o generador distribuido (GD) con su procedimiento de conexión, y verificar la capacidad disponible del circuito, la elevación de tensión en el punto de conexión por la inyección, el aporte del inversor al cortocircuito, la protección anti-isla y la medición bidireccional.",
+    normas: ["CREG 174 de 2021 (conexión de AGPE y GD)", "Ley 1715 de 2014 y Ley 2099 de 2021", "RETIE — instalaciones de generación con fuentes no convencionales", "IEEE 1547-2018 (interconexión de recursos distribuidos)", "IEC 62116 / UL 1741 (anti-isla)", "NTC 1340 (tensiones normalizadas)"],
+    campos: [
+      { key: "tipo", label: "Tipo de generador", tipo: "select", opciones: [{ valor: "AGPE", texto: "AGPE — autogenerador a pequeña escala (con consumo propio)" }, { valor: "GD", texto: "GD — generador distribuido (sin consumo propio)" }], def: "AGPE" },
+      { key: "pac", label: "Potencia nominal AC (vacío = la del inversor)", tipo: "numero", unidad: "kW", def: "" },
+      { key: "tension", label: "Tensión del punto de conexión (vacío = la del inversor)", tipo: "numero", unidad: "kV", def: "" },
+      { key: "sk", label: "Potencia de cortocircuito en el punto de conexión (operador de red)", tipo: "numero", unidad: "MVA", def: 12 },
+      { key: "rxRed", label: "Relación R/X de la red en el punto de conexión", tipo: "numero", def: 0.5 },
+      { key: "demandaMin", label: "Demanda mínima del usuario en horas de sol", tipo: "numero", unidad: "kW", def: 20 },
+      { key: "fp", label: "Factor de potencia de la inyección", tipo: "numero", def: 1 },
+      { key: "dvMax", label: "Elevación de tensión máxima admitida", tipo: "numero", unidad: "%", def: 2 },
+      { key: "capacidadDisponible", label: "Capacidad disponible publicada por el operador de red (0 = sin dato)", tipo: "numero", unidad: "kW", def: 0 },
+      { key: "icu", label: "Capacidad de interrupción de los equipos en el punto de conexión (0 = sin dato)", tipo: "numero", unidad: "kA", def: 25 },
+      { key: "aporte", label: "Aporte del inversor al cortocircuito (veces In)", tipo: "numero", def: 1.2 },
+      { key: "antiIsla", label: "Inversor con anti-isla certificada (IEC 62116 / UL 1741)", tipo: "select", opciones: SI_NO, def: "Sí" },
+      { key: "medidor", label: "Medidor bidireccional en la frontera", tipo: "select", opciones: SI_NO, def: "Sí" }
+    ]
   }
 };
 
@@ -369,5 +472,9 @@ export const NORMAS_GENERALES = [
   ["NTC 818 / NTC 819", "Transformadores monofásicos y trifásicos de distribución"],
   ["IEC 60076", "Transformadores de potencia"],
   ["IEC 60502-2 / IEC 60949", "Cables de media tensión y cortocircuito admisible"],
-  ["IEEE 998", "Direct Lightning Stroke Shielding of Substations"]
+  ["IEEE 998", "Direct Lightning Stroke Shielding of Substations"],
+  ["Ley 1715 de 2014 / Ley 2099 de 2021", "Integración de las fuentes no convencionales de energía"],
+  ["CREG 174 de 2021", "Autogeneración a pequeña escala y generación distribuida"],
+  ["NTC 2050 Sección 690 / IEC 62548", "Sistemas y arreglos solares fotovoltaicos"],
+  ["IEEE 1547-2018", "Interconexión de recursos energéticos distribuidos"]
 ];

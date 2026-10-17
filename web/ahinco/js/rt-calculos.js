@@ -797,4 +797,228 @@ export function apantallamiento(e) {
   };
 }
 
-export const CALCULOS = { cargas, conductores, regulacion, canalizaciones, transformador, cortocircuito, coordinacion, malla, rayos, aislamiento, distancias, mecanico, trafoPotencia, cableMT, apantallamiento };
+// ================================================================ 16. ARREGLO FOTOVOLTAICO E INVERSOR (IEC 62548 / NTC 2050 Sec. 690)
+// Módulos en serie y en paralelo según las temperaturas extremas del sitio,
+// verificados contra los límites del inversor y del módulo.
+export function fvArreglo(e) {
+  const pmod = num(e.pmod, 550), voc = num(e.voc, 49.9), vmp = num(e.vmp, 41.96), isc = num(e.isc, 14), imp = num(e.imp, 13.11);
+  const bVoc = num(e.bVoc, -0.27), bVmp = num(e.bVmp, -0.35), gP = num(e.gPmax, -0.35), noct = num(e.noct, 45);
+  const vmaxMod = num(e.vmaxMod, 1500), fusMax = num(e.fusibleMax, 25);
+  const vdcMax = num(e.vdcMax, 1100), vMin = num(e.vmpptMin, 550), vMax = num(e.vmpptMax, 850), idcMax = num(e.idcMax, 32), iscMax = num(e.iscMax, 40);
+  const nMppt = num(e.nMppt, 10), pac = num(e.pac, 100), vac = num(e.vac, 480), tri = e.fases !== "1";
+  const ns = Math.max(1, Math.round(num(e.ns, 18))), np = Math.max(1, Math.round(num(e.np, 2))), nUso = Math.max(1, Math.round(num(e.mpptUsados, 6)));
+  const tmin = num(e.tmin, 15), tmax = num(e.tmax, 40), ucpv = num(e.ucpv, 0);
+  const tcMax = tmax + ((noct - 20) / 800) * 1000;
+  const vocMax = voc * (1 + (bVoc / 100) * (tmin - 25)), vmpMin = vmp * (1 + (bVmp / 100) * (tcMax - 25)), vmpMax = vmp * (1 + (bVmp / 100) * (tmin - 25));
+  const vOcStr = ns * vocMax, vMpMinStr = ns * vmpMin, vMpMaxStr = ns * vmpMax;
+  const nsMax = Math.floor(Math.min(vdcMax, vmaxMod) / vocMax), nsMin = Math.ceil(vMin / vmpMin), nsMaxMppt = Math.floor(vMax / vmpMax);
+  const iMpptIsc = np * isc * 1.25, iMpptImp = np * imp;
+  const nMod = ns * np * nUso, pdc = (nMod * pmod) / 1000, ilr = pac > 0 ? pdc / pac : 0;
+  const iac = tri ? (pac * 1000) / (Math.sqrt(3) * vac) : (pac * 1000) / vac;
+  const pdcCaliente = pdc * (1 + (gP / 100) * (tcMax - 25));
+  // Corriente inversa hacia un string en falla: la de los demás strings en paralelo.
+  const iInversa = (np - 1) * isc * 1.25, fusibles = iInversa > fusMax;
+  const ilrMin = num(e.ilrMin, 0.9), ilrMax = num(e.ilrMax, 1.35);
+  const verificaciones = [
+    { criterio: "Tensión de circuito abierto del string a la temperatura mínima frente al inversor", norma: "IEC 62548 §6 / NTC 2050 690-7", valor: `${fmt(vOcStr, 0)} V`, limite: `≤ ${fmt(vdcMax, 0)} V`, cumple: vOcStr <= vdcMax },
+    { criterio: "Tensión de circuito abierto del string frente a la tensión máxima del módulo", norma: "IEC 61730 / ficha del módulo", valor: `${fmt(vOcStr, 0)} V`, limite: `≤ ${fmt(vmaxMod, 0)} V`, cumple: vOcStr <= vmaxMod },
+    { criterio: "Tensión de máxima potencia a la temperatura máxima de celda dentro del rango MPPT", norma: "IEC 62548 / ficha del inversor", valor: `${fmt(vMpMinStr, 0)} V`, limite: `≥ ${fmt(vMin, 0)} V`, cumple: vMpMinStr >= vMin },
+    { criterio: "Tensión de máxima potencia a la temperatura mínima dentro del rango MPPT", norma: "IEC 62548 / ficha del inversor", valor: `${fmt(vMpMaxStr, 0)} V`, limite: `≤ ${fmt(vMax, 0)} V`, cumple: vMpMaxStr <= vMax },
+    { criterio: "Corriente de cortocircuito por MPPT (1,25 × Isc)", norma: "NTC 2050 690-8(a) / ficha del inversor", valor: `${fmt(iMpptIsc, 1)} A`, limite: `≤ ${fmt(iscMax, 1)} A`, cumple: iMpptIsc <= iscMax },
+    { criterio: "Corriente de operación por MPPT", norma: "Ficha del inversor (corriente máxima de entrada)", valor: `${fmt(iMpptImp, 1)} A`, limite: `≤ ${fmt(idcMax, 1)} A`, cumple: iMpptImp <= idcMax },
+    { criterio: "Entradas MPPT utilizadas", norma: "Ficha del inversor", valor: String(nUso), limite: `≤ ${nMppt}`, cumple: nUso <= nMppt },
+    { criterio: "Relación DC/AC (potencia pico / potencia del inversor)", norma: "Criterio de diseño", valor: fmt(ilr, 2), limite: `${fmt(ilrMin, 2)} a ${fmt(ilrMax, 2)}`, cumple: ilr >= ilrMin && ilr <= ilrMax }
+  ];
+  if (ucpv > 0) verificaciones.push({ criterio: "Tensión del DPS de corriente continua frente a la tensión máxima del string", norma: "IEC 61643-31 / IEC 60364-7-712 (Ucpv ≥ Voc máx.)", valor: `${fmt(ucpv, 0)} V`, limite: `≥ ${fmt(vOcStr, 0)} V`, cumple: ucpv >= vOcStr });
+  return {
+    resumen: [
+      { etiqueta: "Potencia pico del arreglo", valor: fmt(pdc, 2), unidad: "kWp" },
+      { etiqueta: "Configuración", valor: `${nUso} × ${np} × ${ns}`, unidad: "MPPT × strings × módulos" },
+      { etiqueta: "Relación DC/AC", valor: fmt(ilr, 2), unidad: "" },
+      { etiqueta: "Voc máx. del string", valor: fmt(vOcStr, 0), unidad: "V" }
+    ],
+    salidas: { pdc, pac, vac, tri, isc, imp, ns, np, nUso, vocStr: vOcStr, vmpStr: ns * vmp, vmpMinStr: vMpMinStr, iac, fusMax, gPmax: gP, noct, fusibles },
+    tablas: [
+      { titulo: "Tensiones del módulo y del string", encabezados: ["Condición", "Temperatura de celda", "Módulo (V)", "String de " + ns + " módulos (V)", "Límite"], filas: [
+        ["Circuito abierto a temperatura mínima", `${fmt(tmin, 1)} °C`, fmt(vocMax, 2), fmt(vOcStr, 0), `≤ ${fmt(Math.min(vdcMax, vmaxMod), 0)} V`],
+        ["Máxima potencia a temperatura máxima", `${fmt(tcMax, 1)} °C`, fmt(vmpMin, 2), fmt(vMpMinStr, 0), `≥ ${fmt(vMin, 0)} V`],
+        ["Máxima potencia a temperatura mínima", `${fmt(tmin, 1)} °C`, fmt(vmpMax, 2), fmt(vMpMaxStr, 0), `≤ ${fmt(vMax, 0)} V`]
+      ] },
+      { titulo: "Configuración del arreglo", encabezados: ["Parámetro", "Valor"], filas: [
+        ["Módulos en serie admisibles", `${nsMin} a ${Math.min(nsMax, nsMaxMppt)} (adoptado: ${ns})`], ["Strings en paralelo por MPPT", String(np)], ["Entradas MPPT utilizadas", `${nUso} de ${nMppt}`],
+        ["Número total de módulos", String(nMod)], ["Potencia pico (STC)", `${fmt(pdc, 2)} kWp`], ["Potencia pico a la temperatura máxima de celda", `${fmt(pdcCaliente, 2)} kW`],
+        ["Inversor", `${fmt(pac, 1)} kW, ${fmt(vac, 0)} V ${tri ? "trifásico" : "monofásico"} (${fmt(iac, 1)} A)`],
+        ["Fusibles de string", fusibles ? `Requeridos: la corriente inversa (${fmt(iInversa, 1)} A) supera el fusible máximo del módulo (${fmt(fusMax, 0)} A)` : `No requeridos: corriente inversa ${fmt(iInversa, 1)} A ≤ fusible máximo del módulo ${fmt(fusMax, 0)} A`]
+      ] }
+    ],
+    pasos: [
+      { titulo: "Temperatura máxima de celda", formula: "Tc = Tamb máx. + (NOCT − 20) / 800 × 1000", sustitucion: `${fmt(tmax, 1)} + (${fmt(noct, 0)} − 20) / 800 × 1000`, resultado: `${fmt(tcMax, 1)} °C` },
+      { titulo: "Tensión de circuito abierto máxima", formula: "Voc máx. = Voc × (1 + βVoc × (Tmín − 25))", sustitucion: `${fmt(voc, 2)} × (1 + ${fmt(bVoc, 2)} % × (${fmt(tmin, 1)} − 25))`, resultado: `${fmt(vocMax, 2)} V por módulo; ${fmt(vOcStr, 0)} V el string` },
+      { titulo: "Tensión de máxima potencia mínima", formula: "Vmp mín. = Vmp × (1 + βVmp × (Tc máx. − 25))", sustitucion: `${fmt(vmp, 2)} × (1 + ${fmt(bVmp, 2)} % × (${fmt(tcMax, 1)} − 25))`, resultado: `${fmt(vmpMin, 2)} V por módulo; ${fmt(vMpMinStr, 0)} V el string` },
+      { titulo: "Módulos en serie", formula: "Ns máx. = Vdc máx. / Voc máx.; Ns mín. = V MPPT mín. / Vmp mín.", sustitucion: `${fmt(Math.min(vdcMax, vmaxMod), 0)} / ${fmt(vocMax, 2)}; ${fmt(vMin, 0)} / ${fmt(vmpMin, 2)}`, resultado: `${nsMin} ≤ Ns ≤ ${Math.min(nsMax, nsMaxMppt)}` },
+      { titulo: "Corriente por MPPT", formula: "I = Np × 1,25 × Isc (NTC 2050 690-8)", sustitucion: `${np} × 1,25 × ${fmt(isc, 2)}`, resultado: `${fmt(iMpptIsc, 1)} A` },
+      { titulo: "Potencia y relación DC/AC", formula: "Pdc = N módulos × Pmod; DC/AC = Pdc / Pac", sustitucion: `${nMod} × ${fmt(pmod, 0)} W; ${fmt(pdc, 2)} / ${fmt(pac, 1)}`, resultado: `${fmt(pdc, 2)} kWp; ${fmt(ilr, 2)}` }
+    ],
+    verificaciones,
+    notas: ["Los datos del módulo y del inversor deben tomarse de sus fichas técnicas. Temperaturas del sitio: mínima histórica y máxima de diseño (IDEAM)."],
+    conclusion: veredicto(verificaciones, `Arreglo de ${nMod} módulos (${fmt(pdc, 2)} kWp) en ${nUso} MPPT con ${np} string(s) de ${ns} módulos: compatible con el inversor de ${fmt(pac, 1)} kW.`, "La configuración del arreglo no es compatible con el inversor o el módulo.")
+  };
+}
+
+// ================================================================ 17. PRODUCCIÓN Y BALANCE ENERGÉTICO (AGPE / GD)
+export function fvProduccion(e, proyecto = {}, ctx = {}) {
+  const a = ctx.fvArreglo || {};
+  const pdc = num(e.pdc, a.pdc ?? 100), hsp = num(e.hsp, 5), tamb = num(e.tambSol, 30), g = num(e.gMedia, 800);
+  const gP = num(e.gPmax, a.gPmax ?? -0.35), noct = num(e.noct, a.noct ?? 45);
+  const tcel = tamb + ((noct - 20) / 800) * g;
+  const pTemp = Math.max(0, -gP * (tcel - 25));
+  const perdidas = [
+    ["Temperatura de celda", pTemp, `Tc = ${fmt(tcel, 1)} °C con ${fmt(g, 0)} W/m²; γ = ${fmt(gP, 2)} %/°C`],
+    ["Suciedad", num(e.pSuciedad, 3), "Polvo y suciedad entre limpiezas"], ["Sombreado", num(e.pSombra, 0), "Obstáculos y sombras entre filas"],
+    ["Dispersión entre módulos (mismatch)", num(e.pMismatch, 2), ""], ["Cableado DC", num(e.pCableDC, 1.5), "Ver «Conductores y protecciones del sistema FV»"],
+    ["Inversor", 100 - num(e.efInversor, 98), `Eficiencia europea ${fmt(num(e.efInversor, 98), 1)} %`], ["Cableado AC", num(e.pCableAC, 1), ""],
+    ["Indisponibilidad", num(e.pDisp, 1), "Mantenimientos y fallas"]
+  ];
+  const pr = perdidas.reduce((p, [, l]) => p * (1 - l / 100), 1);
+  const e1 = pdc * hsp * 365 * pr, yieldEsp = pdc > 0 ? e1 / pdc : 0;
+  const deg = num(e.degradacion, 0.5), anios = Math.max(1, Math.round(num(e.anios, 25)));
+  let eTotal = 0; const porAnio = [];
+  for (let k = 1; k <= anios; k++) { const ek = e1 * Math.pow(1 - deg / 100, k - 1); eTotal += ek; if ([1, 5, 10, 15, 20, 25, anios].includes(k) && !porAnio.some((x) => x[0] === k)) porAnio.push([k, ek]); }
+  const consumo = num(e.consumo, 0), simult = num(e.simultaneidad, 70) / 100;
+  const auto = Math.min(e1 * simult, consumo || e1 * simult), exced = e1 - auto, impo = Math.max(0, consumo - auto);
+  const permuta = Math.min(exced, impo), venta = Math.max(0, exced - impo);
+  const tarifa = num(e.tarifa, 0), comerc = num(e.comercializacion, 0), bolsa = num(e.bolsa, 0);
+  const ahorro = auto * tarifa + permuta * (tarifa - comerc) + venta * bolsa;
+  const verificaciones = [{ criterio: "Rendimiento global del sistema (PR) dentro del rango típico", norma: "IEC 61724-1 (referencia de diseño)", valor: fmt(pr, 3), limite: "0,70 a 0,90", cumple: pr >= 0.7 && pr <= 0.9 }];
+  return {
+    resumen: [
+      { etiqueta: "Energía del primer año", valor: fmt(e1 / 1000, 1), unidad: "MWh/año" },
+      { etiqueta: "Rendimiento específico", valor: fmt(yieldEsp, 0), unidad: "kWh/kWp·año" },
+      { etiqueta: "Rendimiento global PR", valor: fmt(pr * 100, 1), unidad: "%" },
+      ...(consumo ? [{ etiqueta: "Cobertura del consumo", valor: fmt((e1 / consumo) * 100, 1), unidad: "%" }] : [])
+    ],
+    salidas: { e1, pr, autoconsumo: auto, excedentes: exced },
+    tablas: [
+      { titulo: "Pérdidas y rendimiento global (PR)", encabezados: ["Pérdida", "%", "Observación"], filas: [...perdidas.map(([n, l, o]) => [n, fmt(l, 2), o]), ["Rendimiento global PR = Π (1 − pérdida)", fmt(pr * 100, 1), ""]] },
+      { titulo: "Producción a lo largo de la vida útil", encabezados: ["Año", "Energía (MWh)"], filas: [...porAnio.map(([k, ek]) => [String(k), fmt(ek / 1000, 1)]), [`Total ${anios} años`, fmt(eTotal / 1000, 0)]] },
+      ...(consumo ? [{ titulo: "Balance energético anual (CREG 174 de 2021)", encabezados: ["Concepto", "kWh/año", "Valoración"], filas: [
+        ["Consumo anual del usuario", fmt(consumo, 0), ""], ["Autoconsumo (energía generada y consumida en sitio)", fmt(auto, 0), tarifa ? `$ ${fmt(auto * tarifa, 0)} a la tarifa` : ""],
+        ["Excedentes entregados a la red", fmt(exced, 0), ""], ["— permutados (hasta igualar las importaciones)", fmt(permuta, 0), tarifa ? `$ ${fmt(permuta * (tarifa - comerc), 0)} a tarifa menos comercialización` : ""],
+        ["— vendidos (por encima de las importaciones)", fmt(venta, 0), bolsa ? `$ ${fmt(venta * bolsa, 0)} a precio de bolsa` : ""], ["Importaciones de la red", fmt(impo, 0), ""],
+        ...(tarifa ? [["Ahorro e ingresos anuales estimados", "", `$ ${fmt(ahorro, 0)}`]] : [])
+      ] }] : [])
+    ],
+    pasos: [
+      { titulo: "Temperatura media de celda", formula: "Tc = Tamb + (NOCT − 20) / 800 × G", sustitucion: `${fmt(tamb, 1)} + (${fmt(noct, 0)} − 20) / 800 × ${fmt(g, 0)}`, resultado: `${fmt(tcel, 1)} °C → pérdida ${fmt(pTemp, 2)} %` },
+      { titulo: "Rendimiento global", formula: "PR = Π (1 − pérdida i)", sustitucion: perdidas.map(([n, l]) => `${n.split(" ")[0]} ${fmt(l, 1)} %`).join("; "), resultado: `PR = ${fmt(pr, 3)}` },
+      { titulo: "Energía del primer año", formula: "E = Pdc × HSP × 365 × PR", sustitucion: `${fmt(pdc, 2)} kWp × ${fmt(hsp, 2)} h × 365 × ${fmt(pr, 3)}`, resultado: `${fmt(e1, 0)} kWh/año (${fmt(yieldEsp, 0)} kWh/kWp)` },
+      { titulo: "Degradación", formula: "E año n = E1 × (1 − d)^(n − 1)", sustitucion: `d = ${fmt(deg, 2)} %/año`, resultado: `${fmt(eTotal / 1000, 0)} MWh en ${anios} años` },
+      ...(consumo ? [{ titulo: "Balance", formula: "Autoconsumo = E × simultaneidad; excedentes = E − autoconsumo; permuta = mín(excedentes, importaciones)", sustitucion: `Simultaneidad ${fmt(simult * 100, 0)} %`, resultado: `Excedentes ${fmt(exced, 0)} kWh; permuta ${fmt(permuta, 0)} kWh; venta ${fmt(venta, 0)} kWh` }] : [])
+    ],
+    verificaciones,
+    notas: ["Las horas sol pico (HSP) deben tomarse del Atlas de Radiación Solar del IDEAM o de una base satelital (NASA POWER, PVGIS) para el sitio y la inclinación del arreglo.", "La valoración económica es indicativa: depende de la tarifa vigente, del comercializador y de las reglas de la CREG 174 de 2021 aplicables al usuario."],
+    conclusion: `El sistema de ${fmt(pdc, 2)} kWp produciría unos ${fmt(e1 / 1000, 1)} MWh el primer año (PR ${fmt(pr * 100, 1)} %)${consumo ? `, el ${fmt((e1 / consumo) * 100, 0)} % del consumo anual` : ""}.`
+  };
+}
+
+// ================================================================ 18. CONDUCTORES Y PROTECCIONES DEL SISTEMA FV (NTC 2050 690-8)
+export function fvConductores(e, proyecto = {}, ctx = {}) {
+  const a = ctx.fvArreglo || {};
+  const dvMax = num(e.dvMax, 1.5), dvTotalMax = num(e.dvTotalMax, 3);
+  const verificaciones = [];
+  let dvDC = 0, dvAC = 0;
+  const tabla = filas(e.circuitos).map((c) => {
+    const tipo = c.tipo || "DC string", dc = tipo.startsWith("DC");
+    const base = num(c.corriente, NaN);
+    const iBase = Number.isFinite(base) ? base : tipo === "DC string" ? a.isc ?? 0 : tipo === "DC agrupado" ? (a.isc ?? 0) * (a.np ?? 1) : a.iac ?? 0;
+    const iMax = dc ? iBase * 1.25 : iBase; // 690-8(a): 125 % de Isc por irradiancia
+    const iDis = iMax * 1.25; // 690-8(b) y 215-2: 125 % adicional
+    const cal = String(c.calibre || "10"), mat = c.material === "Al" ? "Al" : "Cu";
+    const tabla = N.AMPACIDAD[mat][cal] || [0, 0, 0];
+    const tAmb = num(c.tAmb, num(proyecto.tempAmbiente, 30)) + num(c.adicional, 0);
+    const ft = (N.FACTOR_TEMPERATURA.find(([hasta]) => tAmb <= hasta) || [0, 0, 0, 0])[3] ?? 0;
+    const fa = (N.FACTOR_AGRUPAMIENTO.find(([hasta]) => num(c.portadores, 2) <= hasta) || [0, 0.35])[1];
+    const amp90 = tabla[2] * ft * fa, amp75 = tabla[1];
+    const prot = num(c.proteccion, 0) || sigNormal(N.PROTECCIONES_NORMALIZADAS, iDis) || 0;
+    const t9 = N.TABLA9[cal] || [0.1, 0.1, 1, 1, 1];
+    const R = mat === "Al" ? t9[4] : t9[2], X = t9[0];
+    const L = num(c.longitud, 0) / 1000, V = num(c.tension, NaN);
+    const vRef = Number.isFinite(V) ? V : dc ? a.vmpStr ?? 700 : a.vac ?? 480;
+    const dv = dc ? ((2 * iMax * R * L) / vRef) * 100 : ((a.tri === false ? 2 : Math.sqrt(3)) * iMax * L * R / vRef) * 100;
+    if (dc) dvDC = Math.max(dvDC, dv); else dvAC = Math.max(dvAC, dv);
+    const tierra = (N.TIERRA_EQUIPOS.find(([lim]) => prot <= lim) || N.TIERRA_EQUIPOS[N.TIERRA_EQUIPOS.length - 1])[1];
+    const nom = c.tramo || tipo;
+    verificaciones.push({ criterio: `${nom}: capacidad corregida del conductor (90 °C)`, norma: "NTC 2050 690-8(b)(2) — I máx. con factores de corrección", valor: `${fmt(amp90, 1)} A`, limite: `≥ ${fmt(iMax, 1)} A`, cumple: amp90 >= iMax });
+    verificaciones.push({ criterio: `${nom}: capacidad en los terminales (75 °C)`, norma: "NTC 2050 690-8(b)(1) y 110-14(c) — 125 % de I máx.", valor: `${fmt(amp75, 1)} A`, limite: `≥ ${fmt(iDis, 1)} A`, cumple: amp75 >= iDis });
+    if (tipo === "DC string" && a.fusibles) verificaciones.push({ criterio: `${nom}: fusible de string`, norma: "NTC 2050 690-9 — entre 1,56 Isc y el fusible máximo del módulo", valor: `${fmt(prot, 0)} A`, limite: `${fmt(iDis, 1)} a ${fmt(a.fusMax ?? 25, 0)} A`, cumple: prot >= iDis - 1e-9 && prot <= (a.fusMax ?? 25) });
+    else if (tipo !== "DC string") verificaciones.push({ criterio: `${nom}: protección contra sobrecorriente`, norma: "NTC 2050 690-9 y 240-4", valor: `${fmt(prot, 0)} A`, limite: `≥ ${fmt(iDis, 1)} A y ≤ capacidad del conductor`, cumple: prot >= iDis - 1e-9 && prot <= (sigNormal(N.PROTECCIONES_NORMALIZADAS, amp90) || amp90) });
+    if (L > 0) verificaciones.push({ criterio: `${nom}: caída de tensión`, norma: "Criterio de diseño (IEC 62548 recomienda limitar las pérdidas DC)", valor: `${fmt(dv, 2)} %`, limite: `≤ ${fmt(dvMax, 1)} %`, cumple: dv <= dvMax });
+    return [nom, `${mat} ${N.etiquetaCalibre(cal)}`, fmt(iBase, 1), fmt(iMax, 1), fmt(iDis, 1), fmt(amp90, 1), fmt(amp75, 0), tipo === "DC string" && !a.fusibles ? "No requerida" : `${fmt(prot, 0)} A`, N.etiquetaCalibre(tierra), L ? fmt(dv, 2) : "—"];
+  });
+  if (dvDC + dvAC > 0) verificaciones.push({ criterio: "Caída de tensión total (DC más AC)", norma: "Criterio de diseño", valor: `${fmt(dvDC + dvAC, 2)} %`, limite: `≤ ${fmt(dvTotalMax, 1)} %`, cumple: dvDC + dvAC <= dvTotalMax });
+  return {
+    resumen: [{ etiqueta: "Circuitos verificados", valor: String(tabla.length), unidad: "" }, { etiqueta: "Caída de tensión DC + AC", valor: fmt(dvDC + dvAC, 2), unidad: "%" }],
+    tablas: [{ titulo: "Conductores y protecciones del sistema fotovoltaico", encabezados: ["Circuito", "Conductor", "I base (A)", "I máx. (A)", "I diseño 125 % (A)", "Capacidad corregida 90 °C (A)", "Capacidad 75 °C (A)", "Protección", "Tierra de equipos", "ΔV (%)"], filas: tabla }],
+    pasos: [
+      { titulo: "Corriente máxima", formula: "DC: I máx. = 1,25 × Isc (string) o 1,25 × Np × Isc (agrupado); AC: I máx. = I nominal del inversor", sustitucion: "NTC 2050 690-8(a)", resultado: "Por circuito" },
+      { titulo: "Corriente de diseño", formula: "I diseño = 1,25 × I máx. (DC: 1,56 × Isc)", sustitucion: "NTC 2050 690-8(b) y 215-2", resultado: "Por circuito" },
+      { titulo: "Capacidad del conductor", formula: "I 90 °C × Ft × Fa ≥ I máx.; I 75 °C ≥ I diseño", sustitucion: "NTC 2050 Tabla 310-16; temperatura con el incremento por exposición solar", resultado: "Por circuito" },
+      { titulo: "Caída de tensión", formula: "DC: ΔV = 2 I L R / V; AC trifásico: ΔV = √3 I L R / V", sustitucion: "R de la NTC 2050 Cap. 9 Tabla 9", resultado: `DC ${fmt(dvDC, 2)} %; AC ${fmt(dvAC, 2)} %` },
+      { titulo: "Puesta a tierra de equipos", formula: "Calibre según la protección", sustitucion: "NTC 2050 Tabla 250-122", resultado: "Por circuito" }
+    ],
+    verificaciones,
+    notas: ["Para circuitos DC use conductor fotovoltaico (PV wire) de doble aislamiento, resistente a rayos UV, con tensión nominal ≥ Voc máx. del string."],
+    conclusion: veredicto(verificaciones, "Los conductores y protecciones del sistema fotovoltaico cumplen.", "Hay conductores o protecciones del sistema fotovoltaico que no cumplen.")
+  };
+}
+
+// ================================================================ 19. CONEXIÓN A LA RED (CREG 174 DE 2021)
+export function fvConexion(e, proyecto = {}, ctx = {}) {
+  const a = ctx.fvArreglo || {};
+  const tipo = e.tipo === "GD" ? "GD" : "AGPE";
+  const pac = num(e.pac, a.pac ?? 100), vkv = num(e.tension, (a.vac ?? 480) / 1000), sk = num(e.sk, 20), rx = num(e.rxRed, 0.5);
+  const dmin = num(e.demandaMin, 0), fp = Math.min(1, Math.max(0.8, num(e.fp, 1))), dvMax = num(e.dvMax, 2);
+  const capDisp = num(e.capacidadDisponible, 0), icu = num(e.icu, 0), fAporte = num(e.aporte, 1.2);
+  const Z = (vkv * vkv) / sk, X = Z / Math.sqrt(1 + rx * rx), R = rx * X;
+  const pExp = Math.max(0, pac - dmin) / 1000, qExp = pExp * Math.tan(Math.acos(fp));
+  const dv = ((pExp * R + qExp * X) / (vkv * vkv)) * 100;
+  const iac = (pac * 1000) / (Math.sqrt(3) * vkv * 1000);
+  const ikRed = sk / (Math.sqrt(3) * vkv), ikInv = (fAporte * iac) / 1000, ikTot = ikRed + ikInv;
+  const scr = pac > 0 ? (sk * 1000) / pac : 0;
+  const clase = tipo === "GD" ? (pac <= 1000 ? "Generador distribuido (GD), hasta 1 MW" : "Fuera del rango de GD (> 1 MW)")
+    : pac <= 100 ? "AGPE hasta 0,1 MW: procedimiento simplificado, sin estudio de conexión" : pac <= 1000 ? "AGPE entre 0,1 y 1 MW: requiere estudio de conexión simplificado" : "Autogenerador a gran escala (> 1 MW): fuera del alcance de AGPE";
+  const verificaciones = [
+    { criterio: `Potencia dentro del límite de ${tipo}`, norma: "CREG 174 de 2021 (AGPE y GD hasta 1 MW)", valor: `${fmt(pac, 1)} kW`, limite: "≤ 1.000 kW", cumple: pac <= 1000 },
+    { criterio: "Elevación de tensión en el punto de conexión por la inyección", norma: "Criterio de diseño (verificar el límite con el operador de red; NTC 1340)", valor: `${fmt(dv, 2)} %`, limite: `≤ ${fmt(dvMax, 1)} %`, cumple: dv <= dvMax },
+    { criterio: "Inversor con protección anti-isla certificada", norma: "RETIE / CREG 174 de 2021 (IEC 62116, UL 1741 o IEEE 1547)", valor: e.antiIsla === "No" ? "No" : "Sí", limite: "Sí", cumple: e.antiIsla !== "No" },
+    { criterio: "Medidor bidireccional en la frontera", norma: "CREG 174 de 2021 y código de medida (CREG 038 de 2014)", valor: e.medidor === "No" ? "No" : "Sí", limite: "Sí", cumple: e.medidor !== "No" }
+  ];
+  if (capDisp > 0) verificaciones.splice(1, 0, { criterio: "Potencia frente a la capacidad disponible publicada por el operador de red", norma: "CREG 174 de 2021 — disponibilidad de capacidad del circuito", valor: `${fmt(pac, 1)} kW`, limite: `≤ ${fmt(capDisp, 1)} kW`, cumple: pac <= capDisp });
+  if (icu > 0) verificaciones.push({ criterio: "Capacidad de interrupción de los equipos con el aporte del inversor", norma: "RETIE / IEC 60909 (aporte del inversor ≈ 1,1 a 1,5 In)", valor: `${fmt(icu, 1)} kA`, limite: `≥ ${fmt(ikTot, 2)} kA`, cumple: icu >= ikTot });
+  return {
+    resumen: [
+      { etiqueta: "Clasificación", valor: tipo, unidad: "" },
+      { etiqueta: "Elevación de tensión en el punto de conexión", valor: fmt(dv, 2), unidad: "%" },
+      { etiqueta: "Relación de cortocircuito Sk / Pac", valor: fmt(scr, 0), unidad: "" }
+    ],
+    tablas: [
+      { titulo: "Conexión a la red", encabezados: ["Parámetro", "Valor"], filas: [
+        ["Tipo de generador", clase], ["Potencia nominal AC", `${fmt(pac, 1)} kW`], ["Tensión del punto de conexión", `${fmt(vkv, 3)} kV`],
+        ["Potencia de cortocircuito en el punto de conexión", `${fmt(sk, 2)} MVA (Z = ${fmt(Z * 1000, 2)} mΩ, R/X = ${fmt(rx, 2)})`],
+        ["Potencia exportada en el peor caso", `${fmt(pExp * 1000, 1)} kW (demanda mínima ${fmt(dmin, 1)} kW)`],
+        ["Corriente nominal del inversor", `${fmt(iac, 1)} A`], ["Cortocircuito de la red / aporte del inversor", `${fmt(ikRed, 2)} kA / ${fmt(ikInv, 3)} kA`]
+      ] },
+      { titulo: "Ajustes de referencia de las protecciones de interconexión (IEEE 1547-2018, categoría II)", encabezados: ["Función", "Ajuste", "Tiempo de despeje"], filas: N.AJUSTES_IEEE1547 }
+    ],
+    pasos: [
+      { titulo: "Impedancia de la red en el punto de conexión", formula: "Z = U² / Sk; X = Z / √(1 + (R/X)²); R = (R/X) × X", sustitucion: `${fmt(vkv, 3)}² / ${fmt(sk, 2)}`, resultado: `R = ${fmt(R * 1000, 2)} mΩ; X = ${fmt(X * 1000, 2)} mΩ` },
+      { titulo: "Elevación de tensión", formula: "ΔU / U = (P × R + Q × X) / U²", sustitucion: `P = ${fmt(pExp * 1000, 1)} kW; fp = ${fmt(fp, 2)}`, resultado: `${fmt(dv, 2)} %` },
+      { titulo: "Aporte al cortocircuito", formula: "Ik inversor ≈ factor × In", sustitucion: `${fmt(fAporte, 2)} × ${fmt(iac, 1)} A`, resultado: `${fmt(ikInv * 1000, 0)} A; total ${fmt(ikTot, 2)} kA` }
+    ],
+    verificaciones,
+    notas: ["Los ajustes de las protecciones de interconexión son de referencia: los definitivos los fija el operador de red en la aprobación de la conexión.", "Antes de la solicitud de conexión, consulte en la página del operador de red la capacidad disponible del circuito o transformador (CREG 174 de 2021)."],
+    conclusion: veredicto(verificaciones, `${clase}. La conexión cumple los criterios verificados.`, `${clase}. Hay criterios de conexión que no se cumplen.`)
+  };
+}
+
+export const CALCULOS = { cargas, conductores, regulacion, canalizaciones, transformador, cortocircuito, coordinacion, malla, rayos, aislamiento, distancias, mecanico, trafoPotencia, cableMT, apantallamiento, fvArreglo, fvProduccion, fvConductores, fvConexion };

@@ -84,6 +84,19 @@ export const TUBERIAS = {
 export const LLENADO_MAX = (n) => (n <= 1 ? 53 : n === 2 ? 31 : 40);
 
 // NTC 2050 240-6: corrientes nominales normalizadas de interruptores y fusibles (A).
+// NTC 2050 Tabla 250-122: conductor de puesta a tierra de equipos (cobre)
+// según la corriente de la protección contra sobrecorriente (A → calibre).
+export const TIERRA_EQUIPOS = [[15, "14"], [20, "12"], [60, "10"], [100, "8"], [200, "6"], [300, "4"], [400, "3"], [500, "2"], [600, "1"], [800, "1/0"], [1000, "2/0"], [1200, "3/0"], [1600, "4/0"], [2000, "250"], [2500, "350"], [3000, "400"], [4000, "500"], [5000, "700"], [6000, "800"]];
+
+// IEEE 1547-2018, categoría II: ajustes de referencia de las protecciones
+// de interconexión (los definitivos los fija el operador de red).
+export const AJUSTES_IEEE1547 = [
+  ["Sobretensión OV2 (59)", "1,20 p.u.", "0,16 s"], ["Sobretensión OV1 (59)", "1,10 p.u.", "2,0 s"],
+  ["Subtensión UV1 (27)", "0,70 p.u.", "10,0 s"], ["Subtensión UV2 (27)", "0,45 p.u.", "0,16 s"],
+  ["Sobrefrecuencia OF2 (81O)", "62,0 Hz", "0,16 s"], ["Sobrefrecuencia OF1 (81O)", "61,2 Hz", "300 s"],
+  ["Subfrecuencia UF1 (81U)", "58,5 Hz", "300 s"], ["Subfrecuencia UF2 (81U)", "56,5 Hz", "0,16 s"]
+];
+
 export const PROTECCIONES_NORMALIZADAS = [15, 20, 25, 30, 35, 40, 45, 50, 60, 70, 80, 90, 100, 110, 125, 150, 175, 200, 225, 250, 300, 350, 400, 450, 500, 600, 700, 800, 1000, 1200, 1600, 2000, 2500, 3000, 4000, 5000, 6000];
 
 // ---------------------------------------------------------------- conductores aéreos (media y alta tensión)
