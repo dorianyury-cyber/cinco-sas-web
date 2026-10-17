@@ -46,7 +46,7 @@ const TIPO_LABEL = {
   gestion: "Informe de gestión", mediciones: "Informe de mediciones",
   consultoria: "Informe de consultoría", interventoria: "Informe de interventoría",
   obra: "Informe de obra", capacitacion: "Informe de capacitación",
-  revisionDisenos: "Revisión de diseños eléctricos", otro: "Informe"
+  revisionDisenos: "Revisión de diseños eléctricos", memoriaCalculo: "Memoria de cálculo", otro: "Informe"
 };
 
 // formato "PNG" (por defecto, para el logo — necesita transparencia) o

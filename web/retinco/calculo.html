@@ -1,0 +1,52 @@
+<!doctype html>
+<html lang="es" class="rt-preparando">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<meta name="robots" content="noindex, nofollow">
+<title>Cálculo — RETINCO</title>
+<link rel="icon" type="image/png" sizes="32x32" href="../assets/img/favicon-32.png">
+<link rel="stylesheet" href="../interventoria-pro/assets/ip.css">
+<link rel="stylesheet" href="assets/rt.css">
+</head>
+<body>
+  <div class="bienvenida-page">
+    <header class="bienvenida-topbar">
+      <a href="inicio.html" class="bienvenida-brand">
+        <img src="../interventoria-pro/assets/logo.png" alt="CINCO S.A.S.">
+        <span>RETINCO<span class="rt-marca-sub">Memorias de cálculo RETIE</span></span>
+      </a>
+      <div class="ip-topbar-acciones">
+        <span class="rt-usuario" id="rtUsuario"></span>
+        <button type="button" class="ip-btn-cuenta" id="logoutBtn">⏻ Cerrar sesión</button>
+      </div>
+    </header>
+
+    <main class="rt-main">
+      <div class="rt-titulo">
+        <div>
+          <p class="text-muted" id="migas"></p>
+          <h1 id="titulo">Cálculo</h1>
+          <p class="text-muted" id="objeto"></p>
+        </div>
+        <div class="rt-acciones">
+          <span class="rt-estado-guardado" id="estadoGuardado"></span>
+          <button type="button" class="btn secondary" id="ejemploBtn">Restablecer ejemplo</button>
+          <button type="button" class="btn" id="guardarBtn">Guardar</button>
+        </div>
+      </div>
+      <div class="alert" id="alerta"></div>
+      <div class="rt-calculo">
+        <section class="card">
+          <h2>Datos de entrada</h2>
+          <p class="rt-nota" id="normas"></p>
+          <div class="rt-aviso-norma hidden" id="avisoEjemplo">Se muestran valores de ejemplo: reemplácelos por los del proyecto y guarde.</div>
+          <div class="rt-campos" id="campos"></div>
+        </section>
+        <section class="card rt-resultados" id="resultados"></section>
+      </div>
+    </main>
+  </div>
+  <script type="module" src="js/rt-calculo.js"></script>
+</body>
+</html>

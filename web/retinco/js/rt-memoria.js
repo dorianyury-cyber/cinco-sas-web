@@ -1,0 +1,142 @@
+// Memoria de cálculo de RETINCO en PDF y Word, organizada por los literales
+// a) a x) del diseño detallado del RETIE. Usa los mismos generadores de
+// informes de Cinco S.A.S. (web/js/control/informes-pdf.js e
+// informes-docx.js): portada, índice con páginas, títulos numerados,
+// tablas con anchos proporcionales al contenido, encabezado y pie.
+import { generarInformePDF } from "../../js/control/informes-pdf.js";
+import { generarInformeDocxBlob } from "../../js/control/informes-docx.js";
+import { MODULOS, NORMAS_GENERALES } from "./rt-modulos.js";
+import { LITERALES, FUENTE_LITERALES } from "./rt-literales.js";
+import { svgTCC, svgAPng } from "./rt-grafico.js";
+import { esc, hoyISO } from "./rt-core.js";
+
+const P = (html) => ({ tipo: "parrafo", texto: html });
+const T = (nivel, texto) => ({ tipo: `titulo${nivel}`, texto });
+const tabla = (titulo, encabezados, filas) => ({ tipo: "tabla", titulo, filas: [encabezados, ...filas.map((f) => f.map((v) => String(v ?? "")))], merges: [], centrados: [], filasEncabezado: 1 });
+
+// Texto visible de un valor de entrada (las listas muestran su texto).
+function valorVisible(campo, v) {
+  if (campo.opciones) { const o = campo.opciones.find((x) => String(x.valor) === String(v ?? "")); if (o) return o.texto; }
+  return v === "" || v == null ? "—" : String(v);
+}
+
+async function seccionModulo(id, r, entradas, nivel, proyecto) {
+  const mod = MODULOS[id];
+  const b = [T(nivel, mod.titulo)];
+  b.push(P(`<b>Objeto.</b> ${esc(mod.objeto)}`));
+  b.push(P(`<b>Normas aplicadas.</b> ${esc(mod.normas.join("; "))}.`));
+  // Datos de entrada.
+  const simples = mod.campos.filter((c) => c.tipo !== "tabla" && !(c.soloSi && String(entradas[Object.keys(c.soloSi)[0]]) !== String(Object.values(c.soloSi)[0])));
+  if (simples.length) b.push(tabla(`Datos de entrada — ${mod.titulo}`, ["Parámetro", "Valor", "Unidad"], simples.map((c) => [c.label, valorVisible(c, entradas[c.key]), c.unidad || ""])));
+  mod.campos.filter((c) => c.tipo === "tabla").forEach((c) => {
+    const filas = (entradas[c.key] || []).filter((f) => Object.values(f).some((v) => v !== "" && v != null));
+    if (filas.length) b.push(tabla(`${c.label.replace(/\s*\(.*\)\s*$/, "")} — datos de entrada`, c.columnas.map((col) => col.label), filas.map((f) => c.columnas.map((col) => valorVisible(col, f[col.key])))));
+  });
+  // Metodología.
+  b.push(P("<b>Metodología y cálculos.</b>"));
+  (r.pasos || []).forEach((p, i) => b.push(P(`<b>${i + 1}. ${esc(p.titulo)}.</b> <i>${esc(p.formula)}</i>. ${esc(p.sustitucion)}. Resultado: <b>${esc(p.resultado)}</b>.`)));
+  (r.tablas || []).forEach((t) => b.push(tabla(t.titulo, t.encabezados, t.filas)));
+  if (r.grafico?.tipo === "tcc") {
+    try { b.push({ tipo: "imagen", url: await svgAPng(svgTCC(r.grafico)), nombre: "Curvas tiempo-corriente de las protecciones", pieDeFoto: "", tamano: 95 }); } catch (e) { /* sin gráfico */ }
+  }
+  // Verificación y conclusión.
+  if ((r.verificaciones || []).length) b.push(tabla(`Verificación normativa — ${mod.titulo}`, ["Criterio", "Norma o referencia", "Valor", "Límite", "Resultado"], r.verificaciones.map((v) => [v.criterio, v.norma, v.valor, v.limite, v.cumple ? "Cumple" : "No cumple"])));
+  (r.notas || []).forEach((n) => b.push(P(`<i>Nota: ${esc(n)}</i>`)));
+  b.push(P(`<b>Conclusión.</b> ${esc(r.conclusion || "")}`));
+  return b;
+}
+
+export async function construirMemoria({ proyecto, resultados, guardados }) {
+  const lits = proyecto.literales || {};
+  const b = [];
+  // ---- Generalidades
+  b.push(T(1, "Generalidades"));
+  b.push(P(`La presente memoria de cálculo corresponde al ${esc((proyecto.tipoDiseno || "diseño detallado").toLowerCase())} de la instalación eléctrica del proyecto <b>${esc(proyecto.nombre)}</b>${proyecto.descripcion ? `: ${esc(proyecto.descripcion)}` : ""}. Se organiza según los literales del ${esc(FUENTE_LITERALES)}; los literales que no aplican a la instalación se mencionan expresamente con su justificación, como lo exige el parágrafo 1 del mismo artículo.`));
+  b.push(tabla("Datos generales del proyecto", ["Dato", "Valor"], [
+    ["Proyecto", proyecto.nombre], ["Cliente", proyecto.cliente || "—"], ["Ubicación", proyecto.ubicacion || "—"],
+    ["Altitud", `${proyecto.altitud ?? "—"} m s. n. m.`], ["Temperatura ambiente de diseño", `${proyecto.tempAmbiente ?? "—"} °C`],
+    ["Tipo de diseño", proyecto.tipoDiseno || "Diseño detallado"], ["Diseñador", `${proyecto.disenador || "—"}${proyecto.matricula ? ` — M.P. ${proyecto.matricula}` : ""}`]
+  ]));
+  b.push(tabla("Normas y reglamentos aplicados", ["Documento", "Título"], NORMAS_GENERALES));
+  b.push(tabla("Alcance de la memoria por literal del RETIE", ["Lit.", "Contenido exigido", "Aplica", "Desarrollo"], LITERALES.map((l) => {
+    const d = lits[l.l] || {};
+    const calc = l.modulos.filter((m) => resultados[m]).map((m) => MODULOS[m].titulo);
+    return [`${l.l})`, l.texto, d.aplica === "No" ? "No" : "Sí", d.aplica === "No" ? `No aplica: ${d.texto || "sin justificación"}` : calc.length ? `Cálculo: ${calc.join("; ")}` : d.texto ? "Desarrollo del diseñador" : "Pendiente"];
+  })));
+  // ---- un capítulo con una sección por literal (sin salto de página entre literales)
+  b.push(T(1, "Diseño detallado según los literales a) a x) del RETIE"));
+  const yaIncluido = {};
+  for (const l of LITERALES) {
+    const d = lits[l.l] || {};
+    b.push(T(2, `Literal ${l.l}) ${l.texto.replace(/\.$/, "")}`));
+    if (d.aplica === "No") { b.push(P(`<b>No aplica.</b> ${esc(d.texto || "El diseñador no registró la justificación.")}`)); continue; }
+    if (d.texto) b.push(P(esc(d.texto).replace(/\n/g, "<br>")));
+    const mods = l.modulos.filter((m) => resultados[m]);
+    for (const m of mods) {
+      if (yaIncluido[m]) { b.push(P(`El cálculo de <b>${esc(MODULOS[m].titulo)}</b> se presenta en el literal ${yaIncluido[m]}) de esta memoria.`)); continue; }
+      yaIncluido[m] = l.l;
+      b.push(...(await seccionModulo(m, resultados[m], guardados[m]?.entradas || {}, 3, proyecto)));
+    }
+    if (!mods.length && !d.texto) b.push(P("<i>Pendiente por desarrollar.</i>"));
+  }
+  // ---- conclusiones
+  b.push(T(1, "Conclusiones"));
+  const filasConc = Object.entries(resultados).map(([m, r]) => {
+    const fallan = (r.verificaciones || []).filter((v) => v.cumple === false).length;
+    return [MODULOS[m].titulo, fallan ? `No cumple (${fallan})` : "Cumple", r.conclusion || ""];
+  });
+  b.push(tabla("Resumen de resultados", ["Cálculo", "Estado", "Conclusión"], filasConc));
+  b.push(P("El diseñador declara que los cálculos se realizaron con base en el RETIE y las normas técnicas citadas, y que los supuestos adoptados se indican en cada literal."));
+  b.push({ tipo: "firma", etiqueta: "Elaboró", firmantes: [{ nombre: proyecto.disenador || "", cargo: `Ingeniero electricista${proyecto.matricula ? `\nMatrícula profesional ${proyecto.matricula}` : ""}\nCinco S.A.S.`, firmaUrl: null }] });
+  return b;
+}
+
+function datosInforme(proyecto, bloques) {
+  return {
+    titulo: `Memoria de cálculo — ${proyecto.nombre}`,
+    tipoInforme: "memoriaCalculo",
+    portada: "oscura",
+    mes: hoyISO().slice(0, 7),
+    fecha: hoyISO(),
+    radicado: proyecto.radicado || "Sin radicado",
+    contratoNombre: proyecto.descripcion || proyecto.nombre,
+    contratoCliente: proyecto.cliente || "",
+    firmaNombre: proyecto.disenador || "",
+    firmaCargo: proyecto.matricula ? `Ingeniero electricista — M.P. ${proyecto.matricula}` : "Ingeniero electricista",
+    margenEncuadernacion: 10,
+    bloques
+  };
+}
+
+function descargarBlob(blob, nombre) {
+  const url = URL.createObjectURL(blob);
+  const a = document.createElement("a");
+  a.href = url; a.download = nombre;
+  document.body.appendChild(a); a.click(); a.remove();
+  setTimeout(() => URL.revokeObjectURL(url), 4000);
+}
+const nombreArchivo = (p, ext) => `Memoria de calculo - ${String(p.nombre || "proyecto").replace(/[\\/:*?"<>|]/g, "-").slice(0, 80)}.${ext}`;
+
+// Las fuentes estándar del PDF (Helvetica, WinAnsi) no tienen letras
+// griegas ni símbolos matemáticos: se escriben con equivalentes legibles
+// (el Word sí los conserva).
+const EQUIV_PDF = { "√": "raíz ", "Ω": "ohm", "Σ": "Suma ", "π": "pi", "ρ": "rho", "α": "alfa", "φ": "phi", "κ": "kappa", "θ": "theta", "Δ": "Delta ", "→": "->", "−": "-", "⁻": "-", "⁰": "^0", "¹": "^1", "⁴": "^4", "⁵": "^5", "⁶": "^6", "≤": "<=", "≥": ">=", "≈": "~" };
+// Caracteres fuera de Latin-1 que WinAnsi sí tiene; el resto (emoji, etc.) se omite.
+const WINANSI_EXTRA = "€‚ƒ„…†‡ˆ‰Š‹ŒŽ‘’“”•–—˜™š›œžŸ";
+const pdfSeguro = (t) => (typeof t === "string" ? t.replace(/[^\u0000-ÿ]/gu, (c) => EQUIV_PDF[c] ?? (WINANSI_EXTRA.includes(c) ? c : "")) : t);
+function sanearPDF(v) {
+  if (Array.isArray(v)) return v.map(sanearPDF);
+  if (v && typeof v === "object") return Object.fromEntries(Object.entries(v).map(([k, x]) => [k, k === "url" ? x : sanearPDF(x)]));
+  return pdfSeguro(v);
+}
+
+export async function descargarMemoria(datos, tipo) {
+  const bloques = await construirMemoria(datos);
+  const informe = datosInforme(datos.proyecto, bloques);
+  if (tipo === "word") {
+    descargarBlob(await generarInformeDocxBlob(informe), nombreArchivo(datos.proyecto, "docx"));
+  } else {
+    const doc = await generarInformePDF(sanearPDF(informe));
+    descargarBlob(doc.output("blob"), nombreArchivo(datos.proyecto, "pdf"));
+  }
+}

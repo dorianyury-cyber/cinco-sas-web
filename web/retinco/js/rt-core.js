@@ -1,0 +1,155 @@
+// Núcleo de RETINCO (web/retinco/*): sesión, perfil, proyectos y cálculo
+// encadenado entre módulos. Vive en el proyecto Firebase "cinco-sas" y usa
+// el mismo ingreso de Cinco S.A.S. (cuenta propia o la de Cinco Conecta) y
+// el perfil de la colección "empleados" (debe estar activo).
+//
+// Datos: rtProyectos/{id} (datos generales del proyecto) y
+// rtProyectos/{id}/calculos/{moduloId} = { entradas, actualizadoEn, actualizadoPor }.
+// La barrera real está en firestore.rules (match /rtProyectos).
+
+import { signOut, onAuthStateChanged } from "https://www.gstatic.com/firebasejs/10.7.1/firebase-auth.js";
+import { collection, doc, getDoc, getDocs, addDoc, setDoc, updateDoc, deleteDoc, serverTimestamp, query, orderBy } from "https://www.gstatic.com/firebasejs/10.7.1/firebase-firestore.js";
+import { auth, db, obtenerPerfil } from "../../js/control/firebase-control.js";
+import { CALCULOS } from "./rt-calculos.js";
+import { MODULOS, entradasPorDefecto } from "./rt-modulos.js";
+
+export { auth, db };
+export const NOMBRE_APP = "RETINCO";
+const CLAVE_TEMA = "ip-theme";
+
+export function esc(texto) {
+  return String(texto ?? "").replace(/[&<>"']/g, (c) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" }[c]));
+}
+export function fechaCorta(v) {
+  const d = v?.toDate ? v.toDate() : v ? new Date(v) : null;
+  return d && !isNaN(d) ? d.toLocaleDateString("es-CO", { year: "numeric", month: "short", day: "2-digit" }) : "—";
+}
+export function hoyISO() {
+  const d = new Date();
+  return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}-${String(d.getDate()).padStart(2, "0")}`;
+}
+export function mostrarAlerta(el, texto, tipo = "error") { if (el) { el.textContent = texto; el.className = `alert ${tipo}`; } }
+export function limpiarAlerta(el) { if (el) { el.textContent = ""; el.className = "alert"; } }
+export function errorAmigable(err) {
+  const code = err?.code || "";
+  if (code.includes("permission-denied")) return "No tienes permiso para esta acción.";
+  if (code.includes("unavailable")) return "Sin conexión con el servidor. Revisa tu internet e inténtalo de nuevo.";
+  return err?.message || "Ocurrió un error inesperado.";
+}
+
+// ---------------------------------------------------------------- tema claro / oscuro (compartido con Interventoría PRO)
+(function iniciarTema() {
+  let tema = "light";
+  try { tema = localStorage.getItem(CLAVE_TEMA) || (matchMedia("(prefers-color-scheme: dark)").matches ? "dark" : "light"); } catch (e) { /* sin almacenamiento */ }
+  document.documentElement.setAttribute("data-theme", tema);
+  const crear = () => {
+    const btn = document.createElement("button");
+    btn.type = "button"; btn.className = "theme-toggle"; btn.title = "Cambiar modo claro/oscuro";
+    const pintar = () => { btn.textContent = document.documentElement.getAttribute("data-theme") === "dark" ? "☀️" : "🌙"; };
+    pintar();
+    btn.addEventListener("click", () => {
+      const nuevo = document.documentElement.getAttribute("data-theme") === "dark" ? "light" : "dark";
+      document.documentElement.setAttribute("data-theme", nuevo);
+      try { localStorage.setItem(CLAVE_TEMA, nuevo); } catch (e) { /* sin almacenamiento */ }
+      pintar();
+    });
+    document.body.appendChild(btn);
+  };
+  if (document.body) crear(); else document.addEventListener("DOMContentLoaded", crear);
+})();
+
+// ---------------------------------------------------------------- sesión
+function esperarUsuario() {
+  return new Promise((resolve) => { const c = onAuthStateChanged(auth, (u) => { c(); resolve(u); }); });
+}
+export async function cerrarSesion() {
+  await signOut(auth);
+  window.location.href = "index.html";
+}
+export async function iniciarPagina() {
+  const user = await esperarUsuario();
+  if (!user) { window.location.href = "index.html"; return null; }
+  const perfil = await obtenerPerfil(user.email);
+  if (!perfil || perfil.estado !== "activo") {
+    document.documentElement.classList.remove("rt-preparando");
+    document.body.innerHTML = `<div class="auth-page"><div class="auth-card"><h1>${NOMBRE_APP}</h1><p class="text-muted">Tu cuenta no tiene un perfil activo en Cinco S.A.S. Pídele a un administrador que te registre en Empleados.</p><button type="button" class="btn" id="salirSinAcceso">Cerrar sesión</button></div></div>`;
+    document.getElementById("salirSinAcceso").addEventListener("click", cerrarSesion);
+    return null;
+  }
+  const btn = document.getElementById("logoutBtn");
+  if (btn) btn.addEventListener("click", cerrarSesion);
+  const quien = document.getElementById("rtUsuario");
+  if (quien) quien.textContent = perfil.nombre || user.email;
+  document.documentElement.classList.remove("rt-preparando");
+  return { user, perfil, esAdmin: perfil.rol === "admin" };
+}
+
+// ---------------------------------------------------------------- proyectos
+const col = () => collection(db, "rtProyectos");
+export async function listarProyectos() {
+  const snap = await getDocs(query(col(), orderBy("actualizadoEn", "desc")));
+  return snap.docs.map((d) => ({ id: d.id, ...d.data() }));
+}
+export async function leerProyecto(id) {
+  const snap = await getDoc(doc(db, "rtProyectos", id));
+  return snap.exists() ? { id: snap.id, ...snap.data() } : null;
+}
+export async function crearProyecto(datos, user) {
+  const ref = await addDoc(col(), { ...datos, creadoPor: user.email, creadoEn: serverTimestamp(), actualizadoPor: user.email, actualizadoEn: serverTimestamp() });
+  return ref.id;
+}
+export async function actualizarProyecto(id, datos, user) {
+  await updateDoc(doc(db, "rtProyectos", id), { ...datos, actualizadoPor: user.email, actualizadoEn: serverTimestamp() });
+}
+export async function eliminarProyecto(id) {
+  const calc = await getDocs(collection(db, "rtProyectos", id, "calculos"));
+  for (const d of calc.docs) await deleteDoc(d.ref);
+  await deleteDoc(doc(db, "rtProyectos", id));
+}
+export async function leerCalculos(id) {
+  const snap = await getDocs(collection(db, "rtProyectos", id, "calculos"));
+  return Object.fromEntries(snap.docs.map((d) => [d.id, d.data()]));
+}
+export async function guardarCalculo(id, moduloId, entradas, user) {
+  await setDoc(doc(db, "rtProyectos", id, "calculos", moduloId), { entradas, actualizadoPor: user.email, actualizadoEn: serverTimestamp() });
+  await updateDoc(doc(db, "rtProyectos", id), { actualizadoPor: user.email, actualizadoEn: serverTimestamp() });
+}
+
+// ---------------------------------------------------------------- cálculo encadenado
+// Orden con dependencias: el transformador usa la demanda del cuadro de
+// cargas y el cortocircuito usa los datos del transformador.
+export const ORDEN_MODULOS = ["cargas", "conductores", "regulacion", "canalizaciones", "transformador", "cortocircuito", "coordinacion", "malla", "rayos", "aislamiento", "distancias", "mecanico"];
+
+export function calcularModulo(id, entradas, proyecto, ctx = {}) {
+  try {
+    return CALCULOS[id](entradas, proyecto, ctx);
+  } catch (err) {
+    console.error(id, err);
+    return { error: err.message || String(err), resumen: [], tablas: [], pasos: [], verificaciones: [], conclusion: "No se pudo calcular con los datos ingresados." };
+  }
+}
+
+// guardados: { moduloId: { entradas } }. Calcula los módulos guardados (o,
+// si se pide, también los no guardados con sus valores de ejemplo).
+export function calcularProyecto(proyecto, guardados, { incluirEjemplos = false, sobrescribir = {} } = {}) {
+  const ctx = {}, res = {};
+  for (const id of ORDEN_MODULOS) {
+    const entradas = sobrescribir[id] || guardados[id]?.entradas || (incluirEjemplos ? entradasPorDefecto(id) : null);
+    if (!entradas) continue;
+    const r = calcularModulo(id, entradas, proyecto, ctx);
+    if (r.salidas) ctx[id] = r.salidas;
+    res[id] = r;
+  }
+  return res;
+}
+
+export function estadoModulo(r) {
+  if (!r) return { texto: "Sin datos", clase: "muted" };
+  if (r.error) return { texto: "Error", clase: "danger" };
+  const v = r.verificaciones || [];
+  if (!v.length) return { texto: "Calculado", clase: "ok" };
+  const fallan = v.filter((x) => x.cumple === false).length;
+  return fallan ? { texto: `No cumple (${fallan})`, clase: "danger" } : { texto: "Cumple", clase: "ok" };
+}
+
+export const modulosPorArea = (area) => ORDEN_MODULOS.filter((id) => MODULOS[id].area === area);

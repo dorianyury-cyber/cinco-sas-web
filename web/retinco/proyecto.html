@@ -1,0 +1,73 @@
+<!doctype html>
+<html lang="es" class="rt-preparando">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<meta name="robots" content="noindex, nofollow">
+<title>Proyecto — RETINCO</title>
+<link rel="icon" type="image/png" sizes="32x32" href="../assets/img/favicon-32.png">
+<link rel="stylesheet" href="../interventoria-pro/assets/ip.css">
+<link rel="stylesheet" href="assets/rt.css">
+</head>
+<body>
+  <div class="bienvenida-page">
+    <header class="bienvenida-topbar">
+      <a href="inicio.html" class="bienvenida-brand">
+        <img src="../interventoria-pro/assets/logo.png" alt="CINCO S.A.S.">
+        <span>RETINCO<span class="rt-marca-sub">Memorias de cálculo RETIE</span></span>
+      </a>
+      <div class="ip-topbar-acciones">
+        <span class="rt-usuario" id="rtUsuario"></span>
+        <button type="button" class="ip-btn-cuenta" id="logoutBtn">⏻ Cerrar sesión</button>
+      </div>
+    </header>
+
+    <main class="rt-main">
+      <div class="rt-titulo">
+        <div>
+          <p class="text-muted"><a href="inicio.html">← Proyectos</a></p>
+          <h1 id="titulo">Proyecto</h1>
+          <p class="text-muted" id="subtitulo"></p>
+        </div>
+        <div class="rt-acciones">
+          <button type="button" class="btn" id="pdfBtn">📄 Memoria PDF</button>
+          <button type="button" class="btn secondary" id="wordBtn">📝 Word</button>
+          <button type="button" class="btn secondary" id="excelBtn">📊 Excel formulado</button>
+        </div>
+      </div>
+      <div class="alert" id="alerta"></div>
+
+      <details class="card" id="datosCard">
+        <summary><strong>Datos generales del proyecto</strong> <span class="text-muted">(encabezan la memoria)</span></summary>
+        <form class="rt-form-grid" id="datosForm">
+          <div class="rt-ancho"><label for="dNombre">Nombre del proyecto</label><input id="dNombre" data-p="nombre"></div>
+          <div><label for="dCliente">Cliente</label><input id="dCliente" data-p="cliente"></div>
+          <div><label for="dUbicacion">Ubicación</label><input id="dUbicacion" data-p="ubicacion"></div>
+          <div><label for="dAltitud">Altitud (m s. n. m.)</label><input id="dAltitud" data-p="altitud" type="number" step="any"></div>
+          <div><label for="dTemp">Temperatura ambiente de diseño (°C)</label><input id="dTemp" data-p="tempAmbiente" type="number" step="any"></div>
+          <div><label for="dTipo">Tipo de diseño</label><select id="dTipo" data-p="tipoDiseno"><option>Diseño detallado</option><option>Diseño simplificado</option></select></div>
+          <div><label for="dDisenador">Diseñador (ingeniero responsable)</label><input id="dDisenador" data-p="disenador"></div>
+          <div><label for="dMatricula">Matrícula profesional</label><input id="dMatricula" data-p="matricula" placeholder="Ej. CN205-123456"></div>
+          <div><label for="dRadicado">Código o radicado de la memoria</label><input id="dRadicado" data-p="radicado"></div>
+          <div class="rt-ancho"><label for="dDescripcion">Descripción de la instalación y alcance</label><input id="dDescripcion" data-p="descripcion"></div>
+        </form>
+        <div class="rt-acciones"><button type="button" class="btn" id="guardarDatosBtn">Guardar datos</button><button type="button" class="btn danger" id="eliminarBtn">Eliminar proyecto</button></div>
+      </details>
+
+      <section class="card">
+        <h2>Diseño detallado según el RETIE: literales a) a x)</h2>
+        <p class="text-muted" id="fuenteLiterales"></p>
+        <p class="rt-nota">Cada literal se cubre con los módulos de cálculo y/o con el desarrollo del diseñador. Si un literal no aplica a la instalación, márquelo «No aplica» y escriba la razón: el RETIE exige mencionarlo expresamente en la memoria (parágrafo 1).</p>
+        <div class="tabla-scroll"><table class="rt-tabla-edit rt-literales" id="literales"></table></div>
+        <div class="rt-acciones"><button type="button" class="btn" id="guardarLitBtn">Guardar literales</button><span class="rt-estado-guardado" id="estadoLit"></span></div>
+      </section>
+
+      <div id="areas"></div>
+    </main>
+  </div>
+  <script src="../js/vendor/jspdf.umd.min.js"></script>
+  <script src="../js/vendor/docx.iife.js"></script>
+  <script src="../js/vendor/exceljs.min.js"></script>
+  <script type="module" src="js/rt-proyecto.js"></script>
+</body>
+</html>

@@ -1,0 +1,104 @@
+/* RETINCO — complementa ../../interventoria-pro/assets/ip.css (mismo
+   lenguaje visual de los aplicativos de Cinco S.A.S.). */
+
+.rt-preparando body { visibility: hidden; }
+
+.rt-topbar-nav { display: flex; align-items: center; gap: 14px; flex-wrap: wrap; }
+.rt-topbar-nav a { font-weight: 600; font-size: 13.5px; color: var(--text); }
+.rt-topbar-nav a.activo { color: var(--cinco-orange-dark); }
+.rt-usuario { font-size: 12.5px; color: var(--text-muted); }
+.rt-marca-sub { display: block; font-weight: 500; font-size: 11.5px; color: var(--text-muted); }
+
+.rt-main { max-width: 1240px; margin: 0 auto; padding: 24px 28px 60px; }
+.rt-titulo { display: flex; align-items: flex-end; justify-content: space-between; gap: 16px; flex-wrap: wrap; margin-bottom: 18px; }
+.rt-titulo h1 { margin: 0; font-size: 24px; }
+.rt-titulo p { margin: 4px 0 0; }
+.rt-acciones { display: flex; gap: 10px; flex-wrap: wrap; }
+.rt-acciones .btn { width: auto; margin-top: 0; padding: 9px 16px; font-size: 13px; }
+
+/* Proyectos */
+.rt-proyectos { display: grid; grid-template-columns: repeat(auto-fill, minmax(280px, 1fr)); gap: 16px; }
+.rt-proyecto-card { display: flex; flex-direction: column; gap: 6px; background: var(--card-bg); border: 1px solid var(--border); border-radius: var(--radius); box-shadow: var(--shadow); padding: 18px; color: var(--text); text-decoration: none; transition: border-color .1s ease, transform .1s ease; }
+.rt-proyecto-card:hover { border-color: var(--cinco-orange); transform: translateY(-1px); text-decoration: none; }
+.rt-proyecto-card strong { font-size: 15px; }
+.rt-proyecto-card .text-muted { font-size: 12.5px; }
+
+/* Áreas y módulos */
+.rt-area { margin-top: 26px; }
+.rt-area h2 { display: flex; align-items: center; gap: 10px; font-size: 17px; margin: 0 0 4px; }
+.rt-area h2::before { content: ""; width: 6px; height: 22px; border-radius: 3px; background: var(--rt-color, var(--cinco-orange)); }
+.rt-area > p { margin: 0 0 12px; font-size: 13px; }
+.rt-area-bt { --rt-color: #2f7dd1; }
+.rt-area-mt { --rt-color: #d9820b; }
+.rt-area-spt { --rt-color: #2e9e5b; }
+.rt-area-at { --rt-color: #b0413e; }
+.rt-modulos { display: grid; grid-template-columns: repeat(auto-fill, minmax(250px, 1fr)); gap: 14px; }
+.rt-modulo-card { display: flex; gap: 12px; align-items: flex-start; background: var(--card-bg); border: 1px solid var(--border); border-left: 4px solid var(--rt-color, var(--cinco-orange)); border-radius: var(--radius); box-shadow: var(--shadow); padding: 14px 16px; color: var(--text); text-decoration: none; }
+.rt-modulo-card:hover { border-color: var(--rt-color, var(--cinco-orange)); text-decoration: none; }
+.rt-modulo-icono { font-size: 24px; line-height: 1; }
+.rt-modulo-card strong { display: block; font-size: 14px; margin-bottom: 4px; }
+.rt-modulo-card .badge { margin-top: 6px; }
+
+/* Datos del proyecto */
+.rt-form-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(230px, 1fr)); gap: 4px 16px; }
+.rt-form-grid label, .rt-campo label { display: block; font-size: 12.5px; font-weight: 600; color: var(--text-muted); margin-top: 10px; }
+.rt-form-grid input, .rt-form-grid select, .rt-form-grid textarea, .rt-campo input, .rt-campo select { width: 100%; margin-top: 4px; padding: 8px 10px; border: 1px solid var(--border); border-radius: 8px; background: var(--input-bg); color: var(--text); font-size: 13.5px; }
+.rt-form-grid .rt-ancho { grid-column: 1 / -1; }
+.rt-unidad { font-weight: 400; color: var(--text-muted); }
+
+/* Página de cálculo */
+.rt-calculo { display: grid; grid-template-columns: minmax(0, 1fr) minmax(0, 1fr); gap: 20px; align-items: start; }
+@media (max-width: 1000px) { .rt-calculo { grid-template-columns: 1fr; } }
+.rt-calculo .card { margin: 0; }
+.rt-resultados { position: sticky; top: 16px; }
+.rt-campos { display: grid; grid-template-columns: repeat(auto-fill, minmax(210px, 1fr)); gap: 0 14px; }
+.rt-campo.rt-oculto { display: none; }
+.rt-tabla-campo { grid-column: 1 / -1; margin-top: 14px; }
+.rt-tabla-campo > label { font-size: 12.5px; font-weight: 600; color: var(--text-muted); }
+.rt-tabla-edit { width: 100%; table-layout: fixed; border-collapse: collapse; margin-top: 6px; }
+.rt-tabla-edit th { font-size: 10.5px; text-transform: none; padding: 4px 3px; text-align: left; vertical-align: bottom; }
+.rt-tabla-edit td { padding: 2px 3px; }
+.rt-tabla-edit input, .rt-tabla-edit select { width: 100%; padding: 5px 6px; border: 1px solid var(--border); border-radius: 6px; background: var(--input-bg); color: var(--text); font-size: 12.5px; }
+.rt-tabla-edit tr:hover td { background: transparent; }
+.rt-tabla-scroll { overflow-x: auto; }
+.rt-tabla-scroll .rt-tabla-edit { min-width: 720px; }
+.rt-quitar { border: none; background: none; color: var(--danger); cursor: pointer; font-size: 15px; padding: 2px 4px; }
+.rt-agregar { margin-top: 6px; border: 1px dashed var(--border); background: none; color: var(--cinco-orange-dark); border-radius: 8px; padding: 6px 12px; cursor: pointer; font-weight: 600; font-size: 12.5px; }
+.rt-estado-guardado { font-size: 12.5px; color: var(--text-muted); }
+.rt-estado-guardado.pendiente { color: var(--warning); font-weight: 600; }
+
+.rt-resumen { display: grid; grid-template-columns: repeat(auto-fit, minmax(150px, 1fr)); gap: 10px; margin-bottom: 14px; }
+.rt-resumen-item { background: var(--sidebar-bg); border-radius: 10px; padding: 10px 12px; }
+.rt-resumen-item .valor { font-size: 18px; font-weight: 800; }
+.rt-resumen-item .etiqueta { font-size: 11.5px; color: var(--text-muted); }
+.rt-resultados h3 { font-size: 14px; margin: 18px 0 6px; }
+.rt-tabla-res { width: 100%; table-layout: fixed; border-collapse: collapse; font-size: 12px; }
+.rt-tabla-res th, .rt-tabla-res td { padding: 5px 6px; border-bottom: 1px solid var(--border); text-align: left; vertical-align: top; overflow-wrap: anywhere; }
+.rt-tabla-res th { font-size: 10.5px; }
+.rt-paso { border-left: 3px solid var(--border); padding: 4px 0 4px 10px; margin-bottom: 8px; font-size: 12.5px; }
+.rt-paso strong { display: block; }
+.rt-formula { font-family: Consolas, "Courier New", monospace; font-size: 12px; color: var(--text); }
+.rt-paso .text-muted { display: block; }
+.rt-conclusion { margin-top: 14px; padding: 10px 12px; border-radius: 8px; font-size: 13px; }
+.rt-conclusion.ok { background: #e9f8ef; color: var(--success); }
+.rt-conclusion.mal { background: #fdecec; color: var(--danger); }
+:root[data-theme="dark"] .rt-conclusion.ok { background: rgba(46, 158, 91, 0.16); }
+:root[data-theme="dark"] .rt-conclusion.mal { background: rgba(214, 69, 69, 0.16); }
+.rt-nota { font-size: 12px; color: var(--text-muted); margin: 6px 0 0; }
+.rt-aviso-norma { font-size: 12px; background: #fff4e0; color: #8a5a00; border-radius: 8px; padding: 8px 10px; margin-top: 10px; }
+:root[data-theme="dark"] .rt-aviso-norma { background: rgba(217, 130, 11, 0.16); color: #f2c47a; }
+.rt-grafico svg { width: 100%; height: auto; background: #fff; border-radius: 8px; border: 1px solid var(--border); }
+
+/* Memoria */
+.rt-memoria-lista { columns: 2; column-gap: 24px; margin: 8px 0 0; }
+.rt-memoria-lista label { display: flex; gap: 8px; align-items: center; font-size: 13px; margin: 4px 0; break-inside: avoid; }
+@media (max-width: 700px) { .rt-memoria-lista { columns: 1; } .rt-main { padding: 18px 16px 50px; } }
+.hidden { display: none !important; }
+
+/* Matriz de literales a) a x) */
+.rt-literales { min-width: 900px; }
+.rt-literales td { vertical-align: top; padding: 6px 4px; border-bottom: 1px solid var(--border); font-size: 12.5px; }
+.rt-literales td .rt-nota { display: block; }
+.rt-literales textarea { width: 100%; padding: 6px 8px; border: 1px solid var(--border); border-radius: 6px; background: var(--input-bg); color: var(--text); font: inherit; font-size: 12.5px; resize: vertical; }
+.rt-literales .badge { margin-top: 3px; }
+details.card > summary { cursor: pointer; }

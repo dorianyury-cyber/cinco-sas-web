@@ -371,5 +371,22 @@ service cloud.firestore {
         allow delete: if coleccion != 'historial' && ipPuede('eliminarRegistros') && veContratoIp(contratoId);
       }
     }
+
+    // ---- RETINCO: memorias de cálculo eléctricas (web/retinco). Cualquier
+    // empleado activo ve y edita los proyectos; solo quien lo creó (o el
+    // administrador) lo elimina, junto con sus cálculos.
+    function duenoRt(proyectoId) {
+      return esAdmin() || get(/databases/$(database)/documents/rtProyectos/$(proyectoId)).data.creadoPor == request.auth.token.email;
+    }
+    match /rtProyectos/{proyectoId} {
+      allow read: if esEmpleadoActivo();
+      allow create: if esEmpleadoActivo() && request.resource.data.creadoPor == request.auth.token.email;
+      allow update: if esEmpleadoActivo() && request.resource.data.creadoPor == resource.data.creadoPor;
+      allow delete: if esEmpleadoActivo() && duenoRt(proyectoId);
+      match /calculos/{moduloId} {
+        allow read, create, update: if esEmpleadoActivo();
+        allow delete: if esEmpleadoActivo() && duenoRt(proyectoId);
+      }
+    }
   }
 }
