@@ -3,6 +3,7 @@
 import { iniciarPagina, leerProyecto, leerCalculos, guardarCalculo, eliminarCalculo, calcularProyecto, moduloDe, nuevaClave, esc, mostrarAlerta, limpiarAlerta, errorAmigable } from "./rt-core.js";
 import { MODULOS, AREAS, entradasPorDefecto } from "./rt-modulos.js";
 import { svgTCC } from "./rt-grafico.js";
+import { menuProyecto } from "./rt-shell.js";
 
 const ctx = await iniciarPagina();
 const params = new URLSearchParams(location.search);
@@ -25,7 +26,9 @@ if (ctx && (!id || !mod)) {
 function iniciar(proyecto, guardados) {
   const clave = params.get("k") || (params.get("nuevo") ? nuevaClave(mid, guardados) : mid);
   document.title = `${mod.titulo} — AHÍNCO`;
-  document.getElementById("migas").innerHTML = `<a href="proyecto.html?id=${encodeURIComponent(proyecto.id)}">← ${esc(proyecto.nombre)}</a> · ${esc(AREAS[mod.area].nombre)}`;
+  document.getElementById("migas").innerHTML = `<a href="proyecto.html?id=${encodeURIComponent(proyecto.id)}#resumen">${esc(proyecto.nombre)}</a> › ${esc(AREAS[mod.area].nombre)}`;
+  const pintarMenu = () => menuProyecto(ctx, { proyecto, guardados, resultados: calcularProyecto(proyecto, guardados), activo: clave });
+  pintarMenu();
   document.getElementById("titulo").textContent = `${mod.icono} ${mod.titulo}`;
   document.getElementById("objeto").textContent = mod.objeto;
   document.getElementById("normas").textContent = `Normas: ${mod.normas.join(" · ")}`;
@@ -134,6 +137,7 @@ function iniciar(proyecto, guardados) {
       await guardarCalculo(proyecto.id, clave, entradas, ctx.user, etiqueta);
       guardados[clave] = { entradas: structuredClone(entradas), etiqueta };
       btnEliminar.classList.remove("hidden");
+      pintarMenu();
       if (!params.get("k")) history.replaceState(null, "", `calculo.html?id=${encodeURIComponent(proyecto.id)}&k=${encodeURIComponent(clave)}`);
       avisoEj.classList.add("hidden");
       marcar(false);
@@ -149,7 +153,7 @@ function iniciar(proyecto, guardados) {
     try {
       await eliminarCalculo(proyecto.id, clave, ctx.user);
       sinGuardar = false;
-      window.location.href = `proyecto.html?id=${encodeURIComponent(proyecto.id)}`;
+      window.location.href = `proyecto.html?id=${encodeURIComponent(proyecto.id)}#resumen`;
     } catch (err) { mostrarAlerta(alerta, errorAmigable(err)); }
   });
   document.getElementById("ejemploBtn").addEventListener("click", () => {

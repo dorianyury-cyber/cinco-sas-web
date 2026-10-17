@@ -7,6 +7,7 @@ import * as N from "./rt-normas.js";
 import { MODULOS } from "./rt-modulos.js";
 import { LITERALES, FUENTE_LITERALES } from "./rt-literales.js";
 import { SISTEMAS_BT, impedanciaConductor } from "./rt-calculos.js";
+import { hallazgos, supuestos, esVerificacion } from "./rt-hallazgos.js";
 
 const NAVY = "FF1F2732", AMARILLO = "FFFFF4CC", GRIS = "FFF2F3F5";
 const borde = { style: "thin", color: { argb: "FFC9CED6" } };
@@ -527,9 +528,10 @@ export function construirLibro({ proyecto, resultados, guardados }, ExcelJS = wi
   // Portada.
   const port = wb.addWorksheet("Portada");
   port.columns = [{ width: 30 }, { width: 70 }];
-  port.getCell("A1").value = `Memoria de cálculo — ${proyecto.nombre}`;
+  const verif = esVerificacion(proyecto);
+  port.getCell("A1").value = `${verif ? "Verificación de la memoria de cálculo" : "Memoria de cálculo"} — ${proyecto.nombre}`;
   port.getCell("A1").font = { bold: true, size: 14, color: { argb: NAVY } };
-  [["Cliente", proyecto.cliente], ["Ubicación", proyecto.ubicacion], ["Altitud (m s. n. m.)", proyecto.altitud], ["Temperatura ambiente (°C)", proyecto.tempAmbiente], ["Diseñador", proyecto.disenador], ["Matrícula profesional", proyecto.matricula], ["Generado con", "AHÍNCO — Cinco S.A.S."], ["Convención", "Celdas amarillas = datos de entrada; celdas grises = fórmulas"]]
+  [["Tipo de documento", verif ? "Verificación de interventoría" : "Diseño"], ["Cliente", proyecto.cliente], ["Ubicación", proyecto.ubicacion], ["Altitud (m s. n. m.)", proyecto.altitud], ["Temperatura ambiente (°C)", proyecto.tempAmbiente], ...(verif ? [["Diseño revisado", proyecto.autorDiseno], ["Documentos revisados", proyecto.documentosRevisados]] : []), [verif ? "Interventor que verifica" : "Diseñador", proyecto.disenador], ["Matrícula profesional", proyecto.matricula], ["Generado con", "AHÍNCO — Cinco S.A.S."], ["Convención", "Celdas amarillas = datos de entrada; celdas grises = fórmulas"]]
     .forEach(([k, v], i) => { port.getCell(`A${i + 3}`).value = k; port.getCell(`A${i + 3}`).font = { bold: true }; port.getCell(`B${i + 3}`).value = v ?? ""; });
   // Literales.
   const lit = wb.addWorksheet("Literales RETIE");
@@ -543,6 +545,22 @@ export function construirLibro({ proyecto, resultados, guardados }, ExcelJS = wi
     fila.values = [`${l.l})`, l.texto, d.aplica === "No" ? "No" : "Sí", d.aplica === "No" ? `No aplica: ${d.texto || ""}` : [mods.length ? `Ver hoja: ${mods.join("; ")}` : "", d.texto || ""].filter(Boolean).join(" — ") || "Pendiente"];
     fila.alignment = { wrapText: true, vertical: "top" };
   });
+  // Hallazgos (o pendientes) y supuestos, como valores: resumen para el oficio.
+  const hall = hallazgos(proyecto, resultados), sup = supuestos(proyecto, guardados || {});
+  if (hall.length || sup.length) {
+    const hs = wb.addWorksheet(verif ? "Hallazgos" : "Pendientes");
+    hs.columns = [{ width: 7 }, { width: 30 }, { width: 46 }, { width: 16 }, { width: 22 }, { width: 40 }, { width: 8 }];
+    hs.getCell("A1").value = verif ? "Hallazgos de la interventoría" : "Pendientes por corregir"; hs.getCell("A1").font = { bold: true, size: 13, color: { argb: NAVY } };
+    const enc = (fila, textos) => textos.forEach((t, i) => { const c = hs.getCell(fila, i + 1); c.value = t; c.font = { bold: true, color: { argb: "FFFFFFFF" }, size: 9 }; c.fill = { type: "pattern", pattern: "solid", fgColor: { argb: NAVY } }; c.border = BORDES; });
+    let f = 3;
+    enc(f++, ["N.º", "Cálculo", "Criterio", "Valor", "Límite", "Norma o referencia", "Lit."]);
+    hall.forEach((h) => { hs.getRow(f).values = [h.codigo, h.calculo, h.criterio, h.valor, h.limite, h.norma, h.literales]; hs.getRow(f).alignment = { wrapText: true, vertical: "top" }; hs.getRow(f).eachCell((c) => { c.border = BORDES; c.font = { size: 9 }; }); f++; });
+    if (sup.length) {
+      f++; hs.getCell(f, 1).value = "Supuestos y datos pendientes"; hs.getCell(f, 1).font = { bold: true, color: { argb: NAVY } }; f++;
+      enc(f++, ["", "Origen", "Supuesto"]);
+      sup.forEach((x) => { hs.getRow(f).values = ["", x.origen, x.texto]; hs.mergeCells(f, 3, f, 7); hs.getRow(f).alignment = { wrapText: true, vertical: "top" }; f++; });
+    }
+  }
   hojaTablas(wb);
   // Hojas de cálculo en el orden de los literales.
   const ctx = {};

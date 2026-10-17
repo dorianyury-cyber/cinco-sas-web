@@ -10,60 +10,97 @@
 <link rel="stylesheet" href="assets/rt.css">
 </head>
 <body>
-  <div class="bienvenida-page">
-    <header class="bienvenida-topbar">
-      <a href="inicio.html" class="bienvenida-brand">
-        <img src="../interventoria-pro/assets/logo.png" alt="CINCO S.A.S.">
-        <span>AHÍNCO<span class="rt-marca-sub">Memorias de cálculo RETIE</span></span>
-      </a>
-      <div class="ip-topbar-acciones">
-        <span class="rt-usuario" id="rtUsuario"></span>
-        <button type="button" class="ip-btn-cuenta" id="logoutBtn">⏻ Cerrar sesión</button>
-      </div>
-    </header>
-
-    <main class="rt-main">
-      <div class="rt-titulo">
-        <div>
-          <p class="text-muted"><a href="inicio.html">← Proyectos</a></p>
-          <h1 id="titulo">Proyecto</h1>
-          <p class="text-muted" id="subtitulo"></p>
-        </div>
-        <div class="rt-acciones">
-          <button type="button" class="btn" id="pdfBtn">📄 Memoria PDF</button>
-          <button type="button" class="btn secondary" id="wordBtn">📝 Word</button>
-          <button type="button" class="btn secondary" id="excelBtn">📊 Excel formulado</button>
-          <button type="button" class="btn secondary" id="exportarBtn" title="Descargar el proyecto con sus cálculos para importarlo en otra cuenta o guardarlo como respaldo">⬇ Exportar</button>
-        </div>
+  <div class="app-shell">
+    <aside class="sidebar rt-sidebar" id="sidebar"></aside>
+    <main class="main rt-main">
+      <div class="rt-encabezado">
+        <p class="rt-migas" id="migas"></p>
+        <h1 id="titulo">Proyecto</h1>
+        <p class="text-muted" id="subtitulo"></p>
       </div>
       <div class="alert" id="alerta"></div>
 
-      <details class="card" id="datosCard">
-        <summary><strong>Datos generales del proyecto</strong> <span class="text-muted">(encabezan la memoria)</span></summary>
-        <form class="rt-form-grid" id="datosForm">
-          <div class="rt-ancho"><label for="dNombre">Nombre del proyecto</label><input id="dNombre" data-p="nombre"></div>
-          <div><label for="dCliente">Cliente</label><input id="dCliente" data-p="cliente"></div>
-          <div><label for="dUbicacion">Ubicación</label><input id="dUbicacion" data-p="ubicacion"></div>
-          <div><label for="dAltitud">Altitud (m s. n. m.)</label><input id="dAltitud" data-p="altitud" type="number" step="any"></div>
-          <div><label for="dTemp">Temperatura ambiente de diseño (°C)</label><input id="dTemp" data-p="tempAmbiente" type="number" step="any"></div>
-          <div><label for="dTipo">Tipo de diseño</label><select id="dTipo" data-p="tipoDiseno"><option>Diseño detallado</option><option>Diseño simplificado</option></select></div>
-          <div><label for="dDisenador">Diseñador (ingeniero responsable)</label><input id="dDisenador" data-p="disenador"></div>
-          <div><label for="dMatricula">Matrícula profesional</label><input id="dMatricula" data-p="matricula" placeholder="Ej. CN205-123456"></div>
-          <div><label for="dRadicado">Código o radicado de la memoria</label><input id="dRadicado" data-p="radicado"></div>
-          <div class="rt-ancho"><label for="dDescripcion">Descripción de la instalación y alcance</label><input id="dDescripcion" data-p="descripcion"></div>
-        </form>
-        <div class="rt-acciones"><button type="button" class="btn" id="guardarDatosBtn">Guardar datos</button><button type="button" class="btn danger" id="eliminarBtn">Eliminar proyecto</button></div>
-      </details>
-
-      <section class="card">
-        <h2>Diseño detallado según el RETIE: literales a) a x)</h2>
-        <p class="text-muted" id="fuenteLiterales"></p>
-        <p class="rt-nota">Cada literal se cubre con los módulos de cálculo y/o con el desarrollo del diseñador. Si un literal no aplica a la instalación, márquelo «No aplica» y escriba la razón: el RETIE exige mencionarlo expresamente en la memoria (parágrafo 1).</p>
-        <div class="tabla-scroll"><table class="rt-tabla-edit rt-literales" id="literales"></table></div>
-        <div class="rt-acciones"><button type="button" class="btn" id="guardarLitBtn">Guardar literales</button><span class="rt-estado-guardado" id="estadoLit"></span></div>
+      <!-- Resumen -->
+      <section class="rt-seccion" data-seccion="resumen">
+        <div class="rt-kpis" id="kpis"></div>
+        <div class="rt-dos">
+          <div class="card">
+            <div class="rt-card-cabeza"><h2 id="tituloHallResumen">Hallazgos principales</h2><a href="#hallazgos" class="rt-link">Ver todos →</a></div>
+            <div id="hallResumen"></div>
+          </div>
+          <div class="card">
+            <div class="rt-card-cabeza"><h2>Avance por literal del RETIE</h2><a href="#literales" class="rt-link">Ir a literales →</a></div>
+            <div class="rt-chips" id="chipsLit"></div>
+            <div class="rt-leyenda"><span><i class="rt-chip-ok"></i>Desarrollado</span><span><i class="rt-chip-danger"></i>Con incumplimientos</span><span><i class="rt-chip-warn"></i>Pendiente</span><span><i class="rt-chip-muted"></i>No aplica</span></div>
+          </div>
+        </div>
+        <div class="card">
+          <div class="rt-card-cabeza"><h2>Cálculos del proyecto</h2><a href="#" class="rt-link" id="agregarDesdeResumen">＋ Agregar cálculo</a></div>
+          <div class="rt-calc-lista" id="calcResumen"></div>
+        </div>
       </section>
 
-      <div id="areas"></div>
+      <!-- Datos del proyecto -->
+      <section class="rt-seccion" data-seccion="datos">
+        <div class="card">
+          <h2>Datos generales del proyecto</h2>
+          <p class="text-muted">Encabezan la memoria. El tipo de proyecto define el formato del documento.</p>
+          <div class="rt-modo-selector" id="modoSelector">
+            <label class="rt-modo-op"><input type="radio" name="modo" value="diseno"><span><strong>📐 Diseño</strong><small>Cinco diseña: la memoria de cálculo la firma el diseñador y los «No cumple» son pendientes por corregir.</small></span></label>
+            <label class="rt-modo-op"><input type="radio" name="modo" value="verificacion"><span><strong>🔎 Verificación de interventoría</strong><small>Cinco revisa el diseño de otro: los «No cumple» son hallazgos numerados y el documento lo firma el interventor.</small></span></label>
+          </div>
+          <form class="rt-form-grid" id="datosForm">
+            <div class="rt-ancho"><label for="dNombre">Nombre del proyecto</label><input id="dNombre" data-p="nombre"></div>
+            <div><label for="dCliente">Cliente</label><input id="dCliente" data-p="cliente"></div>
+            <div><label for="dUbicacion">Ubicación</label><input id="dUbicacion" data-p="ubicacion"></div>
+            <div><label for="dAltitud">Altitud (m s. n. m.)</label><input id="dAltitud" data-p="altitud" type="number" step="any"></div>
+            <div><label for="dTemp">Temperatura ambiente de diseño (°C)</label><input id="dTemp" data-p="tempAmbiente" type="number" step="any"></div>
+            <div><label for="dTipo">Tipo de diseño</label><select id="dTipo" data-p="tipoDiseno"><option>Diseño detallado</option><option>Diseño simplificado</option></select></div>
+            <div><label for="dRadicado">Código o radicado del documento</label><input id="dRadicado" data-p="radicado"></div>
+            <div class="rt-solo-verif"><label for="dAutor">Diseño revisado: autor y matrícula</label><input id="dAutor" data-p="autorDiseno" placeholder="Ej. Ing. N. N., M.P. CN205-000000"></div>
+            <div class="rt-solo-verif rt-ancho"><label for="dDocs">Documentos revisados (planos, memorias y versión)</label><input id="dDocs" data-p="documentosRevisados" placeholder="Ej. Unifilar HI-806-ORI rev. 0 del 12/04/2026"></div>
+            <div><label for="dDisenador" id="lblFirma">Diseñador (ingeniero responsable)</label><input id="dDisenador" data-p="disenador"></div>
+            <div><label for="dMatricula">Matrícula profesional</label><input id="dMatricula" data-p="matricula" placeholder="Ej. CN205-123456"></div>
+            <div class="rt-ancho"><label for="dDescripcion">Descripción de la instalación y alcance</label><textarea id="dDescripcion" data-p="descripcion" rows="3"></textarea></div>
+          </form>
+          <div class="rt-acciones"><button type="button" class="btn" id="guardarDatosBtn">Guardar datos</button><button type="button" class="btn danger" id="eliminarBtn">Eliminar proyecto</button></div>
+        </div>
+      </section>
+
+      <!-- Literales -->
+      <section class="rt-seccion" data-seccion="literales">
+        <div class="card">
+          <div class="rt-card-cabeza"><h2>Diseño detallado según el RETIE: literales a) a x)</h2><span class="rt-estado-guardado" id="estadoLit"></span></div>
+          <p class="text-muted" id="fuenteLiterales"></p>
+          <p class="rt-nota">Cada literal se cubre con los cálculos y/o con el desarrollo escrito. Si un literal no aplica, márquelo «No» y escriba la razón: el RETIE exige mencionarlo expresamente (parágrafo 1). Marque con «(S)» los valores supuestos: quedan listados como datos pendientes.</p>
+          <div class="tabla-scroll"><table class="rt-tabla-edit rt-literales" id="literales"></table></div>
+          <div class="rt-acciones"><button type="button" class="btn" id="guardarLitBtn">Guardar literales</button></div>
+        </div>
+      </section>
+
+      <!-- Hallazgos -->
+      <section class="rt-seccion" data-seccion="hallazgos">
+        <div class="card">
+          <h2 id="tituloHall">Hallazgos</h2>
+          <p class="text-muted" id="introHall"></p>
+          <div id="tablaHall"></div>
+        </div>
+        <div class="card">
+          <h2>Supuestos y datos pendientes</h2>
+          <p class="text-muted" id="introSup"></p>
+          <div id="tablaSup"></div>
+        </div>
+      </section>
+
+      <!-- Documentos -->
+      <section class="rt-seccion" data-seccion="documentos">
+        <div class="rt-docs">
+          <button type="button" class="rt-doc" id="pdfBtn"><span class="rt-doc-icono">📄</span><strong>PDF</strong><small id="descPdf">Memoria completa lista para radicar, organizada por los literales a) a x).</small></button>
+          <button type="button" class="rt-doc" id="wordBtn"><span class="rt-doc-icono">📝</span><strong>Word</strong><small>El mismo documento en formato editable.</small></button>
+          <button type="button" class="rt-doc" id="excelBtn"><span class="rt-doc-icono">📊</span><strong>Excel formulado</strong><small>Un solo libro con una hoja por cálculo y fórmulas vivas: cambie un dato y Excel recalcula.</small></button>
+          <button type="button" class="rt-doc" id="exportarBtn"><span class="rt-doc-icono">⬇</span><strong>Exportar proyecto</strong><small>Archivo .ahinco.json para respaldo o para importarlo en otra cuenta.</small></button>
+        </div>
+      </section>
     </main>
   </div>
   <script src="../js/vendor/jspdf.umd.min.js"></script>

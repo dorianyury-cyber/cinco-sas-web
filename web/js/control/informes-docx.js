@@ -51,7 +51,7 @@ const TIPO_LABEL = {
   gestion: "Informe de gestión", mediciones: "Informe de mediciones",
   consultoria: "Informe de consultoría", interventoria: "Informe de interventoría",
   obra: "Informe de obra", capacitacion: "Informe de capacitación",
-  revisionDisenos: "Revisión de diseños eléctricos", memoriaCalculo: "Memoria de cálculo", otro: "Informe"
+  revisionDisenos: "Revisión de diseños eléctricos", memoriaCalculo: "Memoria de cálculo", verificacionMemoria: "Verificación de memoria de cálculo", otro: "Informe"
 };
 
 function rgbAHexDocx(rgb) {
