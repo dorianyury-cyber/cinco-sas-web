@@ -1,5 +1,5 @@
 // Lista de proyectos de AHÍNCO y creación de uno nuevo.
-import { iniciarPagina, listarProyectos, crearProyecto, esc, fechaCorta, mostrarAlerta, errorAmigable } from "./rt-core.js";
+import { iniciarPagina, listarProyectos, crearProyecto, importarProyecto, esc, fechaCorta, mostrarAlerta, errorAmigable } from "./rt-core.js";
 
 const ctx = await iniciarPagina();
 if (ctx) {
@@ -46,6 +46,22 @@ if (ctx) {
       window.location.href = `proyecto.html?id=${encodeURIComponent(id)}`;
     } catch (err) {
       mostrarAlerta(al, errorAmigable(err));
+    }
+  });
+  // Importar un proyecto exportado (datos generales, literales y cálculos).
+  const archivo = document.getElementById("importarArchivo");
+  document.getElementById("importarBtn").addEventListener("click", () => archivo.click());
+  archivo.addEventListener("change", async () => {
+    const f = archivo.files[0];
+    archivo.value = "";
+    if (!f) return;
+    try {
+      const json = JSON.parse(await f.text());
+      if (!confirm(`¿Importar el proyecto «${json?.proyecto?.nombre || f.name}» con ${Object.keys(json?.calculos || {}).length} cálculos? Se crea como un proyecto nuevo a tu nombre.`)) return;
+      const { id } = await importarProyecto(json, ctx.user);
+      window.location.href = `proyecto.html?id=${encodeURIComponent(id)}`;
+    } catch (err) {
+      mostrarAlerta(alerta, err instanceof SyntaxError ? "El archivo no es un JSON válido." : errorAmigable(err));
     }
   });
   pintar();

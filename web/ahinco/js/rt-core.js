@@ -117,6 +117,36 @@ export async function guardarCalculo(id, clave, entradas, user, etiqueta = "") {
   await updateDoc(doc(db, "rtProyectos", id), { actualizadoPor: user.email, actualizadoEn: serverTimestamp() });
 }
 
+// ---------------------------------------------------------------- exportar / importar
+// Archivo JSON con los datos del proyecto y todos sus cálculos, para pasar
+// un proyecto entre personas o cargar uno preparado por fuera.
+const FORMATO = "ahinco-proyecto";
+const CAMPOS_PROYECTO = ["nombre", "cliente", "ubicacion", "altitud", "tempAmbiente", "tipoDiseno", "descripcion", "disenador", "matricula", "radicado", "literales"];
+export function exportarProyecto(proyecto, guardados) {
+  const datos = Object.fromEntries(CAMPOS_PROYECTO.filter((k) => proyecto[k] !== undefined).map((k) => [k, proyecto[k]]));
+  const calculos = Object.fromEntries(Object.entries(guardados).map(([k, v]) => [k, { entradas: v.entradas, etiqueta: v.etiqueta || "" }]));
+  return { formato: FORMATO, version: 1, exportado: new Date().toISOString(), proyecto: datos, calculos };
+}
+export function validarImportacion(json) {
+  if (!json || json.formato !== FORMATO) throw new Error("El archivo no es un proyecto de AHÍNCO.");
+  if (!json.proyecto?.nombre) throw new Error("El proyecto del archivo no tiene nombre.");
+  const calculos = json.calculos || {};
+  for (const [k, v] of Object.entries(calculos)) {
+    if (!/^[A-Za-z]+(-\d+)?$/.test(k) || !MODULOS[moduloDe(k)]) throw new Error(`Cálculo desconocido en el archivo: «${k}».`);
+    if (!v || typeof v.entradas !== "object") throw new Error(`El cálculo «${k}» no tiene datos de entrada.`);
+  }
+  return calculos;
+}
+export async function importarProyecto(json, user) {
+  const calculos = validarImportacion(json);
+  const datos = Object.fromEntries(CAMPOS_PROYECTO.filter((k) => json.proyecto[k] !== undefined).map((k) => [k, json.proyecto[k]]));
+  const id = await crearProyecto({ literales: {}, ...datos }, user);
+  for (const [k, v] of Object.entries(calculos)) {
+    await setDoc(doc(db, "rtProyectos", id, "calculos", k), { entradas: v.entradas, etiqueta: String(v.etiqueta || ""), actualizadoPor: user.email, actualizadoEn: serverTimestamp() });
+  }
+  return { id, n: Object.keys(calculos).length };
+}
+
 export async function eliminarCalculo(id, clave, user) {
   await deleteDoc(doc(db, "rtProyectos", id, "calculos", clave));
   await updateDoc(doc(db, "rtProyectos", id), { actualizadoPor: user.email, actualizadoEn: serverTimestamp() });

@@ -1,6 +1,6 @@
 // Página del proyecto: datos generales, matriz de literales a) a x) del
 // RETIE, tarjetas de módulos por área y generación de la memoria.
-import { iniciarPagina, leerProyecto, leerCalculos, actualizarProyecto, eliminarProyecto, calcularProyecto, estadoModulo, modulosPorArea, clavesDe, tituloCalculo, esc, mostrarAlerta, limpiarAlerta, errorAmigable } from "./rt-core.js";
+import { iniciarPagina, leerProyecto, leerCalculos, actualizarProyecto, eliminarProyecto, calcularProyecto, estadoModulo, modulosPorArea, clavesDe, tituloCalculo, exportarProyecto, esc, mostrarAlerta, limpiarAlerta, errorAmigable } from "./rt-core.js";
 import { MODULOS, AREAS } from "./rt-modulos.js";
 import { LITERALES, FUENTE_LITERALES, estadoLiteral } from "./rt-literales.js";
 
@@ -136,4 +136,12 @@ function iniciar(proyecto, guardados) {
   document.getElementById("pdfBtn").addEventListener("click", (e) => generar("pdf", e.currentTarget));
   document.getElementById("wordBtn").addEventListener("click", (e) => generar("word", e.currentTarget));
   document.getElementById("excelBtn").addEventListener("click", (e) => generar("excel", e.currentTarget));
+  document.getElementById("exportarBtn").addEventListener("click", () => {
+    const blob = new Blob([JSON.stringify(exportarProyecto({ ...proyecto, literales }, guardados), null, 1)], { type: "application/json" });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement("a");
+    a.href = url; a.download = `${String(proyecto.nombre || "proyecto").replace(/[\\/:*?"<>|]/g, "-").slice(0, 80)}.ahinco.json`;
+    document.body.appendChild(a); a.click(); a.remove();
+    setTimeout(() => URL.revokeObjectURL(url), 4000);
+  });
 }
