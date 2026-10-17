@@ -13,10 +13,11 @@ if (ctx) {
   let proyectos = [];
   const filtroActual = () => (["diseno", "verificacion"].includes(location.hash.slice(1)) ? location.hash.slice(1) : "todos");
 
+  const abrirNuevo = () => { card.classList.remove("hidden"); document.getElementById("pNombre").focus(); };
   function pintarMenu() {
     const conteos = { todos: proyectos.length, diseno: proyectos.filter((p) => !esVerificacion(p)).length, verificacion: proyectos.filter(esVerificacion).length };
     const aside = menuInicio(ctx, { filtro: filtroActual(), conteos });
-    aside.querySelector("#rtNuevo").addEventListener("click", (e) => { e.preventDefault(); card.classList.remove("hidden"); aside.classList.remove("ip-menu-abierto"); document.getElementById("pNombre").focus(); });
+    aside.querySelector("#rtNuevo").addEventListener("click", (e) => { e.preventDefault(); abrirNuevo(); aside.classList.remove("ip-menu-abierto"); });
     aside.querySelector("#rtImportar").addEventListener("click", (e) => { e.preventDefault(); archivo.click(); });
   }
 
@@ -87,5 +88,5 @@ if (ctx) {
     }
   });
 
-  cargar();
+  cargar().then(() => { if (location.hash === "#nuevo") abrirNuevo(); });
 }

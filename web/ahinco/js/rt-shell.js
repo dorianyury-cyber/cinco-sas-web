@@ -40,9 +40,9 @@ function conectar(aside) {
 const punto = (clase) => `<span class="rt-punto rt-punto-${clase}" aria-hidden="true"></span>`;
 
 // ---------------------------------------------------------------- lista de proyectos
-export function menuInicio(ctx, { filtro = "todos", conteos = {} } = {}) {
+export function menuInicio(ctx, { filtro = "todos", conteos = {}, activo = "" } = {}) {
   const aside = document.getElementById("sidebar");
-  const item = (f, icono, texto) => `<a href="#${f}" data-filtro="${f}" class="${filtro === f ? "active" : ""}"><span class="rt-nav-icono">${icono}</span>${esc(texto)}<span class="rt-nav-cuenta">${conteos[f] ?? ""}</span></a>`;
+  const item = (f, icono, texto) => `<a href="inicio.html#${f}" data-filtro="${f}" class="${!activo && filtro === f ? "active" : ""}"><span class="rt-nav-icono">${icono}</span>${esc(texto)}${conteos[f] !== undefined ? `<span class="rt-nav-cuenta">${conteos[f]}</span>` : ""}</a>`;
   aside.innerHTML = `${cabeza()}
     <nav>
       <div class="rt-nav-titulo">Proyectos</div>
@@ -50,8 +50,10 @@ export function menuInicio(ctx, { filtro = "todos", conteos = {} } = {}) {
       ${item("diseno", "📐", "Diseño")}
       ${item("verificacion", "🔎", "Verificación")}
       <div class="rt-nav-titulo">Acciones</div>
-      <a href="#" id="rtNuevo"><span class="rt-nav-icono">＋</span>Nuevo proyecto</a>
-      <a href="#" id="rtImportar"><span class="rt-nav-icono">⬆</span>Importar proyecto</a>
+      <a href="inicio.html#nuevo" id="rtNuevo"><span class="rt-nav-icono">＋</span>Nuevo proyecto</a>
+      ${activo ? "" : '<a href="#" id="rtImportar"><span class="rt-nav-icono">⬆</span>Importar proyecto</a>'}
+      <div class="rt-nav-titulo">Ayuda</div>
+      <a href="acerca.html" class="${activo === "acerca" ? "active" : ""}"><span class="rt-nav-icono">ℹ</span>Alcance y validación</a>
     </nav>${caja(ctx)}`;
   conectar(aside);
   return aside;
@@ -94,6 +96,8 @@ export function menuProyecto(ctx, { proyecto, guardados, resultados, activo }) {
       <div class="rt-nav-titulo">Entregables</div>
       ${sec("hallazgos", esVerificacion(proyecto) ? "🔎" : "🛠", modo.hallazgos, nHall ? `<span class="rt-nav-cuenta rt-nav-cuenta-mal">${nHall}</span>` : "")}
       ${sec("documentos", "📄", "Documentos")}
+      <div class="rt-nav-titulo">Ayuda</div>
+      <a href="acerca.html"><span class="rt-nav-icono">ℹ</span>Alcance y validación</a>
     </nav>${caja(ctx)}
     <dialog class="rt-dialogo" id="rtSelector">
       <div class="rt-dialogo-cabeza"><h2>Agregar cálculo</h2><button type="button" class="rt-icono-btn" id="rtSelectorCerrar" title="Cerrar">✕</button></div>

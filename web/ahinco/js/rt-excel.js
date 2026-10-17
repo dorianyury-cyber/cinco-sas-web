@@ -79,6 +79,7 @@ function hojaTablas(wb) {
   return ws;
 }
 
+import { ALCANCE } from "./rt-alcance.js";
 // ---------------------------------------------------------------- estilo del libro
 // Convención (la misma en todas las hojas):
 //   amarillo con letra azul  = dato de entrada (desbloqueado, se puede cambiar)
@@ -182,6 +183,8 @@ class Hoja {
     this.r = 3;
     this.parrafo("¿Qué calcula esta hoja?", mod.objeto || "");
     this.parrafo("Normas aplicadas", (mod.normas || []).join(" · "));
+    const alc = ALCANCE[moduloActual];
+    if (alc) this.parrafo("Alcance y limitaciones", `${alc.metodo} Limitaciones: ${alc.limitaciones.join(" ")}`);
     // Leyenda de colores.
     const lr = this.r++;
     ws.getCell(`A${lr}`).value = "Cómo leer esta hoja"; ws.getCell(`A${lr}`).font = { bold: true, size: 10, color: { argb: C_NAVY } }; ws.getCell(`A${lr}`).alignment = { vertical: "middle" };

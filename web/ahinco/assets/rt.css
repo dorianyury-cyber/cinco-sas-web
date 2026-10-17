@@ -258,3 +258,16 @@ body.rt-verificacion .rt-solo-verif { display: block; }
   .rt-sidebar { width: auto; position: static; max-height: none; }
   .rt-chips { grid-template-columns: repeat(6, minmax(0, 1fr)); }
 }
+
+/* Alcance y limitaciones (cálculo y página «Alcance y validación») */
+.rt-alcance { margin-top: 16px; border: 1px solid var(--border); border-left: 4px solid #8a94a3; border-radius: 10px; padding: 10px 14px; background: var(--sidebar-hover); font-size: 12.5px; }
+.rt-alcance > summary { cursor: pointer; font-weight: 700; font-size: 13px; color: var(--text); }
+.rt-alcance p { margin: 8px 0 4px; }
+.rt-alcance ul { margin: 4px 0 0; padding-left: 18px; }
+.rt-alcance li { margin: 3px 0; color: var(--text-muted); }
+.rt-alcance-area h3 { display: flex; align-items: center; gap: 8px; font-size: 14px; margin: 18px 0 6px; }
+.rt-alcance-area h3::before { content: ""; width: 4px; height: 16px; border-radius: 2px; background: var(--rt-color, var(--cinco-orange)); }
+.rt-alcance-area .rt-alcance { margin-top: 8px; background: transparent; border-left-color: var(--rt-color, #8a94a3); }
+.rt-lista { margin: 0; padding-left: 18px; font-size: 13.5px; }
+.rt-lista li { margin: 6px 0; }
+.rt-w-prioridad { width: 110px; }

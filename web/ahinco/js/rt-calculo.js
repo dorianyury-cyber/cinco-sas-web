@@ -4,6 +4,7 @@ import { iniciarPagina, leerProyecto, leerCalculos, guardarCalculo, eliminarCalc
 import { MODULOS, AREAS, entradasPorDefecto } from "./rt-modulos.js";
 import { svgTCC } from "./rt-grafico.js";
 import { menuProyecto } from "./rt-shell.js";
+import { ALCANCE } from "./rt-alcance.js";
 
 const ctx = await iniciarPagina();
 const params = new URLSearchParams(location.search);
@@ -121,6 +122,7 @@ function iniciar(proyecto, guardados) {
       ${res.error ? `<div class="alert error">${esc(res.error)}</div>` : ""}
       <div class="rt-resumen">${(res.resumen || []).map((r) => `<div class="rt-resumen-item"><div class="valor">${esc(r.valor)} <span class="rt-unidad">${esc(r.unidad)}</span></div><div class="etiqueta">${esc(r.etiqueta)}</div></div>`).join("")}</div>
       <div class="rt-conclusion ${fallan || res.error ? "mal" : "ok"}">${esc(res.conclusion || "")}</div>
+      ${ALCANCE[mid] ? `<details class="rt-alcance"><summary>⚠ Alcance y limitaciones de este cálculo (léalas antes de usar el resultado)</summary><p>${esc(ALCANCE[mid].metodo)}</p><ul>${ALCANCE[mid].limitaciones.map((l) => `<li>${esc(l)}</li>`).join("")}</ul><p class="rt-nota"><a href="acerca.html">Ver el alcance y la validación de AHÍNCO →</a></p></details>` : ""}
       ${(res.verificaciones || []).length ? tablaHtml({ titulo: "Verificaciones", encabezados: ["Criterio", "Norma", "Valor", "Límite", "Resultado"], filas: res.verificaciones.map((v) => [v.criterio, v.norma, v.valor, v.limite, v.cumple ? "✔ Cumple" : "✖ No cumple"]) }) : ""}
       ${res.grafico?.tipo === "tcc" ? `<h3>Curvas tiempo-corriente</h3><div class="rt-grafico">${svgTCC(res.grafico)}</div>` : ""}
       ${(res.tablas || []).map(tablaHtml).join("")}

@@ -10,6 +10,7 @@ import { LITERALES, FUENTE_LITERALES } from "./rt-literales.js";
 import { svgTCC, svgAPng } from "./rt-grafico.js";
 import { esc, hoyISO, tituloCalculo, ORDEN_MODULOS } from "./rt-core.js";
 import { hallazgos, supuestos, esVerificacion } from "./rt-hallazgos.js";
+import { ALCANCE } from "./rt-alcance.js";
 
 const P = (html) => ({ tipo: "parrafo", texto: html });
 const T = (nivel, texto) => ({ tipo: `titulo${nivel}`, texto });
@@ -27,6 +28,8 @@ async function seccionModulo(r, entradas, nivel) {
   const b = [T(nivel, titulo)];
   b.push(P(`<b>Objeto.</b> ${esc(mod.objeto)}`));
   b.push(P(`<b>Normas aplicadas.</b> ${esc(mod.normas.join("; "))}.`));
+  const alc = ALCANCE[r.modulo];
+  if (alc) b.push(P(`<b>Alcance del método.</b> ${esc(alc.metodo)}<br><b>Limitaciones.</b> ${alc.limitaciones.map(esc).join(" ")}`));
   // Datos de entrada.
   const simples = mod.campos.filter((c) => c.tipo !== "tabla" && !(c.soloSi && String(entradas[Object.keys(c.soloSi)[0]]) !== String(Object.values(c.soloSi)[0])));
   if (simples.length) b.push(tabla(`Datos de entrada — ${titulo}`, ["Parámetro", "Valor", "Unidad"], simples.map((c) => [c.label, valorVisible(c, entradas[c.key]), c.unidad || ""])));
