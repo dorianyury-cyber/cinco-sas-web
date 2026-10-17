@@ -1,4 +1,4 @@
-// Núcleo de RETINCO (web/retinco/*): sesión, perfil, proyectos y cálculo
+// Núcleo de AHÍNCO (web/ahinco/*): sesión, perfil, proyectos y cálculo
 // encadenado entre módulos. Vive en el proyecto Firebase "cinco-sas" y usa
 // el mismo ingreso de Cinco S.A.S. (cuenta propia o la de Cinco Conecta) y
 // el perfil de la colección "empleados" (debe estar activo).
@@ -14,7 +14,7 @@ import { CALCULOS } from "./rt-calculos.js";
 import { MODULOS, entradasPorDefecto } from "./rt-modulos.js";
 
 export { auth, db };
-export const NOMBRE_APP = "RETINCO";
+export const NOMBRE_APP = "AHÍNCO";
 const CLAVE_TEMA = "ip-theme";
 
 export function esc(texto) {

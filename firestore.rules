@@ -372,7 +372,7 @@ service cloud.firestore {
       }
     }
 
-    // ---- RETINCO: memorias de cálculo eléctricas (web/retinco). Cualquier
+    // ---- AHÍNCO: memorias de cálculo eléctricas (web/ahinco). Cualquier
     // empleado activo ve y edita los proyectos; solo quien lo creó (o el
     // administrador) lo elimina, junto con sus cálculos.
     function duenoRt(proyectoId) {

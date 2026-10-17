@@ -1,4 +1,4 @@
-// Motor de cálculo de RETINCO. Funciones puras: reciben las entradas de un
+// Motor de cálculo de AHÍNCO. Funciones puras: reciben las entradas de un
 // módulo (y los datos del proyecto) y devuelven un resultado neutro que la
 // pantalla, la memoria en PDF/Word y el Excel presentan de la misma forma:
 //   { resumen: [{etiqueta, valor, unidad}], tablas: [{titulo, encabezados, filas}],

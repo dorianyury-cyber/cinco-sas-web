@@ -1,4 +1,4 @@
-// Definición de los módulos de cálculo de RETINCO: campos del formulario,
+// Definición de los módulos de cálculo de AHÍNCO: campos del formulario,
 // valores de ejemplo, normas y objeto de cada memoria. El cálculo vive en
 // rt-calculos.js (mismo id).
 import { opcionesConductor, SISTEMAS_BT } from "./rt-calculos.js";

@@ -1,6 +1,11 @@
 {
   "hosting": {
     "public": "web",
+    "redirects": [
+      { "source": "/retinco", "destination": "/ahinco/index.html", "type": 301 },
+      { "source": "/retinco/**", "destination": "/ahinco/index.html", "type": 301 },
+      { "source": "/retinco-beneficios.html", "destination": "/ahinco-beneficios.html", "type": 301 }
+    ],
     "ignore": [
       "firebase.json",
       "**/.*",

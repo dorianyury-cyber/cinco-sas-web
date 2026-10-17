@@ -1,4 +1,4 @@
-// Ingreso a RETINCO: mismo flujo que Interventoría PRO — primero la cuenta
+// Ingreso a AHÍNCO: mismo flujo que Interventoría PRO — primero la cuenta
 // propia de Cinco SAS y, si no existe o la clave no coincide, la de Cinco
 // Conecta vía la Cloud Function iniciarSesionConConecta.
 import { signInWithEmailAndPassword, signInWithCustomToken, onAuthStateChanged } from "https://www.gstatic.com/firebasejs/10.7.1/firebase-auth.js";

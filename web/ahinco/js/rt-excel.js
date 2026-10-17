@@ -1,4 +1,4 @@
-// Libro de Excel formulado de RETINCO: un solo archivo con la portada, los
+// Libro de Excel formulado de AHÍNCO: un solo archivo con la portada, los
 // literales a) a x) del RETIE, una hoja por cálculo y la hoja "Tablas" con
 // las tablas normativas. Las celdas amarillas son datos de entrada y las
 // demás son fórmulas vivas: el ingeniero puede cambiar un dato y Excel
@@ -171,7 +171,7 @@ const HOJAS = {
   },
   conductores(wb, e, r, p) {
     const h = new Hoja(wb, "k-m Conductores", "Selección de conductores y protecciones (RETIE literales k y m; NTC 2050)");
-    h.nota("El calibre adoptado es el que seleccionó RETINCO; cámbielo y la hoja verifica de nuevo capacidad, terminales y protección.");
+    h.nota("El calibre adoptado es el que seleccionó AHÍNCO; cámbielo y la hoja verifica de nuevo capacidad, terminales y protección.");
     const sel = r?.tablas?.[0]?.filas || [];
     const filas = vacias(e.circuitos).map((f, i) => ({ ...f, cal: String(sel[i]?.[4] || "").replace(/ (AWG|kcmil)$/, "") || "4/0" }));
     const colAmp = (rr, tcol) => `IF($E${rr}="Al",4,1)+MATCH(${tcol}${rr},{60,75,90},0)`;
@@ -263,7 +263,7 @@ const HOJAS = {
     const c = h.dato("Factor de tensión c", n(e.factorC, 1.05), "", "IEC 60909-0 Tabla 1");
     const umt = h.dato("Tensión nominal MT", n(e.uMT, 13.2), "kV"), sk = h.dato("S\"kQ de la red", n(e.sk, 250), "MVA"), rx = h.dato("R/X de la red", n(e.rxRed, 0.1), "");
     const sn = h.dato("Potencia del transformador", n(e.snTrafo, ctx.transformador?.sn ?? 150), "kVA");
-    const uk = h.dato("ukr", n(e.uk, ctx.transformador?.z ?? 4), "%"), pk = h.dato("PkrT", n(e.pkTrafo, n(e.snTrafo, ctx.transformador?.sn ?? 150) * 0.012), "kW", "Vacío en RETINCO = 1,2 % de Sn");
+    const uk = h.dato("ukr", n(e.uk, ctx.transformador?.z ?? 4), "%"), pk = h.dato("PkrT", n(e.pkTrafo, n(e.snTrafo, ctx.transformador?.sn ?? 150) * 0.012), "kW", "Vacío en AHÍNCO = 1,2 % de Sn");
     h.calc("Ik\" trifásica en MT", `${sk}/(SQRT(3)*${umt})`, "kA");
     const zq = h.calc("ZQ referida a BT", `1.1*${un}^2/(${sk}*1E6)`, "Ω");
     const xq = h.calc("XQ", `${zq}/SQRT(1+${rx}^2)`, "Ω"), rq = h.calc("RQ", `${rx}*${xq}`, "Ω");
@@ -426,14 +426,14 @@ const HOJAS = {
 
 export function construirLibro({ proyecto, resultados, guardados }, ExcelJS = window.ExcelJS) {
   const wb = new ExcelJS.Workbook();
-  wb.creator = "RETINCO — Cinco S.A.S.";
+  wb.creator = "AHÍNCO — Cinco S.A.S.";
   wb.calcProperties.fullCalcOnLoad = true;
   // Portada.
   const port = wb.addWorksheet("Portada");
   port.columns = [{ width: 30 }, { width: 70 }];
   port.getCell("A1").value = `Memoria de cálculo — ${proyecto.nombre}`;
   port.getCell("A1").font = { bold: true, size: 14, color: { argb: NAVY } };
-  [["Cliente", proyecto.cliente], ["Ubicación", proyecto.ubicacion], ["Altitud (m s. n. m.)", proyecto.altitud], ["Temperatura ambiente (°C)", proyecto.tempAmbiente], ["Diseñador", proyecto.disenador], ["Matrícula profesional", proyecto.matricula], ["Generado con", "RETINCO — Cinco S.A.S."], ["Convención", "Celdas amarillas = datos de entrada; celdas grises = fórmulas"]]
+  [["Cliente", proyecto.cliente], ["Ubicación", proyecto.ubicacion], ["Altitud (m s. n. m.)", proyecto.altitud], ["Temperatura ambiente (°C)", proyecto.tempAmbiente], ["Diseñador", proyecto.disenador], ["Matrícula profesional", proyecto.matricula], ["Generado con", "AHÍNCO — Cinco S.A.S."], ["Convención", "Celdas amarillas = datos de entrada; celdas grises = fórmulas"]]
     .forEach(([k, v], i) => { port.getCell(`A${i + 3}`).value = k; port.getCell(`A${i + 3}`).font = { bold: true }; port.getCell(`B${i + 3}`).value = v ?? ""; });
   // Literales.
   const lit = wb.addWorksheet("Literales RETIE");

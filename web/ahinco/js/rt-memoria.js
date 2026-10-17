@@ -1,4 +1,4 @@
-// Memoria de cálculo de RETINCO en PDF y Word, organizada por los literales
+// Memoria de cálculo de AHÍNCO en PDF y Word, organizada por los literales
 // a) a x) del diseño detallado del RETIE. Usa los mismos generadores de
 // informes de Cinco S.A.S. (web/js/control/informes-pdf.js e
 // informes-docx.js): portada, índice con páginas, títulos numerados,

@@ -1,4 +1,4 @@
-// Lista de proyectos de RETINCO y creación de uno nuevo.
+// Lista de proyectos de AHÍNCO y creación de uno nuevo.
 import { iniciarPagina, listarProyectos, crearProyecto, esc, fechaCorta, mostrarAlerta, errorAmigable } from "./rt-core.js";
 
 const ctx = await iniciarPagina();

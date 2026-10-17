@@ -18,7 +18,7 @@ function iniciar(proyecto, guardados) {
   const resultados = calcularProyecto(proyecto, guardados);
   let literales = structuredClone(proyecto.literales || {});
   const pintarEncabezado = () => {
-    document.title = `${proyecto.nombre} — RETINCO`;
+    document.title = `${proyecto.nombre} — AHÍNCO`;
     document.getElementById("titulo").textContent = proyecto.nombre;
     document.getElementById("subtitulo").textContent = [proyecto.cliente, proyecto.ubicacion, proyecto.tipoDiseno].filter(Boolean).join(" · ");
   };
@@ -51,7 +51,7 @@ function iniciar(proyecto, guardados) {
   const badgeMod = (m) => { const e = estadoModulo(resultados[m]); return `<a href="calculo.html?id=${encodeURIComponent(proyecto.id)}&m=${m}">${MODULOS[m].icono} ${esc(MODULOS[m].titulo)}</a> <span class="badge ${e.clase}">${esc(e.texto)}</span>`; };
   function pintarLiterales() {
     tabla.innerHTML = `<colgroup><col data-ancho="4"><col data-ancho="30"><col data-ancho="22"><col data-ancho="10"><col data-ancho="34"></colgroup>
-      <thead><tr><th>Lit.</th><th>Contenido exigido por el RETIE</th><th>Cálculo en RETINCO</th><th>Aplica</th><th>Desarrollo del diseñador / justificación si no aplica</th></tr></thead>
+      <thead><tr><th>Lit.</th><th>Contenido exigido por el RETIE</th><th>Cálculo en AHÍNCO</th><th>Aplica</th><th>Desarrollo del diseñador / justificación si no aplica</th></tr></thead>
       <tbody>${LITERALES.map((lit) => {
         const d = literales[lit.l] || {};
         const e = estadoLiteral(lit, d, resultados);

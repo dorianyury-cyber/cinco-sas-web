@@ -22,7 +22,7 @@ if (ctx && (!id || !mod)) {
 }
 
 function iniciar(proyecto, guardados) {
-  document.title = `${mod.titulo} — RETINCO`;
+  document.title = `${mod.titulo} — AHÍNCO`;
   document.getElementById("migas").innerHTML = `<a href="proyecto.html?id=${encodeURIComponent(proyecto.id)}">← ${esc(proyecto.nombre)}</a> · ${esc(AREAS[mod.area].nombre)}`;
   document.getElementById("titulo").textContent = `${mod.icono} ${mod.titulo}`;
   document.getElementById("objeto").textContent = mod.objeto;

@@ -1,6 +1,6 @@
 // Literales del diseño detallado del RETIE (Resolución 40117 de 2024 del
 // Ministerio de Minas y Energía, Libro 3, Título 3, numeral 3.3.1.1
-// "Diseño detallado"). La memoria de RETINCO se organiza por estos
+// "Diseño detallado"). La memoria de AHÍNCO se organiza por estos
 // literales: cada uno queda cubierto por uno o más módulos de cálculo o por
 // el desarrollo que escribe el diseñador. Parágrafo 1o del mismo artículo:
 // en la memoria se debe mencionar expresamente qué literales no aplican y

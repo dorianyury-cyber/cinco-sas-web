@@ -1,4 +1,4 @@
-// Tablas normativas de RETINCO (memorias de cálculo eléctricas).
+// Tablas normativas de AHÍNCO (memorias de cálculo eléctricas).
 //
 // Cada tabla indica su fuente. Son datos de referencia de uso común en
 // Colombia (NTC 2050 = NEC; IEEE 80; IEC 60071/60909/60255/62305; RETIE).
