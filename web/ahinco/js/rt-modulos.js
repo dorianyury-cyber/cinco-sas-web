@@ -121,9 +121,9 @@ export const MODULOS = {
       { key: "snTrafo", label: "Potencia del transformador (vacío = módulo Transformador)", tipo: "numero", unidad: "kVA", def: "" },
       { key: "uk", label: "Impedancia ukr (vacío = módulo Transformador)", tipo: "numero", unidad: "%", def: "" },
       { key: "pkTrafo", label: "Pérdidas en el cobre PkrT (vacío = 1,2 % de Sn)", tipo: "numero", unidad: "kW", def: "" },
-      { key: "uBT", label: "Tensión secundaria (vacío = módulo Transformador)", tipo: "numero", unidad: "V", def: "" },
-      { key: "factorC", label: "Factor de tensión c (BT)", tipo: "select", opciones: [{ valor: "1.05", texto: "1,05 (tolerancia +6 %)" }, { valor: "1.1", texto: "1,10 (tolerancia +10 %)" }], def: "1.05" },
-      { key: "icuBornes", label: "Icu del interruptor general", tipo: "numero", unidad: "kA", def: 25 },
+      { key: "uBT", label: "Tensión del secundario, línea-línea (vacío = módulo Transformador)", tipo: "numero", unidad: "V", def: "" },
+      { key: "factorC", label: "Factor de tensión c", tipo: "select", opciones: [{ valor: "1.05", texto: "1,05 (BT, tolerancia +6 %)" }, { valor: "1.1", texto: "1,10 (BT +10 % o media/alta tensión)" }], def: "1.05" },
+      { key: "icuBornes", label: "Capacidad de interrupción en la barra del secundario", tipo: "numero", unidad: "kA", def: 25 },
       { key: "cables", label: "Cables desde los bornes del transformador (en orden)", tipo: "tabla", columnas: [
         { key: "barra", label: "Barra al final del cable", tipo: "texto", ancho: 16 }, { key: "longitud", label: "L (m)", tipo: "numero", ancho: 8 },
         { key: "conductor", label: "Conductor", tipo: "select", opciones: opcionesConductor().filter((o) => !o.valor.startsWith("aereo")), ancho: 20 },
@@ -214,8 +214,9 @@ export const MODULOS = {
     objeto: "Seleccionar el descargador de sobretensiones (DPS) y verificar el margen de protección del aislamiento de los equipos frente a sobretensiones temporales y de impulso tipo rayo, corregido por altitud.",
     normas: ["RETIE — análisis de coordinación de aislamiento", "IEC 60071-1 y 60071-2 (coordinación de aislamiento)", "IEC 60099-4 / 60099-5 (descargadores)", "IEEE C62.22"],
     campos: [
-      { key: "um", label: "Tensión máxima del sistema Um", tipo: "select", opciones: lista(Object.keys(N.NIVELES_AISLAMIENTO)), def: "36" },
-      { key: "puestaTierra", label: "Puesta a tierra del neutro", tipo: "select", opciones: [{ valor: "efectiva", texto: "Efectiva (k = 1,4)" }, { valor: "aislado", texto: "Aislado o no efectiva (k = 1,73)" }], def: "efectiva" },
+      { key: "um", label: "Tensión máxima del equipo Um", tipo: "select", opciones: lista(Object.keys(N.NIVELES_AISLAMIENTO)), def: "36" },
+      { key: "us", label: "Tensión máxima de operación del sistema Us (vacío = Um)", tipo: "numero", unidad: "kV", def: "" },
+      { key: "puestaTierra", label: "Puesta a tierra del neutro", tipo: "select", opciones: [{ valor: "solido", texto: "Sólida (k = 1,3)" }, { valor: "efectiva", texto: "Efectiva (k = 1,4)" }, { valor: "aislado", texto: "Aislado o no efectiva (k = 1,73)" }], def: "efectiva" },
       { key: "altitud", label: "Altitud del sitio (vacío = la del proyecto)", tipo: "numero", unidad: "m", def: "" },
       { key: "bil", label: "BIL del equipo protegido", tipo: "numero", unidad: "kV", def: 170 },
       { key: "ur", label: "DPS: tensión asignada Ur", tipo: "numero", unidad: "kV", def: 30 },
@@ -267,6 +268,83 @@ export const MODULOS = {
         { nombre: "Viento máximo", temperatura: 15, viento: 390 }, { nombre: "Temperatura máxima (flecha máxima)", temperatura: 75, viento: 0 }
       ] }
     ]
+  },
+  trafoPotencia: {
+    area: "at", icono: "🏭", titulo: "Transformador de potencia",
+    objeto: "Verificar las corrientes nominales por etapa de refrigeración y toma, el cortocircuito pasante con la impedancia de la red, y la coherencia de los transformadores de corriente y de los equipos en serie con cada devanado.",
+    normas: ["RETIE — cálculo de transformadores", "IEC 60076-1 / -5 / -7 (transformadores de potencia, cortocircuito y cargabilidad)", "IEC 61869-2 (transformadores de corriente)", "IEC 62271-1 (equipos de maniobra)"],
+    campos: [
+      { key: "sOnan", label: "Potencia ONAN", tipo: "numero", unidad: "MVA", def: 40 },
+      { key: "sOnaf", label: "Potencia ONAF", tipo: "numero", unidad: "MVA", def: 50 },
+      { key: "uAT", label: "Tensión AT", tipo: "numero", unidad: "kV", def: 115 },
+      { key: "uMT", label: "Tensión MT", tipo: "numero", unidad: "kV", def: 34.5 },
+      { key: "tapRango", label: "Rango de tomas (±)", tipo: "numero", unidad: "%", def: 12.5 },
+      { key: "uk", label: "Impedancia de cortocircuito uk", tipo: "numero", unidad: "%", def: 9.5 },
+      { key: "ukBase", label: "Potencia base de uk", tipo: "select", opciones: [{ valor: "ONAN", texto: "ONAN" }, { valor: "ONAF", texto: "ONAF" }], def: "ONAN" },
+      { key: "ikRed", label: "Cortocircuito de la red en la barra AT Ik\"", tipo: "numero", unidad: "kA", def: 40 },
+      { key: "factorC", label: "Factor de tensión c", tipo: "numero", def: 1.1 },
+      { key: "ikSoporta", label: "Soportabilidad al cortocircuito especificada, lado AT (opcional)", tipo: "numero", unidad: "kA", def: "" },
+      { key: "tSoporta", label: "Duración de la soportabilidad", tipo: "numero", unidad: "s", def: 2 },
+      { key: "demanda", label: "Demanda proyectada (opcional)", tipo: "numero", unidad: "MVA", def: "" },
+      { key: "crecimiento", label: "Crecimiento sobre la demanda", tipo: "numero", unidad: "%", def: 0 },
+      { key: "cargaMax", label: "Cargabilidad máxima admisible (ONAF)", tipo: "numero", unidad: "%", def: 100 },
+      { key: "tcs", label: "Transformadores de corriente", tipo: "tabla", columnas: [
+        { key: "nombre", label: "TC", tipo: "texto", ancho: 16 }, { key: "lado", label: "Lado", tipo: "select", opciones: lista(["AT", "MT"]), ancho: 7 },
+        { key: "funcion", label: "Función", tipo: "select", opciones: lista(["Protección", "Medida"]), ancho: 11 },
+        { key: "primaria", label: "Ipn (A)", tipo: "numero", ancho: 8 }, { key: "alf", label: "ALF (5P20 = 20)", tipo: "numero", ancho: 9 }
+      ], nueva: { lado: "MT", funcion: "Protección", alf: 20 }, def: [
+        { nombre: "TC bahía AT", lado: "AT", funcion: "Protección", primaria: 400, alf: 20 },
+        { nombre: "TC celda MT", lado: "MT", funcion: "Protección", primaria: 1000, alf: 20 }
+      ] },
+      { key: "equipos", label: "Equipos en serie con el transformador", tipo: "tabla", columnas: [
+        { key: "equipo", label: "Equipo", tipo: "texto", ancho: 22 }, { key: "lado", label: "Lado", tipo: "select", opciones: lista(["AT", "MT"]), ancho: 7 },
+        { key: "inom", label: "In (A)", tipo: "numero", ancho: 8 }, { key: "icc", label: "Ik (kA)", tipo: "numero", ancho: 8 }
+      ], nueva: { lado: "MT" }, def: [
+        { equipo: "Interruptor bahía AT", lado: "AT", inom: 1600, icc: 40 },
+        { equipo: "Celda de llegada MT", lado: "MT", inom: 1250, icc: 31.5 }
+      ] }
+    ]
+  },
+  cableMT: {
+    area: "mt", icono: "🧵", titulo: "Cables de media tensión",
+    objeto: "Verificar la capacidad de corriente, la soportabilidad al cortocircuito y la caída de tensión de los cables de media tensión, y su coherencia con la celda o protección de cada circuito.",
+    normas: ["RETIE — especificación de conductores (literal k)", "IEC 60502-2 / NTC 2050 Sección 310 (cables de más de 2 kV)", "IEC 60949 (cortocircuito admisible, método adiabático)"],
+    campos: [
+      { key: "tension", label: "Tensión nominal (vacío = MT del transformador de potencia)", tipo: "numero", unidad: "kV", def: "" },
+      { key: "fp", label: "Factor de potencia", tipo: "numero", def: 0.9 },
+      { key: "dvMax", label: "Caída de tensión máxima", tipo: "numero", unidad: "%", def: 3 },
+      { key: "circuitos", label: "Circuitos (Ik vacío = cortocircuito de la barra)", tipo: "tabla", columnas: [
+        { key: "circuito", label: "Circuito", tipo: "texto", ancho: 14 }, { key: "material", label: "Mat.", tipo: "select", opciones: lista(["Al", "Cu"]), ancho: 6 },
+        { key: "calibre", label: "Calibre", tipo: "select", opciones: CALIBRES_OP, ancho: 10 }, { key: "aislamiento", label: "Aisl.", tipo: "select", opciones: lista(["XLPE", "EPR", "PVC"]), ancho: 7 },
+        { key: "ampacidad", label: "Ampacidad base (A)", tipo: "numero", ancho: 9 }, { key: "factor", label: "Factor corr.", tipo: "numero", ancho: 7 },
+        { key: "corriente", label: "I diseño (A)", tipo: "numero", ancho: 8 }, { key: "longitud", label: "L (m)", tipo: "numero", ancho: 7 },
+        { key: "r", label: "R (Ω/km, opc.)", tipo: "numero", ancho: 8 }, { key: "x", label: "X (Ω/km)", tipo: "numero", ancho: 7 },
+        { key: "icc", label: "Ik (kA)", tipo: "numero", ancho: 7 }, { key: "tDespeje", label: "t despeje (s)", tipo: "numero", ancho: 7 },
+        { key: "inCelda", label: "In celda (A)", tipo: "numero", ancho: 7 }
+      ], nueva: { material: "Al", calibre: "750", aislamiento: "XLPE", factor: 1, x: 0.13, tDespeje: 0.5 }, def: [
+        { circuito: "Circuito 1", material: "Al", calibre: "750", aislamiento: "XLPE", ampacidad: 520, factor: 0.85, corriente: 300, longitud: 300, x: 0.13, tDespeje: 0.5, inCelda: 630 }
+      ] }
+    ]
+  },
+  apantallamiento: {
+    area: "spt", icono: "⛳", titulo: "Apantallamiento (esfera rodante)",
+    objeto: "Verificar que los equipos y barrajes de la subestación queden dentro de la zona protegida por mástiles y cables de guarda, con el método de la esfera rodante o el modelo electrogeométrico.",
+    normas: ["RETIE — protección contra rayos", "NTC 4552-3 / IEC 62305-3 (esfera rodante)", "IEEE 998 (apantallamiento de subestaciones, modelo electrogeométrico)"],
+    campos: [
+      { key: "metodo", label: "Método", tipo: "select", opciones: [{ valor: "ieee998", texto: "Modelo electrogeométrico IEEE 998" }, { valor: "nivel", texto: "Esfera rodante por nivel de protección (NTC 4552)" }], def: "ieee998" },
+      { key: "bil", label: "BIL de los equipos protegidos", tipo: "numero", unidad: "kV", def: 550, soloSi: { metodo: "ieee998" } },
+      { key: "zs", label: "Impedancia de onda del barraje Zs", tipo: "numero", unidad: "Ω", def: 350, soloSi: { metodo: "ieee998" } },
+      { key: "captador", label: "Tipo de captador", tipo: "select", opciones: [{ valor: "mastil", texto: "Mástil (k = 1,2)" }, { valor: "cable", texto: "Cable de guarda (k = 1)" }], def: "mastil", soloSi: { metodo: "ieee998" } },
+      { key: "nivel", label: "Nivel de protección", tipo: "select", opciones: lista(["I", "II", "III", "IV"]), def: "I", soloSi: { metodo: "nivel" } },
+      { key: "elementos", label: "Elementos a proteger", tipo: "tabla", columnas: [
+        { key: "elemento", label: "Elemento", tipo: "texto", ancho: 22 }, { key: "captador", label: "Captador", tipo: "texto", ancho: 16 },
+        { key: "hCaptador", label: "Altura captador (m)", tipo: "numero", ancho: 10 }, { key: "hElemento", label: "Altura elemento (m)", tipo: "numero", ancho: 10 },
+        { key: "distancia", label: "Distancia horizontal (m)", tipo: "numero", ancho: 10 }
+      ], nueva: {}, def: [
+        { elemento: "Pórtico de llegada de línea", captador: "Mástil 1", hCaptador: 20, hElemento: 12, distancia: 6 },
+        { elemento: "Transformador de potencia", captador: "Mástil 2", hCaptador: 18, hElemento: 6, distancia: 10 }
+      ] }
+    ]
   }
 };
 
@@ -287,5 +365,8 @@ export const NORMAS_GENERALES = [
   ["IEC 60255-151", "Measuring relays and protection equipment — overcurrent protection"],
   ["IEC 62305-2 / NTC 4552", "Protección contra descargas eléctricas atmosféricas — gestión del riesgo"],
   ["IEC 60071-1/-2", "Coordinación de aislamiento"],
-  ["NTC 818 / NTC 819", "Transformadores monofásicos y trifásicos de distribución"]
+  ["NTC 818 / NTC 819", "Transformadores monofásicos y trifásicos de distribución"],
+  ["IEC 60076", "Transformadores de potencia"],
+  ["IEC 60502-2 / IEC 60949", "Cables de media tensión y cortocircuito admisible"],
+  ["IEEE 998", "Direct Lightning Stroke Shielding of Substations"]
 ];

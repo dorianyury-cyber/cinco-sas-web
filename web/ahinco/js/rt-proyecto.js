@@ -1,6 +1,6 @@
 // Página del proyecto: datos generales, matriz de literales a) a x) del
 // RETIE, tarjetas de módulos por área y generación de la memoria.
-import { iniciarPagina, leerProyecto, leerCalculos, actualizarProyecto, eliminarProyecto, calcularProyecto, estadoModulo, modulosPorArea, esc, mostrarAlerta, limpiarAlerta, errorAmigable } from "./rt-core.js";
+import { iniciarPagina, leerProyecto, leerCalculos, actualizarProyecto, eliminarProyecto, calcularProyecto, estadoModulo, modulosPorArea, clavesDe, tituloCalculo, esc, mostrarAlerta, limpiarAlerta, errorAmigable } from "./rt-core.js";
 import { MODULOS, AREAS } from "./rt-modulos.js";
 import { LITERALES, FUENTE_LITERALES, estadoLiteral } from "./rt-literales.js";
 
@@ -48,7 +48,13 @@ function iniciar(proyecto, guardados) {
   document.getElementById("fuenteLiterales").textContent = `Fuente: ${FUENTE_LITERALES}.`;
   const tabla = document.getElementById("literales");
   const estadoLit = document.getElementById("estadoLit");
-  const badgeMod = (m) => { const e = estadoModulo(resultados[m]); return `<a href="calculo.html?id=${encodeURIComponent(proyecto.id)}&m=${m}">${MODULOS[m].icono} ${esc(MODULOS[m].titulo)}</a> <span class="badge ${e.clase}">${esc(e.texto)}</span>`; };
+  const urlCalc = (clave) => `calculo.html?id=${encodeURIComponent(proyecto.id)}&k=${encodeURIComponent(clave)}`;
+  // Un módulo puede tener varios cálculos (p. ej. aislamiento a 115 y a 34,5 kV).
+  const badgeMod = (m) => {
+    const claves = clavesDe(m, guardados);
+    if (!claves.length) return `<a href="${urlCalc(m)}">${MODULOS[m].icono} ${esc(MODULOS[m].titulo)}</a> <span class="badge muted">Sin datos</span>`;
+    return claves.map((k) => { const e = estadoModulo(resultados[k]); return `<a href="${urlCalc(k)}">${MODULOS[m].icono} ${esc(tituloCalculo(resultados[k]))}</a> <span class="badge ${e.clase}">${esc(e.texto)}</span>`; }).join("<br>");
+  };
   function pintarLiterales() {
     tabla.innerHTML = `<colgroup><col data-ancho="4"><col data-ancho="30"><col data-ancho="22"><col data-ancho="10"><col data-ancho="34"></colgroup>
       <thead><tr><th>Lit.</th><th>Contenido exigido por el RETIE</th><th>Cálculo en AHÍNCO</th><th>Aplica</th><th>Desarrollo del diseñador / justificación si no aplica</th></tr></thead>
@@ -89,11 +95,16 @@ function iniciar(proyecto, guardados) {
     <section class="rt-area ${info.clase}">
       <h2>${esc(info.nombre)}</h2><p class="text-muted">${esc(info.desc)}</p>
       <div class="rt-modulos">${modulosPorArea(a).map((m) => {
-        const e = estadoModulo(resultados[m]);
         const lits = LITERALES.filter((l) => l.modulos.includes(m)).map((l) => `${l.l})`).join(", ");
-        return `<a class="rt-modulo-card" href="calculo.html?id=${encodeURIComponent(proyecto.id)}&m=${m}">
+        const claves = clavesDe(m, guardados);
+        const tarjeta = (clave) => {
+          const r = resultados[clave], e = estadoModulo(r);
+          return `<a class="rt-modulo-card" href="${urlCalc(clave)}">
           <span class="rt-modulo-icono">${MODULOS[m].icono}</span>
-          <span><strong>${esc(MODULOS[m].titulo)}</strong><span class="text-muted">RETIE literal ${lits}</span><br><span class="badge ${e.clase}">${esc(e.texto)}</span></span></a>`;
+          <span><strong>${esc(r ? tituloCalculo(r) : MODULOS[m].titulo)}</strong><span class="text-muted">RETIE literal ${lits}</span><br><span class="badge ${e.clase}">${esc(e.texto)}</span></span></a>`;
+        };
+        const otro = claves.length ? `<a class="rt-modulo-otro" href="calculo.html?id=${encodeURIComponent(proyecto.id)}&m=${m}&nuevo=1" title="Repetir este cálculo, p. ej. para otro nivel de tensión">+ Otro cálculo de ${esc(MODULOS[m].titulo.toLowerCase())}</a>` : "";
+        return (claves.length ? claves.map(tarjeta).join("") : tarjeta(m)) + otro;
       }).join("")}</div>
     </section>`).join("");
 

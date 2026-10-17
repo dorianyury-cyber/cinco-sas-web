@@ -78,13 +78,20 @@ function hojaTablas(wb) {
 }
 
 // ---------------------------------------------------------------- utilidades de hoja
+// Identificación del cálculo que se está escribiendo (un módulo puede tener
+// varios cálculos en el proyecto: la hoja lleva su etiqueta).
+let etiquetaActual = "";
 class Hoja {
   constructor(wb, nombre, titulo, anchos = [44, 18, 14, 50]) {
-    this.ws = wb.addWorksheet(nombre.slice(0, 31));
+    const limpio = (t) => String(t).replace(/[\\/?*[\]:]/g, "-");
+    const base = limpio(etiquetaActual ? `${nombre} ${etiquetaActual}` : nombre).slice(0, 31);
+    let nombreHoja = base, k = 2;
+    while (wb.getWorksheet(nombreHoja)) nombreHoja = `${base.slice(0, 27)} (${k++})`;
+    this.ws = wb.addWorksheet(nombreHoja);
     this.ws.columns = anchos.map((w) => ({ width: w }));
     this.r = 1;
     const c = this.ws.getCell("A1");
-    c.value = titulo; c.font = { bold: true, size: 13, color: { argb: NAVY } };
+    c.value = etiquetaActual ? `${titulo} — ${etiquetaActual}` : titulo; c.font = { bold: true, size: 13, color: { argb: NAVY } };
     this.r = 3;
   }
   nota(texto) { const c = this.ws.getCell(`A${this.r}`); c.value = texto; c.font = { italic: true, size: 9, color: { argb: "FF5C6570" } }; this.r++; }
@@ -372,16 +379,17 @@ const HOJAS = {
   },
   aislamiento(wb, e, r, p) {
     const h = new Hoja(wb, "d Aislamiento", "Coordinación de aislamiento y DPS (RETIE literal d; IEC 60071 / 60099-5)");
-    const um = h.dato("Um", n(e.um, 36), "kV"), k = h.dato("Factor de falla a tierra k", e.puestaTierra === "aislado" ? 1.73 : 1.4, "");
+    h.dato("Um del equipo", n(e.um, 36), "kV");
+    const um = h.dato("Us, tensión máxima de operación del sistema", n(e.us, 0) || n(e.um, 36), "kV"), k = h.dato("Factor de falla a tierra k", e.puestaTierra === "aislado" ? 1.73 : e.puestaTierra === "solido" ? 1.3 : 1.4, "");
     const H = h.dato("Altitud", n(e.altitud, n(p.altitud, 0)), "m"), bil = h.dato("BIL del equipo", n(e.bil, 170), "kV");
     const ur = h.dato("Ur del DPS", n(e.ur, 30), "kV"), uc = h.dato("Uc del DPS", n(e.uc, 24.4), "kV"), ures = h.dato("Ures 10 kA", n(e.ures, 79), "kV"), T = h.dato("Capacidad TOV T", n(e.capTov, 1.1), "p.u.");
     const d = h.dato("Separación DPS-equipo", n(e.distancia, 3), "m"), S = h.dato("Pendiente de la onda", n(e.pendiente, 500), "kV/µs");
     h.seccion("Cálculos");
-    const tov = h.calc("TOV = k·Um/√3", `${k}*${um}/SQRT(3)`, "kV"), ucm = h.calc("Uc mínima = Um/√3", `${um}/SQRT(3)`, "kV"), urm = h.calc("Ur mínima = TOV/T", `${tov}/${T}`, "kV");
+    const tov = h.calc("TOV = k·Us/√3", `${k}*${um}/SQRT(3)`, "kV"), ucm = h.calc("Uc mínima = Us/√3", `${um}/SQRT(3)`, "kV"), urm = h.calc("Ur mínima = TOV/T", `${tov}/${T}`, "kV");
     const ka = h.calc("Ka = e^(H/8150)", `EXP(${H}/8150)`, ""), ve = h.calc("Tensión en el equipo", `${ures}+2*${S}*${d}/300`, "kV");
     const mp = h.calc("Margen de protección", `((${bil}/${ka})/${ve}-1)*100`, "%");
     h.seccion("Verificaciones");
-    h.verif("Uc ≥ Um/√3", `${uc}>=${ucm}`); h.verif("Ur ≥ TOV/T", `${ur}>=${urm}`); h.verif("Margen ≥ 20 %", `${mp}>=20`, "IEEE C62.22");
+    h.verif("Uc ≥ Us/√3", `${uc}>=${ucm}`); h.verif("Ur ≥ TOV/T", `${ur}>=${urm}`); h.verif("Margen ≥ 20 %", `${mp}>=20`, "IEEE C62.22");
   },
   distancias(wb, e, r, p) {
     const h = new Hoja(wb, "u Distancias", "Distancias de seguridad (RETIE literal u)");
@@ -421,6 +429,93 @@ const HOJAS = {
     const ult = col(13);
     cols.push({ t: "Tensión (kgf)", v: (x, r) => `=${ult}${r}/9.80665`, fmt: "0" }, { t: "% rotura", v: (x, r) => `=${ult}${r}/9.80665/${rot}*100`, fmt: "0.0" }, { t: "Flecha (m)", v: (x, r) => `=D${r}*${L}^2/(8*${ult}${r})`, fmt: "0.00" }, { t: "≤ 50 % rotura", v: (x, r) => `=IF(${col(15)}${r}<=50,"Cumple","No cumple")` });
     h.tabla(cols, hip);
+  },
+  trafoPotencia(wb, e) {
+    const h = new Hoja(wb, "h Trafo potencia", "Transformador de potencia (RETIE literal h; IEC 60076-5; IEC 61869-2)");
+    const sOnan = h.dato("Potencia ONAN", n(e.sOnan, 40), "MVA"), sOnaf = h.dato("Potencia ONAF", Math.max(n(e.sOnaf, 40), n(e.sOnan, 40)), "MVA");
+    const uAT = h.dato("Tensión AT", n(e.uAT, 115), "kV"), uMT = h.dato("Tensión MT", n(e.uMT, 34.5), "kV"), tap = h.dato("Rango de tomas (±)", n(e.tapRango, 12.5), "%");
+    const uk = h.dato("Impedancia uk", n(e.uk, 9.5), "%"), base = h.dato(`Potencia base de uk (${e.ukBase === "ONAF" ? "ONAF" : "ONAN"})`, e.ukBase === "ONAF" ? Math.max(n(e.sOnaf, 40), n(e.sOnan, 40)) : n(e.sOnan, 40), "MVA");
+    const ikRed = h.dato("Cortocircuito de la red en AT Ik\"", n(e.ikRed, 40), "kA"), c = h.dato("Factor de tensión c", n(e.factorC, 1.1), "");
+    h.seccion("Corrientes nominales y cortocircuito pasante");
+    h.calc("In AT ONAN", `${sOnan}*1000/(SQRT(3)*${uAT})`, "A"); h.calc("In AT ONAF", `${sOnaf}*1000/(SQRT(3)*${uAT})`, "A");
+    const iAT = h.calc("In AT ONAF en la toma extrema", `${sOnaf}*1000/(SQRT(3)*${uAT})/(1-${tap}/100)`, "A");
+    h.calc("In MT ONAN", `${sOnan}*1000/(SQRT(3)*${uMT})`, "A");
+    const iMT = h.calc("In MT ONAF", `${sOnaf}*1000/(SQRT(3)*${uMT})`, "A");
+    const sk = h.calc("S\"kQ de la red", `SQRT(3)*${uAT}*${ikRed}`, "MVA");
+    const zq = h.calc("ZQ referida a MT", `${c}*${uMT}^2/${sk}`, "Ω"), zt = h.calc("ZT referida a MT", `${uk}/100*${uMT}^2/${base}`, "Ω");
+    const ikMT = h.calc("Ik\" en la barra MT", `${c}*${uMT}/(SQRT(3)*(${zq}+${zt}))`, "kA");
+    const ikPas = h.calc("Ik pasante vista desde AT", `${ikMT}*${uMT}/${uAT}`, "kA");
+    if (n(e.ikSoporta, 0) > 0) {
+      const esp = h.dato(`Soportabilidad especificada lado AT (${n(e.tSoporta, 2)} s)`, n(e.ikSoporta), "kA");
+      h.verif("Ik pasante ≤ soportabilidad especificada", `${ikPas}<=${esp}`, "IEC 60076-5");
+    }
+    if (n(e.demanda, 0) > 0) {
+      const dem = h.dato("Demanda proyectada", n(e.demanda), "MVA"), cre = h.dato("Crecimiento", n(e.crecimiento, 0), "%"), cmax = h.dato("Cargabilidad máxima (ONAF)", n(e.cargaMax, 100), "%");
+      h.verif("Cargabilidad con la demanda proyectada", `${dem}*(1+${cre}/100)/${sOnaf}*100<=${cmax}`, "IEC 60076-7");
+    }
+    const tcs = vacias(e.tcs);
+    if (tcs.length) {
+      h.seccion("Transformadores de corriente (corriente térmica extendida 120 %; ALF × Ipn ≥ Ik)");
+      h.tabla([
+        { t: "TC", v: (f) => String(f.nombre || ""), ancho: 18 }, { t: "Lado (AT/MT)", v: (f) => f.lado === "AT" ? "AT" : "MT", entrada: true },
+        { t: "Función", v: (f) => String(f.funcion || "Protección"), entrada: true }, { t: "Ipn (A)", v: (f) => n(f.primaria), entrada: true }, { t: "ALF", v: (f) => n(f.alf, 20), entrada: true },
+        { t: "I máx. circuito (A)", v: (f, rr) => `=IF(B${rr}="AT",${iAT},${iMT})`, fmt: "0" }, { t: "Ik vista (kA)", v: (f, rr) => `=IF(B${rr}="AT",${ikPas},${ikMT})`, fmt: "0.00" },
+        { t: "Resultado", v: (f, rr) => `=IF(AND(F${rr}<=1.2*D${rr},OR(C${rr}<>"Protección",D${rr}*E${rr}>=G${rr}*1000)),"Cumple","No cumple")` }
+      ], tcs);
+    }
+    const eq = vacias(e.equipos);
+    if (eq.length) {
+      h.seccion("Equipos en serie con el transformador");
+      h.tabla([
+        { t: "Equipo", v: (f) => String(f.equipo || ""), ancho: 24 }, { t: "Lado (AT/MT)", v: (f) => f.lado === "AT" ? "AT" : "MT", entrada: true },
+        { t: "In (A)", v: (f) => n(f.inom), entrada: true }, { t: "Ik equipo (kA)", v: (f) => n(f.icc), entrada: true },
+        { t: "I exigida (A)", v: (f, rr) => `=IF(B${rr}="AT",${iAT},${iMT})`, fmt: "0" }, { t: "Ik exigida (kA)", v: (f, rr) => `=IF(B${rr}="AT",${ikRed},${ikMT})`, fmt: "0.00" },
+        { t: "Resultado", v: (f, rr) => `=IF(AND(C${rr}>=E${rr},OR(D${rr}=0,D${rr}>=F${rr})),"Cumple","No cumple")` }
+      ], eq);
+    }
+  },
+  cableMT(wb, e, r, p, ctx) {
+    const h = new Hoja(wb, "k Cables MT", "Cables de media tensión (RETIE literal k; IEC 60502-2; IEC 60949)");
+    const U = h.dato("Tensión nominal", n(e.tension, ctx.trafoPotencia ? ctx.trafoPotencia.vs / 1000 : 34.5), "kV");
+    const fp = h.dato("Factor de potencia", n(e.fp, 0.9), ""), sen = h.calc("sen φ", `SQRT(1-${fp}^2)`, ""), dvMax = h.dato("Caída de tensión máxima", n(e.dvMax, 3), "%");
+    const ik3 = ctx.cortocircuito?.barras?.[0]?.ik3;
+    const ikDef = ctx.trafoPotencia?.ikMT ?? (Number.isFinite(ik3) ? ik3 / 1000 : 0);
+    h.nota("K adiabático (IEC 60949): Cu XLPE/EPR 143, Al XLPE/EPR 94, Cu PVC 115, Al PVC 76. R vacía en AHÍNCO = resistencia a 90 °C calculada.");
+    h.tabla([
+      { t: "Circuito", v: (f) => String(f.circuito || ""), ancho: 16 }, { t: "Mat. (Cu/Al)", v: (f) => (f.material === "Cu" ? "Cu" : "Al"), entrada: true },
+      { t: "Calibre", v: (f) => String(f.calibre || "750"), entrada: true }, { t: "Aisl.", v: (f) => String(f.aislamiento || "XLPE"), entrada: true },
+      { t: "S (mm²)", v: (f, rr) => `=VLOOKUP(C${rr},${T.cond},8,FALSE)`, fmt: "0.0" },
+      { t: "Ampacidad base (A)", v: (f) => n(f.ampacidad), entrada: true }, { t: "Factor", v: (f) => n(f.factor, 1), entrada: true },
+      { t: "Ampacidad corregida (A)", v: (f, rr) => `=F${rr}*G${rr}`, fmt: "0" }, { t: "I diseño (A)", v: (f) => n(f.corriente), entrada: true },
+      { t: "L (m)", v: (f) => n(f.longitud), entrada: true },
+      { t: "R (Ω/km)", v: (f) => { const S = N.SECCION_MM2[f.calibre] || 0, cu = f.material === "Cu"; return n(f.r, 0) || (S ? ((cu ? 0.017241 : 0.028264) / S) * 1000 * (1 + (cu ? 0.00393 : 0.00403) * 70) : 0); }, entrada: true, fmt: "0.0000" },
+      { t: "X (Ω/km)", v: (f) => n(f.x, 0.13), entrada: true, fmt: "0.000" },
+      { t: "K", v: (f, rr) => `=IF(B${rr}="Cu",IF(D${rr}="PVC",115,143),IF(D${rr}="PVC",76,94))` },
+      { t: "t despeje (s)", v: (f) => n(f.tDespeje, 0.5), entrada: true }, { t: "Ik (kA)", v: (f) => n(f.icc, ikDef), entrada: true, fmt: "0.00" },
+      { t: "Ik admisible (kA)", v: (f, rr) => `=M${rr}*E${rr}/SQRT(N${rr})/1000`, fmt: "0.00" },
+      { t: "ΔV (%)", v: (f, rr) => `=SQRT(3)*I${rr}*J${rr}/1000*(K${rr}*${fp}+L${rr}*${sen})/(${U}*1000)*100`, fmt: "0.00" },
+      { t: "In celda (A)", v: (f) => n(f.inCelda, 0), entrada: true },
+      { t: "Resultado", v: (f, rr) => `=IF(AND(I${rr}<=H${rr},O${rr}<=P${rr},Q${rr}<=${dvMax},OR(R${rr}=0,R${rr}>=I${rr})),"Cumple","No cumple")` }
+    ], vacias(e.circuitos));
+  },
+  apantallamiento(wb, e) {
+    const h = new Hoja(wb, "b Apantallamiento", "Apantallamiento por esfera rodante (RETIE literal b; NTC 4552-3; IEEE 998)");
+    let R;
+    if (e.metodo === "ieee998") {
+      const bil = h.dato("BIL de los equipos", n(e.bil, 550), "kV"), zs = h.dato("Impedancia de onda Zs", n(e.zs, 350), "Ω"), k = h.dato("k (mástil 1,2; cable 1)", e.captador === "cable" ? 1 : 1.2, "");
+      const ic = h.calc("Ic = 2,2 × BIL / Zs", `2.2*${bil}/${zs}`, "kA");
+      R = h.calc("Radio de la esfera S = 8 k Ic^0,65", `8*${k}*${ic}^0.65`, "m");
+    } else {
+      R = h.dato(`Radio de la esfera (nivel ${e.nivel || "I"})`, (N.NIVELES_SIPRA[e.nivel] || N.NIVELES_SIPRA.I).esfera, "m");
+    }
+    h.seccion("Elementos a proteger — r = √(hm(2R − hm)) − √(h(2R − h))");
+    h.tabla([
+      { t: "Elemento", v: (f) => String(f.elemento || ""), ancho: 26 }, { t: "Captador", v: (f) => String(f.captador || ""), ancho: 14 },
+      { t: "Altura captador (m)", v: (f) => n(f.hCaptador), entrada: true }, { t: "Altura elemento (m)", v: (f) => n(f.hElemento), entrada: true },
+      { t: "Distancia (m)", v: (f) => (f.distancia === "" || f.distancia == null ? "" : n(f.distancia)), entrada: true },
+      { t: "Radio protegido (m)", v: (f, rr) => `=IF(D${rr}>=C${rr},0,MAX(0,IF(C${rr}>=${R},${R},SQRT(C${rr}*(2*${R}-C${rr})))-IF(D${rr}>=${R},${R},SQRT(D${rr}*(2*${R}-D${rr})))))`, fmt: "0.00" },
+      { t: "Resultado", v: (f, rr) => `=IF(E${rr}="","Captador a <= "&ROUND(F${rr},2)&" m",IF(E${rr}<=F${rr},"Protegido","No protegido"))` }
+    ], vacias(e.elementos));
   }
 };
 
@@ -442,7 +537,7 @@ export function construirLibro({ proyecto, resultados, guardados }, ExcelJS = wi
   ["Lit.", "Contenido exigido", "Aplica", "Desarrollo / cálculo / justificación"].forEach((h, i) => { const c = lit.getCell(3, i + 1); c.value = h; c.font = { bold: true, color: { argb: "FFFFFFFF" } }; c.fill = { type: "pattern", pattern: "solid", fgColor: { argb: NAVY } }; });
   LITERALES.forEach((l, i) => {
     const d = proyecto.literales?.[l.l] || {};
-    const mods = l.modulos.filter((m) => resultados[m]).map((m) => MODULOS[m].titulo);
+    const mods = Object.entries(resultados).filter(([k, r]) => l.modulos.includes(r.modulo ?? k)).map(([k, r]) => `${MODULOS[r.modulo ?? k].titulo}${r.etiqueta ? ` — ${r.etiqueta}` : ""}`);
     const fila = lit.getRow(4 + i);
     fila.values = [`${l.l})`, l.texto, d.aplica === "No" ? "No" : "Sí", d.aplica === "No" ? `No aplica: ${d.texto || ""}` : [mods.length ? `Ver hoja: ${mods.join("; ")}` : "", d.texto || ""].filter(Boolean).join(" — ") || "Pendiente"];
     fila.alignment = { wrapText: true, vertical: "top" };
@@ -450,12 +545,16 @@ export function construirLibro({ proyecto, resultados, guardados }, ExcelJS = wi
   hojaTablas(wb);
   // Hojas de cálculo en el orden de los literales.
   const ctx = {};
-  Object.entries(resultados).forEach(([m, r]) => { if (r.salidas) ctx[m] = r.salidas; });
-  const orden = ["rayos", "cargas", "aislamiento", "cortocircuito", "transformador", "malla", "conductores", "mecanico", "coordinacion", "canalizaciones", "regulacion", "distancias"];
+  Object.entries(resultados).forEach(([k, r]) => { const m = r.modulo ?? k; if (r.salidas && !ctx[m]) ctx[m] = r.salidas; });
+  const orden = ["rayos", "apantallamiento", "cargas", "aislamiento", "cortocircuito", "transformador", "trafoPotencia", "malla", "conductores", "cableMT", "mecanico", "coordinacion", "canalizaciones", "regulacion", "distancias"];
   for (const m of orden) {
-    if (!resultados[m] || !guardados[m]?.entradas) continue;
-    HOJAS[m](wb, guardados[m].entradas, resultados[m], proyecto, ctx);
+    for (const [clave, r] of Object.entries(resultados)) {
+      if ((r.modulo ?? clave) !== m || !guardados[clave]?.entradas) continue;
+      etiquetaActual = r.etiqueta || "";
+      HOJAS[m](wb, guardados[clave].entradas, r, proyecto, ctx);
+    }
   }
+  etiquetaActual = "";
   // "Tablas" al final.
   wb.getWorksheet("Tablas").orderNo = 1000;
   return wb;

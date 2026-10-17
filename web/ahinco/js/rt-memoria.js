@@ -8,7 +8,7 @@ import { generarInformeDocxBlob } from "../../js/control/informes-docx.js";
 import { MODULOS, NORMAS_GENERALES } from "./rt-modulos.js";
 import { LITERALES, FUENTE_LITERALES } from "./rt-literales.js";
 import { svgTCC, svgAPng } from "./rt-grafico.js";
-import { esc, hoyISO } from "./rt-core.js";
+import { esc, hoyISO, tituloCalculo, ORDEN_MODULOS } from "./rt-core.js";
 
 const P = (html) => ({ tipo: "parrafo", texto: html });
 const T = (nivel, texto) => ({ tipo: `titulo${nivel}`, texto });
@@ -20,14 +20,15 @@ function valorVisible(campo, v) {
   return v === "" || v == null ? "—" : String(v);
 }
 
-async function seccionModulo(id, r, entradas, nivel, proyecto) {
-  const mod = MODULOS[id];
-  const b = [T(nivel, mod.titulo)];
+async function seccionModulo(r, entradas, nivel) {
+  const mod = MODULOS[r.modulo];
+  const titulo = tituloCalculo(r);
+  const b = [T(nivel, titulo)];
   b.push(P(`<b>Objeto.</b> ${esc(mod.objeto)}`));
   b.push(P(`<b>Normas aplicadas.</b> ${esc(mod.normas.join("; "))}.`));
   // Datos de entrada.
   const simples = mod.campos.filter((c) => c.tipo !== "tabla" && !(c.soloSi && String(entradas[Object.keys(c.soloSi)[0]]) !== String(Object.values(c.soloSi)[0])));
-  if (simples.length) b.push(tabla(`Datos de entrada — ${mod.titulo}`, ["Parámetro", "Valor", "Unidad"], simples.map((c) => [c.label, valorVisible(c, entradas[c.key]), c.unidad || ""])));
+  if (simples.length) b.push(tabla(`Datos de entrada — ${titulo}`, ["Parámetro", "Valor", "Unidad"], simples.map((c) => [c.label, valorVisible(c, entradas[c.key]), c.unidad || ""])));
   mod.campos.filter((c) => c.tipo === "tabla").forEach((c) => {
     const filas = (entradas[c.key] || []).filter((f) => Object.values(f).some((v) => v !== "" && v != null));
     if (filas.length) b.push(tabla(`${c.label.replace(/\s*\(.*\)\s*$/, "")} — datos de entrada`, c.columnas.map((col) => col.label), filas.map((f) => c.columnas.map((col) => valorVisible(col, f[col.key])))));
@@ -40,10 +41,17 @@ async function seccionModulo(id, r, entradas, nivel, proyecto) {
     try { b.push({ tipo: "imagen", url: await svgAPng(svgTCC(r.grafico)), nombre: "Curvas tiempo-corriente de las protecciones", pieDeFoto: "", tamano: 95 }); } catch (e) { /* sin gráfico */ }
   }
   // Verificación y conclusión.
-  if ((r.verificaciones || []).length) b.push(tabla(`Verificación normativa — ${mod.titulo}`, ["Criterio", "Norma o referencia", "Valor", "Límite", "Resultado"], r.verificaciones.map((v) => [v.criterio, v.norma, v.valor, v.limite, v.cumple ? "Cumple" : "No cumple"])));
+  if ((r.verificaciones || []).length) b.push(tabla(`Verificación normativa — ${titulo}`, ["Criterio", "Norma o referencia", "Valor", "Límite", "Resultado"], r.verificaciones.map((v) => [v.criterio, v.norma, v.valor, v.limite, v.cumple ? "Cumple" : "No cumple"])));
   (r.notas || []).forEach((n) => b.push(P(`<i>Nota: ${esc(n)}</i>`)));
   b.push(P(`<b>Conclusión.</b> ${esc(r.conclusion || "")}`));
   return b;
+}
+
+// Cálculos que desarrollan un literal: en el orden de sus módulos y, dentro
+// de cada módulo, en el orden de las instancias.
+export function calculosDe(lit, resultados) {
+  return Object.values(resultados).filter((r) => lit.modulos.includes(r.modulo))
+    .sort((a, b) => lit.modulos.indexOf(a.modulo) - lit.modulos.indexOf(b.modulo) || ORDEN_MODULOS.indexOf(a.modulo) - ORDEN_MODULOS.indexOf(b.modulo));
 }
 
 export async function construirMemoria({ proyecto, resultados, guardados }) {
@@ -60,7 +68,7 @@ export async function construirMemoria({ proyecto, resultados, guardados }) {
   b.push(tabla("Normas y reglamentos aplicados", ["Documento", "Título"], NORMAS_GENERALES));
   b.push(tabla("Alcance de la memoria por literal del RETIE", ["Lit.", "Contenido exigido", "Aplica", "Desarrollo"], LITERALES.map((l) => {
     const d = lits[l.l] || {};
-    const calc = l.modulos.filter((m) => resultados[m]).map((m) => MODULOS[m].titulo);
+    const calc = calculosDe(l, resultados).map(tituloCalculo);
     return [`${l.l})`, l.texto, d.aplica === "No" ? "No" : "Sí", d.aplica === "No" ? `No aplica: ${d.texto || "sin justificación"}` : calc.length ? `Cálculo: ${calc.join("; ")}` : d.texto ? "Desarrollo del diseñador" : "Pendiente"];
   })));
   // ---- un capítulo con una sección por literal (sin salto de página entre literales)
@@ -71,19 +79,19 @@ export async function construirMemoria({ proyecto, resultados, guardados }) {
     b.push(T(2, `Literal ${l.l}) ${l.texto.replace(/\.$/, "")}`));
     if (d.aplica === "No") { b.push(P(`<b>No aplica.</b> ${esc(d.texto || "El diseñador no registró la justificación.")}`)); continue; }
     if (d.texto) b.push(P(esc(d.texto).replace(/\n/g, "<br>")));
-    const mods = l.modulos.filter((m) => resultados[m]);
-    for (const m of mods) {
-      if (yaIncluido[m]) { b.push(P(`El cálculo de <b>${esc(MODULOS[m].titulo)}</b> se presenta en el literal ${yaIncluido[m]}) de esta memoria.`)); continue; }
-      yaIncluido[m] = l.l;
-      b.push(...(await seccionModulo(m, resultados[m], guardados[m]?.entradas || {}, 3, proyecto)));
+    const mods = calculosDe(l, resultados);
+    for (const r of mods) {
+      if (yaIncluido[r.clave]) { b.push(P(`El cálculo de <b>${esc(tituloCalculo(r))}</b> se presenta en el literal ${yaIncluido[r.clave]}) de esta memoria.`)); continue; }
+      yaIncluido[r.clave] = l.l;
+      b.push(...(await seccionModulo(r, guardados[r.clave]?.entradas || {}, 3)));
     }
     if (!mods.length && !d.texto) b.push(P("<i>Pendiente por desarrollar.</i>"));
   }
   // ---- conclusiones
   b.push(T(1, "Conclusiones"));
-  const filasConc = Object.entries(resultados).map(([m, r]) => {
+  const filasConc = Object.values(resultados).map((r) => {
     const fallan = (r.verificaciones || []).filter((v) => v.cumple === false).length;
-    return [MODULOS[m].titulo, fallan ? `No cumple (${fallan})` : "Cumple", r.conclusion || ""];
+    return [tituloCalculo(r), fallan ? `No cumple (${fallan})` : "Cumple", r.conclusion || ""];
   });
   b.push(tabla("Resumen de resultados", ["Cálculo", "Estado", "Conclusión"], filasConc));
   b.push(P("El diseñador declara que los cálculos se realizaron con base en el RETIE y las normas técnicas citadas, y que los supuestos adoptados se indican en cada literal."));

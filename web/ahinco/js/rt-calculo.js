@@ -1,12 +1,13 @@
 // Página de un módulo de cálculo: formulario generado desde rt-modulos.js,
 // cálculo en vivo (rt-calculos.js) y guardado en rtProyectos/{id}/calculos.
-import { iniciarPagina, leerProyecto, leerCalculos, guardarCalculo, calcularProyecto, esc, mostrarAlerta, limpiarAlerta, errorAmigable } from "./rt-core.js";
+import { iniciarPagina, leerProyecto, leerCalculos, guardarCalculo, eliminarCalculo, calcularProyecto, moduloDe, nuevaClave, esc, mostrarAlerta, limpiarAlerta, errorAmigable } from "./rt-core.js";
 import { MODULOS, AREAS, entradasPorDefecto } from "./rt-modulos.js";
 import { svgTCC } from "./rt-grafico.js";
 
 const ctx = await iniciarPagina();
 const params = new URLSearchParams(location.search);
-const id = params.get("id"), mid = params.get("m");
+// k = clave del cálculo ("aislamiento" o "aislamiento-2"); m + nuevo=1 = otro cálculo del módulo.
+const id = params.get("id"), mid = params.get("k") ? moduloDe(params.get("k")) : params.get("m");
 const mod = MODULOS[mid];
 const alerta = document.getElementById("alerta");
 
@@ -22,6 +23,7 @@ if (ctx && (!id || !mod)) {
 }
 
 function iniciar(proyecto, guardados) {
+  const clave = params.get("k") || (params.get("nuevo") ? nuevaClave(mid, guardados) : mid);
   document.title = `${mod.titulo} — AHÍNCO`;
   document.getElementById("migas").innerHTML = `<a href="proyecto.html?id=${encodeURIComponent(proyecto.id)}">← ${esc(proyecto.nombre)}</a> · ${esc(AREAS[mod.area].nombre)}`;
   document.getElementById("titulo").textContent = `${mod.icono} ${mod.titulo}`;
@@ -30,12 +32,19 @@ function iniciar(proyecto, guardados) {
   const estado = document.getElementById("estadoGuardado");
   const avisoEj = document.getElementById("avisoEjemplo");
 
-  let entradas = guardados[mid]?.entradas ? structuredClone(guardados[mid].entradas) : entradasPorDefecto(mid);
+  // Un cálculo nuevo del mismo módulo parte de los datos del primero.
+  const origen = guardados[clave] || (clave !== mid ? guardados[mid] : null);
+  let entradas = origen?.entradas ? structuredClone(origen.entradas) : entradasPorDefecto(mid);
+  const etiquetaEl = document.getElementById("etiqueta");
+  etiquetaEl.value = guardados[clave]?.etiqueta || "";
+  etiquetaEl.addEventListener("input", () => marcar(true));
+  const btnEliminar = document.getElementById("eliminarCalcBtn");
+  btnEliminar.classList.toggle("hidden", !guardados[clave]);
   // Campos nuevos que no existían cuando se guardó: toman el valor por defecto.
   mod.campos.forEach((c) => { if (entradas[c.key] === undefined) entradas[c.key] = entradasPorDefecto(mid)[c.key]; });
-  avisoEj.classList.toggle("hidden", !!guardados[mid]);
+  avisoEj.classList.toggle("hidden", !!origen);
   let sinGuardar = false;
-  const marcar = (v) => { sinGuardar = v; estado.textContent = v ? "● Cambios sin guardar" : guardados[mid] ? "Guardado" : "Sin guardar"; estado.className = `rt-estado-guardado${v ? " pendiente" : ""}`; };
+  const marcar = (v) => { sinGuardar = v; estado.textContent = v ? "● Cambios sin guardar" : guardados[clave] ? "Guardado" : "Sin guardar"; estado.className = `rt-estado-guardado${v ? " pendiente" : ""}`; };
   marcar(false);
   window.addEventListener("beforeunload", (e) => { if (sinGuardar) { e.preventDefault(); e.returnValue = ""; } });
 
@@ -101,7 +110,7 @@ function iniciar(proyecto, guardados) {
     return `<h3>${esc(t.titulo)}</h3><div class="tabla-scroll"><table class="rt-tabla-res"><thead><tr>${t.encabezados.map((h) => `<th>${esc(h)}</th>`).join("")}</tr></thead><tbody>${t.filas.map((f) => `<tr>${f.map((v) => `<td>${esc(v)}</td>`).join("")}</tr>`).join("")}</tbody></table></div>`;
   }
   function recalcular() {
-    const res = calcularProyecto(proyecto, guardados, { sobrescribir: { [mid]: entradas } })[mid];
+    const res = calcularProyecto(proyecto, guardados, { sobrescribir: { [clave]: entradas } })[clave];
     if (!res) { resultados.innerHTML = ""; return; }
     const fallan = (res.verificaciones || []).filter((v) => v.cumple === false).length;
     resultados.innerHTML = `
@@ -121,8 +130,11 @@ function iniciar(proyecto, guardados) {
     btn.disabled = true;
     limpiarAlerta(alerta);
     try {
-      await guardarCalculo(proyecto.id, mid, entradas, ctx.user);
-      guardados[mid] = { entradas: structuredClone(entradas) };
+      const etiqueta = etiquetaEl.value.trim();
+      await guardarCalculo(proyecto.id, clave, entradas, ctx.user, etiqueta);
+      guardados[clave] = { entradas: structuredClone(entradas), etiqueta };
+      btnEliminar.classList.remove("hidden");
+      if (!params.get("k")) history.replaceState(null, "", `calculo.html?id=${encodeURIComponent(proyecto.id)}&k=${encodeURIComponent(clave)}`);
       avisoEj.classList.add("hidden");
       marcar(false);
       mostrarAlerta(alerta, "Cálculo guardado.", "success");
@@ -131,6 +143,14 @@ function iniciar(proyecto, guardados) {
     } finally {
       btn.disabled = false;
     }
+  });
+  btnEliminar.addEventListener("click", async () => {
+    if (!confirm("¿Eliminar este cálculo del proyecto? No se puede deshacer.")) return;
+    try {
+      await eliminarCalculo(proyecto.id, clave, ctx.user);
+      sinGuardar = false;
+      window.location.href = `proyecto.html?id=${encodeURIComponent(proyecto.id)}`;
+    } catch (err) { mostrarAlerta(alerta, errorAmigable(err)); }
   });
   document.getElementById("ejemploBtn").addEventListener("click", () => {
     if (!confirm("¿Reemplazar los datos del formulario por los valores de ejemplo? No se guarda hasta que pulses «Guardar».")) return;

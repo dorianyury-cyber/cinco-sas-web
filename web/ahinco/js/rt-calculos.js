@@ -310,7 +310,7 @@ export function cortocircuito(e, proyecto = {}, ctx = {}) {
     const ik1 = (Math.sqrt(3) * c * Un) / mod(suma(esc(z1, 2), z0));
     barras.push({ nombre, z1: { ...z1 }, ik3, ip: kappa * Math.SQRT2 * ik3, ik1, kappa, icu: num(icu, 0) });
   };
-  registrar(e.nombreBornes || "Bornes BT del transformador", e.icuBornes);
+  registrar(e.nombreBornes || (Un > 1000 ? "Barra del secundario" : "Bornes BT del transformador"), e.icuBornes);
   filas(e.cables).forEach((cb) => {
     const zc = impedanciaConductor(cb.conductor, cb.canalizacion);
     const L = num(cb.longitud) / 1000, n = Math.max(1, num(cb.paralelos, 1));
@@ -322,27 +322,27 @@ export function cortocircuito(e, proyecto = {}, ctx = {}) {
   const verificaciones = barras.filter((b) => b.icu > 0).map((b) => ({ criterio: `${b.nombre}: capacidad de interrupción`, norma: "RETIE / NTC 2050 110-9; IEC 60947-2", valor: `${fmt(b.icu, 1)} kA`, limite: `≥ ${fmt(b.ik3 / 1000, 2)} kA`, cumple: b.icu * 1000 >= b.ik3 }));
   return {
     resumen: [
-      { etiqueta: "Ik\" trifásica en MT", valor: fmt(ikMT / 1000, 2), unidad: "kA" },
-      { etiqueta: "Ik\" trifásica en bornes BT", valor: fmt(barras[0].ik3 / 1000, 2), unidad: "kA" },
-      { etiqueta: "Ik\" monofásica en bornes BT", valor: fmt(barras[0].ik1 / 1000, 2), unidad: "kA" }
+      { etiqueta: "Ik\" trifásica en la red (primario)", valor: fmt(ikMT / 1000, 2), unidad: "kA" },
+      { etiqueta: "Ik\" trifásica en el secundario", valor: fmt(barras[0].ik3 / 1000, 2), unidad: "kA" },
+      { etiqueta: "Ik\" monofásica en el secundario", valor: fmt(barras[0].ik1 / 1000, 2), unidad: "kA" }
     ],
     salidas: { barras: barras.map((b) => ({ nombre: b.nombre, ik3: b.ik3, ik1: b.ik1 })) },
     tablas: [
-      { titulo: "Impedancias referidas a baja tensión", encabezados: ["Elemento", "R (mΩ)", "X (mΩ)", "Z (mΩ)"], filas: [
+      { titulo: "Impedancias referidas al secundario", encabezados: ["Elemento", "R (mΩ)", "X (mΩ)", "Z (mΩ)"], filas: [
         ["Red equivalente", fmt(zq.r * 1000, 3), fmt(zq.x * 1000, 3), fmt(mod(zq) * 1000, 3)],
         [`Transformador (KT = ${fmt(KT, 3)})`, fmt(zt.r * 1000, 3), fmt(zt.x * 1000, 3), fmt(mod(zt) * 1000, 3)]
       ] },
       { titulo: "Corrientes de cortocircuito por barra", encabezados: ["Barra", "R (mΩ)", "X (mΩ)", "Ik\" 3F (kA)", "κ", "ip (kA)", "Ik\" 1F (kA)", "Icu (kA)"], filas: barras.map((b) => [b.nombre, fmt(b.z1.r * 1000, 3), fmt(b.z1.x * 1000, 3), fmt(b.ik3 / 1000, 2), fmt(b.kappa, 2), fmt(b.ip / 1000, 2), fmt(b.ik1 / 1000, 2), b.icu ? fmt(b.icu, 1) : "—"]) }
     ],
     pasos: [
-      { titulo: "Red equivalente referida a BT", formula: "ZQ = c × Un² / S\"kQ; XQ = ZQ / √(1 + (R/X)²)", sustitucion: `1,1 × ${fmt(Un, 0)}² / ${fmt(skq / 1e6, 1)} MVA`, resultado: `ZQ = ${fmt(ZQ * 1000, 3)} mΩ` },
+      { titulo: "Red equivalente referida al secundario", formula: "ZQ = c × Un² / S\"kQ; XQ = ZQ / √(1 + (R/X)²)", sustitucion: `1,1 × ${fmt(Un, 0)}² / ${fmt(skq / 1e6, 1)} MVA`, resultado: `ZQ = ${fmt(ZQ * 1000, 3)} mΩ` },
       { titulo: "Transformador", formula: "ZT = ukr × Un² / SrT; RT = PkrT × Un² / SrT²; KT = 0,95 × cmax / (1 + 0,6 xT)", sustitucion: `ukr = ${fmt(uk, 1)} %; PkrT = ${fmt(pk / 1000, 2)} kW; SrT = ${fmt(sn / 1000, 1)} kVA`, resultado: `ZT = ${fmt(ZT * 1000, 3)} mΩ; KT = ${fmt(KT, 3)}` },
-      { titulo: "Corriente trifásica", formula: "Ik\" = c × Un / (√3 × |Z1|)", sustitucion: `c = ${fmt(c, 2)} (BT, IEC 60909-0 Tabla 1)`, resultado: "Por barra" },
-      { titulo: "Corriente monofásica a tierra", formula: "Ik1\" = √3 × c × Un / |2 Z1 + Z0|", sustitucion: "Z0 del transformador Dyn ≈ Z1; Z0 de cables ≈ 4 Z1 (aproximación IEC 60909-2)", resultado: "Por barra" },
+      { titulo: "Corriente trifásica", formula: "Ik\" = c × Un / (√3 × |Z1|)", sustitucion: `c = ${fmt(c, 2)} (IEC 60909-0 Tabla 1)`, resultado: "Por barra" },
+      { titulo: "Corriente monofásica a tierra", formula: "Ik1\" = √3 × c × Un / |2 Z1 + Z0|", sustitucion: "Z0 del transformador Dyn o YNyn con terciario en delta ≈ Z1; Z0 de cables ≈ 4 Z1 (aproximación IEC 60909-2)", resultado: "Por barra" },
       { titulo: "Corriente pico", formula: "ip = κ × √2 × Ik\"; κ = 1,02 + 0,98 e^(−3R/X)", sustitucion: "IEC 60909-0 ec. 55", resultado: "Por barra" }
     ],
     verificaciones,
-    conclusion: verificaciones.length ? veredicto(verificaciones, "Los interruptores tienen capacidad de interrupción suficiente.", "Hay interruptores con capacidad de interrupción insuficiente.") : `La corriente de cortocircuito trifásica en bornes de baja tensión es ${fmt(barras[0].ik3 / 1000, 2)} kA; con ella se especifica la capacidad de interrupción de los equipos.`
+    conclusion: verificaciones.length ? veredicto(verificaciones, "Los interruptores tienen capacidad de interrupción suficiente.", "Hay interruptores con capacidad de interrupción insuficiente.") : `La corriente de cortocircuito trifásica en el secundario es ${fmt(barras[0].ik3 / 1000, 2)} kA; con ella se especifica la capacidad de interrupción de los equipos.`
   };
 }
 
@@ -521,12 +521,12 @@ export function rayos(e) {
 
 // ================================================================ 10. COORDINACIÓN DE AISLAMIENTO Y DPS (IEC 60071 / IEC 60099-5)
 export function aislamiento(e, proyecto = {}) {
-  const Um = num(e.um, 36), k = e.puestaTierra === "aislado" ? 1.73 : 1.4;
+  const Um = num(e.um, 36), Us = num(e.us, 0) || Um, k = e.puestaTierra === "aislado" ? 1.73 : e.puestaTierra === "solido" ? 1.3 : 1.4;
   const H = num(e.altitud, num(proyecto.altitud, 0));
   const bil = num(e.bil, 170), ur = num(e.ur, 30), uc = num(e.uc, 24), ures = num(e.ures, 80), T = num(e.capTov, 1.1);
   const dist = num(e.distancia, 0), S = num(e.pendiente, 500);
-  const tov = (k * Um) / Math.sqrt(3);
-  const ucMin = Um / Math.sqrt(3), urMin = tov / T;
+  const tov = (k * Us) / Math.sqrt(3);
+  const ucMin = Us / Math.sqrt(3), urMin = tov / T;
   const Ka = Math.exp(H / 8150);
   const vEquipo = ures + 2 * S * (dist / 300);
   const margen = ((bil / Ka) / vEquipo - 1) * 100;
@@ -534,11 +534,11 @@ export function aislamiento(e, proyecto = {}) {
   const dAire = fila[1] * Ka;
   const normalizados = N.NIVELES_AISLAMIENTO[String(Um)] || [];
   const verificaciones = [
-    { criterio: "Tensión de operación continua del DPS", norma: "IEC 60099-5 — Uc ≥ Um/√3", valor: `${fmt(uc, 1)} kV`, limite: `≥ ${fmt(ucMin, 1)} kV`, cumple: uc >= ucMin },
+    { criterio: "Tensión de operación continua del DPS", norma: "IEC 60099-5 — Uc ≥ Us/√3", valor: `${fmt(uc, 1)} kV`, limite: `≥ ${fmt(ucMin, 1)} kV`, cumple: uc >= ucMin },
     { criterio: "Tensión asignada frente a sobretensiones temporales", norma: "IEC 60099-5 — Ur ≥ TOV / T", valor: `${fmt(ur, 1)} kV`, limite: `≥ ${fmt(urMin, 1)} kV`, cumple: ur >= urMin },
     { criterio: "Margen de protección al impulso tipo rayo", norma: "IEEE C62.22 / IEC 60071-2 (≥ 20 %)", valor: `${fmt(margen, 1)} %`, limite: "≥ 20 %", cumple: margen >= 20 }
   ];
-  if (normalizados.length) verificaciones.push({ criterio: "BIL del equipo es un nivel normalizado para Um", norma: "IEC 60071-1 Tabla 2", valor: `${fmt(bil, 0)} kV`, limite: normalizados.join(" / ") + " kV", cumple: normalizados.includes(bil) });
+  if (normalizados.length) verificaciones.push({ criterio: "BIL del equipo frente a los niveles normalizados para Um", norma: "IEC 60071-1 Tabla 2", valor: `${fmt(bil, 0)} kV`, limite: `≥ ${Math.min(...normalizados)} kV (normalizados: ${normalizados.join(" / ")} kV)`, cumple: bil >= Math.min(...normalizados) });
   return {
     resumen: [
       { etiqueta: "Sobretensión temporal TOV", valor: fmt(tov, 1), unidad: "kV" },
@@ -547,13 +547,13 @@ export function aislamiento(e, proyecto = {}) {
       { etiqueta: "Distancia mínima en aire fase-tierra", valor: fmt(dAire, 0), unidad: "mm" }
     ],
     tablas: [{ titulo: "Coordinación de aislamiento", encabezados: ["Parámetro", "Valor"], filas: [
-      ["Tensión máxima del sistema Um", `${fmt(Um, 1)} kV`], ["Puesta a tierra del neutro", e.puestaTierra === "aislado" ? "Aislado o no efectiva (k = 1,73)" : "Efectiva (k = 1,4)"],
+      ["Tensión máxima del equipo Um / de operación del sistema Us", `${fmt(Um, 1)} / ${fmt(Us, 1)} kV`], ["Puesta a tierra del neutro", e.puestaTierra === "aislado" ? "Aislado o no efectiva (k = 1,73)" : e.puestaTierra === "solido" ? "Sólida (k = 1,3)" : "Efectiva (k = 1,4)"],
       ["Altitud del sitio / factor Ka", `${fmt(H, 0)} m / ${fmt(Ka, 3)}`], ["BIL del equipo", `${fmt(bil, 0)} kV`],
       ["DPS: Ur / Uc / Ures (10 kA)", `${fmt(ur, 1)} / ${fmt(uc, 1)} / ${fmt(ures, 1)} kV`], ["Separación DPS-equipo", `${fmt(dist, 1)} m (pendiente ${fmt(S, 0)} kV/µs)`]
     ] }],
     pasos: [
-      { titulo: "Sobretensión temporal", formula: "TOV = k × Um / √3", sustitucion: `${k} × ${fmt(Um, 1)} / √3`, resultado: `${fmt(tov, 1)} kV` },
-      { titulo: "Selección del DPS", formula: "Uc ≥ Um/√3; Ur ≥ TOV / T", sustitucion: `T = ${fmt(T, 2)} p.u. (capacidad TOV del catálogo)`, resultado: `Uc mín = ${fmt(ucMin, 1)} kV; Ur mín = ${fmt(urMin, 1)} kV` },
+      { titulo: "Sobretensión temporal", formula: "TOV = k × Us / √3", sustitucion: `${k} × ${fmt(Us, 1)} / √3`, resultado: `${fmt(tov, 1)} kV` },
+      { titulo: "Selección del DPS", formula: "Uc ≥ Us/√3; Ur ≥ TOV / T", sustitucion: `T = ${fmt(T, 2)} p.u. (capacidad TOV del catálogo)`, resultado: `Uc mín = ${fmt(ucMin, 1)} kV; Ur mín = ${fmt(urMin, 1)} kV` },
       { titulo: "Corrección por altitud", formula: "Ka = e^(H/8150) (m = 1, impulso tipo rayo)", sustitucion: `H = ${fmt(H, 0)} m`, resultado: `Ka = ${fmt(Ka, 3)}` },
       { titulo: "Tensión en el equipo por la separación", formula: "Ve = Ures + 2 S d / v (v = 300 m/µs)", sustitucion: `${fmt(ures, 1)} + 2 × ${fmt(S, 0)} × ${fmt(dist, 1)} / 300`, resultado: `${fmt(vEquipo, 1)} kV` },
       { titulo: "Margen de protección", formula: "MP = (BIL / Ka) / Ve − 1", sustitucion: `(${fmt(bil, 0)} / ${fmt(Ka, 3)}) / ${fmt(vEquipo, 1)} − 1`, resultado: `${fmt(margen, 1)} %` },
@@ -637,4 +637,162 @@ export function mecanico(e) {
   };
 }
 
-export const CALCULOS = { cargas, conductores, regulacion, canalizaciones, transformador, cortocircuito, coordinacion, malla, rayos, aislamiento, distancias, mecanico };
+// ================================================================ 13. TRANSFORMADOR DE POTENCIA (subestaciones AT/MT)
+// Corrientes por etapa de refrigeración y por toma extrema, cortocircuito
+// pasante (IEC 60076-5, con la impedancia de la red) y verificación de los
+// TC y de los equipos en serie con cada devanado.
+export function trafoPotencia(e) {
+  const sOnan = num(e.sOnan, 40), sOnaf = Math.max(num(e.sOnaf, sOnan), sOnan);
+  const uAT = num(e.uAT, 115), uMT = num(e.uMT, 34.5), uk = num(e.uk, 9.5), tap = num(e.tapRango, 12.5);
+  const baseUk = e.ukBase === "ONAF" ? sOnaf : sOnan;
+  const ikRed = num(e.ikRed, 40), c = num(e.factorC, 1.1);
+  const dem = num(e.demanda, 0), crec = num(e.crecimiento, 0), demFut = dem * (1 + crec / 100);
+  const inAT = (s) => (s * 1000) / (Math.sqrt(3) * uAT), inMT = (s) => (s * 1000) / (Math.sqrt(3) * uMT);
+  const iATmax = inAT(sOnaf) / (1 - tap / 100); // toma de menor tensión
+  // Impedancias referidas al lado MT (Ω).
+  const skRed = Math.sqrt(3) * uAT * ikRed; // MVA
+  const ZQ = (c * uMT * uMT) / skRed, ZT = (uk / 100) * (uMT * uMT) / baseUk;
+  const ikMT = (c * uMT) / (Math.sqrt(3) * (ZQ + ZT)); // kA
+  const ikMTinf = (c * uMT) / (Math.sqrt(3) * ZT);
+  const ikPasAT = ikMT * (uMT / uAT); // kA vistos desde AT
+  const ikEsp = num(e.ikSoporta, 0), tEsp = num(e.tSoporta, 2);
+  const lado = (l) => (l === "AT" ? { inom: iATmax, ik: ikRed, u: uAT } : { inom: inMT(sOnaf), ik: ikMT, u: uMT });
+  const verificaciones = [];
+  if (dem > 0) {
+    verificaciones.push({ criterio: "Cargabilidad con la demanda proyectada (ONAF)", norma: "IEC 60076-7 / criterio del operador de red", valor: `${fmt((demFut / sOnaf) * 100, 1)} %`, limite: `≤ ${fmt(num(e.cargaMax, 100), 0)} %`, cumple: (demFut / sOnaf) * 100 <= num(e.cargaMax, 100) });
+  }
+  if (ikEsp > 0) verificaciones.push({ criterio: "Cortocircuito pasante frente a la soportabilidad especificada (lado AT)", norma: "IEC 60076-5 — corriente simétrica con la impedancia de la red", valor: `${fmt(ikPasAT, 2)} kA`, limite: `≤ ${fmt(ikEsp, 2)} kA (${fmt(tEsp, 0)} s, valor del plano o la especificación)`, cumple: ikPasAT <= ikEsp });
+  const tcs = filas(e.tcs).map((t) => {
+    const L = lado(t.lado), ipn = num(t.primaria), alf = num(t.alf, 20), proteccion = t.funcion === "Protección";
+    const okTerm = ipn > 0 && L.inom <= 1.2 * ipn; // corriente térmica extendida 120 %
+    const ikTC = t.lado === "AT" ? ikPasAT : ikMT;
+    const okSat = !proteccion || ipn * alf >= ikTC * 1000;
+    verificaciones.push({ criterio: `${t.nombre || "TC"} (${t.lado}, ${fmt(ipn, 0)} A): corriente nominal de la máquina`, norma: "IEC 61869-2 — corriente térmica extendida 120 %", valor: `${fmt(L.inom, 0)} A`, limite: `≤ ${fmt(1.2 * ipn, 0)} A`, cumple: okTerm });
+    if (proteccion) verificaciones.push({ criterio: `${t.nombre || "TC"}: no satura con la falla pasante`, norma: `IEC 61869-2 — ALF ${fmt(alf, 0)} × Ipn`, valor: `${fmt(ikTC, 2)} kA`, limite: `≤ ${fmt((ipn * alf) / 1000, 2)} kA`, cumple: okSat });
+    return [t.nombre || "", t.lado, t.funcion || "", `${fmt(ipn, 0)} A`, proteccion ? fmt(alf, 0) : "—", `${fmt(L.inom, 0)} A`, okTerm && okSat ? "Cumple" : "No cumple"];
+  });
+  const equipos = filas(e.equipos).map((q) => {
+    const L = lado(q.lado), inq = num(q.inom), icq = num(q.icc);
+    const okI = inq >= L.inom, okK = !icq || icq >= L.ik;
+    verificaciones.push({ criterio: `${q.equipo || "Equipo"} (${q.lado}): corriente nominal`, norma: "IEC 62271-1 — In ≥ corriente máxima del circuito", valor: `${fmt(inq, 0)} A`, limite: `≥ ${fmt(L.inom, 0)} A`, cumple: okI });
+    if (icq) verificaciones.push({ criterio: `${q.equipo || "Equipo"} (${q.lado}): corriente de cortocircuito`, norma: "IEC 62271-1 / -100 — Ik del equipo ≥ Ik de la barra", valor: `${fmt(icq, 1)} kA`, limite: `≥ ${fmt(L.ik, 2)} kA`, cumple: okK });
+    return [q.equipo || "", q.lado, `${fmt(inq, 0)} A`, icq ? `${fmt(icq, 1)} kA` : "—", `${fmt(L.inom, 0)} A / ${fmt(L.ik, 2)} kA`, okI && okK ? "Cumple" : "No cumple"];
+  });
+  return {
+    resumen: [
+      { etiqueta: "Potencia ONAN / ONAF", valor: `${fmt(sOnan, 0)} / ${fmt(sOnaf, 0)}`, unidad: "MVA" },
+      { etiqueta: "In MT (ONAF)", valor: fmt(inMT(sOnaf), 0), unidad: "A" },
+      { etiqueta: "Ik\" en barra MT", valor: fmt(ikMT, 2), unidad: "kA" },
+      { etiqueta: "Ik pasante vista desde AT", valor: fmt(ikPasAT, 2), unidad: "kA" }
+    ],
+    salidas: { sn: sOnan * 1000, z: uk, vs: uMT * 1000, vp: uAT * 1000, ikMT, ikAT: ikRed, inMT: inMT(sOnaf), inAT: iATmax },
+    tablas: [
+      { titulo: "Corrientes nominales del transformador", encabezados: ["Condición", "Potencia (MVA)", `I AT ${fmt(uAT, 1)} kV (A)`, `I MT ${fmt(uMT, 1)} kV (A)`], filas: [
+        ["ONAN, toma central", fmt(sOnan, 1), fmt(inAT(sOnan), 1), fmt(inMT(sOnan), 1)],
+        ["ONAF, toma central", fmt(sOnaf, 1), fmt(inAT(sOnaf), 1), fmt(inMT(sOnaf), 1)],
+        [`ONAF, toma extrema (−${fmt(tap, 2)} %)`, fmt(sOnaf, 1), fmt(iATmax, 1), fmt(inMT(sOnaf), 1)]
+      ] },
+      { titulo: "Cortocircuito pasante (referido al lado MT)", encabezados: ["Elemento", "Valor"], filas: [
+        ["Red en AT", `Ik" = ${fmt(ikRed, 1)} kA → S"kQ = ${fmt(skRed, 0)} MVA; ZQ = ${fmt(ZQ, 3)} Ω`],
+        ["Transformador", `uk = ${fmt(uk, 2)} % sobre ${fmt(baseUk, 0)} MVA; ZT = ${fmt(ZT, 3)} Ω`],
+        ["Ik\" en barra MT (con red / barra infinita)", `${fmt(ikMT, 2)} kA / ${fmt(ikMTinf, 2)} kA`],
+        ["Ik pasante vista desde AT", `${fmt(ikPasAT, 2)} kA`]
+      ] },
+      ...(tcs.length ? [{ titulo: "Transformadores de corriente", encabezados: ["TC", "Lado", "Función", "Ipn", "ALF", "I máx. circuito", "Resultado"], filas: tcs }] : []),
+      ...(equipos.length ? [{ titulo: "Equipos en serie con el transformador", encabezados: ["Equipo", "Lado", "In", "Ik equipo", "Exigido (In / Ik)", "Resultado"], filas: equipos }] : [])
+    ],
+    pasos: [
+      { titulo: "Corrientes nominales", formula: "In = S / (√3 × U); en AT con la toma de menor tensión: In / (1 − rango)", sustitucion: `${fmt(sOnaf, 0)} MVA / (√3 × ${fmt(uAT, 1)} kV) / (1 − ${fmt(tap, 2)} %)`, resultado: `I AT máx. = ${fmt(iATmax, 1)} A; I MT = ${fmt(inMT(sOnaf), 1)} A` },
+      { titulo: "Impedancia de la red referida a MT", formula: "ZQ = c × U MT² / S\"kQ; S\"kQ = √3 × U AT × Ik\" AT", sustitucion: `c = ${fmt(c, 2)}; Ik" AT = ${fmt(ikRed, 1)} kA`, resultado: `ZQ = ${fmt(ZQ, 4)} Ω` },
+      { titulo: "Impedancia del transformador", formula: "ZT = uk × U MT² / Sbase", sustitucion: `${fmt(uk, 2)} % × ${fmt(uMT, 1)}² / ${fmt(baseUk, 0)}`, resultado: `ZT = ${fmt(ZT, 4)} Ω` },
+      { titulo: "Cortocircuito pasante", formula: "Ik\" MT = c × U MT / (√3 × (ZQ + ZT)); Ik visto desde AT = Ik\" MT × U MT / U AT", sustitucion: "IEC 60076-5 §4.1 (incluye la impedancia de la red)", resultado: `${fmt(ikMT, 2)} kA en MT; ${fmt(ikPasAT, 2)} kA en AT` }
+    ],
+    verificaciones,
+    notas: ["La impedancia uk se toma sobre la potencia indicada (normalmente la ONAN); confirme la base con el protocolo de pruebas del fabricante.", "La corriente de falla en el lado AT de los equipos se toma igual a la de la red (falla en la barra AT)."],
+    conclusion: veredicto(verificaciones, `El transformador de ${fmt(sOnan, 0)}/${fmt(sOnaf, 0)} MVA y los equipos asociados son coherentes con las corrientes nominales y de cortocircuito.`, "Hay incoherencias entre el transformador y los equipos o la soportabilidad especificada.")
+  };
+}
+
+// ================================================================ 14. CABLES DE MEDIA TENSIÓN
+// Capacidad de corriente con factores de corrección, soportabilidad al
+// cortocircuito (método adiabático IEC 60949) y caída de tensión.
+const K_ADIABATICO = { "Cu-XLPE": 143, "Al-XLPE": 94, "Cu-EPR": 143, "Al-EPR": 94, "Cu-PVC": 115, "Al-PVC": 76 };
+export function cableMT(e, proyecto = {}, ctx = {}) {
+  const U = num(e.tension, ctx.trafoPotencia ? ctx.trafoPotencia.vs / 1000 : 34.5), dvMax = num(e.dvMax, 3);
+  const ik3cc = ctx.cortocircuito?.barras?.[0]?.ik3;
+  const ikDef = ctx.trafoPotencia?.ikMT ?? (Number.isFinite(ik3cc) ? ik3cc / 1000 : 0);
+  const verificaciones = [];
+  const tabla = filas(e.circuitos).map((c) => {
+    const mat = c.material === "Cu" ? "Cu" : "Al", ais = c.aislamiento || "XLPE";
+    const S = N.SECCION_MM2[c.calibre] ?? num(c.calibre, 0);
+    const amp = num(c.ampacidad) * num(c.factor, 1);
+    const I = num(c.corriente), L = num(c.longitud) / 1000;
+    const rho20 = mat === "Cu" ? 0.017241 : 0.028264, alfa = mat === "Cu" ? 0.00393 : 0.00403;
+    const R = num(c.r, 0) || (S > 0 ? (rho20 / S) * 1000 * (1 + alfa * 70) : 0), X = num(c.x, 0.13);
+    const fp = num(e.fp, 0.9), sen = Math.sqrt(1 - fp * fp);
+    const dv = U > 0 ? (Math.sqrt(3) * I * L * (R * fp + X * sen)) / (U * 1000) * 100 : 0;
+    const K = K_ADIABATICO[`${mat}-${ais}`] || 94, t = num(c.tDespeje, 0.5);
+    const ikAdm = (K * S) / Math.sqrt(t) / 1000, ik = num(c.icc, ikDef);
+    const nombre = c.circuito || "Circuito";
+    verificaciones.push({ criterio: `${nombre}: capacidad de corriente`, norma: "NTC 2050 Sec. 310 (> 2 kV) / IEC 60502-2 — datos del fabricante con factores de corrección", valor: `${fmt(I, 0)} A`, limite: `≤ ${fmt(amp, 0)} A`, cumple: I <= amp });
+    if (ik > 0) verificaciones.push({ criterio: `${nombre}: soportabilidad al cortocircuito`, norma: `IEC 60949 (adiabático, K = ${K})`, valor: `${fmt(ik, 2)} kA`, limite: `≤ ${fmt(ikAdm, 2)} kA en ${fmt(t, 2)} s`, cumple: ik <= ikAdm });
+    if (num(c.inCelda, 0)) verificaciones.push({ criterio: `${nombre}: celda o protección`, norma: "IEC 62271-200 — In de la celda ≥ corriente del circuito", valor: `${fmt(num(c.inCelda), 0)} A`, limite: `≥ ${fmt(I, 0)} A`, cumple: num(c.inCelda) >= I });
+    if (L > 0) verificaciones.push({ criterio: `${nombre}: caída de tensión`, norma: "RETIE — regulación (criterio del operador de red)", valor: `${fmt(dv, 2)} %`, limite: `≤ ${fmt(dvMax, 1)} %`, cumple: dv <= dvMax });
+    return [nombre, `${mat} ${N.etiquetaCalibre(String(c.calibre))} ${ais}`, fmt(S, 1), fmt(amp, 0), fmt(I, 0), ik ? fmt(ik, 2) : "—", fmt(ikAdm, 2), L ? fmt(dv, 2) : "—"];
+  });
+  return {
+    resumen: [{ etiqueta: "Circuitos verificados", valor: String(tabla.length), unidad: "" }, { etiqueta: "Ik\" en la barra", valor: ikDef ? fmt(ikDef, 2) : "—", unidad: "kA" }],
+    tablas: [{ titulo: "Verificación de cables de media tensión", encabezados: ["Circuito", "Cable", "S (mm²)", "Ampacidad corregida (A)", "I diseño (A)", "Ik (kA)", "Ik admisible (kA)", "ΔV (%)"], filas: tabla }],
+    pasos: [
+      { titulo: "Capacidad de corriente", formula: "I adm = I tabla × factores de corrección (temperatura, agrupamiento, resistividad térmica)", sustitucion: "Valor base de la tabla del fabricante o NTC 2050 Tablas 310-77 a 310-86", resultado: "Por circuito" },
+      { titulo: "Cortocircuito en el conductor", formula: "I adm = K × S / √t (IEC 60949, 90 → 250 °C)", sustitucion: "K = 143 (Cu XLPE), 94 (Al XLPE)", resultado: "Por circuito" },
+      { titulo: "Caída de tensión", formula: "ΔV % = √3 × I × L × (R cos φ + X sen φ) / U × 100", sustitucion: `U = ${fmt(U, 1)} kV; R a 90 °C (calculada si no se digita)`, resultado: "Por circuito" }
+    ],
+    verificaciones,
+    notas: ["La pantalla metálica del cable debe verificarse para la corriente de falla a tierra con los datos del fabricante."],
+    conclusion: veredicto(verificaciones, "Los cables de media tensión cumplen capacidad de corriente, cortocircuito y regulación.", "Hay cables de media tensión que no cumplen.")
+  };
+}
+
+// ================================================================ 15. APANTALLAMIENTO (esfera rodante / modelo electrogeométrico)
+export function apantallamiento(e) {
+  let R, origen;
+  if (e.metodo === "ieee998") {
+    const bil = num(e.bil, 550), zs = num(e.zs, 350), kc = e.captador === "cable" ? 1 : 1.2;
+    const ic = (2.2 * bil) / zs;
+    R = 8 * kc * Math.pow(ic, 0.65);
+    origen = `IEEE 998: Ic = 2,2 × BIL / Zs = 2,2 × ${fmt(bil, 0)} / ${fmt(zs, 0)} = ${fmt(ic, 2)} kA; S = 8 × ${kc} × Ic^0,65 = ${fmt(R, 1)} m`;
+  } else {
+    const nivel = N.NIVELES_SIPRA[e.nivel] || N.NIVELES_SIPRA.I;
+    R = nivel.esfera;
+    origen = `NTC 4552-3 / IEC 62305-3: nivel ${e.nivel || "I"} → radio ${R} m`;
+  }
+  const radio = (hm, h) => {
+    if (h >= hm) return 0;
+    const xc = hm >= R ? R : Math.sqrt(hm * (2 * R - hm));
+    const xh = h >= R ? R : Math.sqrt(h * (2 * R - h));
+    return Math.max(0, xc - xh);
+  };
+  const verificaciones = [];
+  const tabla = filas(e.elementos).map((p) => {
+    const hm = num(p.hCaptador), h = num(p.hElemento), d = num(p.distancia, NaN);
+    const r = radio(hm, h), ok = d <= r;
+    // Sin distancia: el radio queda como requisito para ubicar el captador.
+    if (!Number.isFinite(d)) return [p.elemento || "", p.captador || "", fmt(hm, 1), fmt(h, 1), fmt(r, 2), "Por definir", `Captador a ≤ ${fmt(r, 2)} m`];
+    verificaciones.push({ criterio: `${p.elemento || "Elemento"} protegido por ${p.captador || "captador"}`, norma: "Método de la esfera rodante (NTC 4552-3 / IEEE 998)", valor: `${fmt(d, 2)} m`, limite: `≤ ${fmt(r, 2)} m`, cumple: ok });
+    return [p.elemento || "", p.captador || "", fmt(hm, 1), fmt(h, 1), fmt(r, 2), fmt(d, 2), ok ? "Protegido" : "No protegido"];
+  });
+  return {
+    resumen: [{ etiqueta: "Radio de la esfera rodante", valor: fmt(R, 1), unidad: "m" }, { etiqueta: "Elementos protegidos", valor: verificaciones.length ? `${verificaciones.filter((v) => v.cumple).length} de ${verificaciones.length}` : "Por definir", unidad: "" }],
+    tablas: [{ titulo: "Zona de protección por elemento", encabezados: ["Elemento", "Captador", "Altura captador (m)", "Altura elemento (m)", "Radio protegido (m)", "Distancia (m)", "Resultado"], filas: tabla }],
+    pasos: [
+      { titulo: "Radio de la esfera rodante", formula: e.metodo === "ieee998" ? "S = 8 k Ic^0,65; Ic = 2,2 BIL / Zs" : "Radio según el nivel de protección", sustitucion: origen, resultado: `R = ${fmt(R, 1)} m` },
+      { titulo: "Radio protegido a la altura del elemento", formula: "r = √(hm (2R − hm)) − √(h (2R − h)) (hm ≤ R)", sustitucion: "Para hm > R se toma √(hm(2R − hm)) = R", resultado: "Por elemento" }
+    ],
+    verificaciones,
+    notas: ["Cálculo en el plano del captador y el elemento (un mástil o un cable de guarda). Entre dos captadores la zona protegida es mayor; este cálculo queda del lado de la seguridad."],
+    conclusion: verificaciones.length ? veredicto(verificaciones, "Todos los elementos quedan dentro de la zona protegida.", "Hay elementos fuera de la zona protegida: agregue o eleve captadores.") : `Con una esfera de ${fmt(R, 1)} m, cada captador debe quedar a la distancia horizontal indicada del elemento que protege.`
+  };
+}
+
+export const CALCULOS = { cargas, conductores, regulacion, canalizaciones, transformador, cortocircuito, coordinacion, malla, rayos, aislamiento, distancias, mecanico, trafoPotencia, cableMT, apantallamiento };

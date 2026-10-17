@@ -4,7 +4,9 @@
 // el perfil de la colección "empleados" (debe estar activo).
 //
 // Datos: rtProyectos/{id} (datos generales del proyecto) y
-// rtProyectos/{id}/calculos/{moduloId} = { entradas, actualizadoEn, actualizadoPor }.
+// rtProyectos/{id}/calculos/{clave} = { entradas, etiqueta?, actualizadoEn, actualizadoPor }.
+// La clave es el id del módulo ("aislamiento") o, para repetir un cálculo
+// en el mismo proyecto, el id con un número ("aislamiento-2", "aislamiento-3").
 // La barrera real está en firestore.rules (match /rtProyectos).
 
 import { signOut, onAuthStateChanged } from "https://www.gstatic.com/firebasejs/10.7.1/firebase-auth.js";
@@ -110,15 +112,33 @@ export async function leerCalculos(id) {
   const snap = await getDocs(collection(db, "rtProyectos", id, "calculos"));
   return Object.fromEntries(snap.docs.map((d) => [d.id, d.data()]));
 }
-export async function guardarCalculo(id, moduloId, entradas, user) {
-  await setDoc(doc(db, "rtProyectos", id, "calculos", moduloId), { entradas, actualizadoPor: user.email, actualizadoEn: serverTimestamp() });
+export async function guardarCalculo(id, clave, entradas, user, etiqueta = "") {
+  await setDoc(doc(db, "rtProyectos", id, "calculos", clave), { entradas, etiqueta, actualizadoPor: user.email, actualizadoEn: serverTimestamp() });
   await updateDoc(doc(db, "rtProyectos", id), { actualizadoPor: user.email, actualizadoEn: serverTimestamp() });
 }
+
+export async function eliminarCalculo(id, clave, user) {
+  await deleteDoc(doc(db, "rtProyectos", id, "calculos", clave));
+  await updateDoc(doc(db, "rtProyectos", id), { actualizadoPor: user.email, actualizadoEn: serverTimestamp() });
+}
+
+// ---------------------------------------------------------------- instancias de un módulo
+export const moduloDe = (clave) => String(clave).split("-")[0];
+const numeroDe = (clave) => Number(String(clave).split("-")[1] || 1);
+// Claves guardadas de un módulo, en orden (la base primero).
+export function clavesDe(m, guardados) {
+  return Object.keys(guardados).filter((k) => moduloDe(k) === m).sort((a, b) => numeroDe(a) - numeroDe(b));
+}
+export function nuevaClave(m, guardados) {
+  const ns = clavesDe(m, guardados).map(numeroDe);
+  return ns.length ? `${m}-${Math.max(...ns) + 1}` : m;
+}
+export const tituloCalculo = (r) => `${MODULOS[r.modulo].titulo}${r.etiqueta ? ` — ${r.etiqueta}` : ""}`;
 
 // ---------------------------------------------------------------- cálculo encadenado
 // Orden con dependencias: el transformador usa la demanda del cuadro de
 // cargas y el cortocircuito usa los datos del transformador.
-export const ORDEN_MODULOS = ["cargas", "conductores", "regulacion", "canalizaciones", "transformador", "cortocircuito", "coordinacion", "malla", "rayos", "aislamiento", "distancias", "mecanico"];
+export const ORDEN_MODULOS = ["cargas", "conductores", "regulacion", "canalizaciones", "transformador", "trafoPotencia", "cortocircuito", "cableMT", "coordinacion", "malla", "rayos", "apantallamiento", "aislamiento", "distancias", "mecanico"];
 
 export function calcularModulo(id, entradas, proyecto, ctx = {}) {
   try {
@@ -129,16 +149,23 @@ export function calcularModulo(id, entradas, proyecto, ctx = {}) {
   }
 }
 
-// guardados: { moduloId: { entradas } }. Calcula los módulos guardados (o,
-// si se pide, también los no guardados con sus valores de ejemplo).
+// guardados: { clave: { entradas, etiqueta } }. Calcula todos los cálculos
+// guardados, en el orden de dependencias (o, si se pide, los módulos sin
+// guardar con sus valores de ejemplo). El resultado queda por clave, con
+// r.modulo, r.clave y r.etiqueta. Los módulos siguientes reciben las salidas
+// del primer cálculo de cada módulo (ctx[modulo]).
 export function calcularProyecto(proyecto, guardados, { incluirEjemplos = false, sobrescribir = {} } = {}) {
   const ctx = {}, res = {};
   for (const id of ORDEN_MODULOS) {
-    const entradas = sobrescribir[id] || guardados[id]?.entradas || (incluirEjemplos ? entradasPorDefecto(id) : null);
-    if (!entradas) continue;
-    const r = calcularModulo(id, entradas, proyecto, ctx);
-    if (r.salidas) ctx[id] = r.salidas;
-    res[id] = r;
+    let claves = [...new Set([...clavesDe(id, guardados), ...Object.keys(sobrescribir).filter((k) => moduloDe(k) === id)])].sort((a, b) => numeroDe(a) - numeroDe(b));
+    if (!claves.length && incluirEjemplos) claves = [id];
+    for (const clave of claves) {
+      const entradas = sobrescribir[clave] || guardados[clave]?.entradas || entradasPorDefecto(id);
+      const r = calcularModulo(id, entradas, proyecto, ctx);
+      Object.assign(r, { modulo: id, clave, etiqueta: guardados[clave]?.etiqueta || "" });
+      if (r.salidas && !ctx[id]) ctx[id] = r.salidas;
+      res[clave] = r;
+    }
   }
   return res;
 }
