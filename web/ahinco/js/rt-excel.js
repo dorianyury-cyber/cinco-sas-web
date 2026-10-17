@@ -277,6 +277,7 @@ const HOJAS = {
     const zt = h.calc("ZT", `${uk}/100*${un}^2/(${sn}*1000)`, "Ω"), rt = h.calc("RT", `${pk}*1000*${un}^2/(${sn}*1000)^2`, "Ω");
     const xt = h.calc("XT", `SQRT(MAX(${zt}^2-${rt}^2,0))`, "Ω");
     const kt = h.calc("KT = 0,95·cmax/(1+0,6·xT)", `0.95*1.1/(1+0.6*${xt}/(${un}^2/(${sn}*1000)))`, "");
+    const x0zz = n(e.x0Tierra, 0) > 0 ? h.dato("X0 del transformador zig-zag", n(e.x0Tierra), "Ω", "Secundario en delta: Z0 = la del zig-zag") : null;
     const r1 = h.calc("R1 en bornes", `${rq}+${kt}*${rt}`, "Ω"), x1 = h.calc("X1 en bornes", `${xq}+${kt}*${xt}`, "Ω");
     h.seccion("Barras (Z0 del transformador Dyn ≈ Z1; Z0 de cables ≈ 4 Z1)");
     const barras = [{ barra: e.nombreBornes || "Bornes BT", L: 0, R: 0, X: 0, n: 1, icu: n(e.icuBornes, 0) }, ...vacias(e.cables).map((cb) => { const z = impedanciaConductor(cb.conductor, cb.canalizacion); return { barra: cb.barra, L: n(cb.longitud), R: z.R, X: z.X, n: n(cb.paralelos, 1), icu: n(cb.icu, 0) }; })];
@@ -285,8 +286,8 @@ const HOJAS = {
       { t: "X cable (Ω/km)", v: (b) => b.X, entrada: true, fmt: "0.0000" }, { t: "Paralelos", v: (b) => b.n, entrada: true },
       { t: "R1 (Ω)", v: (b, rr) => (b === barras[0] ? `=${r1}` : `=F${rr - 1}+C${rr}*B${rr}/1000/E${rr}`), fmt: "0.00000" },
       { t: "X1 (Ω)", v: (b, rr) => (b === barras[0] ? `=${x1}` : `=G${rr - 1}+D${rr}*B${rr}/1000/E${rr}`), fmt: "0.00000" },
-      { t: "R0 (Ω)", v: (b, rr) => (b === barras[0] ? `=${kt}*${rt}` : `=H${rr - 1}+4*C${rr}*B${rr}/1000/E${rr}`), fmt: "0.00000" },
-      { t: "X0 (Ω)", v: (b, rr) => (b === barras[0] ? `=${kt}*${xt}` : `=I${rr - 1}+4*D${rr}*B${rr}/1000/E${rr}`), fmt: "0.00000" },
+      { t: "R0 (Ω)", v: (b, rr) => (b === barras[0] ? (x0zz ? 0 : `=${kt}*${rt}`) : `=H${rr - 1}+4*C${rr}*B${rr}/1000/E${rr}`), fmt: "0.00000" },
+      { t: "X0 (Ω)", v: (b, rr) => (b === barras[0] ? (x0zz ? `=${x0zz}` : `=${kt}*${xt}`) : `=I${rr - 1}+4*D${rr}*B${rr}/1000/E${rr}`), fmt: "0.00000" },
       { t: "Ik\" 3F (kA)", v: (b, rr) => `=${c}*${un}/(SQRT(3)*SQRT(F${rr}^2+G${rr}^2))/1000`, fmt: "0.00" },
       { t: "κ", v: (b, rr) => `=1.02+0.98*EXP(-3*F${rr}/G${rr})`, fmt: "0.00" },
       { t: "ip (kA)", v: (b, rr) => `=K${rr}*SQRT(2)*J${rr}`, fmt: "0.00" },

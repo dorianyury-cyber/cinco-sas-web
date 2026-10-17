@@ -122,6 +122,7 @@ export const MODULOS = {
       { key: "uk", label: "Impedancia ukr (vacío = módulo Transformador)", tipo: "numero", unidad: "%", def: "" },
       { key: "pkTrafo", label: "Pérdidas en el cobre PkrT (vacío = 1,2 % de Sn)", tipo: "numero", unidad: "kW", def: "" },
       { key: "uBT", label: "Tensión del secundario, línea-línea (vacío = módulo Transformador)", tipo: "numero", unidad: "V", def: "" },
+      { key: "x0Tierra", label: "X0 del transformador zig-zag del secundario (solo si el secundario es delta)", tipo: "numero", unidad: "Ω", def: "" },
       { key: "factorC", label: "Factor de tensión c", tipo: "select", opciones: [{ valor: "1.05", texto: "1,05 (BT, tolerancia +6 %)" }, { valor: "1.1", texto: "1,10 (BT +10 % o media/alta tensión)" }], def: "1.05" },
       { key: "icuBornes", label: "Capacidad de interrupción en la barra del secundario", tipo: "numero", unidad: "kA", def: 25 },
       { key: "cables", label: "Cables desde los bornes del transformador (en orden)", tipo: "tabla", columnas: [

@@ -303,7 +303,9 @@ export function cortocircuito(e, proyecto = {}, ctx = {}) {
   const xT = XT / ((Un * Un) / sn), KT = (0.95 * 1.1) / (1 + 0.6 * xT);
   const zt = esc(cplx(RT, XT), KT);
   const barras = [];
-  let z1 = suma(zq, zt), z0 = zt;
+  // Secundario en delta con transformador zig-zag: Z0 = la del zig-zag (reactiva).
+  const x0zz = num(e.x0Tierra, 0);
+  let z1 = suma(zq, zt), z0 = x0zz > 0 ? cplx(0, x0zz) : zt;
   const registrar = (nombre, icu) => {
     const ik3 = (c * Un) / (Math.sqrt(3) * mod(z1));
     const kappa = 1.02 + 0.98 * Math.exp(-3 * (z1.r / Math.max(z1.x, 1e-9)));
@@ -338,7 +340,7 @@ export function cortocircuito(e, proyecto = {}, ctx = {}) {
       { titulo: "Red equivalente referida al secundario", formula: "ZQ = c × Un² / S\"kQ; XQ = ZQ / √(1 + (R/X)²)", sustitucion: `1,1 × ${fmt(Un, 0)}² / ${fmt(skq / 1e6, 1)} MVA`, resultado: `ZQ = ${fmt(ZQ * 1000, 3)} mΩ` },
       { titulo: "Transformador", formula: "ZT = ukr × Un² / SrT; RT = PkrT × Un² / SrT²; KT = 0,95 × cmax / (1 + 0,6 xT)", sustitucion: `ukr = ${fmt(uk, 1)} %; PkrT = ${fmt(pk / 1000, 2)} kW; SrT = ${fmt(sn / 1000, 1)} kVA`, resultado: `ZT = ${fmt(ZT * 1000, 3)} mΩ; KT = ${fmt(KT, 3)}` },
       { titulo: "Corriente trifásica", formula: "Ik\" = c × Un / (√3 × |Z1|)", sustitucion: `c = ${fmt(c, 2)} (IEC 60909-0 Tabla 1)`, resultado: "Por barra" },
-      { titulo: "Corriente monofásica a tierra", formula: "Ik1\" = √3 × c × Un / |2 Z1 + Z0|", sustitucion: "Z0 del transformador Dyn o YNyn con terciario en delta ≈ Z1; Z0 de cables ≈ 4 Z1 (aproximación IEC 60909-2)", resultado: "Por barra" },
+      { titulo: "Corriente monofásica a tierra", formula: "Ik1\" = √3 × c × Un / |2 Z1 + Z0|", sustitucion: x0zz > 0 ? `Z0 = X0 del transformador zig-zag = ${fmt(x0zz, 2)} Ω (secundario en delta); Z0 de cables ≈ 4 Z1` : "Z0 del transformador Dyn o YNyn con terciario en delta ≈ Z1; Z0 de cables ≈ 4 Z1 (aproximación IEC 60909-2)", resultado: "Por barra" },
       { titulo: "Corriente pico", formula: "ip = κ × √2 × Ik\"; κ = 1,02 + 0,98 e^(−3R/X)", sustitucion: "IEC 60909-0 ec. 55", resultado: "Por barra" }
     ],
     verificaciones,
