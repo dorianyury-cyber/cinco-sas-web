@@ -124,17 +124,26 @@ export const MODULOS = {
       { key: "pkTrafo", label: "Pérdidas en el cobre PkrT (vacío = 1,2 % de Sn)", tipo: "numero", unidad: "kW", def: "" },
       { key: "uBT", label: "Tensión del secundario, línea-línea (vacío = módulo Transformador)", tipo: "numero", unidad: "V", def: "" },
       { key: "x0Tierra", label: "X0 del transformador zig-zag del secundario (solo si el secundario es delta)", tipo: "numero", unidad: "Ω", def: "" },
+      { key: "z0Trafo", label: "Impedancia de secuencia cero del transformador (fabricante; vacío = igual a ukr)", tipo: "numero", unidad: "%", def: "" },
       { key: "factorC", label: "Factor de tensión c", tipo: "select", opciones: [{ valor: "1.05", texto: "1,05 (BT, tolerancia +6 %)" }, { valor: "1.1", texto: "1,10 (BT +10 % o media/alta tensión)" }], def: "1.05" },
       { key: "icuBornes", label: "Capacidad de interrupción en la barra del secundario", tipo: "numero", unidad: "kA", def: 25 },
       { key: "cables", label: "Cables desde los bornes del transformador (en orden)", tipo: "tabla", columnas: [
         { key: "barra", label: "Barra al final del cable", tipo: "texto", ancho: 16 }, { key: "longitud", label: "L (m)", tipo: "numero", ancho: 8 },
         { key: "conductor", label: "Conductor", tipo: "select", opciones: opcionesConductor().filter((o) => !o.valor.startsWith("aereo")), ancho: 20 },
         { key: "paralelos", label: "Paral.", tipo: "numero", ancho: 7 }, { key: "canalizacion", label: "Canalización", tipo: "select", opciones: [{ valor: "PVC", texto: "PVC o aluminio" }, { valor: "acero", texto: "Acero" }], ancho: 12 },
-        { key: "icu", label: "Icu (kA)", tipo: "numero", ancho: 8 }
+        { key: "icu", label: "Icu (kA)", tipo: "numero", ancho: 7 }, { key: "r0", label: "R0 (Ω/km, opc.)", tipo: "numero", ancho: 7 }, { key: "x0", label: "X0 (Ω/km, opc.)", tipo: "numero", ancho: 7 }
       ], nueva: { conductor: "Cu:2", paralelos: 1, canalizacion: "PVC" }, def: [
         { barra: "Tablero general TG", longitud: 25, conductor: "Cu:350", paralelos: 1, canalizacion: "PVC", icu: 25 },
         { barra: "Tablero TD-1", longitud: 40, conductor: "Cu:2", paralelos: 1, canalizacion: "PVC", icu: 10 }
-      ] }
+      ] },
+      { key: "motores", label: "Grupos de motores que aportan al cortocircuito (opcional)", tipo: "tabla", columnas: [
+        { key: "barra", label: "Barra (nombre exacto)", tipo: "texto", ancho: 30 }, { key: "potencia", label: "Potencia total (kW)", tipo: "numero", ancho: 16 },
+        { key: "tipo", label: "Tipo", tipo: "select", opciones: [{ valor: "BT", texto: "Grupo de BT" }, { valor: "MT", texto: "Motor de MT" }], ancho: 18 },
+        { key: "ilr", label: "ILR / IrM", tipo: "numero", ancho: 12 }, { key: "fpEta", label: "η × cos φ", tipo: "numero", ancho: 12 }
+      ], nueva: { tipo: "BT", ilr: 5, fpEta: 0.8 }, def: [] },
+      { key: "generacion", label: "Generación con inversores que aporta al cortocircuito (opcional; por ejemplo, solar)", tipo: "tabla", columnas: [
+        { key: "barra", label: "Barra (nombre exacto)", tipo: "texto", ancho: 40 }, { key: "potencia", label: "Potencia (kVA)", tipo: "numero", ancho: 25 }, { key: "factor", label: "Aporte (× In)", tipo: "numero", ancho: 25 }
+      ], nueva: { factor: 1.2 }, def: [] }
     ]
   },
   coordinacion: {
@@ -145,17 +154,21 @@ export const MODULOS = {
       { key: "cti", label: "Margen de coordinación (CTI)", tipo: "numero", unidad: "s", def: 0.3 },
       { key: "tensionRef", label: "Tensión a la que están referidas las corrientes (la usa el arco eléctrico)", tipo: "numero", unidad: "kV", def: "" },
       { key: "iInrush", label: "Corriente de energización del transformador (opcional, ≈ 8–12 In)", tipo: "numero", unidad: "A", def: "" },
-      { key: "protecciones", label: "Protecciones (de aguas abajo hacia aguas arriba, referidas a la misma tensión)", tipo: "tabla", columnas: [
-        { key: "nombre", label: "Protección", tipo: "texto", ancho: 16 }, { key: "curva", label: "Curva", tipo: "select", opciones: op(N.CURVAS_IEC), ancho: 18 },
-        { key: "pickup", label: "I arranque (A)", tipo: "numero", ancho: 9 }, { key: "tms", label: "TMS / t (s)", tipo: "numero", ancho: 8 },
-        { key: "inst", label: "I inst. (A)", tipo: "numero", ancho: 9 }, { key: "tinst", label: "t inst. (s)", tipo: "numero", ancho: 8 }
-      ], nueva: { curva: "SI", tms: 0.1 }, def: [
-        { nombre: "Relé del alimentador", curva: "SI", pickup: 200, tms: 0.1, inst: 3000, tinst: 0.05 },
-        { nombre: "Relé de la subestación", curva: "SI", pickup: 400, tms: 0.25, inst: "", tinst: "" }
+      { key: "protecciones", label: "Protecciones (de aguas abajo hacia aguas arriba, referidas a la misma tensión; curva por puntos: «I:t; I:t» en A y s, curva de despeje total del fabricante)", tipo: "tabla", columnas: [
+        { key: "nombre", label: "Protección", tipo: "texto", ancho: 14 }, { key: "tipo", label: "Tipo", tipo: "select", opciones: lista(["Fase", "Tierra (51N)"]), ancho: 10 }, { key: "curva", label: "Curva", tipo: "select", opciones: op(N.CURVAS_IEC), ancho: 16 },
+        { key: "pickup", label: "I arranque (A)", tipo: "numero", ancho: 8 }, { key: "tms", label: "TMS / TD / t (s)", tipo: "numero", ancho: 7 },
+        { key: "inst", label: "I inst. (A)", tipo: "numero", ancho: 8 }, { key: "tinst", label: "t inst. (s)", tipo: "numero", ancho: 7 },
+        { key: "puntos", label: "Curva por puntos I:t", tipo: "texto", ancho: 20 }
+      ], nueva: { tipo: "Fase", curva: "SI", tms: 0.1 }, def: [
+        { nombre: "Fusible del ramal 40K", tipo: "Fase", curva: "PUNTOS", puntos: "80:300; 95:60; 125:12; 190:3; 320:0.8; 640:0.15; 1300:0.04; 2600:0.016" },
+        { nombre: "Relé del alimentador", tipo: "Fase", curva: "SI", pickup: 200, tms: 0.1, inst: 3000, tinst: 0.05 },
+        { nombre: "Relé de la subestación", tipo: "Fase", curva: "SI", pickup: 400, tms: 0.25, inst: "", tinst: "" },
+        { nombre: "51N del alimentador", tipo: "Tierra (51N)", curva: "IVI", pickup: 40, tms: 2, inst: "", tinst: "" },
+        { nombre: "51N de la subestación", tipo: "Tierra (51N)", curva: "IVI", pickup: 80, tms: 3, inst: "", tinst: "" }
       ] },
       { key: "fallas", label: "Corrientes de falla a verificar", tipo: "tabla", columnas: [
-        { key: "punto", label: "Punto de falla", tipo: "texto", ancho: 30 }, { key: "corriente", label: "I (A)", tipo: "numero", ancho: 12 }
-      ], nueva: {}, def: [{ punto: "Falla al final del alimentador", corriente: 1500 }, { punto: "Falla en la barra de la subestación", corriente: 2800 }] }
+        { key: "punto", label: "Punto de falla", tipo: "texto", ancho: 30 }, { key: "tipo", label: "Falla", tipo: "select", opciones: lista(["Trifásica", "A tierra"]), ancho: 12 }, { key: "corriente", label: "I (A)", tipo: "numero", ancho: 10 }, { key: "desde", label: "Protección más cercana (vacío = la primera)", tipo: "texto", ancho: 22 }
+      ], nueva: {}, def: [{ punto: "Falla en el ramal", tipo: "Trifásica", corriente: 800, desde: "Fusible del ramal 40K" }, { punto: "Falla al final del alimentador", tipo: "Trifásica", corriente: 1500, desde: "Relé del alimentador" }, { punto: "Falla en la salida del alimentador", tipo: "Trifásica", corriente: 2800, desde: "Relé del alimentador" }, { punto: "Falla a tierra en el ramal", tipo: "A tierra", corriente: 600, desde: "Fusible del ramal 40K" }] }
     ]
   },
   malla: {

@@ -1,13 +1,17 @@
 // Gráfico tiempo-corriente (TCC) en escala log-log para la coordinación de
 // protecciones. Devuelve un SVG en texto (sin estilos en línea: los colores
 // van como atributos, permitido por la política de seguridad del sitio).
-import { tiempoRele } from "./rt-calculos.js";
+import { tiempoRele, esTierra } from "./rt-calculos.js";
+import { puntosCurva } from "./rt-normas.js";
+
+// Corriente desde la que opera una protección (la del primer punto en una curva por puntos).
+const arranque = (r) => (r.curva === "PUNTOS" ? puntosCurva(r.puntos)[0]?.[0] || 0 : Number(r.pickup) || 0);
 
 const COLORES = ["#1f6fb2", "#d9820b", "#2e9e5b", "#b0413e", "#7a4fb5", "#0f8b8d"];
 const fmtI = (v) => (v >= 1000 ? `${v / 1000} k` : String(v));
 
 export function svgTCC({ reles = [], fallas = [], inrush = 0 }, { ancho = 720, alto = 460 } = {}) {
-  const pick = reles.map((r) => Number(r.pickup) || 0).filter((v) => v > 0);
+  const pick = reles.map(arranque).filter((v) => v > 0);
   const maxF = Math.max(...fallas.map((f) => f.I || 0), ...reles.map((r) => Number(r.inst) || 0), inrush || 0, 1);
   if (!pick.length) return "";
   const iMin = Math.pow(10, Math.floor(Math.log10(Math.min(...pick) * 0.8)));
@@ -48,23 +52,24 @@ export function svgTCC({ reles = [], fallas = [], inrush = 0 }, { ancho = 720, a
   });
   if (inrush > iMin && inrush < iMax) s += `<circle cx="${x(inrush)}" cy="${y(0.1)}" r="5" fill="#d64545"/><text x="${x(inrush) + 7}" y="${y(0.1) - 6}" fill="#d64545">Inrush</text>`;
   // Curvas; la leyenda va abajo a la izquierda (zona libre de un diagrama TCC).
-  const nLey = reles.filter((r) => Number(r.pickup)).length;
+  const nLey = reles.filter((r) => arranque(r)).length;
   if (nLey) s += `<rect x="${m.l + 6}" y="${m.t + H - 12 - nLey * 18}" width="200" height="${nLey * 18 + 6}" fill="#ffffff" fill-opacity="0.9" stroke="#ccc"/>`;
   let iLey = 0;
   reles.forEach((r, i) => {
-    const is = Number(r.pickup) || 0;
+    const is = arranque(r);
     if (!is) return;
+    const tierra = esTierra(r);
     const color = COLORES[i % COLORES.length];
     const pts = [];
-    const desde = Math.log10(is * 1.03), hasta = Math.log10(iMax);
+    const desde = Math.log10(is * (r.curva === "PUNTOS" ? 1 : 1.03)), hasta = Math.log10(iMax);
     for (let k = 0; k <= 160; k++) {
       const I = Math.pow(10, desde + ((hasta - desde) * k) / 160);
       const t = tiempoRele(r, I);
       if (Number.isFinite(t)) pts.push(`${x(I).toFixed(1)},${y(Math.max(tMin, Math.min(tMax, t))).toFixed(1)}`);
     }
-    if (pts.length) s += `<polyline points="${pts.join(" ")}" fill="none" stroke="${color}" stroke-width="2.2"/>`;
+    if (pts.length) s += `<polyline points="${pts.join(" ")}" fill="none" stroke="${color}" stroke-width="2.2"${tierra ? ' stroke-dasharray="7 4"' : ""}/>`;
     const yL = m.t + H - 12 - nLey * 18 + 12 + iLey++ * 18;
-    s += `<rect x="${m.l + 14}" y="${yL - 4}" width="12" height="4" fill="${color}"/><text x="${m.l + 32}" y="${yL + 1}" fill="#222">${String(r.nombre || `Protección ${i + 1}`).slice(0, 30)}</text>`;
+    s += `<rect x="${m.l + 14}" y="${yL - 4}" width="12" height="4" fill="${color}"/><text x="${m.l + 32}" y="${yL + 1}" fill="#222">${String(r.nombre || `Protección ${i + 1}`).slice(0, 30)}${tierra ? " (tierra)" : ""}</text>`;
   });
   return s + "</svg>";
 }

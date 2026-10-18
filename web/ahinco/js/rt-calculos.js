@@ -305,20 +305,48 @@ export function cortocircuito(e, proyecto = {}, ctx = {}) {
   const barras = [];
   // Secundario en delta con transformador zig-zag: Z0 = la del zig-zag (reactiva).
   const x0zz = num(e.x0Tierra, 0);
-  let z1 = suma(zq, zt), z0 = x0zz > 0 ? cplx(0, x0zz) : zt;
-  const registrar = (nombre, icu) => {
-    const ik3 = (c * Un) / (Math.sqrt(3) * mod(z1));
-    const kappa = 1.02 + 0.98 * Math.exp(-3 * (z1.r / Math.max(z1.x, 1e-9)));
-    const ik1 = (Math.sqrt(3) * c * Un) / mod(suma(esc(z1, 2), z0));
-    barras.push({ nombre, z1: { ...z1 }, ik3, ip: kappa * Math.SQRT2 * ik3, ik1, kappa, icu: num(icu, 0) });
-  };
-  registrar(e.nombreBornes || (Un > 1000 ? "Barra del secundario" : "Bornes BT del transformador"), e.icuBornes);
+  const z0pct = num(e.z0Trafo, NaN);
+  const zt0 = Number.isFinite(z0pct) && z0pct > 0 ? esc(zt, z0pct / uk) : zt; // Z0 del fabricante con la misma relación R/X
+  let z1 = suma(zq, zt), z0 = x0zz > 0 ? cplx(0, x0zz) : zt0;
+  // Aportes por barra: grupos de motores (impedancia en paralelo, IEC 60909-0 §3.8) y
+  // generación con inversores (fuente de corriente k × In, IEC 60909-0 §3.9).
+  const clave = (t) => String(t || "").trim().toLowerCase();
+  const motores = filas(e.motores).map((m) => {
+    const P = num(m.potencia, 0) * 1000, mt = m.tipo === "MT", rel = num(m.ilr, mt ? 6 : 5), fe = num(m.fpEta, 0.8);
+    const Sr = P / fe, ZM = (1 / rel) * (Un * Un) / Sr, rx = mt ? 0.15 : 0.42, XM = ZM / Math.sqrt(1 + rx * rx);
+    return { barra: clave(m.barra), nombre: m.barra || "", P, Sr, ZM, z: cplx(rx * XM, XM), Ir: Sr / (Math.sqrt(3) * Un) };
+  }).filter((m) => m.P > 0);
+  const gens = filas(e.generacion).map((g) => ({ barra: clave(g.barra), nombre: g.barra || "", S: num(g.potencia, 0) * 1000, k: num(g.factor, 1.2) })).filter((g) => g.S > 0).map((g) => ({ ...g, I: (g.k * g.S) / (Math.sqrt(3) * Un) }));
+  const iGen = gens.reduce((s, g) => s + g.I, 0);
+  const par = (a, b) => { const den = suma(a, b), num2 = cplx(a.r * b.r - a.x * b.x, a.r * b.x + a.x * b.r); const m2 = den.r * den.r + den.x * den.x; return cplx((num2.r * den.r + num2.x * den.x) / m2, (num2.x * den.r - num2.r * den.x) / m2); };
+  // Equivalente de Thévenin de secuencia positiva visto desde cada barra (radial).
+  // Barras en cadena radial: impedancia serie desde la barra anterior (la primera, la de la
+  // red más el transformador) y Z0 acumulada.
+  const nodos = [{ nombre: e.nombreBornes || (Un > 1000 ? "Barra del secundario" : "Bornes BT del transformador"), icu: e.icuBornes, zs: z1, z1red: z1, z0: { ...z0 } }];
   filas(e.cables).forEach((cb) => {
     const zc = impedanciaConductor(cb.conductor, cb.canalizacion);
     const L = num(cb.longitud) / 1000, n = Math.max(1, num(cb.paralelos, 1));
     const z = cplx((zc.R * L) / n, (zc.X * L) / n);
-    z1 = suma(z1, z); z0 = suma(z0, esc(z, 4));
-    registrar(cb.barra || "Barra", cb.icu);
+    const r0 = num(cb.r0, NaN), x0 = num(cb.x0, NaN);
+    const zc0 = Number.isFinite(r0) && Number.isFinite(x0) ? cplx((r0 * L) / n, (x0 * L) / n) : esc(z, 4); // Z0 del fabricante o ≈ 4 Z1
+    z1 = suma(z1, z); z0 = suma(z0, zc0);
+    nodos.push({ nombre: cb.barra || "Barra", icu: cb.icu, zs: z, z1red: { ...z1 }, z0: { ...z0 } });
+  });
+  // Motores de cada barra en paralelo (null = sin motores).
+  const zMot = nodos.map((nd) => motores.filter((m) => m.barra === clave(nd.nombre)).reduce((z, m) => (z ? par(z, m.z) : m.z), null));
+  const pp = (x, y) => (x && y ? par(x, y) : x || y);
+  // Thévenin hacia la fuente (izquierda) y hacia los motores de aguas abajo (derecha).
+  const izq = [], der = new Array(nodos.length).fill(null);
+  nodos.forEach((nd, k) => { izq[k] = k === 0 ? nd.zs : suma(nd.zs, pp(izq[k - 1], zMot[k - 1])); });
+  for (let k = nodos.length - 2; k >= 0; k--) { const aguas = pp(zMot[k + 1], der[k + 1]); der[k] = aguas ? suma(nodos[k + 1].zs, aguas) : null; }
+  nodos.forEach((nd, k) => {
+    const zth = pp(pp(izq[k], zMot[k]), der[k]);
+    const ik3red = (c * Un) / (Math.sqrt(3) * mod(nd.z1red));
+    const ik3m = (c * Un) / (Math.sqrt(3) * mod(zth)); // red + motores
+    const ik3 = ik3m + iGen; // los inversores se suman en forma aritmética (conservador)
+    const kappa = 1.02 + 0.98 * Math.exp(-3 * (zth.r / Math.max(zth.x, 1e-9)));
+    const ik1 = (Math.sqrt(3) * c * Un) / mod(suma(esc(zth, 2), nd.z0)) + iGen;
+    barras.push({ nombre: nd.nombre, z1: { ...zth }, ik3, ik3red, aporte: ik3 - ik3red, ip: kappa * Math.SQRT2 * ik3m + Math.SQRT2 * iGen, ik1, kappa, icu: num(nd.icu, 0) });
   });
   const ikMT = skq / (Math.sqrt(3) * UnMT);
   const verificaciones = barras.filter((b) => b.icu > 0).map((b) => ({ criterio: `${b.nombre}: capacidad de interrupción`, norma: "RETIE / NTC 2050 110-9; IEC 60947-2", valor: `${fmt(b.icu, 1)} kA`, limite: `≥ ${fmt(b.ik3 / 1000, 2)} kA`, cumple: b.icu * 1000 >= b.ik3 }));
@@ -334,13 +362,15 @@ export function cortocircuito(e, proyecto = {}, ctx = {}) {
         ["Red equivalente", fmt(zq.r * 1000, 3), fmt(zq.x * 1000, 3), fmt(mod(zq) * 1000, 3)],
         [`Transformador (KT = ${fmt(KT, 3)})`, fmt(zt.r * 1000, 3), fmt(zt.x * 1000, 3), fmt(mod(zt) * 1000, 3)]
       ] },
-      { titulo: "Corrientes de cortocircuito por barra", encabezados: ["Barra", "R (mΩ)", "X (mΩ)", "Ik\" 3F (kA)", "κ", "ip (kA)", "Ik\" 1F (kA)", "Icu (kA)"], filas: barras.map((b) => [b.nombre, fmt(b.z1.r * 1000, 3), fmt(b.z1.x * 1000, 3), fmt(b.ik3 / 1000, 2), fmt(b.kappa, 2), fmt(b.ip / 1000, 2), fmt(b.ik1 / 1000, 2), b.icu ? fmt(b.icu, 1) : "—"]) }
+      { titulo: "Corrientes de cortocircuito por barra", encabezados: ["Barra", "R (mΩ)", "X (mΩ)", "Ik\" 3F (kA)", "Aporte motores y generación (kA)", "κ", "ip (kA)", "Ik\" 1F (kA)", "Icu (kA)"], filas: barras.map((b) => [b.nombre, fmt(b.z1.r * 1000, 3), fmt(b.z1.x * 1000, 3), fmt(b.ik3 / 1000, 2), b.aporte > 0.5 ? fmt(b.aporte / 1000, 2) : "—", fmt(b.kappa, 2), fmt(b.ip / 1000, 2), fmt(b.ik1 / 1000, 2), b.icu ? fmt(b.icu, 1) : "—"]) },
+      ...(motores.length || gens.length ? [{ titulo: "Aportes al cortocircuito (IEC 60909-0)", encabezados: ["Fuente", "Barra", "Potencia", "Impedancia o corriente"], filas: [...motores.map((m) => ["Grupo de motores", m.nombre, `${fmt(m.P / 1000, 1)} kW (SrM = ${fmt(m.Sr / 1000, 1)} kVA)`, `ZM = ${fmt(m.ZM * 1000, 2)} mΩ (IrM = ${fmt(m.Ir, 0)} A)`]), ...gens.map((g) => ["Generación con inversores", g.nombre, `${fmt(g.S / 1000, 1)} kVA`, `${fmt(g.k, 2)} × In = ${fmt(g.I, 0)} A`])] }] : [])
     ],
     pasos: [
       { titulo: "Red equivalente referida al secundario", formula: "ZQ = c × Un² / S\"kQ; XQ = ZQ / √(1 + (R/X)²)", sustitucion: `1,1 × ${fmt(Un, 0)}² / ${fmt(skq / 1e6, 1)} MVA`, resultado: `ZQ = ${fmt(ZQ * 1000, 3)} mΩ` },
       { titulo: "Transformador", formula: "ZT = ukr × Un² / SrT; RT = PkrT × Un² / SrT²; KT = 0,95 × cmax / (1 + 0,6 xT)", sustitucion: `ukr = ${fmt(uk, 1)} %; PkrT = ${fmt(pk / 1000, 2)} kW; SrT = ${fmt(sn / 1000, 1)} kVA`, resultado: `ZT = ${fmt(ZT * 1000, 3)} mΩ; KT = ${fmt(KT, 3)}` },
       { titulo: "Corriente trifásica", formula: "Ik\" = c × Un / (√3 × |Z1|)", sustitucion: `c = ${fmt(c, 2)} (IEC 60909-0 Tabla 1)`, resultado: "Por barra" },
-      { titulo: "Corriente monofásica a tierra", formula: "Ik1\" = √3 × c × Un / |2 Z1 + Z0|", sustitucion: x0zz > 0 ? `Z0 = X0 del transformador zig-zag = ${fmt(x0zz, 2)} Ω (secundario en delta); Z0 de cables ≈ 4 Z1` : "Z0 del transformador Dyn o YNyn con terciario en delta ≈ Z1; Z0 de cables ≈ 4 Z1 (aproximación IEC 60909-2)", resultado: "Por barra" },
+      ...(motores.length || gens.length ? [{ titulo: "Aporte de motores y generación", formula: "ZM = (IrM / ILR) × Un² / SrM con RM/XM = 0,42 (grupos de BT) o 0,15 (MT), en paralelo con la red en su barra; inversores: fuente de corriente k × In sumada a Ik\" e ip", sustitucion: `${motores.length} grupo(s) de motores; ${gens.length} generador(es) con inversores (${fmt(iGen, 0)} A)`, resultado: "Por barra" }] : []),
+      { titulo: "Corriente monofásica a tierra", formula: "Ik1\" = √3 × c × Un / |2 Z1 + Z0|", sustitucion: `${x0zz > 0 ? `Z0 = X0 del transformador zig-zag = ${fmt(x0zz, 2)} Ω (secundario en delta)` : Number.isFinite(z0pct) && z0pct > 0 ? `Z0 del transformador = ${fmt(z0pct, 2)} % (fabricante)` : "Z0 del transformador Dyn o YNyn con terciario en delta ≈ Z1"}; Z0 de cables: R0 y X0 del fabricante o ≈ 4 Z1 (IEC 60909-2)`, resultado: "Por barra" },
       { titulo: "Corriente pico", formula: "ip = κ × √2 × Ik\"; κ = 1,02 + 0,98 e^(−3R/X)", sustitucion: "IEC 60909-0 ec. 55", resultado: "Por barra" }
     ],
     verificaciones,
@@ -350,40 +380,66 @@ export function cortocircuito(e, proyecto = {}, ctx = {}) {
 
 // ================================================================ 7. COORDINACIÓN DE PROTECCIONES (IEC 60255)
 export function tiempoRele(p, I) {
+  if (p.curva === "PUNTOS") {
+    // Curva digitada: interpolación log-log; por debajo del primer punto no opera.
+    const pts = N.puntosCurva(p.puntos);
+    if (pts.length < 2 || !(I >= pts[0][0])) return Infinity;
+    if (I >= pts[pts.length - 1][0]) return pts[pts.length - 1][1];
+    const k = pts.findIndex(([i]) => i > I);
+    const [[i1, t1], [i2, t2]] = [pts[k - 1], pts[k]];
+    return Math.pow(10, Math.log10(t1) + ((Math.log10(I) - Math.log10(i1)) * (Math.log10(t2) - Math.log10(t1))) / (Math.log10(i2) - Math.log10(i1)));
+  }
   const is = num(p.pickup), tms = num(p.tms, 0.1), curva = N.CURVAS_IEC[p.curva] || N.CURVAS_IEC.SI;
   if (!(I > is * 1.0001) || is <= 0) return Infinity;
-  let t = p.curva === "DT" ? tms : (tms * curva.k) / (Math.pow(I / is, curva.a) - 1);
+  let t = p.curva === "DT" ? tms : tms * (curva.k / (Math.pow(I / is, curva.a) - 1) + curva.b);
   const iinst = num(p.inst, 0);
   if (iinst > 0 && I >= iinst) t = Math.min(t, num(p.tinst, 0.05));
   return t;
 }
+// Pares de protecciones sucesivas del mismo tipo (fase con fase, tierra con tierra), en el
+// orden de la tabla (de aguas abajo hacia aguas arriba).
+export const esTierra = (r) => String(r.tipo || "").startsWith("Tierra");
+export function paresCoordinacion(rels) {
+  const pares = [];
+  for (const tierra of [false, true]) {
+    const idx = rels.map((r, i) => (esTierra(r) === tierra ? i : -1)).filter((i) => i >= 0);
+    for (let k = 0; k + 1 < idx.length; k++) pares.push({ a: idx[k], b: idx[k + 1], tierra });
+  }
+  return pares;
+}
 export function coordinacion(e) {
   const rels = filas(e.protecciones);
-  const fallas = filas(e.fallas).map((f) => ({ punto: f.punto || "", I: num(f.corriente) }));
+  // «desde»: protección más cercana a la falla; solo se verifican los pares desde ella hacia aguas arriba.
+  const pos = (nombre) => rels.findIndex((r) => String(r.nombre || "").trim().toLowerCase() === String(nombre || "").trim().toLowerCase());
+  const fallas = filas(e.fallas).map((f) => ({ punto: f.punto || "", I: num(f.corriente), tierra: String(f.tipo || "").startsWith("A tierra"), desde: Math.max(0, pos(f.desde)) }));
   const cti = num(e.cti, 0.3);
   const verificaciones = [];
-  const tabla = fallas.map((f) => [f.punto, fmt(f.I, 0), ...rels.map((r) => { const t = tiempoRele(r, f.I); return Number.isFinite(t) ? fmt(t, 3) : "No opera"; })]);
+  // Una protección de tierra solo ve fallas a tierra; las de fase ven todas.
+  const ve = (r, f) => !esTierra(r) || f.tierra;
+  const tabla = fallas.map((f) => [f.punto, f.tierra ? "A tierra" : "Trifásica", fmt(f.I, 0), ...rels.map((r) => { if (!ve(r, f)) return "—"; const t = tiempoRele(r, f.I); return Number.isFinite(t) ? fmt(t, 3) : "No opera"; })]);
+  const pares = paresCoordinacion(rels);
   fallas.forEach((f) => {
-    for (let i = 0; i + 1 < rels.length; i++) {
-      const t1 = tiempoRele(rels[i], f.I), t2 = tiempoRele(rels[i + 1], f.I);
-      if (Number.isFinite(t1) && Number.isFinite(t2)) verificaciones.push({ criterio: `${f.punto}: ${rels[i + 1].nombre} respalda a ${rels[i].nombre}`, norma: "IEEE 242 / IEC 60255 — margen de coordinación", valor: `${fmt(t2 - t1, 3)} s`, limite: `≥ ${fmt(cti, 2)} s`, cumple: t2 - t1 >= cti - 1e-9 });
-    }
+    pares.forEach(({ a, b, tierra }) => {
+      if ((tierra && !f.tierra) || a < f.desde) return;
+      const t1 = tiempoRele(rels[a], f.I), t2 = tiempoRele(rels[b], f.I);
+      if (Number.isFinite(t1) && Number.isFinite(t2)) verificaciones.push({ criterio: `${f.punto}: ${rels[b].nombre} respalda a ${rels[a].nombre}${tierra ? " (tierra)" : ""}`, norma: "IEEE 242 / IEC 60255 — margen de coordinación", valor: `${fmt(t2 - t1, 3)} s`, limite: `≥ ${fmt(cti, 2)} s`, cumple: t2 - t1 >= cti - 1e-9 });
+    });
   });
   const inrush = num(e.iInrush, 0);
   if (inrush > 0 && rels.length) {
-    const r = rels[rels.length - 1], t = tiempoRele(r, inrush);
+    const r = rels.filter((x) => !esTierra(x)).at(-1) || rels[rels.length - 1], t = tiempoRele(r, inrush);
     verificaciones.push({ criterio: `${r.nombre}: no dispara con la corriente de energización`, norma: "IEEE C37.91 (punto de inrush a 0,1 s)", valor: Number.isFinite(t) ? `${fmt(t, 3)} s` : "No opera", limite: "> 0,10 s", cumple: !Number.isFinite(t) || t > 0.1 });
   }
   return {
     resumen: [{ etiqueta: "Pares coordinados", valor: `${verificaciones.filter((v) => v.cumple).length} de ${verificaciones.length}`, unidad: "" }],
     salidas: { reles: rels.map((r) => ({ ...r })), tensionRef: num(e.tensionRef, NaN) },
     tablas: [
-      { titulo: "Ajustes de las protecciones", encabezados: ["Protección", "Curva", "I arranque (A)", "TMS / t (s)", "I instantánea (A)", "t inst. (s)"], filas: rels.map((r) => [r.nombre || "", (N.CURVAS_IEC[r.curva] || N.CURVAS_IEC.SI).nombre, fmt(num(r.pickup), 0), fmt(num(r.tms), 3), num(r.inst) ? fmt(num(r.inst), 0) : "—", num(r.inst) ? fmt(num(r.tinst, 0.05), 2) : "—"]) },
-      { titulo: "Tiempos de operación (s) por corriente de falla", encabezados: ["Punto de falla", "I (A)", ...rels.map((r) => r.nombre || "")], filas: tabla }
+      { titulo: "Ajustes de las protecciones", encabezados: ["Protección", "Tipo", "Curva", "I arranque (A)", "TMS / TD / t (s)", "I instantánea (A)", "t inst. (s)"], filas: rels.map((r) => [r.nombre || "", esTierra(r) ? "Tierra (51N)" : "Fase", r.curva === "PUNTOS" ? `Por puntos: ${N.puntosCurva(r.puntos).map(([i, t]) => `${fmt(i, 0)} A–${fmt(t, t >= 10 ? 0 : t >= 1 ? 1 : 3)} s`).join("; ")}` : (N.CURVAS_IEC[r.curva] || N.CURVAS_IEC.SI).nombre, r.curva === "PUNTOS" ? "—" : fmt(num(r.pickup), 0), r.curva === "PUNTOS" ? "—" : fmt(num(r.tms), 3), num(r.inst) ? fmt(num(r.inst), 0) : "—", num(r.inst) ? fmt(num(r.tinst, 0.05), 2) : "—"]) },
+      { titulo: "Tiempos de operación (s) por corriente de falla", encabezados: ["Punto de falla", "Falla", "I (A)", ...rels.map((r) => r.nombre || "")], filas: tabla }
     ],
     pasos: [
-      { titulo: "Curvas de tiempo inverso", formula: "t = TMS × k / ((I / Is)^α − 1)", sustitucion: "IEC 60255-151: SI k = 0,14 α = 0,02; VI k = 13,5 α = 1; EI k = 80 α = 2; LTI k = 120 α = 1", resultado: "Por protección y corriente" },
-      { titulo: "Margen de coordinación", formula: "t aguas arriba − t aguas abajo ≥ CTI", sustitucion: `CTI = ${fmt(cti, 2)} s`, resultado: "Por par de protecciones y punto de falla" }
+      { titulo: "Curvas de tiempo inverso", formula: "t = TMS × (k / ((I / Is)^α − 1) + B); curva por puntos: interpolación log-log entre los puntos del fabricante", sustitucion: "IEC 60255-151 (B = 0): SI k = 0,14 α = 0,02; VI k = 13,5 α = 1; EI k = 80 α = 2; LTI k = 120 α = 1. IEEE C37.112: MI k = 0,0515 α = 0,02 B = 0,114; VI k = 19,61 α = 2 B = 0,491; EI k = 28,2 α = 2 B = 0,1217", resultado: "Por protección y corriente" },
+      { titulo: "Margen de coordinación", formula: "t aguas arriba − t aguas abajo ≥ CTI", sustitucion: `CTI = ${fmt(cti, 2)} s; pares sucesivos del mismo tipo (fase con fase en todas las fallas; tierra con tierra en las fallas a tierra)`, resultado: "Por par de protecciones y punto de falla" }
     ],
     verificaciones,
     grafico: { tipo: "tcc", reles: rels, fallas, inrush },
@@ -1201,7 +1257,8 @@ export function tiempoArcoDesdeRele(rel, iarcKA, vPunto, vRef, aperturaMs) {
   const iRef = (iarcKA * 1000 * vPunto) / (Number.isFinite(vRef) && vRef > 0 ? vRef : vPunto);
   const t = tiempoRele(rel, iRef);
   if (!Number.isFinite(t)) return { ms: 2000, iRef, nota: "la protección no opera con esa corriente: se limita a 2 s (S)" };
-  const ms = t * 1000 + aperturaMs;
+  // Una curva por puntos (fusible o interruptor) ya es de despeje total: no se suma apertura.
+  const ms = t * 1000 + (rel.curva === "PUNTOS" ? 0 : aperturaMs);
   return ms > 2000 ? { ms: 2000, iRef, nota: "tiempo mayor que 2 s: se limita a 2 s (S)" } : { ms, iRef, nota: "" };
 }
 
@@ -1225,7 +1282,7 @@ export function arcoElectrico(e, proyecto = {}, ctx = {}) {
       const a = tiempoArcoDesdeRele(rel, pre.full.iarc, ent.voc, vRef, apertura), b = tiempoArcoDesdeRele(rel, pre.min.iarc, ent.voc, vRef, apertura);
       tFull = a.ms; if (!Number.isFinite(tMin)) tMin = b.ms;
       ent.origenT = `curva de «${rel.nombre}»`;
-      notasT.push(`${p.punto || eq.nombre}: tiempos de «${rel.nombre}» con ${fmt(a.iRef, 0)} A y ${fmt(b.iRef, 0)} A referidos a ${fmt(Number.isFinite(vRef) ? vRef : ent.voc, 2)} kV, más ${fmt(apertura, 0)} ms de apertura${[a.nota, b.nota].filter(Boolean).length ? ` — ${[...new Set([a.nota, b.nota].filter(Boolean))].join("; ")}` : ""}.`);
+      notasT.push(`${p.punto || eq.nombre}: tiempos de «${rel.nombre}» con ${fmt(a.iRef, 0)} A y ${fmt(b.iRef, 0)} A referidos a ${fmt(Number.isFinite(vRef) ? vRef : ent.voc, 2)} kV, ${rel.curva === "PUNTOS" ? "curva de despeje total (sin apertura adicional)" : `más ${fmt(apertura, 0)} ms de apertura`}${[a.nota, b.nota].filter(Boolean).length ? ` — ${[...new Set([a.nota, b.nota].filter(Boolean))].join("; ")}` : ""}.`);
       if (!Number.isFinite(vRef)) notasT.push("(S) La coordinación no indica a qué tensión están referidas sus corrientes: se supuso la tensión de cada punto.");
     } else if (!Number.isFinite(tFull)) {
       tFull = 100; ent.origenT = "supuesto";

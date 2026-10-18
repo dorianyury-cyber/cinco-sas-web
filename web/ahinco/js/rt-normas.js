@@ -131,13 +131,23 @@ export const FUSIBLES_K = [1, 2, 3, 5, 6, 8, 10, 12, 15, 20, 25, 30, 40, 50, 65,
 
 // ---------------------------------------------------------------- protecciones (IEC 60255-151)
 
+// Curvas de tiempo inverso: t = TMS × (k / ((I/Is)^α − 1) + B). IEC 60255-151 (B = 0) e
+// IEEE C37.112-2018 (TD en lugar de TMS). "PUNTOS" = curva digitada (fusibles, interruptores).
 export const CURVAS_IEC = {
-  SI: { nombre: "IEC normalmente inversa", k: 0.14, a: 0.02 },
-  VI: { nombre: "IEC muy inversa", k: 13.5, a: 1 },
-  EI: { nombre: "IEC extremadamente inversa", k: 80, a: 2 },
-  LTI: { nombre: "IEC inversa de tiempo largo", k: 120, a: 1 },
-  DT: { nombre: "Tiempo definido", k: 0, a: 0 }
+  SI: { nombre: "IEC normalmente inversa", k: 0.14, a: 0.02, b: 0 },
+  VI: { nombre: "IEC muy inversa", k: 13.5, a: 1, b: 0 },
+  EI: { nombre: "IEC extremadamente inversa", k: 80, a: 2, b: 0 },
+  LTI: { nombre: "IEC inversa de tiempo largo", k: 120, a: 1, b: 0 },
+  MI: { nombre: "IEEE moderadamente inversa (U1)", k: 0.0515, a: 0.02, b: 0.114 },
+  IVI: { nombre: "IEEE muy inversa (U2)", k: 19.61, a: 2, b: 0.491 },
+  IEI: { nombre: "IEEE extremadamente inversa (U3)", k: 28.2, a: 2, b: 0.1217 },
+  DT: { nombre: "Tiempo definido", k: 0, a: 0, b: 0 },
+  PUNTOS: { nombre: "Curva por puntos (fusible o interruptor del fabricante)", k: 0, a: 0, b: 0 }
 };
+// Puntos "I:t; I:t" (A:s) de una curva digitada, ordenados por corriente.
+export function puntosCurva(texto) {
+  return String(texto || "").split(/[;\n]+/).map((p) => p.split(/[:=]/).map((x) => parseFloat(String(x).trim().replace(",", ".")))).filter(([i, t]) => i > 0 && t > 0).sort((p, q) => p[0] - q[0]);
+}
 
 // ---------------------------------------------------------------- puesta a tierra (IEEE 80-2013)
 

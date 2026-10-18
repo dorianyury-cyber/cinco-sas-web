@@ -40,17 +40,18 @@ Datos en Firestore: `rtProyectos/{id}` y `rtProyectos/{id}/calculos/{clave}` (`c
 - Factor de división (Endrenyi): ejemplo de la IEEE 80 §15.9 — Zeq de la línea 4,22 + j1,04 Ω (igual), Sf 0,36 frente a 0,37 publicado (la norma redondea el neutro del alimentador a 1,88 + j0,89 Ω; la fórmula da 1,88 + j0,81 Ω).
 - Cables de MT: los valores de `AMPACIDAD_MT` se extrajeron de las verificaciones de CalcWare (NEC 2017) y se compararon celda por celda (0 diferencias); dos erratas de la NEC impresa (Tabla 85 Det. 7 350 kcmil 105 °C: 580 → 530; Tabla 84 Det. 6 6 AWG 35 kV 105 °C: 95 → 87) se reemplazaron por el valor coherente con el cálculo Neher-McGrath.
 - Arco con tiempos de la coordinación: `tiempoArcoDesdeRele()` coincide con el cálculo manual de la curva IEC (2,33 kA en SI 200 A TMS 0,1 → 328 ms con 50 ms de apertura) y con el Excel.
+- Coordinación: curvas IEEE C37.112 (VI 0,6891 s con M = 10, TD = 1; EI 1,2967 s con M = 5) y curva por puntos (interpolación log-log exacta en el punto medio geométrico). Cortocircuito: aporte de motores = c × (ILR/IrM) × IrM en bornes; motores aguas abajo aportan a las barras de aguas arriba; Excel = pantalla.
 - **Pendiente:** validación independiente de cortocircuito y coordinación contra un estudio en ETAP o DIgSILENT, y revisión de una memoria completa por un organismo de inspección acreditado.
 
 ## 3. Limitaciones conocidas por cálculo
 
 | Cálculo | Limitación | Dónde se resolvería |
 |---|---|---|
-| Cortocircuito | Radial, una fuente; sin aporte de motores ni generación distribuida. Z0 aproximada (transformador ≈ Z1, cables ≈ 4 Z1, zig-zag con su X0). Sin Ib ni Ik permanente. | `cortocircuito()` en `rt-calculos.js`; columnas R0/X0 en `HOJAS.cortocircuito` |
+| Cortocircuito | Radial con un solo transformador. Motores en paralelo por barra (en el Excel, un grupo por barra con los datos del primero); inversores sumados en forma aritmética. Z0 del fabricante opcional. Sin Ib ni Ik permanente. | `cortocircuito()` en `rt-calculos.js` (nodos con Thévenin hacia la fuente y hacia aguas abajo); `HOJAS.cortocircuito` con funciones IM de Excel |
 | Malla (IEEE 80) | Dos capas por resistividad equivalente ρa(av2), no por cálculo numérico de dos capas (Em puede quedar baja con K < 0; se muestra la referencia con ρ1). Malla rectangular. Sf por Endrenyi sin acoples mutuos. Transferidas solo GPR frente al contacto tolerable. | `malla()`, `ajusteDosCapas()`, `factorDivision()` en `rt-calculos.js` |
 | Arco eléctrico | Solo 0,208 a 15 kV trifásico AC (fuera: «Fuera del modelo»); tiempos de la coordinación solo con curvas IEC (sin fusibles ni ANSI); sin arco DC. | `arco1584()` y `arcoElectrico()`; tablas `IEEE1584` en `rt-normas.js` |
 | Cables de MT | Tablas 310.60(C)(77) a (86) (`AMPACIDAD_MT`, `INSTALACIONES_MT` en `rt-normas.js`; `ampacidadTablaMT()`) solo para suelo de 90 °C·cm/W y las disposiciones de la Figura 310.60; sin IEC 60287; pantalla no verificada. | `cableMT()`; agregar Neher-McGrath (NEC Anexo B) |
-| Coordinación | Solo sobrecorriente de fase IEC; sin ANSI, fusibles, 51N, 87, 21; corrientes referidas a una tensión por el usuario. | `coordinacion()`, `CURVAS_IEC` en `rt-normas.js`, gráfico en `rt-grafico.js` |
+| Coordinación | IEC, IEEE C37.112, tiempo definido y curvas por puntos (fusibles); fase y 51N con la protección más cercana a cada falla. Sin bandas de tolerancia, 87, 21 ni reconectadores. | `coordinacion()`, `paresCoordinacion()`, `CURVAS_IEC` y `puntosCurva()` en `rt-normas.js`; `curvaPuntosExcel()` en `rt-excel.js` |
 | Apantallamiento | Un captador por elemento, en el plano; sin protección combinada ni planta. | `apantallamiento()` |
 | Riesgo por rayos | Solo R1 (RA, RB, RU, RV); una zona y una línea. | `rayos()` |
 | Aislamiento | Método simplificado sin transitorios (EMTP/ATP). | — (fuera del alcance de una herramienta de cálculo manual) |
@@ -71,7 +72,7 @@ Datos en Firestore: `rtProyectos/{id}` y `rtProyectos/{id}/calculos/{clave}` (`c
 3. **Malla en dos capas por método numérico** (sin resistividad equivalente) y potenciales fuera del cerramiento.
 4. **Cables de MT — IEC 60287 / Neher-McGrath** para bancos de ductos fuera de las condiciones de las tablas (resistividad térmica, disposición, más circuitos).
 5. **Historial de versiones**: guardar una copia de entradas y literales al generar cada memoria (`rtProyectos/{id}/versiones`), con comparación entre revisiones.
-6. **Cortocircuito ampliado**: aporte de motores y generación, impedancias de secuencia cero del fabricante.
-7. **Coordinación ampliada**: curvas ANSI, fusibles, 51N; apantallamiento con varios captadores.
+6. **Cortocircuito**: redes malladas o con varias fuentes; corriente de corte Ib e Ik permanente.
+7. **Coordinación**: bandas de tolerancia de fusibles e interruptores de BT, reconectadores; apantallamiento con varios captadores.
 8. **Fotovoltaica avanzada**: HSP mensual (IDEAM / NASA POWER), simulación horaria con la curva de carga del usuario, varias orientaciones, sombras, bifaciales y flujo de caja con los beneficios de la Ley 1715.
 9. **Otros**: riesgo R2 a R4, armónicos y factor K, cálculo económico de conductores (literal j), campos electromagnéticos (literal g).

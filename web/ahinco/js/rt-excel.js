@@ -7,7 +7,7 @@
 import * as N from "./rt-normas.js";
 import { MODULOS } from "./rt-modulos.js";
 import { LITERALES, FUENTE_LITERALES } from "./rt-literales.js";
-import { SISTEMAS_BT, impedanciaConductor, ajusteDosCapas, ampacidadTablaMT } from "./rt-calculos.js";
+import { SISTEMAS_BT, impedanciaConductor, ajusteDosCapas, ampacidadTablaMT, esTierra, paresCoordinacion } from "./rt-calculos.js";
 import { hallazgos, supuestos, esVerificacion } from "./rt-hallazgos.js";
 
 const NAVY = "FF1F2732", AMARILLO = "FFFFF4CC", GRIS = "FFF2F3F5";
@@ -71,10 +71,10 @@ function hojaTablas(wb) {
   T.tub = `Tablas!$A$${iniTu}:$D$${r - 1}`;
   r++;
   titulo("Curvas IEC 60255-151");
-  enc(["Curva", "k", "α"]);
+  enc(["Curva", "k", "α", "B"]);
   const iniC = r;
-  Object.entries(N.CURVAS_IEC).forEach(([k, v]) => { ws.addRow([k, v.k, v.a]); r++; });
-  T.curvas = `Tablas!$A${iniC}:$C${r - 1}`;
+  Object.entries(N.CURVAS_IEC).forEach(([k, v]) => { ws.addRow([k, v.k, v.a, v.b]); r++; });
+  T.curvas = `Tablas!$A${iniC}:$D${r - 1}`;
   r++;
   titulo("Conductor de puesta a tierra de equipos (NTC 2050 Tabla 250-122)");
   enc(["Protección hasta (A)", "Calibre Cu"]);
@@ -147,7 +147,7 @@ const CONSTANTES = {
   trafoPotencia: [["c = 1,1", "", "Factor de tensión para el cortocircuito máximo en media y alta tensión", "IEC 60909-0 Tabla 1"], ["1,2", "", "Un TC soporta en forma permanente el 120 % de su corriente nominal (corriente térmica extendida)", "IEC 61869-2"], ["ALF", "", "Factor límite de precisión: un TC 5P20 mide bien hasta 20 veces su corriente nominal", "IEC 61869-2"]],
   cortocircuito: [["c", "", "Factor de tensión: 1,05 en BT (tolerancia +6 %) o 1,10 (BT +10 %, media y alta tensión)", "IEC 60909-0 Tabla 1"], ["1,1 (cmax)", "", "Factor de tensión máximo usado para la red equivalente y la corrección KT", "IEC 60909-0"], ["0,95 y 0,6", "", "Constantes de la corrección KT de la impedancia del transformador", "IEC 60909-0 ec. 12a"], ["1,02 / 0,98 / 3", "", "Constantes del factor κ para la corriente pico", "IEC 60909-0 ec. 55"], ["4", "", "La impedancia de secuencia cero de un cable se aproxima a 4 veces la de secuencia positiva", "IEC 60909-2"]],
   cableMT: [["K = 143 / 94", "A·√s/mm²", "Constante adiabática para conductor de cobre / aluminio con aislamiento XLPE o EPR (90 °C → 250 °C)", "IEC 60949"], ["K = 115 / 76", "A·√s/mm²", "Constante adiabática para aislamiento PVC (cobre / aluminio)", "IEC 60949"], ["0,017241 / 0,028264", "Ω·mm²/m", "Resistividad del cobre / aluminio a 20 °C (para la resistencia a 90 °C)", "IEC 60228"]],
-  coordinacion: [["k y α", "", "Constantes de cada curva: SI 0,14 y 0,02; VI 13,5 y 1; EI 80 y 2; LTI 120 y 1", "IEC 60255-151"], ["CTI", "s", "Margen mínimo entre la protección principal y su respaldo (típico 0,2 a 0,4 s)", "IEEE 242"]],
+  coordinacion: [["k, α y B", "", "Constantes de t = TMS × (k / ((I/Is)^α − 1) + B). IEC (B = 0): SI 0,14 y 0,02; VI 13,5 y 1; EI 80 y 2; LTI 120 y 1. IEEE: MI 0,0515, 0,02 y 0,114; VI 19,61, 2 y 0,491; EI 28,2, 2 y 0,1217", "IEC 60255-151 / IEEE C37.112"], ["CTI", "s", "Margen mínimo entre la protección principal y su respaldo (típico 0,2 a 0,4 s)", "IEEE 242"]],
   malla: [["1000", "Ω", "Resistencia del cuerpo humano", "IEEE 80-2013 §7"], ["0,116 / 0,157", "", "Constante de la persona de 50 kg / 70 kg en las tensiones tolerables", "IEEE 80-2013 ec. 29 a 32"], ["1,5 y 6", "", "Factores de la resistencia de los pies en contacto y en paso", "IEEE 80-2013"], ["0,09", "m", "Constante del factor Cs de la capa superficial", "IEEE 80-2013 ec. 27"], ["60", "Hz", "Frecuencia del sistema (constante de tiempo Ta = X/(2π·60·R))", ""], ["0,644 y 0,148", "", "Constantes del factor de irregularidad Ki", "IEEE 80-2013 ec. 89"], ["(ρa máx + ρa mín) / 2", "Ω·m", "Resistividad uniforme equivalente de un suelo no uniforme (solo con el modelo de dos capas)", "IEEE 80 Anexo E, ec. E.2"], ["Zs/2 + √(Zs·Rt)", "Ω", "Impedancia de un cable de guarda o neutro con sus puestas a tierra, vista desde la subestación (solo con Sf calculado)", "Endrenyi; IEEE 80 §15.9"]],
   rayos: [["3H", "m", "El área colectiva se extiende 3 veces la altura de la estructura", "IEC 62305-2 Anexo A"], ["40 · LL", "m²", "Área colectiva de la línea de servicio", "IEC 62305-2 Anexo A"], ["10⁻⁶", "", "Conversión de m² a km² (NG está en descargas por km² al año)", ""], ["8760", "h", "Horas de un año", ""], ["10⁻⁵", "", "Riesgo tolerable de pérdida de vidas humanas (R1)", "IEC 62305-2 Tabla 7"]],
   apantallamiento: [["2,2", "", "Constante de la corriente crítica Ic = 2,2 × BIL / Zs", "IEEE 998"], ["8 · k", "", "Distancia de impacto S = 8 k Ic^0,65 (k = 1,2 mástiles, 1 cables de guarda)", "IEEE 998"]],
@@ -163,7 +163,7 @@ const CONSTANTES = {
 
 // Nombres legibles de los rangos de la hoja "Tablas" para las explicaciones.
 const NOMBRE_TABLA = { cond: "tabla de conductores (hoja Tablas)", temp: "factores de temperatura (hoja Tablas)", tempDesde: "rangos de temperatura (hoja Tablas)", agr: "factores de agrupamiento (hoja Tablas)", agrDesde: "rangos de agrupamiento (hoja Tablas)", prot: "corrientes normalizadas de protecciones (hoja Tablas)", fusK: "fusibles tipo K normalizados (hoja Tablas)", tub: "áreas de tuberías (hoja Tablas)", curvas: "curvas IEC (hoja Tablas)", tierraLim: "límites de protección (hoja Tablas)", tierraCal: "calibres de puesta a tierra (hoja Tablas)", a1: "Tabla 1 IEEE 1584", a1k: "claves de la Tabla 1 IEEE 1584", a2: "Tabla 2 IEEE 1584", a2k: "claves de la Tabla 2 IEEE 1584", aE: "Tablas 3 a 5 IEEE 1584", aEk: "claves de las Tablas 3 a 5 IEEE 1584", a7: "Tabla 7 IEEE 1584", a7k: "claves de la Tabla 7 IEEE 1584", nSerie: "n = 1 a 300", ampMT: "Tablas 310.60(C)(77) a (86)", ampMTk: "claves de las Tablas 310.60(C)(77) a (86)", ampMTcal: "calibres de las Tablas 310.60(C)(77) a (86)" };
-const FUNCIONES = [["NOT", "NO"], ["_xlfn.AGGREGATE", "AGREGAR"], ["ROUNDDOWN", "REDONDEAR.MENOS"], ["ROUNDUP", "REDONDEAR.MAS"], ["LEFT", "IZQUIERDA"], ["IFERROR", "SI.ERROR"], ["SUMPRODUCT", "SUMAPRODUCTO"], ["SUMIF", "SUMAR.SI"], ["COUNTIF", "CONTAR.SI"], ["VLOOKUP", "BUSCARV"], ["INDEX", "INDICE"], ["MATCH", "COINCIDIR"], ["ISNUMBER", "ESNUMERO"], ["ISTEXT", "ESTEXTO"], ["SEARCH", "HALLAR"], ["AVERAGE", "PROMEDIO"], ["COUNT", "CONTAR"], ["ROUND", "REDONDEAR"], ["SQRT", "√"], ["EXP", "e^"], ["LN", "ln"], ["LEN", "LARGO"], ["AND", "Y"], ["OR", "O"], ["IF", "SI"], ["MAX", "MÁX"], ["MIN", "MÍN"], ["SUM", "SUMA"]];
+const FUNCIONES = [["IMSUM", "IM.SUM"], ["IMPRODUCT", "IM.PRODUCT"], ["IMDIV", "IM.DIV"], ["IMABS", "IM.ABS"], ["IMREAL", "IM.REAL"], ["IMAGINARY", "IMAGINARIO"], ["IMSQRT", "IM.RAIZ2"], ["COMPLEX", "COMPLEJO"], ["NOT", "NO"], ["_xlfn.AGGREGATE", "AGREGAR"], ["ROUNDDOWN", "REDONDEAR.MENOS"], ["ROUNDUP", "REDONDEAR.MAS"], ["LEFT", "IZQUIERDA"], ["IFERROR", "SI.ERROR"], ["SUMPRODUCT", "SUMAPRODUCTO"], ["SUMIF", "SUMAR.SI"], ["COUNTIF", "CONTAR.SI"], ["VLOOKUP", "BUSCARV"], ["INDEX", "INDICE"], ["MATCH", "COINCIDIR"], ["ISNUMBER", "ESNUMERO"], ["ISTEXT", "ESTEXTO"], ["SEARCH", "HALLAR"], ["AVERAGE", "PROMEDIO"], ["COUNT", "CONTAR"], ["ROUND", "REDONDEAR"], ["SQRT", "√"], ["EXP", "e^"], ["LN", "ln"], ["LEN", "LARGO"], ["AND", "Y"], ["OR", "O"], ["IF", "SI"], ["MAX", "MÁX"], ["MIN", "MÍN"], ["SUM", "SUMA"]];
 
 // Traduce una fórmula de Excel a una explicación legible: las celdas se
 // reemplazan por el nombre de la variable y las funciones por su nombre en
@@ -434,6 +434,19 @@ class Hoja {
     ws.views = [{ state: "frozen", ySplit: 2, showGridLines: false }];
   }
 }
+// Curva por puntos (fusible o interruptor): tabla I-t de entrada y fórmula de interpolación
+// log-log. La fórmula devuelve el tiempo en s, o 1E9 si la corriente es menor que el primer punto.
+function curvaPuntosExcel(h, rel) {
+  const pts = N.puntosCurva(rel.puntos);
+  h.nota(`Curva por puntos de «${rel.nombre}» (despeje total del fabricante): entre dos puntos se interpola en escala logarítmica.`);
+  const tp = h.tabla([{ t: `I (A) — ${rel.nombre}`, v: (p) => p[0], entrada: true, fmt: "0" }, { t: "t (s)", v: (p) => p[1], entrada: true, fmt: "0.000" }], pts.length ? pts : [[0, 0]]);
+  h.necesitaEncabezado = true;
+  const Ir = `$A$${tp.r0}:$A$${tp.r1}`, tr = `$B$${tp.r0}:$B$${tp.r1}`, nP = tp.r1 - tp.r0 + 1;
+  return (x) => {
+    const k = `MATCH(${x},${Ir},1)`, L = (rg, i) => `LOG10(INDEX(${rg},${i}))`;
+    return `IF(${x}<INDEX(${Ir},1),1E9,IF(${x}>=INDEX(${Ir},${nP}),INDEX(${tr},${nP}),10^(${L(tr, k)}+(LOG10(${x})-${L(Ir, k)})*(${L(tr, `${k}+1`)}-${L(tr, k)})/(${L(Ir, `${k}+1`)}-${L(Ir, k)}))))`;
+  };
+}
 const sigNormTierra = (x) => `IFERROR(INDEX(${T.tierraCal},MATCH(${x}-1E-9,${T.tierraLim},1)+1),INDEX(${T.tierraCal},1))`;
 const sigNorm = (x, rango) => `IFERROR(INDEX(${rango},MATCH(${x}-1E-9,${rango},1)+1),INDEX(${rango},1))`;
 const vacias = (arr) => (arr || []).filter((f) => f && Object.values(f).some((v) => v !== "" && v != null));
@@ -581,47 +594,79 @@ const HOJAS = {
     const x0zz = n(e.x0Tierra, 0) > 0 ? h.dato("X0 del transformador zig-zag", n(e.x0Tierra), "Ω", "Secundario en delta: Z0 = la del zig-zag") : null;
     const r1 = h.calc("R1 en bornes", `${rq}+${kt}*${rt}`, "Ω"), x1 = h.calc("X1 en bornes", `${xq}+${kt}*${xt}`, "Ω");
     h.seccion("Corrientes de cortocircuito por barra");
-    h.nota(x0zz ? "Secundario en delta con transformador zig-zag: la impedancia de secuencia cero en la barra es la del zig-zag; en los cables Z0 ≈ 4 Z1." : "Z0 del transformador Dyn o YNyn con terciario en delta ≈ Z1; en los cables Z0 ≈ 4 Z1 (aproximación IEC 60909-2).");
-    const barras = [{ barra: e.nombreBornes || "Bornes BT", L: 0, R: 0, X: 0, n: 1, icu: n(e.icuBornes, 0) }, ...vacias(e.cables).map((cb) => { const z = impedanciaConductor(cb.conductor, cb.canalizacion); return { barra: cb.barra, L: n(cb.longitud), R: z.R, X: z.X, n: n(cb.paralelos, 1), icu: n(cb.icu, 0) }; })];
+    h.nota(`${x0zz ? "Secundario en delta con transformador zig-zag: Z0 en la barra = la del zig-zag." : "Z0 del transformador: la del fabricante si se digitó; si no, ≈ Z1 (Dyn o YNyn con terciario)."} Z0 de cables: R0 y X0 del fabricante o ≈ 4 Z1. Motores: un grupo por barra (si hay varios en la misma barra se suman con los datos del primero), ZM = (IrM/ILR) × Un²/SrM en paralelo con la red. Las impedancias complejas se calculan con las funciones IM de Excel.`);
+    const z0pct = h.dato("Z0 del transformador (fabricante; 0 = igual a ukr)", n(e.z0Trafo, 0), "%");
+    // Generación con inversores (fuente de corriente).
+    const gens = vacias(e.generacion);
+    let iGen = "0";
+    if (gens.length) {
+      const tg = h.tabla([{ t: "Generación con inversores (barra)", v: (g) => String(g.barra || ""), ancho: 20 }, { t: "Potencia (kVA)", v: (g) => n(g.potencia, 0), entrada: true }, { t: "Aporte (× In)", v: (g) => n(g.factor, 1.2), entrada: true },
+        { t: "Corriente aportada (A)", v: (g, rr) => `=C${rr}*B${rr}*1000/(SQRT(3)*${un})`, fmt: "0.0" }], gens);
+      iGen = h.calc("Corriente total de los inversores", `SUM(D${tg.r0}:D${tg.r1})`, "A", "Se suma a Ik\" e ip de todas las barras (conservador)");
+      h.necesitaEncabezado = false;
+    }
+    const clave = (t) => String(t || "").trim().toLowerCase();
+    const mot = (nombre) => { const g = vacias(e.motores).filter((m) => clave(m.barra) === clave(nombre)); return g.length ? { P: g.reduce((s, m) => s + n(m.potencia, 0), 0), ilr: n(g[0].ilr, g[0].tipo === "MT" ? 6 : 5), fe: n(g[0].fpEta, 0.8), rx: g[0].tipo === "MT" ? 0.15 : 0.42 } : { P: 0, ilr: 5, fe: 0.8, rx: 0.42 }; };
+    const barras = [{ barra: e.nombreBornes || "Bornes BT", L: 0, R: 0, X: 0, n: 1, R0: 0, X0: 0, icu: n(e.icuBornes, 0) }, ...vacias(e.cables).map((cb) => { const z = impedanciaConductor(cb.conductor, cb.canalizacion); const r0 = n(cb.r0, NaN), x0 = n(cb.x0, NaN); return { barra: cb.barra, L: n(cb.longitud), R: z.R, X: z.X, n: n(cb.paralelos, 1), R0: Number.isFinite(r0) && Number.isFinite(x0) ? r0 : 4 * z.R, X0: Number.isFinite(r0) && Number.isFinite(x0) ? x0 : 4 * z.X, icu: n(cb.icu, 0) }; })].map((b) => ({ ...b, m: mot(b.barra) }));
+    const ult = barras.length - 1;
+    const par = (a, b) => `IF(${a}="",${b},IF(${b}="",${a},IMDIV(IMPRODUCT(${a},${b}),IMSUM(${a},${b}))))`;
+    const z0b = x0zz ? `COMPLEX(0,${x0zz})` : `IMPRODUCT(COMPLEX(${kt}*${rt},${kt}*${xt}),COMPLEX(IF(${z0pct}>0,${z0pct}/${uk},1),0))`;
     const tb = h.tabla([
       { t: "Barra", v: (b) => String(b.barra || ""), ancho: 20 }, { t: "L (m)", v: (b) => b.L, entrada: true }, { t: "R cable (Ω/km)", v: (b) => b.R, entrada: true, fmt: "0.0000" },
       { t: "X cable (Ω/km)", v: (b) => b.X, entrada: true, fmt: "0.0000" }, { t: "Paralelos", v: (b) => b.n, entrada: true },
-      { t: "R1 (Ω)", v: (b, rr) => (b === barras[0] ? `=${r1}` : `=F${rr - 1}+C${rr}*B${rr}/1000/E${rr}`), fmt: "0.00000" },
-      { t: "X1 (Ω)", v: (b, rr) => (b === barras[0] ? `=${x1}` : `=G${rr - 1}+D${rr}*B${rr}/1000/E${rr}`), fmt: "0.00000" },
-      { t: "R0 (Ω)", v: (b, rr) => (b === barras[0] ? (x0zz ? 0 : `=${kt}*${rt}`) : `=H${rr - 1}+4*C${rr}*B${rr}/1000/E${rr}`), fmt: "0.00000" },
-      { t: "X0 (Ω)", v: (b, rr) => (b === barras[0] ? (x0zz ? `=${x0zz}` : `=${kt}*${xt}`) : `=I${rr - 1}+4*D${rr}*B${rr}/1000/E${rr}`), fmt: "0.00000" },
-      { t: "Ik\" 3F (kA)", v: (b, rr) => `=${c}*${un}/(SQRT(3)*SQRT(F${rr}^2+G${rr}^2))/1000`, fmt: "0.00" },
-      { t: "κ", v: (b, rr) => `=1.02+0.98*EXP(-3*F${rr}/G${rr})`, fmt: "0.00" },
-      { t: "ip (kA)", v: (b, rr) => `=K${rr}*SQRT(2)*J${rr}`, fmt: "0.00" },
-      { t: "Ik\" 1F (kA)", v: (b, rr) => `=SQRT(3)*${c}*${un}/SQRT((2*F${rr}+H${rr})^2+(2*G${rr}+I${rr})^2)/1000`, fmt: "0.00" },
-      { t: "Icu (kA)", v: (b) => b.icu, entrada: true }, { t: "Resultado", v: (b, rr) => `=IF(N${rr}=0,"Sin dato",IF(N${rr}>=J${rr},"Cumple","No cumple"))` }
+      { t: "R0 cable (Ω/km)", v: (b) => b.R0, entrada: true, fmt: "0.0000" }, { t: "X0 cable (Ω/km)", v: (b) => b.X0, entrada: true, fmt: "0.0000" },
+      { t: "Motores (kW)", v: (b) => b.m.P, entrada: true }, { t: "ILR / IrM", v: (b) => b.m.ilr, entrada: true }, { t: "η × cos φ", v: (b) => b.m.fe, entrada: true }, { t: "RM / XM", v: (b) => b.m.rx, entrada: true },
+      { t: "Z serie (Ω)", v: (b, rr) => (b === barras[0] ? `=COMPLEX(${r1},${x1})` : `=COMPLEX(C${rr}*B${rr}/1000/E${rr},D${rr}*B${rr}/1000/E${rr})`) },
+      { t: "Z motores (Ω)", v: (b, rr) => `=IF(H${rr}<=0,"",COMPLEX(K${rr}*(1/I${rr})*${un}^2/(H${rr}*1000/J${rr})/SQRT(1+K${rr}^2),(1/I${rr})*${un}^2/(H${rr}*1000/J${rr})/SQRT(1+K${rr}^2)))` },
+      { t: "Z red sin motores (Ω)", v: (b, rr) => (b === barras[0] ? `=L${rr}` : `=IMSUM(N${rr - 1},L${rr})`) },
+      { t: "Z hacia la fuente (Ω)", v: (b, rr) => (b === barras[0] ? `=L${rr}` : `=IMSUM(L${rr},${par(`O${rr - 1}`, `M${rr - 1}`)})`) },
+      { t: "Z hacia aguas abajo (Ω)", v: (b, rr) => (b === barras[ult] ? "" : `=IF(${par(`M${rr + 1}`, `P${rr + 1}`)}="","",IMSUM(L${rr + 1},${par(`M${rr + 1}`, `P${rr + 1}`)}))`) },
+      { t: "Z Thévenin (Ω)", v: (b, rr) => `=${par(par(`O${rr}`, `M${rr}`), `P${rr}`)}` },
+      { t: "Z0 (Ω)", v: (b, rr) => (b === barras[0] ? `=${z0b}` : `=IMSUM(R${rr - 1},COMPLEX(F${rr}*B${rr}/1000/E${rr},G${rr}*B${rr}/1000/E${rr}))`) },
+      { t: "Ik\" 3F (kA)", v: (b, rr) => `=(${c}*${un}/(SQRT(3)*IMABS(Q${rr}))+${iGen})/1000`, fmt: "0.00" },
+      { t: "Aporte motores y generación (kA)", v: (b, rr) => `=S${rr}-${c}*${un}/(SQRT(3)*IMABS(N${rr}))/1000`, fmt: "0.00" },
+      { t: "κ", v: (b, rr) => `=1.02+0.98*EXP(-3*IMREAL(Q${rr})/IMAGINARY(Q${rr}))`, fmt: "0.00" },
+      { t: "ip (kA)", v: (b, rr) => `=U${rr}*SQRT(2)*(S${rr}-${iGen}/1000)+SQRT(2)*${iGen}/1000`, fmt: "0.00" },
+      { t: "Ik\" 1F (kA)", v: (b, rr) => `=(SQRT(3)*${c}*${un}/IMABS(IMSUM(IMPRODUCT(Q${rr},COMPLEX(2,0)),R${rr}))+${iGen})/1000`, fmt: "0.00" },
+      { t: "Icu (kA)", v: (b) => b.icu, entrada: true }, { t: "Resultado", v: (b, rr) => `=IF(X${rr}=0,"Sin dato",IF(X${rr}>=S${rr},"Cumple","No cumple"))` }
     ], barras);
-    h.resumen(barras.map((b, i) => { const rr = tb.r0 + i; return { t: String(b.barra || `Barra ${i + 1}`), texto: true, f: `"Ik3 = "&ROUND(J${rr},2)&" kA; Ik1 = "&ROUND(M${rr},2)&" kA; pico ip = "&ROUND(L${rr},2)&" kA → especificar equipos con capacidad de interrupción ≥ "&ROUND(MAX(J${rr},M${rr}),1)&" kA"` }; }));
+    h.resumen(barras.map((b, i) => { const rr = tb.r0 + i; return { t: String(b.barra || `Barra ${i + 1}`), texto: true, f: `"Ik3 = "&ROUND(S${rr},2)&" kA"&IF(T${rr}>0.0005," (incluye "&ROUND(T${rr},2)&" kA de motores y generación)","")&"; Ik1 = "&ROUND(W${rr},2)&" kA; pico ip = "&ROUND(V${rr},2)&" kA → especificar equipos con capacidad de interrupción ≥ "&ROUND(MAX(S${rr},W${rr}),1)&" kA"` }; }));
   },
   coordinacion(wb, e) {
-    const h = new Hoja(wb, "m Coordinación", "Coordinación de protecciones IEC 60255-151 (RETIE literal m)");
+    const h = new Hoja(wb, "m Coordinación", "Coordinación de protecciones IEC 60255-151 / IEEE C37.112 (RETIE literal m)");
     const cti = h.dato("Margen de coordinación CTI", n(e.cti, 0.3), "s");
     h.seccion("Protecciones (de aguas abajo hacia aguas arriba)");
     const rels = vacias(e.protecciones);
     const t = h.tabla([
-      { t: "Protección", v: (f) => String(f.nombre || ""), ancho: 22 }, { t: "Curva (SI/VI/EI/LTI/DT)", v: (f) => String(f.curva || "SI"), entrada: true, lista: ["SI", "VI", "EI", "LTI", "DT"] },
-      { t: "I arranque (A)", v: (f) => n(f.pickup), entrada: true }, { t: "TMS / t (s)", v: (f) => n(f.tms, 0.1), entrada: true },
+      { t: "Protección", v: (f) => String(f.nombre || ""), ancho: 22 }, { t: "Tipo", v: (f) => (esTierra(f) ? "Tierra (51N)" : "Fase"), entrada: true, lista: ["Fase", "Tierra (51N)"] },
+      { t: "Curva", v: (f) => String(f.curva || "SI"), entrada: true, lista: Object.keys(N.CURVAS_IEC) },
+      { t: "I arranque (A)", v: (f) => n(f.pickup), entrada: true }, { t: "TMS / TD / t (s)", v: (f) => n(f.tms, 0.1), entrada: true },
       { t: "I inst. (A)", v: (f) => n(f.inst, 0), entrada: true }, { t: "t inst. (s)", v: (f) => n(f.tinst, 0.05), entrada: true },
-      { t: "k", v: (f, rr) => `=VLOOKUP(B${rr},${T.curvas},2,FALSE)` }, { t: "α", v: (f, rr) => `=VLOOKUP(B${rr},${T.curvas},3,FALSE)` }
+      { t: "k", v: (f, rr) => `=VLOOKUP(C${rr},${T.curvas},2,FALSE)` }, { t: "α", v: (f, rr) => `=VLOOKUP(C${rr},${T.curvas},3,FALSE)` }, { t: "B", v: (f, rr) => `=VLOOKUP(C${rr},${T.curvas},4,FALSE)` }
     ], rels);
+    // Curvas por puntos (fusibles e interruptores): una tabla por protección.
+    const puntos = {};
+    rels.forEach((rel, i) => { if (rel.curva === "PUNTOS") puntos[i] = curvaPuntosExcel(h, rel); });
     h.seccion("Tiempos de operación (s) por corriente de falla");
+    h.nota("«Protección más cercana»: los márgenes se verifican desde esa protección hacia aguas arriba. Las protecciones de tierra solo ven las fallas a tierra y se comparan entre ellas.");
     const fallas = vacias(e.fallas);
-    const cols = [{ t: "Punto de falla", v: (f) => String(f.punto || ""), ancho: 30 }, { t: "I (A)", v: (f) => n(f.corriente), entrada: true }];
+    const nombres = `$A$${t.r0}:$A$${t.r1}`;
+    const cols = [{ t: "Punto de falla", v: (f) => String(f.punto || ""), ancho: 30 }, { t: "Falla", v: (f) => (String(f.tipo || "").startsWith("A tierra") ? "A tierra" : "Trifásica"), entrada: true, lista: ["Trifásica", "A tierra"] },
+      { t: "I (A)", v: (f) => n(f.corriente), entrada: true }, { t: "Protección más cercana", v: (f) => String(f.desde || ""), entrada: true, ancho: 22 }];
+    const colT = (i) => col(4 + i);
     rels.forEach((rel, i) => {
       const rr = t.r0 + i;
-      cols.push({ t: `t ${rel.nombre || i + 1}`, v: (f, r) => `=IF(B${r}<=$C$${rr},"No opera",MIN(IF($B$${rr}="DT",$D$${rr},$D$${rr}*$G$${rr}/((B${r}/$C$${rr})^$H$${rr}-1)),IF(AND($E$${rr}>0,B${r}>=$E$${rr}),$F$${rr},1E9)))`, fmt: "0.000" });
+      const noVe = (r) => `AND($B$${rr}="Tierra (51N)",B${r}<>"A tierra")`;
+      cols.push({ t: `t ${rel.nombre || i + 1}`, fmt: "0.000", v: (f, r) => (puntos[i]
+        ? `=IF(${noVe(r)},"—",IF(${puntos[i](`C${r}`)}>=1E9,"No opera",${puntos[i](`C${r}`)}))`
+        : `=IF(${noVe(r)},"—",IF(C${r}<=$D$${rr},"No opera",MIN(IF($C$${rr}="DT",$E$${rr},$E$${rr}*($H$${rr}/((C${r}/$D$${rr})^$I$${rr}-1)+$J$${rr})),IF(AND($F$${rr}>0,C${r}>=$F$${rr}),$G$${rr},1E9))))`) });
     });
-    for (let i = 0; i + 1 < rels.length; i++) {
-      const a = col(2 + i), b = col(3 + i);
-      cols.push({ t: `Margen ${rels[i + 1].nombre || i + 2} − ${rels[i].nombre || i + 1}`, v: (f, r) => `=IF(OR(ISTEXT(${a}${r}),ISTEXT(${b}${r})),"—",IF(${b}${r}-${a}${r}>=${cti},"Cumple ("&ROUND(${b}${r}-${a}${r},3)&" s)","No cumple ("&ROUND(${b}${r}-${a}${r},3)&" s)"))`, ancho: 22 });
-    }
+    paresCoordinacion(rels).forEach(({ a, b, tierra }) => {
+      const ta = colT(a), tb = colT(b);
+      cols.push({ t: `Margen ${rels[b].nombre || b + 1} − ${rels[a].nombre || a + 1}`, ancho: 22, v: (f, r) => `=IF(OR(ISTEXT(${ta}${r}),ISTEXT(${tb}${r}),IFERROR(MATCH(D${r},${nombres},0),1)>${a + 1}${tierra ? `,B${r}<>"A tierra"` : ""}),"—",IF(${tb}${r}-${ta}${r}>=${cti},"Cumple ("&ROUND(${tb}${r}-${ta}${r},3)&" s)","No cumple ("&ROUND(${tb}${r}-${ta}${r},3)&" s)"))` });
+    });
     h.tabla(cols, fallas);
-    h.resumen(rels.map((rl, i) => { const rr = t.r0 + i; return { t: String(rl.nombre || `Protección ${i + 1}`), texto: true, f: `"Curva "&B${rr}&", arranque "&C${rr}&" A, TMS "&D${rr}&IF(E${rr}>0,", instantánea "&E${rr}&" A en "&F${rr}&" s","")` }; }));
+    h.resumen(rels.map((rl, i) => { const rr = t.r0 + i; return { t: String(rl.nombre || `Protección ${i + 1}`), texto: true, f: rl.curva === "PUNTOS" ? `B${rr}&": curva por puntos del fabricante"` : `B${rr}&", curva "&C${rr}&", arranque "&D${rr}&" A, TMS/TD "&E${rr}&IF(F${rr}>0,", instantánea "&F${rr}&" A en "&G${rr}&" s","")` }; }));
   },
   malla(wb, e, r) {
     const h = new Hoja(wb, "i Puesta a tierra", "Malla de puesta a tierra — IEEE 80-2013 (RETIE literal i)");
@@ -1084,16 +1129,17 @@ const HOJAS = {
         const cv = N.CURVAS_IEC[rel.curva] || N.CURVAS_IEC.SI;
         h.seccion(`Tiempo de despeje de «${rel.nombre}» (ajustes de la coordinación de protecciones)`);
         const dt = h.dato("Curva de tiempo definido (1 = sí)", rel.curva === "DT" ? 1 : 0, "", cv.nombre);
-        const kc = h.dato("Constante k de la curva", cv.k, "", "IEC 60255-151"), ac = h.dato("Exponente α de la curva", cv.a, "");
-        const pk = h.dato("Corriente de arranque", n(rel.pickup), "A"), tms = h.dato("TMS (o tiempo, si es de tiempo definido)", n(rel.tms, 0.1), "");
+        const pp = rel.curva === "PUNTOS" ? curvaPuntosExcel(h, rel) : null;
+        const kc = h.dato("Constante k de la curva", cv.k, "", "IEC 60255-151 / IEEE C37.112"), ac = h.dato("Exponente α de la curva", cv.a, ""), bc = h.dato("Constante B de la curva (0 en las IEC)", cv.b, "");
+        const pk = h.dato("Corriente de arranque", n(rel.pickup), "A"), tms = h.dato("TMS / TD (o tiempo, si es de tiempo definido)", n(rel.tms, 0.1), "");
         const ii = h.dato("Corriente instantánea (0 = sin instantáneo)", n(rel.inst, 0), "A"), ti = h.dato("Tiempo instantáneo", n(rel.tinst, 0.05), "s");
         const vr = h.dato("Tensión de referencia de la coordinación", Number.isFinite(vRefC) ? vRefC : val("tension", 0.48), "kV", Number.isFinite(vRefC) ? "De la coordinación" : "(S) La coordinación no la indica: se supone la del punto");
         const iR = h.calc("Corriente de arco referida a la coordinación", fz(`${iarc}*1000*${V}/${vr}`), "A", "Iarc × Voc / Vref");
         const iRm = h.calc("Corriente de arco reducida referida a la coordinación", fz(`${iarcm}*1000*${V}/${vr}`), "A");
-        const tr = (i) => `IF(${i}>${pk}*1.0001,MIN(IF(${dt}=1,${tms},${tms}*${kc}/((${i}/${pk})^${ac}-1)),IF(AND(${ii}>0,${i}>=${ii}),${ti},1E9)),1E9)`;
-        const ex = "t = mín(2000; t relé × 1000 + apertura), con t relé = TMS × k / ((I/Is)^α − 1), o el tiempo instantáneo si I ≥ I inst.; si la protección no opera se toman 2 s (IEEE 1584-2018 §6.9.1)";
-        t = h.fila("Tiempo de despeje con la corriente de arco", `=IF(ISNUMBER(${iR}),MIN(2000,${tr(iR)}*1000+${apert}),2000)`, "ms", "", false, ex);
-        tm = h.fila("Tiempo de despeje con la corriente de arco reducida", `=IF(ISNUMBER(${iRm}),MIN(2000,${tr(iRm)}*1000+${apert}),2000)`, "ms", "", false, ex);
+        const tr = (i) => (pp ? pp(i) : `IF(${i}>${pk}*1.0001,MIN(IF(${dt}=1,${tms},${tms}*(${kc}/((${i}/${pk})^${ac}-1)+${bc})),IF(AND(${ii}>0,${i}>=${ii}),${ti},1E9)),1E9)`);
+        const ex = "t = mín(2000; t relé × 1000 + apertura), con t relé = TMS × (k / ((I/Is)^α − 1) + B) o la curva por puntos, o el tiempo instantáneo si I ≥ I inst.; si la protección no opera se toman 2 s (IEEE 1584-2018 §6.9.1)";
+        t = h.fila("Tiempo de despeje con la corriente de arco", `=IF(ISNUMBER(${iR}),MIN(2000,${tr(iR)}*1000+${pp ? 0 : apert}),2000)`, "ms", "", false, ex);
+        tm = h.fila("Tiempo de despeje con la corriente de arco reducida", `=IF(ISNUMBER(${iRm}),MIN(2000,${tr(iRm)}*1000+${pp ? 0 : apert}),2000)`, "ms", "", false, ex);
         h.seccion("Energía incidente");
       }
       const A = `IF(${ec}="VCB",4,10)`, B = `IF(${ec}="VCB",20,IF(${ec}="VCBB",24,22))`;
