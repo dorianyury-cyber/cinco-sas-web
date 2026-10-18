@@ -391,9 +391,69 @@ export function coordinacion(e) {
 }
 
 // ================================================================ 8. MALLA DE PUESTA A TIERRA (IEEE 80-2013)
+// Resistividad aparente Wenner en un suelo de dos capas (Sunde; IEEE 81-2012):
+// ρa = ρ1 [1 + 4 Σ Kⁿ (1/√(1 + (2nh/a)²) − 1/√(4 + (2nh/a)²))], K = (ρ2 − ρ1)/(ρ2 + ρ1).
+export function rhoWenner2capas(a, r1, r2, h) {
+  const K = (r2 - r1) / (r2 + r1);
+  let suma = 0;
+  for (let n = 1, kn = K; n <= 2000 && Math.abs(kn) > 1e-9; n++, kn *= K) {
+    const x = (2 * n * h) / a;
+    suma += kn * (1 / Math.sqrt(1 + x * x) - 1 / Math.sqrt(4 + x * x));
+  }
+  return r1 * (1 + 4 * suma);
+}
+// Ajuste de ρ1, ρ2 y h a las mediciones por mínimos cuadrados del error
+// relativo (Nelder-Mead sobre el logaritmo de los parámetros, varios arranques).
+export function ajusteDosCapas(med) {
+  const err = ([l1, l2, lh]) => med.reduce((s, m) => s + ((rhoWenner2capas(m.a, Math.exp(l1), Math.exp(l2), Math.exp(lh)) - m.rho) / m.rho) ** 2, 0);
+  const nm = (x0) => {
+    let S = [x0, ...x0.map((_, i) => x0.map((v, j) => (i === j ? v + 0.4 : v)))].map((x) => ({ x, f: err(x) }));
+    for (let it = 0; it < 600; it++) {
+      S.sort((p, q) => p.f - q.f);
+      if (Math.abs(S[3].f - S[0].f) < 1e-14) break;
+      const c = [0, 1, 2].map((j) => (S[0].x[j] + S[1].x[j] + S[2].x[j]) / 3);
+      const pt = (t) => { const x = c.map((v, j) => v + t * (S[3].x[j] - v)); return { x, f: err(x) }; };
+      const r = pt(-1);
+      if (r.f < S[0].f) { const e2 = pt(-2); S[3] = e2.f < r.f ? e2 : r; }
+      else if (r.f < S[2].f) S[3] = r;
+      else { const k = pt(r.f < S[3].f ? -0.5 : 0.5); if (k.f < Math.min(r.f, S[3].f)) S[3] = k; else S = S.map((p, i) => (i ? { x: p.x.map((v, j) => S[0].x[j] + 0.5 * (v - S[0].x[j])), f: 0 } : p)).map((p) => ({ x: p.x, f: err(p.x) })); }
+    }
+    S.sort((p, q) => p.f - q.f);
+    return S[0];
+  };
+  const r1 = med[0].rho, r2 = med[med.length - 1].rho;
+  const mejor = [0.5, 1, 2, 4, 8, 16].map((h) => nm([Math.log(r1), Math.log(r2), Math.log(h)])).sort((p, q) => p.f - q.f)[0];
+  const [p1, p2, ph] = mejor.x.map(Math.exp);
+  return { r1: p1, r2: p2, h: ph, rms: Math.sqrt(mejor.f / med.length) * 100 };
+}
+// Impedancia equivalente de un cable de guarda o neutro con sus puestas a tierra
+// (Endrenyi; IEEE 80-2000 §15.9 y ec. C.7): Zeq = Zs/2 + √(Zs × Rtg), complejos [re, im].
+const cMul = ([a, b], [c, d]) => [a * c - b * d, a * d + b * c];
+const cDiv = ([a, b], [c, d]) => { const m = c * c + d * d; return [(a * c + b * d) / m, (b * c - a * d) / m]; };
+const cSqrt = ([a, b]) => { const m = Math.hypot(a, b), r = Math.sqrt((m + a) / 2), i = Math.sign(b || 1) * Math.sqrt(Math.max(0, (m - a) / 2)); return [r, i]; };
+const cAbs = ([a, b]) => Math.hypot(a, b);
+export function zEndrenyi(zs, rt) { const q = cSqrt(cMul(zs, [rt, 0])); return [zs[0] / 2 + q[0], zs[1] / 2 + q[1]]; }
+export function factorDivision({ nL, zsL, rtg, nF, zsF, rdg, rg }) {
+  const adm = [];
+  if (nL > 0) adm.push(cDiv([nL, 0], zEndrenyi(zsL, rtg)));
+  if (nF > 0) adm.push(cDiv([nF, 0], zEndrenyi(zsF, rdg)));
+  if (!adm.length) return { sf: 1, zeq: null };
+  const zeq = cDiv([1, 0], adm.reduce((s, y) => [s[0] + y[0], s[1] + y[1]], [0, 0]));
+  return { sf: cAbs(zeq) / cAbs([zeq[0] + rg, zeq[1]]), zeq };
+}
+
 export function malla(e) {
-  const rho = num(e.rho, 100), rhos = num(e.rhoS, 3000), hs = num(e.hs, 0.1);
-  const If = num(e.ifalla, 5000), Sf = num(e.sf, 100) / 100, tf = num(e.tf, 0.5), tc = num(e.tc, tf), XR = num(e.xr, 10);
+  const rhoS0 = num(e.rhoS, 3000), hs = num(e.hs, 0.1), rhos = rhoS0;
+  const dosCapas = e.modeloSuelo === "dosCapas";
+  const med = filas(e.mediciones).map((m) => ({ a: num(m.a, 0), rho: num(m.rhoA, 0) })).filter((m) => m.a > 0 && m.rho > 0).sort((p, q) => p.a - q.a);
+  let suelo = null;
+  if (dosCapas && med.length >= 3) {
+    const aj = ajusteDosCapas(med);
+    const av1 = med.reduce((t, m) => t + m.rho, 0) / med.length, av2 = (Math.max(...med.map((m) => m.rho)) + Math.min(...med.map((m) => m.rho))) / 2;
+    suelo = { ...aj, K: (aj.r2 - aj.r1) / (aj.r2 + aj.r1), av1, av2 };
+  }
+  const rho = suelo ? suelo.av2 : num(e.rho, 100);
+  const If = num(e.ifalla, 5000), sfDig = num(e.sf, 100) / 100, tf = num(e.tf, 0.5), tc = num(e.tc, tf), XR = num(e.xr, 10);
   const Lx = num(e.lx, 20), Ly = num(e.ly, 20), D = num(e.d, 5), h = num(e.h, 0.5);
   const cal = e.calibre || "2/0", dmm = N.DIAMETRO_COBRE_DESNUDO[cal] || 10.52, d = dmm / 1000;
   const mat = N.MATERIALES_SPT[e.material] || N.MATERIALES_SPT.cuDuro;
@@ -407,7 +467,6 @@ export function malla(e) {
   // Corriente de malla.
   const TaDc = XR / (2 * PI * 60);
   const Df = Math.sqrt(1 + (TaDc / tf) * (1 - Math.exp((-2 * tf) / TaDc)));
-  const IG = Df * Sf * If;
   // Conductor (IEEE 80 ec. 37).
   const Areq = (Df * If / 1000) / Math.sqrt(((mat.TCAP * 1e-4) / (tc * mat.ar * mat.rr)) * Math.log((mat.K0 + mat.Tm) / (mat.K0 + Ta)));
   const Acal = N.SECCION_MM2[cal] || 67.43;
@@ -415,6 +474,9 @@ export function malla(e) {
   const nx = Math.round(Lx / D) + 1, ny = Math.round(Ly / D) + 1;
   const LC = ny * Lx + nx * Ly, Lp = 2 * (Lx + Ly), A = Lx * Ly, LR = nR * Lr, LT = LC + LR;
   const Rg = rho * (1 / LT + (1 / Math.sqrt(20 * A)) * (1 + 1 / (1 + h * Math.sqrt(20 / A))));
+  const div = e.sfModo === "calculado" ? factorDivision({ nL: num(e.nLineas, 0), zsL: [num(e.zsLineaR, 1.24), num(e.zsLineaX, 0.55)], rtg: num(e.rtg, 10), nF: num(e.nAlim, 0), zsF: [num(e.zsAlimR, 0.11), num(e.zsAlimX, 0.11)], rdg: num(e.rdg, 25), rg: Rg }) : null;
+  const Sf = div ? div.sf : sfDig;
+  const IG = Df * Sf * If;
   const GPR = IG * Rg;
   const na = (2 * LC) / Lp, nb = Math.sqrt(Lp / (4 * Math.sqrt(A))), n = na * nb;
   const Kii = nR > 0 && rodsPer ? 1 : 1 / Math.pow(2 * n, 2 / n);
@@ -427,6 +489,18 @@ export function malla(e) {
   const LS = 0.75 * LC + 0.85 * LR;
   const Es = (rho * Ks * Ki * IG) / LS;
   const ret = N.RETIE_RESISTENCIA_SPT[e.tipoInstalacion] || N.RETIE_RESISTENCIA_SPT.subMT;
+  // Suelo de dos capas: sensibilidad con la capa superior para paso y contacto y
+  // la inferior para la resistencia (IEEE 80 §13.4.2.1), como referencia.
+  const sens = suelo ? { em: (suelo.r1 * Km * Ki * IG) / LM, es: (suelo.r1 * Ks * Ki * IG) / LS, rg: (Rg * suelo.r2) / rho } : null;
+  const notasSuelo = [];
+  if (dosCapas && !suelo) notasSuelo.push("Modelo de dos capas seleccionado sin al menos tres mediciones válidas: se usó la resistividad uniforme digitada.");
+  if (suelo) {
+    notasSuelo.push(`Suelo de dos capas (IEEE 81): ρ1 = ${fmt(suelo.r1, 1)} Ω·m hasta ${fmt(suelo.h, 2)} m, ρ2 = ${fmt(suelo.r2, 1)} Ω·m, K = ${fmt(suelo.K, 3)} (error RMS del ajuste ${fmt(suelo.rms, 2)} %). Las ecuaciones de la IEEE 80 son de suelo uniforme: se usó la resistividad equivalente ρa(av2) = ${fmt(suelo.av2, 1)} Ω·m (IEEE 80 Anexo E).`);
+    notasSuelo.push(suelo.K < 0 ? "K negativo (capa superior más resistiva): las tensiones de paso y contacto en la superficie tienden a ser mayores que en suelo uniforme; las varillas que alcanzan la capa inferior reducen la resistencia de forma notable (IEEE 80 §13.4.2.3)." : "K positivo (capa inferior más resistiva): las varillas aportan poco y la corriente tiende a salir por la capa superior; conviene ampliar el área de la malla (IEEE 80 §13.4.2.3).");
+    if (suelo.rms > 5) notasSuelo.push(`El ajuste de dos capas tiene un error RMS de ${fmt(suelo.rms, 1)} %: el suelo puede requerir un modelo de más capas (software especializado).`);
+    if (Math.max(suelo.r1, suelo.r2) / Math.min(suelo.r1, suelo.r2) > 5) notasSuelo.push("Contraste de resistividades mayor que 5: el modelo uniforme equivalente puede no ser conservador; confirme con un programa de dos capas o multicapa.");
+  }
+  const notaTransf = GPR <= Etouch ? `El GPR (${fmt(GPR, 0)} V) es menor que la tensión de contacto tolerable: no hay riesgo por tensiones transferidas (IEEE 80 §16, paso 7).` : `El GPR (${fmt(GPR, 0)} V) supera la tensión de contacto tolerable: los elementos metálicos que salen de la subestación (cercas, rieles, tuberías, neutros, pantallas y circuitos de comunicaciones) pueden transferir hasta ese potencial; aíslelos, sepárelos o use dispositivos de neutralización (IEEE 80 §17).`;
   const verificaciones = [
     { criterio: "Tensión de contacto (de malla)", norma: "IEEE 80-2013 §16", valor: `${fmt(Em, 1)} V`, limite: `≤ ${fmt(Etouch, 1)} V`, cumple: Em <= Etouch },
     { criterio: "Tensión de paso", norma: "IEEE 80-2013 §16", valor: `${fmt(Es, 1)} V`, limite: `≤ ${fmt(Estep, 1)} V`, cumple: Es <= Estep },
@@ -440,12 +514,16 @@ export function malla(e) {
       { etiqueta: "Tensión de contacto / tolerable", valor: `${fmt(Em, 0)} / ${fmt(Etouch, 0)}`, unidad: "V" },
       { etiqueta: "Tensión de paso / tolerable", valor: `${fmt(Es, 0)} / ${fmt(Estep, 0)}`, unidad: "V" }
     ],
-    tablas: [{ titulo: "Parámetros de la malla", encabezados: ["Parámetro", "Valor"], filas: [
+    tablas: [...(suelo ? [{ titulo: "Modelo del suelo a partir de las mediciones Wenner (IEEE 81)", encabezados: ["Separación a (m)", "ρa medida (Ω·m)", "ρa modelo de dos capas (Ω·m)", "Diferencia (%)"], filas: med.map((m) => { const c = rhoWenner2capas(m.a, suelo.r1, suelo.r2, suelo.h); return [fmt(m.a, 2), fmt(m.rho, 1), fmt(c, 1), fmt((c / m.rho - 1) * 100, 2)]; }) }] : []), { titulo: "Parámetros de la malla", encabezados: ["Parámetro", "Valor"], filas: [
       ["Dimensiones", `${fmt(Lx, 1)} m × ${fmt(Ly, 1)} m (A = ${fmt(A, 1)} m²)`], ["Espaciamiento / profundidad", `${fmt(D, 2)} m / ${fmt(h, 2)} m`],
       ["Conductores", `${nx} × ${fmt(Ly, 1)} m + ${ny} × ${fmt(Lx, 1)} m; LC = ${fmt(LC, 1)} m`], ["Varillas", `${nR} × ${fmt(Lr, 2)} m${nR ? (rodsPer ? " (en el perímetro)" : " (en el interior)") : ""}`],
-      ["Corriente de malla IG", `${fmt(IG, 0)} A (Df = ${fmt(Df, 3)}, Sf = ${fmt(Sf * 100, 0)} %)`], ["Factores", `Cs = ${fmt(Cs, 3)}; n = ${fmt(n, 2)}; Km = ${fmt(Km, 3)}; Ks = ${fmt(Ks, 3)}; Ki = ${fmt(Ki, 3)}`]
+      ["Resistividad de diseño", suelo ? `${fmt(rho, 1)} Ω·m (ρa(av2) del modelo de dos capas; ρa(av1) = ${fmt(suelo.av1, 1)} Ω·m)` : `${fmt(rho, 1)} Ω·m (suelo uniforme)`], ["Corriente de malla IG", `${fmt(IG, 0)} A (Df = ${fmt(Df, 3)}, Sf = ${fmt(Sf * 100, 1)} %${div ? `, calculado: Zeq = ${fmt(div.zeq?.[0] ?? 0, 3)} + j${fmt(div.zeq?.[1] ?? 0, 3)} Ω` : ""})`], ["Factores", `Cs = ${fmt(Cs, 3)}; n = ${fmt(n, 2)}; Km = ${fmt(Km, 3)}; Ks = ${fmt(Ks, 3)}; Ki = ${fmt(Ki, 3)}`],
+      ...(sens ? [["Referencia: ρ1 para paso y contacto, ρ2 para resistencia (IEEE 80 §13.4.2.1)", `Em = ${fmt(sens.em, 0)} V; Es = ${fmt(sens.es, 0)} V; Rg = ${fmt(sens.rg, 2)} Ω`]] : [])
     ] }],
     pasos: [
+      ...(suelo ? [{ titulo: "Modelo de suelo de dos capas", formula: "ρa = ρ1 [1 + 4 Σ Kⁿ (1/√(1 + (2nh/a)²) − 1/√(4 + (2nh/a)²))]; K = (ρ2 − ρ1)/(ρ2 + ρ1); ρ1, ρ2 y h por mínimos cuadrados", sustitucion: `${med.length} mediciones Wenner de ${fmt(med[0].a, 2)} a ${fmt(med[med.length - 1].a, 2)} m`, resultado: `ρ1 = ${fmt(suelo.r1, 1)} Ω·m; ρ2 = ${fmt(suelo.r2, 1)} Ω·m; h = ${fmt(suelo.h, 2)} m; RMS = ${fmt(suelo.rms, 2)} %` },
+        { titulo: "Resistividad uniforme equivalente", formula: "ρa(av2) = (ρa máx + ρa mín) / 2 (IEEE 80 Anexo E)", sustitucion: `ρa(av1) = promedio = ${fmt(suelo.av1, 1)} Ω·m`, resultado: `ρ = ${fmt(suelo.av2, 1)} Ω·m` }] : []),
+      ...(div ? [{ titulo: "Factor de división de corriente", formula: "Zeq = Zs/2 + √(Zs Rt) por línea (Endrenyi); Sf = |Zeq / (Zeq + Rg)|", sustitucion: `${num(e.nLineas, 0)} línea(s) con cable de guarda y ${num(e.nAlim, 0)} alimentador(es) con neutro; Zeq = ${fmt(div.zeq?.[0] ?? 0, 3)} + j${fmt(div.zeq?.[1] ?? 0, 3)} Ω; Rg = ${fmt(Rg, 3)} Ω`, resultado: `Sf = ${fmt(Sf * 100, 1)} %` }] : []),
       { titulo: "Factor de reducción de la capa superficial", formula: "Cs = 1 − 0,09 (1 − ρ/ρs) / (2 hs + 0,09)", sustitucion: `ρ = ${fmt(rho, 0)}; ρs = ${fmt(rhos, 0)} Ω·m; hs = ${fmt(hs, 3)} m`, resultado: `Cs = ${fmt(Cs, 3)}` },
       { titulo: `Tensiones tolerables (persona de ${num(e.peso, 70) >= 70 ? 70 : 50} kg)`, formula: `E contacto = (1000 + 1,5 Cs ρs) × ${k} / √ts; E paso = (1000 + 6 Cs ρs) × ${k} / √ts`, sustitucion: `ts = ${fmt(tf, 2)} s`, resultado: `E contacto = ${fmt(Etouch, 1)} V; E paso = ${fmt(Estep, 1)} V` },
       { titulo: "Corriente de malla", formula: "IG = Df × Sf × 3I0; Df = √(1 + Ta/tf (1 − e^(−2tf/Ta)))", sustitucion: `X/R = ${fmt(XR, 1)} → Ta = ${fmt(TaDc, 4)} s`, resultado: `IG = ${fmt(IG, 0)} A` },
@@ -455,6 +533,7 @@ export function malla(e) {
       { titulo: "Tensión de paso", formula: "Es = ρ Ks Ki IG / LS", sustitucion: `Ks = ${fmt(Ks, 3)}; LS = ${fmt(LS, 1)} m`, resultado: `Es = ${fmt(Es, 1)} V` }
     ],
     verificaciones,
+    notas: [...notasSuelo, notaTransf],
     conclusion: veredicto(verificaciones, "La malla cumple tensiones de paso y contacto, resistencia y sección del conductor.", "La malla no cumple: reduzca el espaciamiento, agregue varillas o aumente el área o la capa superficial.")
   };
 }
@@ -1021,4 +1100,110 @@ export function fvConexion(e, proyecto = {}, ctx = {}) {
   };
 }
 
-export const CALCULOS = { cargas, conductores, regulacion, canalizaciones, transformador, cortocircuito, coordinacion, malla, rayos, aislamiento, distancias, mecanico, trafoPotencia, cableMT, apantallamiento, fvArreglo, fvProduccion, fvConductores, fvConexion };
+// ================================================================ 20. ARCO ELÉCTRICO (IEEE 1584-2018)
+// Modelo empírico de la IEEE 1584-2018 para sistemas trifásicos de 208 V a
+// 15 kV. Implementación propia, validada con los ejemplos D.1 (4,16 kV) y D.2
+// (480 V) del Anexo D de la norma; sigue el mismo tratamiento de la biblioteca
+// abierta arcflash (Li-aung Yip, MIT) para la corriente reducida en BT.
+// Unidades internas: kV, kA, mm, ms, J/cm².
+const L10 = Math.log10;
+function poli(coef, x) { return coef.reduce((s, k, i) => s + k * Math.pow(x, coef.length - 1 - i), 0); }
+function cfEncerramiento(ec, V, h, w, d) {
+  if (ec === "VOA" || ec === "HOA") return { cf: 1, tipo: "Al aire libre", ees: null };
+  const tipo = V < 0.6 && h < 508 && w < 508 && d <= 203.2 ? "Shallow" : "Typical";
+  const [A, B] = { VCB: [4, 20], VCBB: [10, 24], HCB: [10, 22] }[ec];
+  const eq1112 = (dim) => (660.4 + (dim - 660.4) * ((V + A) / B)) / 25.4;
+  const mmIn = 0.03937;
+  let w1, h1;
+  if (w < 508) w1 = tipo === "Typical" ? 20 : mmIn * w; else if (w <= 660.4) w1 = mmIn * w; else if (w <= 1244.6) w1 = eq1112(w); else w1 = eq1112(1244.6);
+  if (h < 508) h1 = tipo === "Typical" ? 20 : mmIn * h; else if (h <= 660.4) h1 = mmIn * h;
+  else if (h <= 1244.6) h1 = ec === "VCB" ? mmIn * h : eq1112(h); else h1 = ec === "VCB" ? 49 : eq1112(1244.6);
+  const ees = (h1 + w1) / 2;
+  const [b1, b2, b3] = N.IEEE1584.t7[`${tipo}|${ec}`];
+  const x = b1 * ees * ees + b2 * ees + b3;
+  return { cf: tipo === "Typical" ? x : 1 / x, tipo: tipo === "Typical" ? "Típico" : "Poco profundo", ees, w1, h1 };
+}
+export function arco1584({ ec = "VCB", voc, ibf, g, dist, h, w, d, tFull, tMin }) {
+  const T = N.IEEE1584, V = voc, lv = V <= 0.6;
+  const fuera = [];
+  if (V < 0.208 || V > 15) fuera.push("tensión fuera de 0,208 a 15 kV");
+  if (lv ? g < 6.35 || g > 76.2 : g < 19.05 || g > 254) fuera.push(`separación G fuera del rango (${lv ? "6,35 a 76,2" : "19,05 a 254"} mm)`);
+  if (dist < 305) fuera.push("distancia de trabajo menor que 305 mm");
+  if (lv ? ibf < 0.5 || ibf > 106 : ibf < 0.2 || ibf > 65) fuera.push(`corriente de falla fuera del rango (${lv ? "0,5 a 106" : "0,2 a 65"} kA)`);
+  if (!(ec === "VOA" || ec === "HOA") && w < 4 * g) fuera.push("ancho del encerramiento menor que 4 G");
+  const enc = cfEncerramiento(ec, V, h, w, d);
+  const iInt = (v) => { const k = T.t1[`${ec}|${v}`]; return Math.pow(10, k[0] + k[1] * L10(ibf) + k[2] * L10(g)) * poli(k.slice(3), ibf); };
+  const interp = (x6, x27, x143) => {
+    const x1 = ((x27 - x6) / 2.1) * (V - 2.7) + x27, x2 = ((x143 - x27) / 11.6) * (V - 14.3) + x143, x3 = (x1 * (2.7 - V)) / 2.1 + (x2 * (V - 0.6)) / 2.1;
+    return V <= 2.7 ? x3 : x2;
+  };
+  const finalBT = (i600) => 1 / Math.sqrt(Math.pow(0.6 / V, 2) * (1 / (i600 * i600) - (0.36 - V * V) / (0.36 * ibf * ibf)));
+  const varCf = poli(T.t2[ec], V), red = 1 - 0.5 * varCf;
+  const tabla = (v) => (v <= 0.6 ? T.t3 : v === 2.7 ? T.t4 : T.t5)[ec];
+  const eInt = (v, ia, t, ia600) => {
+    const k = tabla(v);
+    const den = poli([k[3], k[4], k[5], k[6], k[7], k[8], k[9], 0], ibf);
+    return (12.552 / 50) * t * Math.pow(10, k[0] + k[1] * L10(g) + (k[2] * (ia600 ?? ia)) / den + k[10] * L10(ibf) + k[12] * L10(ia) + L10(1 / enc.cf) + k[11] * L10(dist));
+  };
+  const afbDeE = (v, e) => { const k12 = tabla(v)[11]; return Math.pow(5.0208 / (e / Math.pow(dist, k12)), 1 / k12); };
+  const caso = (reducido, t) => {
+    if (lv) {
+      const i600 = iInt(0.6), ia = finalBT(i600) * (reducido ? red : 1);
+      const e = eInt(V, ia, t, i600);
+      return { iarc: ia, e, afb: afbDeE(V, e) };
+    }
+    const i = [0.6, 2.7, 14.3].map((v) => iInt(v) * (reducido ? red : 1));
+    const es = [0.6, 2.7, 14.3].map((v, k) => eInt(v, i[k], t));
+    const afbs = [0.6, 2.7, 14.3].map((v, k) => afbDeE(v, es[k]));
+    return { iarc: interp(...i), e: interp(...es), afb: interp(...afbs), intermedias: { i, es, afbs } };
+  };
+  const full = caso(false, tFull), min = caso(true, tMin ?? tFull);
+  return { full, min, varCf, red, enc, fuera };
+}
+
+export function arcoElectrico(e, proyecto = {}, ctx = {}) {
+  const eppDisp = num(e.eppDisponible, 8);
+  const verificaciones = [];
+  const filasT = filas(e.puntos).map((p) => {
+    const eq = N.IEEE1584.equipos[p.equipo] || N.IEEE1584.equipos.swBT;
+    const dato = (k, def) => { const x = num(p[k], NaN); return Number.isFinite(x) ? x : def; };
+    const barra = (ctx.cortocircuito?.barras || []).find((b) => b.nombre.trim().toLowerCase() === String(p.punto || "").trim().toLowerCase());
+    const ent = { ec: p.configuracion || "VCB", voc: dato("tension", 0.48), ibf: dato("ibf", barra ? barra.ik3 / 1000 : 25), deCorto: !Number.isFinite(num(p.ibf, NaN)) && !!barra };
+    const r = arco1584({ ec: ent.ec, voc: ent.voc, ibf: ent.ibf, g: dato("gap", eq.G), dist: dato("distancia", eq.D), h: dato("alto", eq.h), w: dato("ancho", eq.w), d: dato("fondo", eq.d), tFull: dato("tiempo", 100), tMin: dato("tiempoMin", dato("tiempo", 100)) });
+    // Fuera de 0,208 a 15 kV el modelo extrapola sin sentido: no se reportan valores.
+    if (ent.voc < 0.208 || ent.voc > 15) [r.full, r.min].forEach((c) => { c.iarc = c.e = c.afb = NaN; });
+    const eCal = Math.max(r.full.e, r.min.e) / 4.184, afb = r.full.e >= r.min.e ? r.full.afb : r.min.afb;
+    const cat = N.CATEGORIAS_EPP.find(([lim]) => eCal <= lim);
+    const nombre = p.punto || eq.nombre;
+    if (r.fuera.length) verificaciones.push({ criterio: `${nombre}: dentro del rango de validez del modelo`, norma: "IEEE 1584-2018 §4.2", valor: r.fuera.join("; "), limite: "Dentro del rango", cumple: false });
+    verificaciones.push({ criterio: `${nombre}: energía incidente frente al EPP disponible`, norma: "NFPA 70E 130.5 / RETIE", valor: `${fmt(eCal, 2)} cal/cm²`, limite: `≤ ${fmt(eppDisp, 1)} cal/cm²`, cumple: eCal <= eppDisp });
+    verificaciones.push({ criterio: `${nombre}: energía incidente menor que 40 cal/cm²`, norma: "NFPA 70E (por encima no hay EPP normalizado: trabajar desenergizado)", valor: `${fmt(eCal, 2)} cal/cm²`, limite: "≤ 40 cal/cm²", cumple: eCal <= 40 });
+    const catCorta = Number.isNaN(eCal) ? "Fuera del modelo" : !cat ? "No trabajar energizado (> 40 cal/cm²)" : cat[0] <= 1.2 ? "Sin requisito" : cat[1].replace(/ \(.*\)$/, "");
+    return { nombre, r, eCal, afb, catCorta, cat: Number.isNaN(eCal) ? "Fuera del modelo IEEE 1584 (0,208 a 15 kV): use otro método" : cat ? cat[1] : "Mayor que 40 cal/cm²: no trabajar energizado", eq, p, ent };
+  });
+  const peor = filasT.reduce((m, f) => (f.eCal > (m?.eCal ?? -1) ? f : m), null);
+  return {
+    resumen: peor ? [
+      { etiqueta: "Mayor energía incidente", valor: fmt(peor.eCal, 2), unidad: "cal/cm²" },
+      { etiqueta: "En", valor: peor.nombre, unidad: "" },
+      { etiqueta: "Frontera de arco", valor: fmt(peor.afb / 1000, 2), unidad: "m" }
+    ] : [],
+    tablas: [
+      { titulo: "Energía incidente y frontera de arco por punto (IEEE 1584-2018)", encabezados: ["Punto", "Voc (kV)", "Ibf (kA)", "Iarc (kA)", "Iarc red. (kA)", "E (cal/cm²)", "Frontera (m)", "EPP mínimo"], filas: filasT.map((f) => [f.nombre, fmt(f.ent.voc, f.ent.voc < 1 ? 3 : 1), fmt(f.ent.ibf, 1) + (f.ent.deCorto ? " (S)" : ""), fmt(f.r.full.iarc, 2), fmt(f.r.min.iarc, 2), fmt(f.eCal, 2), fmt(f.afb / 1000, 2), f.catCorta]) },
+      { titulo: "Detalle del cálculo por punto", encabezados: ["Punto", "Electrodos", "Encerramiento (EES, tipo)", "CF", "VarCf / factor", "E plena (J/cm²)", "E reducida (J/cm²)", "Gobierna"], filas: filasT.map((f) => [f.nombre, f.ent.ec, f.r.enc.ees ? `${fmt(f.r.enc.ees, 2)} pulg., ${f.r.enc.tipo}` : f.r.enc.tipo, fmt(f.r.enc.cf, 3), `${fmt(f.r.varCf, 3)} / ${fmt(f.r.red, 3)}`, fmt(f.r.full.e, 2), fmt(f.r.min.e, 2), f.r.full.e >= f.r.min.e ? "Corriente plena" : "Corriente reducida"]) }
+    ],
+    pasos: [
+      { titulo: "Corriente de arco intermedia", formula: "Iarc,Voc = 10^(k1 + k2 lg Ibf + k3 lg G) × (k4 Ibf⁶ + … + k9 Ibf + k10)", sustitucion: "Tabla 1 de la IEEE 1584-2018 a 600, 2700 y 14 300 V", resultado: "Por punto" },
+      { titulo: "Corriente de arco final", formula: "Voc > 600 V: interpolación entre 600, 2700 y 14 300 V; Voc ≤ 600 V: ecuación 25", sustitucion: "IEEE 1584-2018 ecuaciones 16 a 25", resultado: "Por punto" },
+      { titulo: "Corriente de arco reducida", formula: "Iarc,mín = Iarc × (1 − 0,5 VarCf)", sustitucion: "VarCf de la Tabla 2 (ecuación 2); se evalúa con el tiempo de despeje a esa corriente", resultado: "Por punto" },
+      { titulo: "Factor de tamaño del encerramiento", formula: "EES = (alto₁ + ancho₁) / 2; CF = b1 EES² + b2 EES + b3 (típico) o su inverso (poco profundo)", sustitucion: "Tablas 6 y 7, ecuaciones 11 a 15", resultado: "Por punto" },
+      { titulo: "Energía incidente", formula: "E = 12,552/50 × T × 10^(k1 + k2 lg G + k3 Iarc / f(Ibf) + k11 lg Ibf + k12 lg D + k13 lg Iarc + lg(1/CF))", sustitucion: "Tablas 3 a 5; se toma la mayor entre corriente plena y reducida", resultado: "Por punto" },
+      { titulo: "Frontera de arco", formula: "Distancia a la que la energía incidente es 1,2 cal/cm² (5,0 J/cm²)", sustitucion: "Misma ecuación de energía despejada para D", resultado: "Por punto" }
+    ],
+    verificaciones,
+    notas: [...(filasT.some((f) => f.ent.deCorto) ? ["(S) Ibf tomada del cálculo de cortocircuito del proyecto (barra con el mismo nombre del punto)."] : []), "El tiempo de arco es el tiempo de despeje de la protección aguas arriba a la corriente de arco (tome los tiempos de la coordinación de protecciones). Con la corriente reducida el tiempo suele ser mayor.", "Cada equipo debe rotularse con la energía incidente, la frontera de arco y el EPP requerido."],
+    conclusion: peor ? veredicto(verificaciones, `La mayor energía incidente es ${fmt(peor.eCal, 2)} cal/cm² en «${peor.nombre}» (${peor.cat}).`, "Hay puntos con energía incidente por encima del EPP disponible o fuera del rango del modelo: reduzca el tiempo de despeje o trabaje desenergizado.") : filasT.length ? "Ningún punto está dentro del rango de tensión del modelo IEEE 1584 (0,208 a 15 kV): use otro método." : "Agregue los puntos a evaluar."
+  };
+}
+
+export const CALCULOS = { cargas, conductores, regulacion, canalizaciones, transformador, cortocircuito, coordinacion, malla, rayos, aislamiento, distancias, mecanico, trafoPotencia, cableMT, apantallamiento, fvArreglo, fvProduccion, fvConductores, fvConexion, arcoElectrico };

@@ -30,10 +30,11 @@ async function seccionModulo(r, entradas, nivel) {
   b.push(P(`<b>Normas aplicadas.</b> ${esc(mod.normas.join("; "))}.`));
   const alc = ALCANCE[r.modulo];
   if (alc) b.push(P(`<b>Alcance del método.</b> ${esc(alc.metodo)}<br><b>Limitaciones.</b> ${alc.limitaciones.map(esc).join(" ")}`));
-  // Datos de entrada.
-  const simples = mod.campos.filter((c) => c.tipo !== "tabla" && !(c.soloSi && String(entradas[Object.keys(c.soloSi)[0]]) !== String(Object.values(c.soloSi)[0])));
+  // Datos de entrada (un campo condicional se muestra según el valor guardado o, si falta, el de ejemplo).
+  const visible = (c) => { if (!c.soloSi) return true; const [k, v] = Object.entries(c.soloSi)[0]; return String(entradas[k] ?? mod.campos.find((x) => x.key === k)?.def) === String(v); };
+  const simples = mod.campos.filter((c) => c.tipo !== "tabla" && visible(c));
   if (simples.length) b.push(tabla(`Datos de entrada — ${titulo}`, ["Parámetro", "Valor", "Unidad"], simples.map((c) => [c.label, valorVisible(c, entradas[c.key]), c.unidad || ""])));
-  mod.campos.filter((c) => c.tipo === "tabla").forEach((c) => {
+  mod.campos.filter((c) => c.tipo === "tabla" && visible(c)).forEach((c) => {
     const filas = (entradas[c.key] || []).filter((f) => Object.values(f).some((v) => v !== "" && v != null));
     if (filas.length) b.push(tabla(`${c.label.replace(/\s*\(.*\)\s*$/, "")} — datos de entrada`, c.columnas.map((col) => col.label), filas.map((f) => c.columnas.map((col) => valorVisible(col, f[col.key])))));
   });
@@ -152,7 +153,7 @@ const nombreArchivo = (p, ext) => `${esVerificacion(p) ? "Verificacion memoria d
 // Las fuentes estándar del PDF (Helvetica, WinAnsi) no tienen letras
 // griegas ni símbolos matemáticos: se escriben con equivalentes legibles
 // (el Word sí los conserva).
-const EQUIV_PDF = { "√": "raíz ", "Ω": "ohm", "Σ": "Suma ", "π": "pi", "ρ": "rho", "α": "alfa", "φ": "phi", "κ": "kappa", "θ": "theta", "Δ": "Delta ", "→": "->", "−": "-", "⁻": "-", "⁰": "^0", "¹": "^1", "⁴": "^4", "⁵": "^5", "⁶": "^6", "≤": "<=", "≥": ">=", "≈": "~" };
+const EQUIV_PDF = { "√": "raíz ", "Ω": "ohm", "Σ": "Suma ", "π": "pi", "ρ": "rho", "α": "alfa", "φ": "phi", "κ": "kappa", "θ": "theta", "Δ": "Delta ", "→": "->", "−": "-", "⁻": "-", "⁰": "^0", "¹": "^1", "⁴": "^4", "⁵": "^5", "⁶": "^6", "⁷": "^7", "ⁿ": "^n", "₁": "1", "≤": "<=", "≥": ">=", "≈": "~" };
 // Caracteres fuera de Latin-1 que WinAnsi sí tiene; el resto (emoji, etc.) se omite.
 const WINANSI_EXTRA = "€‚ƒ„…†‡ˆ‰Š‹ŒŽ‘’“”•–—˜™š›œžŸ";
 const pdfSeguro = (t) => (typeof t === "string" ? t.replace(/[^\u0000-ÿ]/gu, (c) => EQUIV_PDF[c] ?? (WINANSI_EXTRA.includes(c) ? c : "")) : t);

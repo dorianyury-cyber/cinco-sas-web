@@ -13,7 +13,7 @@ export const LITERALES = [
   { l: "b", texto: "Análisis de riesgos por descargas eléctricas atmosféricas (rayos) y medidas de protección.", modulos: ["rayos", "apantallamiento"] },
   { l: "c", texto: "Análisis y cálculo de cargas iniciales y futuras, incluyendo factor de potencia y armónicos.", modulos: ["cargas", "fvProduccion"], guia: "Complemente con el análisis de armónicos si hay cargas no lineales." },
   { l: "d", texto: "Coordinación de aislamiento eléctrico.", modulos: ["aislamiento", "fvArreglo"] },
-  { l: "e", texto: "Análisis y cálculos de cortocircuito, arco eléctrico y falla a tierra.", modulos: ["cortocircuito"], guia: "El módulo calcula cortocircuito trifásico y falla a tierra; si aplica, complemente con la energía incidente por arco (IEEE 1584)." },
+  { l: "e", texto: "Análisis y cálculos de cortocircuito, arco eléctrico y falla a tierra.", modulos: ["cortocircuito", "arcoElectrico"], guia: "Cortocircuito trifásico y falla a tierra (IEC 60909) y energía incidente por arco eléctrico con su frontera y EPP (IEEE 1584-2018)." },
   { l: "f", texto: "Análisis del nivel tensión requerido.", modulos: [], guia: "Justifique el nivel de tensión de conexión según la demanda (literal c) y la disponibilidad del operador de red." },
   { l: "g", texto: "Cálculos de campos electromagnéticos.", modulos: [], guia: "Verifique que en espacios de actividades rutinarias no se superen los límites de exposición del RETIE." },
   { l: "h", texto: "Cálculo de transformadores incluyendo efectos de los armónicos y factor de potencia en la carga.", modulos: ["transformador", "trafoPotencia"] },

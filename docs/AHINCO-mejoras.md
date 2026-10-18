@@ -35,6 +35,9 @@ Datos en Firestore: `rtProyectos/{id}` y `rtProyectos/{id}/calculos/{clave}` (`c
 
 - La pantalla y el Excel formulado dan los mismos resultados, comprobados recalculando en Excel con los proyectos de ejemplo y con las subestaciones Oriente, Sur y Seboruco (0 errores de fórmula).
 - Malla de puesta a tierra: coincide con el ejemplo 1 del Anexo B de la IEEE 80-2013 (Rg 2,78 Ω; Cs 0,743; tensión de contacto 840,5 V; tensión de malla 992,5 V).
+- Arco eléctrico (IEEE 1584-2018): coincide con los ejemplos D.1 (4,16 kV: Iarc 12,979 kA, E 12,152 J/cm², AFB 1606 mm; reducida 13,343 J/cm²) y D.2 (480 V: E 11,585 J/cm², AFB 1029 mm; reducida 53,156 J/cm²) del Anexo D, en la pantalla y en el Excel. Prueba: `arco1584()` en `rt-calculos.js`.
+- Suelo de dos capas: la serie de Sunde reproduce la Tabla 3 de la IEEE 81-2012 (error ≤ 0,8 %, redondeo de la tabla) y el ajuste da ρ1 = 300,1, ρ2 = 100,2 Ω·m, h = 6,08 m (RMS 0,27 %), igual que XGSLab en el benchmark de la IEEE 80-2013 Anexo H. ρa(av2) = 193 Ω·m con la Tabla E.2 de la IEEE 80. Con la malla del Anexo H (70 × 70 m, 20 varillas de 7,5 m, 140 Ω·m) Rg = 1,022 Ω y GPR = 761 V, iguales a la norma; Em y Es salen 5 % menores que la columna «STD 80» del benchmark en las dos mallas (mismo factor: corriente de malla del ejemplo).
+- Factor de división (Endrenyi): ejemplo de la IEEE 80 §15.9 — Zeq de la línea 4,22 + j1,04 Ω (igual), Sf 0,36 frente a 0,37 publicado (la norma redondea el neutro del alimentador a 1,88 + j0,89 Ω; la fórmula da 1,88 + j0,81 Ω).
 - **Pendiente:** validación independiente de cortocircuito y coordinación contra un estudio en ETAP o DIgSILENT, y revisión de una memoria completa por un organismo de inspección acreditado.
 
 ## 3. Limitaciones conocidas por cálculo
@@ -42,7 +45,8 @@ Datos en Firestore: `rtProyectos/{id}` y `rtProyectos/{id}/calculos/{clave}` (`c
 | Cálculo | Limitación | Dónde se resolvería |
 |---|---|---|
 | Cortocircuito | Radial, una fuente; sin aporte de motores ni generación distribuida. Z0 aproximada (transformador ≈ Z1, cables ≈ 4 Z1, zig-zag con su X0). Sin Ib ni Ik permanente. | `cortocircuito()` en `rt-calculos.js`; columnas R0/X0 en `HOJAS.cortocircuito` |
-| Malla (IEEE 80) | Suelo uniforme; malla rectangular; Sf digitado; sin tensiones transferidas. | `malla()`; agregar modelo de dos capas (IEEE 80 §13) y cálculo de Sf (Anexo C) |
+| Malla (IEEE 80) | Dos capas por resistividad equivalente ρa(av2), no por cálculo numérico de dos capas (Em puede quedar baja con K < 0; se muestra la referencia con ρ1). Malla rectangular. Sf por Endrenyi sin acoples mutuos. Transferidas solo GPR frente al contacto tolerable. | `malla()`, `ajusteDosCapas()`, `factorDivision()` en `rt-calculos.js` |
+| Arco eléctrico | Solo 0,208 a 15 kV trifásico AC (fuera: «Fuera del modelo»); tiempos de despeje digitados; sin arco DC. | `arco1584()` y `arcoElectrico()`; tablas `IEEE1584` en `rt-normas.js` |
 | Cables de MT | Ampacidad digitada por el usuario; sin IEC 60287 ni tablas 310-77 a 310-86; pantalla no verificada. | `cableMT()` y `rt-normas.js` (tablas nuevas) |
 | Coordinación | Solo sobrecorriente de fase IEC; sin ANSI, fusibles, 51N, 87, 21; corrientes referidas a una tensión por el usuario. | `coordinacion()`, `CURVAS_IEC` en `rt-normas.js`, gráfico en `rt-grafico.js` |
 | Apantallamiento | Un captador por elemento, en el plano; sin protección combinada ni planta. | `apantallamiento()` |
@@ -61,8 +65,8 @@ Datos en Firestore: `rtProyectos/{id}` y `rtProyectos/{id}/calculos/{clave}` (`c
 ## 4. Mejoras pendientes (en orden)
 
 1. **Validación independiente** (cortocircuito, coordinación, memoria completa). No requiere código, pero es lo que más credibilidad da. Registrar el resultado en la sección 2 y en `VALIDACION` (`rt-alcance.js`).
-2. **Arco eléctrico IEEE 1584-2018**: módulo nuevo (área MT), con la corriente de cortocircuito de `ctx.cortocircuito` y el tiempo de despeje de la coordinación; literal e).
-3. **Malla con suelo de dos capas**: entradas ρ1, ρ2 y espesor h1 (de la medición IEEE 81); resistencia y tensiones según IEEE 80 §13 / Anexo E.
+2. **Arco eléctrico — tiempos automáticos**: leer el tiempo de despeje de las curvas de `coordinacion()` a la corriente de arco plena y reducida (hoy se digitan). Arco en DC (baterías, FV).
+3. **Malla en dos capas por método numérico** (sin resistividad equivalente) y potenciales fuera del cerramiento.
 4. **Cables de MT**: cargar las Tablas 310-77 a 310-86 de la NTC 2050 en `rt-normas.js` y, como opción, IEC 60287 para bancos de ductos (resistividad térmica, profundidad, agrupamiento).
 5. **Historial de versiones**: guardar una copia de entradas y literales al generar cada memoria (`rtProyectos/{id}/versiones`), con comparación entre revisiones.
 6. **Cortocircuito ampliado**: aporte de motores y generación, impedancias de secuencia cero del fabricante.

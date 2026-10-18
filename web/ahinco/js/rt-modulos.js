@@ -160,14 +160,27 @@ export const MODULOS = {
   malla: {
     area: "spt", icono: "🌐", titulo: "Malla de puesta a tierra (IEEE 80)",
     objeto: "Diseñar la malla de puesta a tierra para que las tensiones de paso y de contacto sean menores que las tolerables por el cuerpo humano, y verificar su resistencia y la sección del conductor.",
-    normas: ["RETIE — cálculo del sistema de puesta a tierra y valores de referencia de resistencia", "IEEE 80-2013 (seguridad en puesta a tierra de subestaciones)", "NTC 4552 / IEEE 81 (medición de resistividad)"],
+    normas: ["RETIE — cálculo del sistema de puesta a tierra y valores de referencia de resistencia", "IEEE 80-2013 (seguridad en puesta a tierra de subestaciones; §13.4 y Anexo E: suelo no uniforme; §15 y Anexo C: división de corriente)", "IEEE 81-2012 / NTC 4552 (medición de resistividad e interpretación en dos capas)"],
     campos: [
       { key: "tipoInstalacion", label: "Tipo de instalación (valor de referencia RETIE)", tipo: "select", opciones: op(N.RETIE_RESISTENCIA_SPT), def: "subMT" },
-      { key: "rho", label: "Resistividad del suelo ρ", tipo: "numero", unidad: "Ω·m", def: 100 },
+      { key: "modeloSuelo", label: "Modelo del suelo", tipo: "select", opciones: [{ valor: "uniforme", texto: "Uniforme (resistividad digitada)" }, { valor: "dosCapas", texto: "Dos capas a partir de mediciones Wenner (IEEE 81)" }], def: "uniforme" },
+      { key: "rho", label: "Resistividad del suelo ρ (suelo uniforme)", tipo: "numero", unidad: "Ω·m", def: 100, soloSi: { modeloSuelo: "uniforme" } },
+      { key: "mediciones", label: "Mediciones Wenner (separación a y resistividad aparente ρa = 2π a R)", tipo: "tabla", soloSi: { modeloSuelo: "dosCapas" }, columnas: [
+        { key: "a", label: "Separación a (m)", tipo: "numero", ancho: 42 }, { key: "rhoA", label: "ρa medida (Ω·m)", tipo: "numero", ancho: 42 }
+      ], nueva: {}, def: [{ a: 0.3, rhoA: 300 }, { a: 0.9, rhoA: 299.7 }, { a: 1.5, rhoA: 298.5 }, { a: 3, rhoA: 289.9 }, { a: 4.5, rhoA: 272.6 }, { a: 6.1, rhoA: 248.7 }, { a: 9.1, rhoA: 203.6 }, { a: 15.2, rhoA: 144.2 }, { a: 21.3, rhoA: 120.4 }, { a: 27.4, rhoA: 110.2 }, { a: 33.5, rhoA: 107.3 }, { a: 39.6, rhoA: 104.5 }, { a: 45.7, rhoA: 103.4 }] },
       { key: "rhoS", label: "Resistividad de la capa superficial ρs (0 = sin capa)", tipo: "numero", unidad: "Ω·m", def: 3000 },
       { key: "hs", label: "Espesor de la capa superficial", tipo: "numero", unidad: "m", def: 0.1 },
       { key: "ifalla", label: "Corriente de falla a tierra 3I0", tipo: "numero", unidad: "A", def: 3000 },
-      { key: "sf", label: "Factor de división de corriente Sf", tipo: "numero", unidad: "%", def: 60 },
+      { key: "sfModo", label: "Factor de división de corriente Sf", tipo: "select", opciones: [{ valor: "digitado", texto: "Digitado" }, { valor: "calculado", texto: "Calculado con cables de guarda y neutros (Endrenyi, IEEE 80)" }], def: "digitado" },
+      { key: "sf", label: "Sf digitado", tipo: "numero", unidad: "%", def: 60, soloSi: { sfModo: "digitado" } },
+      { key: "nLineas", label: "Líneas con cable de guarda conectado a la malla", tipo: "numero", def: 1, soloSi: { sfModo: "calculado" } },
+      { key: "zsLineaR", label: "Cable de guarda: resistencia propia por vano (con retorno por tierra)", tipo: "numero", unidad: "Ω", def: 1.24, soloSi: { sfModo: "calculado" } },
+      { key: "zsLineaX", label: "Cable de guarda: reactancia propia por vano", tipo: "numero", unidad: "Ω", def: 0.55, soloSi: { sfModo: "calculado" } },
+      { key: "rtg", label: "Resistencia de puesta a tierra de cada torre", tipo: "numero", unidad: "Ω", def: 10, soloSi: { sfModo: "calculado" } },
+      { key: "nAlim", label: "Alimentadores con neutro conectado a la malla", tipo: "numero", def: 1, soloSi: { sfModo: "calculado" } },
+      { key: "zsAlimR", label: "Neutro: resistencia propia por vano", tipo: "numero", unidad: "Ω", def: 0.11, soloSi: { sfModo: "calculado" } },
+      { key: "zsAlimX", label: "Neutro: reactancia propia por vano", tipo: "numero", unidad: "Ω", def: 0.11, soloSi: { sfModo: "calculado" } },
+      { key: "rdg", label: "Resistencia de puesta a tierra de cada poste del alimentador", tipo: "numero", unidad: "Ω", def: 25, soloSi: { sfModo: "calculado" } },
       { key: "xr", label: "Relación X/R en el punto de falla", tipo: "numero", def: 10 },
       { key: "tf", label: "Duración de la falla (tensiones tolerables)", tipo: "numero", unidad: "s", def: 0.5 },
       { key: "tc", label: "Duración de la falla (dimensionamiento del conductor)", tipo: "numero", unidad: "s", def: 1 },
@@ -325,6 +338,26 @@ export const MODULOS = {
         { key: "inCelda", label: "In celda (A)", tipo: "numero", ancho: 7 }
       ], nueva: { material: "Al", calibre: "750", aislamiento: "XLPE", factor: 1, x: 0.13, tDespeje: 0.5 }, def: [
         { circuito: "Circuito 1", material: "Al", calibre: "750", aislamiento: "XLPE", ampacidad: 520, factor: 0.85, corriente: 300, longitud: 300, x: 0.13, tDespeje: 0.5, inCelda: 630 }
+      ] }
+    ]
+  },
+  arcoElectrico: {
+    area: "mt", icono: "🔥", titulo: "Arco eléctrico (IEEE 1584-2018)", literalPrincipal: "e",
+    objeto: "Calcular la corriente de arco, la energía incidente y la frontera de arco en los puntos de trabajo energizado, y definir la categoría de equipo de protección personal (EPP) requerida.",
+    normas: ["RETIE — análisis de riesgo por arco eléctrico", "IEEE 1584-2018 (cálculo de riesgo por arco eléctrico)", "NFPA 70E (categorías de EPP y frontera de arco)"],
+    campos: [
+      { key: "eppDisponible", label: "Calificación de arco del EPP disponible para el trabajo", tipo: "numero", unidad: "cal/cm²", def: 8 },
+      { key: "puntos", label: "Puntos de trabajo (vacíos = valores típicos del equipo; Ibf vacía = la barra del cortocircuito con el mismo nombre)", tipo: "tabla", columnas: [
+        { key: "punto", label: "Punto", tipo: "texto", ancho: 14 }, { key: "equipo", label: "Equipo", tipo: "select", opciones: op(N.IEEE1584.equipos), ancho: 16 },
+        { key: "configuracion", label: "Electrodos", tipo: "select", opciones: Object.keys(N.IEEE1584.configuraciones).map((k) => ({ valor: k, texto: k })), ancho: 10 },
+        { key: "tension", label: "Voc (kV)", tipo: "numero", ancho: 7 }, { key: "ibf", label: "Ibf (kA)", tipo: "numero", ancho: 7 },
+        { key: "tiempo", label: "t a Iarc (ms)", tipo: "numero", ancho: 7 }, { key: "tiempoMin", label: "t a Iarc red. (ms)", tipo: "numero", ancho: 7 },
+        { key: "gap", label: "G (mm)", tipo: "numero", ancho: 6 }, { key: "distancia", label: "D trabajo (mm)", tipo: "numero", ancho: 7 },
+        { key: "alto", label: "Alto (mm)", tipo: "numero", ancho: 6 }, { key: "ancho", label: "Ancho (mm)", tipo: "numero", ancho: 6 }, { key: "fondo", label: "Fondo (mm)", tipo: "numero", ancho: 6 }
+      ], nueva: { equipo: "swBT", configuracion: "VCB", tension: 0.48 }, def: [
+        { punto: "Celdas de 13,2 kV", equipo: "sw15", configuracion: "VCB", tension: 13.2, ibf: 6, tiempo: 250, tiempoMin: 300 },
+        { punto: "Tablero general BT", equipo: "swBT", configuracion: "VCB", tension: 0.48, ibf: 25, tiempo: 50, tiempoMin: 120 },
+        { punto: "Tablero de distribución", equipo: "panelBT", configuracion: "VCB", tension: 0.208, ibf: 8, tiempo: 25, tiempoMin: 25 }
       ] }
     ]
   },
