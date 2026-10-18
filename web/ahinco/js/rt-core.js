@@ -13,7 +13,7 @@ import { signOut, onAuthStateChanged } from "https://www.gstatic.com/firebasejs/
 import { collection, doc, getDoc, getDocs, addDoc, setDoc, updateDoc, deleteDoc, serverTimestamp, query, orderBy } from "https://www.gstatic.com/firebasejs/10.7.1/firebase-firestore.js";
 import { auth, db, obtenerPerfil } from "../../js/control/firebase-control.js";
 import { CALCULOS } from "./rt-calculos.js";
-import { MODULOS, entradasPorDefecto } from "./rt-modulos.js";
+import { MODULOS, entradasPorDefecto, tablasFaltantes } from "./rt-modulos.js";
 
 export { auth, db };
 export const NOMBRE_APP = "AHÍNCO";
@@ -171,6 +171,8 @@ export const tituloCalculo = (r) => `${MODULOS[r.modulo].titulo}${r.etiqueta ? `
 export const ORDEN_MODULOS = ["cargas", "conductores", "conductorEconomico", "regulacion", "canalizaciones", "transformador", "trafoPotencia", "cortocircuito", "armonicos", "cableMT", "coordinacion", "arcoElectrico", "malla", "rayos", "apantallamiento", "aislamiento", "distancias", "camposEM", "mecanico", "fvArreglo", "fvProduccion", "fvConductores", "fvConexion"];
 
 export function calcularModulo(id, entradas, proyecto, ctx = {}) {
+  const faltan = tablasFaltantes(id, entradas);
+  if (faltan.length) return { sinDatos: true, resumen: [], tablas: [], pasos: [], verificaciones: [], conclusion: `Sin datos: agregue al menos una fila en ${faltan.map((f) => `«${f}»`).join(" y ")} para calcular.` };
   try {
     return CALCULOS[id](entradas, proyecto, ctx);
   } catch (err) {
@@ -203,6 +205,7 @@ export function calcularProyecto(proyecto, guardados, { incluirEjemplos = false,
 export function estadoModulo(r) {
   if (!r) return { texto: "Sin datos", clase: "muted" };
   if (r.error) return { texto: "Error", clase: "danger" };
+  if (r.sinDatos) return { texto: "Sin datos", clase: "muted" };
   const v = r.verificaciones || [];
   if (!v.length) return { texto: "Calculado", clase: "ok" };
   const fallan = v.filter((x) => x.cumple === false).length;

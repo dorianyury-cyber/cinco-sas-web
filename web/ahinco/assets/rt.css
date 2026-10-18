@@ -283,3 +283,6 @@ body.rt-verificacion .rt-solo-verif { display: block; }
 #rDialogo label { display: block; margin: 10px 0; }
 #rDialogo select, #rDialogo input { width: 100%; }
 #modulos .rt-selector-area { margin-bottom: 14px; }
+.rt-tabla-acciones { display: flex; flex-wrap: wrap; gap: 8px; }
+.rt-vaciar { margin-top: 6px; border: 1px dashed var(--border); background: none; color: var(--danger); border-radius: 8px; padding: 6px 12px; cursor: pointer; font-weight: 600; font-size: 12.5px; }
+.rt-tabla-edit td:first-child { text-align: center; }

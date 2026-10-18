@@ -3,7 +3,7 @@
 // Con ?rapido=1&m=módulo es un cálculo rápido: sin proyecto, con borrador en
 // el navegador, salidas de ese solo cálculo y opción de guardarlo en un proyecto.
 import { iniciarPagina, leerProyecto, leerCalculos, guardarCalculo, eliminarCalculo, calcularProyecto, moduloDe, nuevaClave, esc, mostrarAlerta, limpiarAlerta, errorAmigable, listarProyectos, crearProyecto, tituloCalculo } from "./rt-core.js";
-import { MODULOS, AREAS, entradasPorDefecto } from "./rt-modulos.js";
+import { MODULOS, AREAS, entradasPorDefecto, tablasFaltantes } from "./rt-modulos.js";
 import { svgTCC } from "./rt-grafico.js";
 import { menuProyecto, menuInicio } from "./rt-shell.js";
 import { ALCANCE } from "./rt-alcance.js";
@@ -89,13 +89,12 @@ function iniciar(proyecto, guardados, esRapido = false) {
     const filas = entradas[c.key] || [];
     const total = c.columnas.reduce((s, col) => s + (col.ancho || 10), 0) + 3;
     return `<div class="rt-tabla-campo" data-campo="${c.key}"><label>${esc(c.label)}</label>
-      <div class="rt-tabla-scroll"><table class="rt-tabla-edit"><colgroup>${c.columnas.map((col) => `<col data-ancho="${((col.ancho || 10) / total) * 100}">`).join("")}<col data-ancho="${(3 / total) * 100}"></colgroup>
-      <thead><tr>${c.columnas.map((col) => `<th>${esc(col.label)}</th>`).join("")}<th></th></tr></thead>
-      <tbody>${filas.map((f, i) => `<tr>${c.columnas.map((col) => `<td>${col.tipo === "select"
+      <div class="rt-tabla-scroll"><table class="rt-tabla-edit"><colgroup><col data-ancho="${(3 / total) * 100}">${c.columnas.map((col) => `<col data-ancho="${((col.ancho || 10) / total) * 100}">`).join("")}</colgroup>
+      <thead><tr><th></th>${c.columnas.map((col) => `<th>${esc(col.label)}</th>`).join("")}</tr></thead>
+      <tbody>${filas.map((f, i) => `<tr><td><button type="button" class="rt-quitar" data-quitar="${c.key}" data-i="${i}" title="Quitar esta fila">✕</button></td>${c.columnas.map((col) => `<td>${col.tipo === "select"
         ? `<select data-t="${c.key}" data-i="${i}" data-c="${col.key}">${opciones(col, f[col.key])}</select>`
-        : `<input data-t="${c.key}" data-i="${i}" data-c="${col.key}" ${col.tipo === "numero" ? 'type="number" step="any"' : 'type="text"'} value="${esc(f[col.key])}">`}</td>`).join("")}
-        <td><button type="button" class="rt-quitar" data-quitar="${c.key}" data-i="${i}" title="Quitar fila">✕</button></td></tr>`).join("")}</tbody></table></div>
-      <button type="button" class="rt-agregar" data-agregar="${c.key}">+ Agregar fila</button></div>`;
+        : `<input data-t="${c.key}" data-i="${i}" data-c="${col.key}" ${col.tipo === "numero" ? 'type="number" step="any"' : 'type="text"'} value="${esc(f[col.key])}">`}</td>`).join("")}</tr>`).join("")}</tbody></table></div>
+      <div class="rt-tabla-acciones"><button type="button" class="rt-agregar" data-agregar="${c.key}">+ Agregar fila</button>${filas.length ? `<button type="button" class="rt-vaciar" data-vaciar="${c.key}">Vaciar tabla</button>` : ""}</div></div>`;
   }
   function pintarCampos() {
     contCampos.innerHTML = mod.campos.map((c) => (c.tipo === "tabla" ? campoTabla(c) : campoSimple(c))).join("");
@@ -119,8 +118,11 @@ function iniciar(proyecto, guardados, esRapido = false) {
     recalcular();
   });
   contCampos.addEventListener("click", (e) => {
-    const ag = e.target.closest("[data-agregar]"), qu = e.target.closest("[data-quitar]");
-    if (ag) {
+    const ag = e.target.closest("[data-agregar]"), qu = e.target.closest("[data-quitar]"), va = e.target.closest("[data-vaciar]");
+    if (va) {
+      if (!confirm("¿Quitar todas las filas de esta tabla?")) return;
+      entradas[va.dataset.vaciar] = [];
+    } else if (ag) {
       const c = mod.campos.find((x) => x.key === ag.dataset.agregar);
       entradas[c.key] = [...(entradas[c.key] || []), { ...(c.nueva || {}) }];
     } else if (qu) {
@@ -135,6 +137,8 @@ function iniciar(proyecto, guardados, esRapido = false) {
     return `<h3>${esc(t.titulo)}</h3><div class="tabla-scroll"><table class="rt-tabla-res"><thead><tr>${t.encabezados.map((h) => `<th>${esc(h)}</th>`).join("")}</tr></thead><tbody>${t.filas.map((f) => `<tr>${f.map((v) => `<td>${esc(v)}</td>`).join("")}</tr>`).join("")}</tbody></table></div>`;
   }
   function recalcular() {
+    const faltan = tablasFaltantes(mid, entradas);
+    if (faltan.length) { resultados.innerHTML = `<h2>Resultados</h2><div class="rt-conclusion">Agregue al menos una fila en ${faltan.map((f) => `«${esc(f)}»`).join(" y ")} para calcular.</div>`; return; }
     const res = calcularProyecto(proyecto, guardados, { sobrescribir: { [clave]: entradas } })[clave];
     if (!res) { resultados.innerHTML = ""; return; }
     const fallan = (res.verificaciones || []).filter((v) => v.cumple === false).length;

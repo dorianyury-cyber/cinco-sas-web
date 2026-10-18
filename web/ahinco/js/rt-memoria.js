@@ -114,7 +114,7 @@ export async function construirMemoria({ proyecto, resultados, guardados }) {
   b.push(T(1, "Conclusiones"));
   const filasConc = Object.values(resultados).map((r) => {
     const fallan = (r.verificaciones || []).filter((v) => v.cumple === false).length;
-    return [tituloCalculo(r), fallan ? (verif ? `Con hallazgos (${fallan})` : `No cumple (${fallan})`) : "Cumple", r.conclusion || ""];
+    return [tituloCalculo(r), r.sinDatos ? "Sin datos" : fallan ? (verif ? `Con hallazgos (${fallan})` : `No cumple (${fallan})`) : "Cumple", r.conclusion || ""];
   });
   b.push(tabla("Resumen de resultados", ["Cálculo", "Estado", "Conclusión"], filasConc));
   b.push(P(verif

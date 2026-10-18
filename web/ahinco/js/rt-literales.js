@@ -41,7 +41,7 @@ export function estadoLiteral(lit, dato, resultados) {
   const aplica = dato?.aplica !== "No";
   const texto = (dato?.texto || "").trim();
   if (!aplica) return texto ? { texto: "No aplica (justificado)", clase: "muted" } : { texto: "No aplica sin justificación", clase: "danger" };
-  const mods = Object.values(resultados).filter((r) => lit.modulos.includes(r.modulo));
+  const mods = Object.values(resultados).filter((r) => lit.modulos.includes(r.modulo) && !r.sinDatos); // un cálculo sin datos no desarrolla el literal
   if (lit.modulos.length && !mods.length && !texto) return { texto: "Pendiente", clase: "warn" };
   if (!lit.modulos.length && !texto) return { texto: "Pendiente", clase: "warn" };
   const fallan = mods.some((r) => (r.verificaciones || []).some((v) => v.cumple === false));

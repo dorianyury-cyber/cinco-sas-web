@@ -580,6 +580,13 @@ export const MODULOS = {
   }
 };
 
+// Tablas sin las cuales el cálculo no tiene sentido (las demás son opcionales):
+// si están vacías no se calcula, para no dar conclusiones sin datos.
+export const TABLAS_REQUERIDAS = { cargas: ["circuitos"], conductores: ["circuitos"], regulacion: ["tramos"], canalizaciones: ["conductores"], coordinacion: ["protecciones", "fallas"], distancias: ["puntos"], mecanico: ["hipotesis"], cableMT: ["circuitos"], armonicos: ["grupos"], conductorEconomico: ["candidatos"], camposEM: ["conductores"], arcoElectrico: ["puntos"], apantallamiento: ["elementos"], fvConductores: ["circuitos"] };
+const conDatos = (filas) => (filas || []).some((f) => f && Object.values(f).some((v) => v !== "" && v != null));
+// Nombres de las tablas requeridas que están vacías.
+export const tablasFaltantes = (id, entradas) => (TABLAS_REQUERIDAS[id] || []).filter((k) => !conDatos(entradas?.[k])).map((k) => MODULOS[id].campos.find((c) => c.key === k).label.replace(/\s*\(.*\)\s*$/, ""));
+
 // Valores por defecto (ejemplo) de un módulo.
 export function entradasPorDefecto(id) {
   const m = MODULOS[id];
