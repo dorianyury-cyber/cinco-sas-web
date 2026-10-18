@@ -22,7 +22,7 @@ export const MODULOS = {
   riesgoElectrico: {
     area: "gen", icono: "⚠️", titulo: "Análisis de riesgos eléctricos", literalPrincipal: "a",
     objeto: "Identificar los factores de riesgo de origen eléctrico de la instalación, valorarlos con la matriz del RETIE (probabilidad frente a consecuencias en personas, económicas, ambientales y de imagen) y definir las medidas para mitigarlos hasta un riesgo residual aceptable.",
-    normas: ["RETIE 2024 (Resolución 40117) Libro 1, 1.5.1.4: matriz de análisis de riesgos (Tabla 1.5.1.4.1.a) y decisiones (Tabla 1.5.1.4.1.b)", "RETIE 2024 — literal a) del diseño detallado"],
+    normas: ["RETIE 2024 (Res. 40117, mod. Res. 40284 de 2026) Libro 1, 1.5.1.4: matriz de análisis de riesgos (Tabla 1.5.1.4.1.a) y decisiones (Tabla 1.5.1.4.1.b)", "RETIE 2024 — literal a) del diseño detallado"],
     campos: [
       { key: "maximoResidual", label: "Nivel máximo admitido para el riesgo residual", tipo: "select", opciones: lista(["Bajo", "Medio"]), def: "Medio" },
       { key: "riesgos", label: "Riesgos (consecuencias de 1 a 5 en personas / económicas / ambientales / imagen)", tipo: "tabla", columnas: [
@@ -45,7 +45,7 @@ export const MODULOS = {
   nivelTension: {
     area: "gen", icono: "📶", titulo: "Nivel de tensión requerido", literalPrincipal: "f",
     objeto: "Determinar el nivel de tensión con el que debe alimentarse la instalación, comparando para la demanda proyectada la corriente, la caída de tensión y las pérdidas de cada nivel candidato y la potencia que el operador de red conecta en cada uno.",
-    normas: ["RETIE 2024 — literal f) del diseño detallado", "CREG 015 de 2018 (niveles de tensión 1 a 4)", "NTC 1340 (tensiones normalizadas)", "Norma técnica del operador de red del área"],
+    normas: ["RETIE 2024 Libro 3, 3.3.1.1 literal f) y Título 9 (clasificación de los niveles de tensión: BT ≤ 1000 V c.a.; MT hasta 57,5 kV; AT de 57,5 a 230 kV; EAT más de 230 kV)", "CREG 015 de 2018 (niveles de tensión 1 a 4)", "NTC 1340 (tensiones normalizadas)", "Norma técnica del operador de red del área"],
     campos: [
       { key: "demanda", label: "Demanda máxima actual (vacío = la del cuadro de cargas)", tipo: "numero", unidad: "kVA", def: "" },
       { key: "crecimiento", label: "Crecimiento anual de la demanda", tipo: "numero", unidad: "%", def: 2 },
@@ -83,7 +83,7 @@ export const MODULOS = {
   cargas: {
     area: "bt", icono: "📋", titulo: "Cuadro de cargas y demanda",
     objeto: "Determinar la carga instalada, la demanda máxima, el balance de fases y la corriente de diseño del alimentador.",
-    normas: ["RETIE — análisis y cuadros de cargas", "NTC 2050 Sección 220 (cálculo de circuitos ramales y alimentadores)", "NTC 2050 430-24 (alimentadores de motores)"],
+    normas: ["RETIE 2024 (Res. 40117, mod. Res. 40284 de 2026) Libro 3, 3.3.1.1 literal c) y Parágrafo 1 (carga proyectada con supuestos y limitaciones consignados)", "NTC 2050 Sección 220 (cálculo de circuitos ramales y alimentadores)", "NTC 2050 430.24 (alimentadores de motores)"],
     campos: [
       { key: "sistema", label: "Sistema", tipo: "select", opciones: op(SISTEMAS_BT), def: "3F208" },
       { key: "desbalanceMax", label: "Desbalance máximo admisible", tipo: "numero", unidad: "%", def: 10 },
@@ -105,7 +105,7 @@ export const MODULOS = {
   conductores: {
     area: "bt", icono: "🔌", titulo: "Selección de conductores y protecciones",
     objeto: "Seleccionar el calibre de los conductores y la protección de sobrecorriente de cada circuito, coordinando capacidad de corriente, temperatura de terminales y capacidad de interrupción.",
-    normas: ["RETIE — cálculo y coordinación de protecciones", "NTC 2050 Tabla 310-16 y 310-15 (capacidad de corriente y factores de ajuste)", "NTC 2050 110-14(c), 210-19, 215-2, 240-3, 240-4, 240-6"],
+    normas: ["RETIE 2024 (Res. 40117, mod. Res. 40284 de 2026) Libro 3, 3.3.1.1 literales k) y m); art. 3.27.3 (protecciones contra sobrecorrientes) y art. 3.17.19 (interruptores automáticos)", "NTC 2050 Tabla 310.15(B)(16) y 310.15 (capacidad de corriente y factores de ajuste)", "NTC 2050 110.14(C), 210.19, 215.2, 240-3, 240.4, 240.6(A)"],
     campos: [
       { key: "circuitos", label: "Circuitos", tipo: "tabla", columnas: [
         { key: "circuito", label: "Circ.", tipo: "texto", ancho: 6 }, { key: "descripcion", label: "Descripción", tipo: "texto", ancho: 18 },
@@ -123,7 +123,7 @@ export const MODULOS = {
   regulacion: {
     area: "bt", icono: "📉", titulo: "Regulación de tensión y pérdidas",
     objeto: "Verificar la caída de tensión por tramo y acumulada, y calcular las pérdidas de potencia en los conductores (aplica a baja y media tensión).",
-    normas: ["RETIE — cálculos de regulación y pérdidas de energía", "NTC 2050 210-19(a) NPN 4 y 215-2(b) NPN 2", "NTC 2050 Cap. 9 Tabla 9 (resistencia y reactancia)"],
+    normas: ["RETIE 2024 (Res. 40117, mod. Res. 40284 de 2026) Libro 3, 3.3.1.1 literales o) y p); Título 26 literal f (acometida ≤ 3 %; alimentadores y ramales ≤ 5 %)", "NTC 2050 210.19(A)(1) Nota informativa 4 y 215.2(A)(1) Nota informativa 2", "NTC 2050 Cap. 9 Tabla 9 (resistencia y reactancia)"],
     campos: [
       { key: "sistema", label: "Sistema", tipo: "select", opciones: [{ valor: "3F", texto: "Trifásico" }, { valor: "1F", texto: "Monofásico" }], def: "3F" },
       { key: "tension", label: "Tensión nominal (línea-línea en trifásico)", tipo: "numero", unidad: "V", def: 208 },
@@ -146,7 +146,7 @@ export const MODULOS = {
   canalizaciones: {
     area: "bt", icono: "🧯", titulo: "Canalizaciones (llenado de ductos)",
     objeto: "Dimensionar las canalizaciones para que el área ocupada por los conductores no supere el porcentaje de llenado permitido.",
-    normas: ["RETIE — cálculo de canalizaciones", "NTC 2050 Cap. 9 Tablas 1, 4 y 5"],
+    normas: ["RETIE 2024 (Res. 40117, mod. Res. 40284 de 2026) Libro 3, 3.3.1.1 literal n) y art. 3.17.6 (canalizaciones y bandejas portacables)", "NTC 2050 Cap. 9 Tablas 1, 4 y 5"],
     campos: [
       { key: "conductores", label: "Conductores por ducto (filas con el mismo ducto se suman)", tipo: "tabla", columnas: [
         { key: "ducto", label: "Ducto", tipo: "texto", ancho: 12 }, { key: "tipo", label: "Tipo de tubería", tipo: "select", opciones: op(N.TUBERIAS), ancho: 22 },
@@ -161,7 +161,7 @@ export const MODULOS = {
   transformador: {
     area: "mt", icono: "🔋", titulo: "Dimensionamiento del transformador",
     objeto: "Seleccionar la potencia normalizada del transformador, su cargabilidad, corrientes nominales, cortocircuito en bornes y protecciones primaria y secundaria.",
-    normas: ["RETIE — cálculo de transformadores", "NTC 818 / NTC 819 (potencias normalizadas)", "NTC 2050 450-3 (protección de transformadores)"],
+    normas: ["RETIE 2024 (Res. 40117, mod. Res. 40284 de 2026) Libro 3, 3.3.1.1 literal h) y art. 3.17.28 (transformadores de potencia y distribución)", "NTC 818 / NTC 819 (potencias normalizadas)", "NTC 2050 450.3 (protección de transformadores)"],
     campos: [
       { key: "demanda", label: "Demanda máxima (si se deja vacía, se toma del cuadro de cargas)", tipo: "numero", unidad: "kVA", def: "" },
       { key: "crecimiento", label: "Reserva por crecimiento", tipo: "numero", unidad: "%", def: 20 },
@@ -176,7 +176,7 @@ export const MODULOS = {
   cortocircuito: {
     area: "mt", icono: "⚡", titulo: "Cortocircuito (IEC 60909)",
     objeto: "Calcular las corrientes de cortocircuito trifásica, monofásica y pico en las barras del sistema, para especificar la capacidad de interrupción de los equipos.",
-    normas: ["RETIE — análisis de cortocircuito y falla a tierra", "IEC 60909-0 (cálculo de corrientes de cortocircuito)", "NTC 2050 110-9"],
+    normas: ["RETIE 2024 (Res. 40117, mod. Res. 40284 de 2026) Libro 3, 3.3.1.1 literales e) y k) (IEC 60909)", "IEC 60909-0 (cálculo de corrientes de cortocircuito)", "NTC 2050 110.9"],
     campos: [
       { key: "uMT", label: "Tensión nominal de la red", tipo: "numero", unidad: "kV", def: 13.2 },
       { key: "sk", label: "Potencia de cortocircuito de la red S\"kQ (operador de red)", tipo: "numero", unidad: "MVA", def: 150 },
@@ -211,7 +211,7 @@ export const MODULOS = {
   coordinacion: {
     area: "mt", icono: "⏱️", titulo: "Coordinación de protecciones",
     objeto: "Verificar la selectividad entre protecciones de sobrecorriente con curvas de tiempo inverso, con margen de coordinación entre la protección principal y su respaldo.",
-    normas: ["RETIE — cálculo y coordinación de protecciones", "IEC 60255-151 (curvas de tiempo inverso)", "IEEE 242 (Buff Book) — márgenes de coordinación"],
+    normas: ["RETIE 2024 (Res. 40117, mod. Res. 40284 de 2026) Libro 3, 3.3.1.1 literales k) y m); art. 3.27.3 (protecciones contra sobrecorrientes) y art. 3.17.19 (interruptores automáticos)", "IEC 60255-151 (curvas de tiempo inverso)", "IEEE 242 (Buff Book) — márgenes de coordinación"],
     campos: [
       { key: "cti", label: "Margen de coordinación (CTI)", tipo: "numero", unidad: "s", def: 0.3 },
       { key: "tensionRef", label: "Tensión a la que están referidas las corrientes (la usa el arco eléctrico)", tipo: "numero", unidad: "kV", def: "" },
@@ -236,9 +236,9 @@ export const MODULOS = {
   malla: {
     area: "spt", icono: "🌐", titulo: "Malla de puesta a tierra (IEEE 80)",
     objeto: "Diseñar la malla de puesta a tierra para que las tensiones de paso y de contacto sean menores que las tolerables por el cuerpo humano, y verificar su resistencia y la sección del conductor.",
-    normas: ["RETIE — cálculo del sistema de puesta a tierra y valores de referencia de resistencia", "IEEE 80-2013 (seguridad en puesta a tierra de subestaciones; §13.4 y Anexo E: suelo no uniforme; §15 y Anexo C: división de corriente)", "IEEE 81-2012 / NTC 4552 (medición de resistividad e interpretación en dos capas)"],
+    normas: ["RETIE 2024 (Res. 40117, mod. Res. 40284 de 2026) Libro 3: 3.3.3.3 (diseño de la puesta a tierra), art. 3.12.1 g y Tabla 3.12.1.a (tensión de contacto sin capa superficial), Tabla 3.12.3.a (resistencia de referencia)", "IEEE 80-2013 (seguridad en puesta a tierra de subestaciones; §13.4 y Anexo E: suelo no uniforme; §15 y Anexo C: división de corriente)", "IEEE 81-2012 / NTC 4552 (medición de resistividad e interpretación en dos capas)"],
     campos: [
-      { key: "tipoInstalacion", label: "Tipo de instalación (valor de referencia RETIE)", tipo: "select", opciones: op(N.RETIE_RESISTENCIA_SPT), def: "subMT" },
+      { key: "tipoInstalacion", label: "Tipo de instalación (resistencia de referencia, RETIE 2024 Tabla 3.12.3.a)", tipo: "select", opciones: op(N.RETIE_RESISTENCIA_SPT), def: "subMT" },
       { key: "modeloSuelo", label: "Modelo del suelo", tipo: "select", opciones: [{ valor: "uniforme", texto: "Uniforme (resistividad digitada)" }, { valor: "dosCapas", texto: "Dos capas a partir de mediciones Wenner (IEEE 81)" }], def: "uniforme" },
       { key: "rho", label: "Resistividad del suelo ρ (suelo uniforme)", tipo: "numero", unidad: "Ω·m", def: 100, soloSi: { modeloSuelo: "uniforme" } },
       { key: "mediciones", label: "Mediciones Wenner (separación a y resistividad aparente ρa = 2π a R)", tipo: "tabla", soloSi: { modeloSuelo: "dosCapas" }, columnas: [
@@ -270,13 +270,14 @@ export const MODULOS = {
       { key: "varillas", label: "Número de varillas", tipo: "numero", def: 8 },
       { key: "lVarilla", label: "Longitud de cada varilla", tipo: "numero", unidad: "m", def: 2.4 },
       { key: "varillasPerimetro", label: "Varillas en el perímetro", tipo: "select", opciones: SI_NO, def: "Sí" },
-      { key: "peso", label: "Peso de la persona (criterio)", tipo: "select", opciones: [{ valor: "50", texto: "50 kg (acceso público)" }, { valor: "70", texto: "70 kg (personal calificado)" }], def: "50" }
+      { key: "peso", label: "Peso de la persona (criterio)", tipo: "select", opciones: [{ valor: "50", texto: "50 kg (acceso público)" }, { valor: "70", texto: "70 kg (personal calificado)" }], def: "50" },
+      { key: "acceso", label: "Columna de la Tabla 3.12.1.a del RETIE (se aplica si no hay capa superficial)", tipo: "select", opciones: [{ valor: "publico", texto: "Público en general (IEC 60479-1)" }, { valor: "ocupacional", texto: "Ocupacional: personal competente con EPP (IEEE 80, 50 kg)" }], def: "publico" }
     ]
   },
   rayos: {
     area: "spt", icono: "🌩️", titulo: "Análisis de riesgo por rayos",
     objeto: "Evaluar el riesgo de pérdida de vidas humanas (R1) por descargas atmosféricas y definir el nivel del sistema de protección contra rayos y de los DPS necesarios para que el riesgo sea tolerable.",
-    normas: ["RETIE — análisis de riesgo por rayos y protección contra rayos", "NTC 4552-1/-2/-3 (protección contra descargas eléctricas atmosféricas)", "IEC 62305-2 (gestión del riesgo)"],
+    normas: ["RETIE 2024 (Res. 40117, mod. Res. 40284 de 2026) Libro 3, 3.13.1.1 (evaluación del nivel de riesgo frente a rayos con la NTC 4552-2 o la IEC 62305-2)", "NTC 4552-1/-2/-3 (protección contra descargas eléctricas atmosféricas)", "IEC 62305-2 (gestión del riesgo)"],
     campos: [
       { key: "largo", label: "Largo de la estructura", tipo: "numero", unidad: "m", def: 30 },
       { key: "ancho", label: "Ancho de la estructura", tipo: "numero", unidad: "m", def: 15 },
@@ -303,7 +304,7 @@ export const MODULOS = {
   aislamiento: {
     area: "at", icono: "🛡️", titulo: "Coordinación de aislamiento y DPS",
     objeto: "Seleccionar el descargador de sobretensiones (DPS) y verificar el margen de protección del aislamiento de los equipos frente a sobretensiones temporales y de impulso tipo rayo, corregido por altitud.",
-    normas: ["RETIE — análisis de coordinación de aislamiento", "IEC 60071-1 y 60071-2 (coordinación de aislamiento)", "IEC 60099-4 / 60099-5 (descargadores)", "IEEE C62.22"],
+    normas: ["RETIE 2024 (Res. 40117, mod. Res. 40284 de 2026) Libro 3: 3.3.3.1 (uso de DPS) y art. 3.17.14 (requisitos de instalación de DPS)", "IEC 60071-1 y 60071-2 (coordinación de aislamiento)", "IEC 60099-4 / 60099-5 (descargadores)", "IEEE C62.22"],
     campos: [
       { key: "um", label: "Tensión máxima del equipo Um", tipo: "select", opciones: lista(Object.keys(N.NIVELES_AISLAMIENTO)), def: "36" },
       { key: "us", label: "Tensión máxima de operación del sistema Us (vacío = Um)", tipo: "numero", unidad: "kV", def: "" },
@@ -315,30 +316,40 @@ export const MODULOS = {
       { key: "ures", label: "DPS: tensión residual a 10 kA (8/20 µs)", tipo: "numero", unidad: "kV", def: 79 },
       { key: "capTov", label: "Capacidad TOV del DPS (p.u. de Ur, a la duración de la falla)", tipo: "numero", def: 1.1 },
       { key: "distancia", label: "Separación entre DPS y equipo", tipo: "numero", unidad: "m", def: 3 },
-      { key: "pendiente", label: "Pendiente de la onda incidente", tipo: "numero", unidad: "kV/µs", def: 500 }
+      { key: "pendiente", label: "Pendiente de la onda incidente", tipo: "numero", unidad: "kV/µs", def: 500 },
+      { key: "icDps", label: "DPS: capacidad de cortocircuito (opcional)", tipo: "numero", unidad: "kA", def: "" },
+      { key: "ikNodo", label: "Corriente de falla en el nodo del DPS (opcional)", tipo: "numero", unidad: "kA", def: "" },
+      { key: "protSerie", label: "¿Protección de sobrecorriente en serie con el DPS (desviación justificada)?", tipo: "select", opciones: [{ valor: "No", texto: "No" }, { valor: "Sí", texto: "Sí" }], def: "No" }
     ]
   },
   distancias: {
     area: "at", icono: "📏", titulo: "Distancias de seguridad",
-    objeto: "Verificar que las distancias de diseño de las partes energizadas cumplan las distancias mínimas de seguridad del RETIE.",
-    normas: ["RETIE — distancias de seguridad (distancias mínimas en zonas con construcciones y vías)"],
+    objeto: "Verificar que las distancias de diseño de las partes energizadas cumplan las distancias mínimas de seguridad del RETIE 2024 y, en líneas de transmisión, el ancho de la zona de servidumbre.",
+    normas: ["RETIE 2024 (Res. 40117, modificada por la Res. 40284 de 2026) Libro 3, art. 3.10: Tablas 3.10.1.a y 3.10.2.a", "RETIE 2024 Libro 3, art. 3.19.1 literal h: Tabla 3.19.1.a (ancho de servidumbre)", "CIGRE TB 348 — Tower top geometry and mid span clearances (reducción del ancho de servidumbre, Nota 5)"],
     campos: [
       { key: "altitud", label: "Altitud del sitio (vacío = la del proyecto)", tipo: "numero", unidad: "m", def: "" },
       { key: "puntos", label: "Puntos a verificar", tipo: "tabla", columnas: [
-        { key: "punto", label: "Punto", tipo: "texto", ancho: 18 }, { key: "tension", label: "Tensión (kV)", tipo: "select", opciones: N.RETIE_DISTANCIAS.tensiones.map((t) => ({ valor: t, texto: t === "<1" ? "< 1 kV" : `${t} kV` })), ancho: 9 },
+        { key: "punto", label: "Punto", tipo: "texto", ancho: 18 }, { key: "tension", label: "Tensión (kV)", tipo: "select", opciones: N.RETIE_DISTANCIAS.tensiones.map((t) => ({ valor: t, texto: N.RETIE_DISTANCIAS.textoTension[t] })), ancho: 12 },
         { key: "tipo", label: "Tipo de distancia", tipo: "select", opciones: op(N.RETIE_DISTANCIAS.tipos), ancho: 32 },
         { key: "diseno", label: "Diseño (m)", tipo: "numero", ancho: 9 }, { key: "exigida", label: "Exigida (m, opcional)", tipo: "numero", ancho: 10 }
       ], nueva: { tension: "13.2", tipo: "e" }, def: [
         { punto: "Cruce de vía principal", tension: "13.2", tipo: "e", diseno: 6.2 },
         { punto: "Fachada de vivienda", tension: "13.2", tipo: "b", diseno: 2.5 },
         { punto: "Acometida BT sobre andén", tension: "<1", tipo: "e", diseno: 5.2 }
-      ] }
+      ] },
+      { key: "servidumbre", label: "Zona de servidumbre de línea de transmisión (Tabla 3.19.1.a)", tipo: "select", opciones: op(N.RETIE_SERVIDUMBRE), def: "no" },
+      { key: "servidumbreAncho", label: "Ancho de servidumbre del diseño (si aplica)", tipo: "numero", unidad: "m", def: "" },
+      { key: "servidumbreAmpliacion", label: "¿Se reserva el corredor para una ampliación futura? (permite superar tabla + 10 %)", tipo: "select", opciones: [{ valor: "no", texto: "No" }, { valor: "si", texto: "Sí" }], def: "no" },
+      { key: "servidumbreEc", label: "¿Reducir el ancho con la ecuación 7 (Nota 5, hasta −10 %)?", tipo: "select", opciones: [{ valor: "no", texto: "No" }, { valor: "si", texto: "Sí" }], def: "no" },
+      { key: "servA", label: "A: eje de la estructura a la proyección del punto energizado más alejado", tipo: "numero", unidad: "m", def: "", soloSi: { servidumbreEc: "si" } },
+      { key: "servB", label: "B: desplazamiento del conductor y la cadena por viento (50 años, 10 min)", tipo: "numero", unidad: "m", def: "", soloSi: { servidumbreEc: "si" } },
+      { key: "servC", label: "C: distancia de seguridad fase-tierra a una infraestructura (coordinación de aislamiento)", tipo: "numero", unidad: "m", def: "", soloSi: { servidumbreEc: "si" } }
     ]
   },
   mecanico: {
     area: "at", icono: "🏗️", titulo: "Cálculo mecánico de conductores",
     objeto: "Calcular las tensiones mecánicas y las flechas del conductor en las hipótesis de temperatura y viento, mediante la ecuación de cambio de estado, y verificar los límites de tensión y la distancia al suelo.",
-    normas: ["RETIE — cálculo mecánico de estructuras y distancias de seguridad", "Criterios CIGRÉ (tensión de cada día, EDS)", "Ecuación de cambio de estado (método parabólico)"],
+    normas: ["RETIE 2024 (Res. 40117, mod. Res. 40284 de 2026) Libro 3, 3.3.1.1 literal l); art. 3.19.3 (requisitos mecánicos de estructuras de líneas de transmisión) y art. 3.20.4 (estructuras de soporte de redes de distribución)", "Criterios CIGRÉ (tensión de cada día, EDS)", "Ecuación de cambio de estado (método parabólico)"],
     campos: [
       { key: "conductor", label: "Conductor", tipo: "select", opciones: [...op(N.CONDUCTORES_AEREOS), { valor: "personalizado", texto: "Personalizado (digitar datos)" }], def: "linnet" },
       { key: "area", label: "Área (personalizado)", tipo: "numero", unidad: "mm²", def: "", soloSi: { conductor: "personalizado" } },
@@ -363,7 +374,7 @@ export const MODULOS = {
   trafoPotencia: {
     area: "at", icono: "🏭", titulo: "Transformador de potencia",
     objeto: "Verificar las corrientes nominales por etapa de refrigeración y toma, el cortocircuito pasante con la impedancia de la red, y la coherencia de los transformadores de corriente y de los equipos en serie con cada devanado.",
-    normas: ["RETIE — cálculo de transformadores", "IEC 60076-1 / -5 / -7 (transformadores de potencia, cortocircuito y cargabilidad)", "IEC 61869-2 (transformadores de corriente)", "IEC 62271-1 (equipos de maniobra)"],
+    normas: ["RETIE 2024 (Res. 40117, mod. Res. 40284 de 2026) Libro 3, 3.3.1.1 literal h) y art. 3.17.28 (transformadores de potencia y distribución)", "IEC 60076-1 / -5 / -7 (transformadores de potencia, cortocircuito y cargabilidad)", "IEC 61869-2 (transformadores de corriente)", "IEC 62271-1 (equipos de maniobra)"],
     campos: [
       { key: "sOnan", label: "Potencia ONAN", tipo: "numero", unidad: "MVA", def: 40 },
       { key: "sOnaf", label: "Potencia ONAF", tipo: "numero", unidad: "MVA", def: 50 },
@@ -399,7 +410,7 @@ export const MODULOS = {
   cableMT: {
     area: "mt", icono: "🧵", titulo: "Cables de media tensión",
     objeto: "Verificar la capacidad de corriente, la soportabilidad al cortocircuito y la caída de tensión de los cables de media tensión, y su coherencia con la celda o protección de cada circuito.",
-    normas: ["RETIE — especificación de conductores (literal k)", "IEC 60502-2 / NTC 2050 Sección 310 (cables de más de 2 kV)", "IEC 60949 (cortocircuito admisible, método adiabático)"],
+    normas: ["RETIE 2024 (Res. 40117, mod. Res. 40284 de 2026) Libro 3, 3.3.1.1 literal k) (tiempo de disparo, cortocircuito de la red y capacidad del conductor, IEC 60909)", "IEC 60502-2 / NTC 2050 Sección 310 (cables de más de 2 kV)", "IEC 60949 (cortocircuito admisible, método adiabático)"],
     campos: [
       { key: "tension", label: "Tensión nominal (vacío = MT del transformador de potencia)", tipo: "numero", unidad: "kV", def: "" },
       { key: "fp", label: "Factor de potencia", tipo: "numero", def: 0.9 },
@@ -425,13 +436,14 @@ export const MODULOS = {
   armonicos: {
     area: "bt", icono: "〰️", titulo: "Armónicos y factor K", literalPrincipal: "c",
     objeto: "Estimar la distorsión armónica de corriente y de tensión que producen las cargas no lineales, verificar los límites de la IEEE 519 en el punto de conexión, y calcular el factor K y la capacidad del transformador con armónicos y la corriente en el neutro.",
-    normas: ["RETIE 2024 — literal c) del diseño detallado (cargas, factor de potencia y armónicos)", "IEEE 519-2014 (límites de distorsión armónica)", "IEEE C57.110 / UL 1561 (transformadores con corrientes no sinusoidales, factor K)", "NTC 2050 310-15(b)(4) (neutro con armónicos)"],
+    normas: ["RETIE 2024 — literal c) del diseño detallado (cargas, factor de potencia y armónicos)", "RETIE 2024 Libro 3, 3.3.3.6 e IEC 60364-5-52 Anexo E (conductores con THDi ≥ 15 %)", "IEEE 519-2014 (límites de distorsión armónica)", "IEEE C57.110 / UL 1561 (transformadores con corrientes no sinusoidales, factor K)", "NTC 2050 310.15(B)(5) (neutro con armónicos)"],
     campos: [
       { key: "tension", label: "Tensión línea-línea en el punto de conexión (vacío = la del transformador)", tipo: "numero", unidad: "V", def: 208 },
       { key: "isc", label: "Corriente de cortocircuito en el punto de conexión (vacío = la del cálculo de cortocircuito)", tipo: "numero", unidad: "kA", def: 20 },
       { key: "corrienteDemanda", label: "Corriente de demanda máxima IL (vacío = suma de las fundamentales)", tipo: "numero", unidad: "A", def: "" },
       { key: "snTrafo", label: "Potencia del transformador (vacío = la del cálculo del transformador)", tipo: "numero", unidad: "kVA", def: 150 },
       { key: "pec", label: "Pérdidas por corrientes parásitas del transformador PEC-R (seco ≈ 8 a 15 %; aceite ≈ 1 a 5 %)", tipo: "numero", unidad: "%", def: 8 },
+      { key: "ampacidad", label: "Ampacidad del conductor previsto del alimentador (opcional; se verifica si THDi ≥ 15 %)", tipo: "numero", unidad: "A", def: "" },
       { key: "grupos", label: "Grupos de carga (corriente fundamental por fase; espectro personalizado: «h:%; h:%»)", tipo: "tabla", columnas: [
         { key: "grupo", label: "Grupo", tipo: "texto", ancho: 20 }, { key: "espectro", label: "Espectro", tipo: "select", opciones: op(N.ESPECTROS), ancho: 30 },
         { key: "corriente", label: "I fundamental (A)", tipo: "numero", ancho: 12 }, { key: "monofasica", label: "Monofásica", tipo: "select", opciones: SI_NO, ancho: 10 },
@@ -446,7 +458,7 @@ export const MODULOS = {
   conductorEconomico: {
     area: "bt", icono: "💰", titulo: "Cálculo económico de conductores", literalPrincipal: "j",
     objeto: "Seleccionar el calibre que minimiza el costo total durante la vida útil —inversión inicial más el valor presente de las pérdidas de energía—, con el rango económico de corriente de cada calibre, y verificar el calibre de diseño.",
-    normas: ["RETIE 2024 — literal j) del diseño detallado (cálculo económico de conductores)", "IEC 60287-3-2 (optimización económica de la sección de cables)", "NTC 2050 Cap. 9 Tabla 9 y Tabla 310-16"],
+    normas: ["RETIE 2024 — literal j) del diseño detallado (cálculo económico de conductores)", "IEC 60287-3-2 (optimización económica de la sección de cables)", "NTC 2050 Cap. 9 Tabla 9 y Tabla 310.15(B)(16)"],
     campos: [
       { key: "material", label: "Material", tipo: "select", opciones: lista(["Cu", "Al"]), def: "Cu" },
       { key: "imax", label: "Corriente máxima del primer año", tipo: "numero", unidad: "A", def: 180 },
@@ -474,7 +486,7 @@ export const MODULOS = {
   camposEM: {
     area: "at", icono: "🧲", titulo: "Campos electromagnéticos", literalPrincipal: "g",
     objeto: "Calcular el perfil lateral del campo eléctrico y de la densidad de flujo magnético a 1 m sobre el suelo, bajo líneas y en subestaciones, y verificar los valores límite de exposición del público y ocupacional del RETIE.",
-    normas: ["RETIE 2024 (Resolución 40117) Libro 3, Título 11, art. 3.11.1 y Tabla 3.11.1.a", "EPRI — Transmission Line Reference Book (simulación de cargas, Biot-Savart)", "IEEE 644 (medición de campos de líneas de potencia)"],
+    normas: ["RETIE 2024 (Res. 40117, mod. Res. 40284 de 2026) Libro 3, 3.3.3.2 (casos en que se exige el cálculo) y Título 11, art. 3.11.1 y Tabla 3.11.1.a", "EPRI — Transmission Line Reference Book (simulación de cargas, Biot-Savart)", "IEEE 644 (medición de campos de líneas de potencia)"],
     campos: [
       { key: "alturaMedida", label: "Altura de cálculo sobre el suelo", tipo: "numero", unidad: "m", def: 1 },
       { key: "servidumbre", label: "Ancho total de la zona de servidumbre (0 = sin servidumbre, todo es público)", tipo: "numero", unidad: "m", def: 20 },
@@ -500,7 +512,7 @@ export const MODULOS = {
   arcoElectrico: {
     area: "mt", icono: "🔥", titulo: "Arco eléctrico (IEEE 1584-2018)", literalPrincipal: "e",
     objeto: "Calcular la corriente de arco, la energía incidente y la frontera de arco en los puntos de trabajo energizado, y definir la categoría de equipo de protección personal (EPP) requerida.",
-    normas: ["RETIE — análisis de riesgo por arco eléctrico", "IEEE 1584-2018 (cálculo de riesgo por arco eléctrico)", "NFPA 70E (categorías de EPP y frontera de arco)"],
+    normas: ["RETIE 2024 (Res. 40117, mod. Res. 40284 de 2026) Libro 3, 3.3.1.1 literal e) y art. 3.10.5 (aviso de riesgo de arco donde la energía incidente sea ≥ 5 J/cm² = 1,2 cal/cm²)", "IEEE 1584-2018 (cálculo de riesgo por arco eléctrico)", "NFPA 70E (categorías de EPP y frontera de arco)"],
     campos: [
       { key: "eppDisponible", label: "Calificación de arco del EPP disponible para el trabajo", tipo: "numero", unidad: "cal/cm²", def: 8 },
       { key: "tApertura", label: "Tiempo de apertura del interruptor (se suma al del relé de la coordinación)", tipo: "numero", unidad: "ms", def: 50 },
@@ -521,7 +533,7 @@ export const MODULOS = {
   apantallamiento: {
     area: "spt", icono: "⛳", titulo: "Apantallamiento (esfera rodante)",
     objeto: "Verificar que los equipos y barrajes de la subestación queden dentro de la zona protegida por mástiles y cables de guarda, con el método de la esfera rodante o el modelo electrogeométrico.",
-    normas: ["RETIE — protección contra rayos", "NTC 4552-3 / IEC 62305-3 (esfera rodante)", "IEEE 998 (apantallamiento de subestaciones, modelo electrogeométrico)"],
+    normas: ["RETIE 2024 (Res. 40117, mod. Res. 40284 de 2026) Libro 3, 3.13.1.2 (diseño con el método electrogeométrico, NTC 4552-3 o IEC 62305-3)", "NTC 4552-3 / IEC 62305-3 (esfera rodante)", "IEEE 998 (apantallamiento de subestaciones, modelo electrogeométrico)"],
     campos: [
       { key: "metodo", label: "Método", tipo: "select", opciones: [{ valor: "ieee998", texto: "Modelo electrogeométrico IEEE 998" }, { valor: "nivel", texto: "Esfera rodante por nivel de protección (NTC 4552)" }], def: "ieee998" },
       { key: "bil", label: "BIL de los equipos protegidos", tipo: "numero", unidad: "kV", def: 550, soloSi: { metodo: "ieee998" } },
@@ -541,7 +553,7 @@ export const MODULOS = {
   fvArreglo: {
     area: "fv", icono: "☀️", titulo: "Arreglo fotovoltaico e inversor", literalPrincipal: "x",
     objeto: "Definir cuántos módulos van en serie y en paralelo para que, con las temperaturas extremas del sitio, las tensiones y corrientes del arreglo queden dentro de los límites del inversor y del módulo, y verificar la relación DC/AC, el DPS de corriente continua y la necesidad de fusibles de string.",
-    normas: ["RETIE — instalaciones de generación con fuentes no convencionales", "NTC 2050 Sección 690 (sistemas solares fotovoltaicos)", "IEC 62548 (diseño de arreglos fotovoltaicos)", "IEC 61215 / IEC 61730 (módulos)", "IEC 61643-31 (DPS de corriente continua)"],
+    normas: ["RETIE 2024 (Res. 40117, mod. Res. 40284 de 2026) Libro 3, 3.3.1.1 literal x); art. 3.18.2 (FNCE, AGPE y GD), art. 3.17.21 (inversores) y art. 3.17.23 (paneles fotovoltaicos)", "NTC 2050 Sección 690 (sistemas solares fotovoltaicos)", "IEC 62548 (diseño de arreglos fotovoltaicos)", "IEC 61215 / IEC 61730 (módulos)", "IEC 61643-31 (DPS de corriente continua)"],
     campos: [
       { key: "pmod", label: "Módulo: potencia máxima Pmax (STC)", tipo: "numero", unidad: "W", def: 550 },
       { key: "voc", label: "Módulo: tensión de circuito abierto Voc", tipo: "numero", unidad: "V", def: 49.9 },
@@ -603,7 +615,7 @@ export const MODULOS = {
   fvConductores: {
     area: "fv", icono: "🔆", titulo: "Conductores y protecciones del sistema FV", literalPrincipal: "k",
     objeto: "Seleccionar los conductores y las protecciones de los circuitos de corriente continua (strings y agrupados) y de corriente alterna (salida del inversor) con los factores del 125 % de la NTC 2050 Sección 690, la corrección por temperatura, la temperatura de terminales, el conductor de puesta a tierra de equipos y la caída de tensión.",
-    normas: ["RETIE — instalaciones de generación con fuentes no convencionales", "NTC 2050 690-8, 690-9 y 690-31 (circuitos fotovoltaicos)", "NTC 2050 Tabla 310-16 y Tabla 250-122", "IEC 62548 (diseño de arreglos fotovoltaicos)"],
+    normas: ["RETIE 2024 (Res. 40117, mod. Res. 40284 de 2026) Libro 3, 3.3.1.1 literal x); art. 3.18.2 (FNCE, AGPE y GD), art. 3.17.21 (inversores) y art. 3.17.23 (paneles fotovoltaicos)", "NTC 2050 690.8, 690.9 y 690.31 (circuitos fotovoltaicos)", "NTC 2050 Tabla 310.15(B)(16) y Tabla 250.122", "IEC 62548 (diseño de arreglos fotovoltaicos)"],
     campos: [
       { key: "dvMax", label: "Caída de tensión máxima por circuito", tipo: "numero", unidad: "%", def: 1.5 },
       { key: "dvTotalMax", label: "Caída de tensión máxima total (DC más AC)", tipo: "numero", unidad: "%", def: 3 },
@@ -623,7 +635,7 @@ export const MODULOS = {
   fvConexion: {
     area: "fv", icono: "🔌", titulo: "Conexión a la red (CREG 174 de 2021)", literalPrincipal: "x",
     objeto: "Clasificar el sistema como autogenerador a pequeña escala (AGPE) o generador distribuido (GD) con su procedimiento de conexión, y verificar la capacidad disponible del circuito, la elevación de tensión en el punto de conexión por la inyección, el aporte del inversor al cortocircuito, la protección anti-isla y la medición bidireccional.",
-    normas: ["CREG 174 de 2021 (conexión de AGPE y GD)", "Ley 1715 de 2014 y Ley 2099 de 2021", "RETIE — instalaciones de generación con fuentes no convencionales", "IEEE 1547-2018 (interconexión de recursos distribuidos)", "IEC 62116 / UL 1741 (anti-isla)", "NTC 1340 (tensiones normalizadas)"],
+    normas: ["CREG 174 de 2021 (conexión de AGPE y GD)", "Ley 1715 de 2014 y Ley 2099 de 2021", "RETIE 2024 (Res. 40117, mod. Res. 40284 de 2026) Libro 3, 3.3.1.1 literal x); art. 3.18.2 (FNCE, AGPE y GD), art. 3.17.21 (inversores) y art. 3.17.23 (paneles fotovoltaicos)", "IEEE 1547-2018 (interconexión de recursos distribuidos)", "IEC 62116 / UL 1741 (anti-isla)", "NTC 1340 (tensiones normalizadas)"],
     campos: [
       { key: "tipo", label: "Tipo de generador", tipo: "select", opciones: [{ valor: "AGPE", texto: "AGPE — autogenerador a pequeña escala (con consumo propio)" }, { valor: "GD", texto: "GD — generador distribuido (sin consumo propio)" }], def: "AGPE" },
       { key: "pac", label: "Potencia nominal AC (vacío = la del inversor)", tipo: "numero", unidad: "kW", def: "" },
@@ -659,8 +671,8 @@ export function entradasPorDefecto(id) {
 
 // Normas generales que encabezan toda memoria.
 export const NORMAS_GENERALES = [
-  ["RETIE", "Reglamento Técnico de Instalaciones Eléctricas (Ministerio de Minas y Energía), versión vigente"],
-  ["NTC 2050", "Código Eléctrico Colombiano"],
+  ["RETIE 2024", "Reglamento Técnico de Instalaciones Eléctricas: Resolución 40117 de 2024 del Ministerio de Minas y Energía, modificada por la Resolución 40284 del 23 de junio de 2026"],
+  ["NTC 2050 (Segunda Actualización)", "Código Eléctrico Colombiano (adopción de la NFPA 70 / NEC 2017), exigido por el RETIE 2024 para instalaciones de uso final"],
   ["IEEE 80-2013", "Guide for Safety in AC Substation Grounding"],
   ["IEC 60909-0", "Short-circuit currents in three-phase a.c. systems"],
   ["IEC 60255-151", "Measuring relays and protection equipment — overcurrent protection"],

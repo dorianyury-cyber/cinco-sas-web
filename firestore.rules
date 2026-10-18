@@ -387,6 +387,13 @@ service cloud.firestore {
         allow read, create, update: if esEmpleadoActivo();
         allow delete: if esEmpleadoActivo() && duenoRt(proyectoId);
       }
+      // Versiones: copias inmutables (no se modifican); las borra el dueño del proyecto o un administrador.
+      match /versiones/{versionId} {
+        allow read: if esEmpleadoActivo();
+        allow create: if esEmpleadoActivo() && request.resource.data.creadoPor == request.auth.token.email;
+        allow update: if false;
+        allow delete: if esEmpleadoActivo() && duenoRt(proyectoId);
+      }
     }
   }
 }

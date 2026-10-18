@@ -44,6 +44,13 @@ Datos en Firestore: `rtProyectos/{id}` y `rtProyectos/{id}/calculos/{clave}` (`c
 - Arco con tiempos de la coordinación: `tiempoArcoDesdeRele()` coincide con el cálculo manual de la curva IEC (2,33 kA en SI 200 A TMS 0,1 → 328 ms con 50 ms de apertura) y con el Excel.
 - Coordinación: curvas IEEE C37.112 (VI 0,6891 s con M = 10, TD = 1; EI 1,2967 s con M = 5) y curva por puntos (interpolación log-log exacta en el punto medio geométrico). Cortocircuito: aporte de motores = c × (ILR/IrM) × IrM en bornes; motores aguas abajo aportan a las barras de aguas arriba; Excel = pantalla.
 - Campos EM: soluciones analíticas de un conductor (E en el suelo = 2V/(h ln(2h/r)); B = μ0 I/(2π r)), radio equivalente de haces y simetría. Armónicos: 6 pulsos teórico (THD 29,04 %, K 8,30). Cálculo económico: Q cerrado = suma; igualdad de CT en los límites económicos. Excel = pantalla en los tres.
+- RETIE 2024 (Res. 40117 de 2024, modificada por la Res. 40284 del 23-jun-2026; texto compilado oficial del MinEnergía), revisado en octubre de 2026:
+  - Literales a) a x) del 3.3.1.1 iguales; el l) dice ahora «centrales de generación». Se agregó el diseño básico del 3.3.1.2 (casos a y b; «Diseño simplificado» del RETIE 2013 se lee como básico a).
+  - Distancias (literal u): Tablas 3.10.1.a y 3.10.2.a completas hasta 500 kV (corregido: cruce de vías a 230 kV = 8,5 m, antes 6,8 m); corrección por altitud de la Nota 2 del art. 3.10 = 3 % por cada 300 m sobre 1000 m solo sobre 57,5 kV (antes 1,25 %/100 m para todas las tensiones); acometida BT sobre vías ≥ 5,5 m (Título 26 a); servidumbre de la Tabla 3.19.1.a con la ecuación 7 (Nota 5) y el máximo de la Nota 3.
+  - Malla (literal i): tensión de contacto sin capa superficial frente a la Tabla 3.12.1.a (público u ocupacional); la resistencia de la Tabla 3.12.3.a es de referencia (Parágrafo 1 del art. 3.12.3): no es hallazgo si paso y contacto cumplen.
+  - Armónicos (literal c): con THDi ≥ 15 %, factor de la IEC 60364-5-52 Anexo E (3.3.3.6). DPS (literal d): 3.3.3.1 y capacidad de cortocircuito del art. 3.17.14 f. Arco (literal e): aviso del art. 3.10.5 d con E ≥ 1,2 cal/cm². FV: caída AC ≤ 3 % (art. 3.17.21 d). Mecánico: tensión de tendido ≤ 25 % (art. 3.19.6 b y 3.20.6.1 a). Regulación: Título 26 f (3 % acometida; 5 % alimentadores y ramales). Nivel de tensión: clase del Título 9. Transformador de potencia: art. 3.17.28 (i, l, d).
+  - Sin cambios: Tabla 3.11.1.a (campos), Tabla 1.5.1.4.1.a (riesgos), Tabla 3.12.3.a (valores).
+  - Referencias de la NTC 2050 pasadas a la Segunda Actualización (NEC 2017): Tabla 310.15(B)(16), 250.122, 240.4, 690.8, etc. Los valores de las tablas no cambian.
 - **Pendiente:** validación independiente de cortocircuito y coordinación contra un estudio en ETAP o DIgSILENT, y revisión de una memoria completa por un organismo de inspección acreditado.
 
 ## 3. Limitaciones conocidas por cálculo
@@ -58,13 +65,13 @@ Datos en Firestore: `rtProyectos/{id}` y `rtProyectos/{id}/calculos/{clave}` (`c
 | Apantallamiento | Un captador por elemento, en el plano; sin protección combinada ni planta. | `apantallamiento()` |
 | Riesgo por rayos | Solo R1 (RA, RB, RU, RV); una zona y una línea. | `rayos()` |
 | Aislamiento | Método simplificado sin transitorios (EMTP/ATP). | — (fuera del alcance de una herramienta de cálculo manual) |
-| Distancias | Tabla RETIE incompleta para 66–230 kV (valores `null`): el usuario digita. | `RETIE_DISTANCIAS` en `rt-normas.js` (cargar con la tabla vigente) |
+| Distancias | Tablas 3.10.1.a y 3.10.2.a completas; donde el RETIE no da valor (p. ej. «a» o «c» sobre 44 kV), cruces entre líneas (3.10.3.a) y entre conductores (3.10.4) el usuario digita. Sin cálculo de la corriente electrostática de 5 mA (> 98 kV f-t). | `RETIE_DISTANCIAS`, `RETIE_SERVIDUMBRE` en `rt-normas.js` |
 | Mecánico | Vano a nivel, parabólico; sin vano regulador ni estructuras. | `mecanico()` |
-| Conductores BT | Tabla 310-16 únicamente; sin I²t ni bandejas. | `conductores()` |
+| Conductores BT | Tabla 310.15(B)(16) únicamente; sin I²t ni bandejas. | `conductores()` |
 | Cargas / transformador | Sin armónicos ni factor K. | `cargas()`, `transformador()` |
 | FV — arreglo | Strings iguales en todas las MPPT; sin varias orientaciones, sombras parciales, recorte (clipping), bifaciales ni optimizadores. | `fvArreglo()` en `rt-calculos.js` |
 | FV — producción | Energía anual con un solo valor de HSP (sin simulación horaria ni transposición al plano); simultaneidad supuesta; economía indicativa sin flujo de caja. | `fvProduccion()`; agregar HSP mensual y curva de carga |
-| FV — conductores | Incremento de temperatura por sol digitado; Tabla 310-16 para todos los casos; no dimensiona seccionador DC ni caja combinadora. | `fvConductores()` |
+| FV — conductores | Incremento de temperatura por sol digitado; Tabla 310.15(B)(16) para todos los casos; no dimensiona seccionador DC ni caja combinadora. | `fvConductores()` |
 | FV — conexión | Sin flujo de carga del circuito; capacidad disponible, Sk y ajustes los da el operador de red; no reemplaza el estudio de conexión simplificado (> 0,1 MW). | `fvConexion()`; `AJUSTES_IEEE1547` en `rt-normas.js` |
 | Campos EM (literal g) | Conductores rectos e infinitos a la altura de la flecha; suelo plano; sin corrientes inducidas en guardas. | `camposEM()`, `camposPerfil()`; Excel con MINVERSE |
 | Armónicos (literal c) | Suma aritmética de grupos; THDv sin resonancias; espectros teóricos o típicos. | `armonicos()`, `ESPECTROS` e `IEEE519_*` en `rt-normas.js` |
@@ -73,7 +80,6 @@ Datos en Firestore: `rtProyectos/{id}` y `rtProyectos/{id}/calculos/{clave}` (`c
 | Riesgos eléctricos (literal a) | Matriz del RETIE 2024 (Tabla 1.5.1.4.1.a); la valoración la hace el diseñador. | `riesgoElectrico()`, `MATRIZ_RIESGO` en `rt-normas.js` |
 | Nivel de tensión (literal f) | Conductores de referencia y límites del operador digitados; sin costos. | `nivelTension()` |
 | Diagrama unifilar (literal r) | Una fuente, un transformador y los circuitos de una barra. | `unifilar()`, `svgUnifilar()` en `rt-grafico.js` |
-| Proyecto | Sin historial de versiones (se usa «Exportar»). | `rt-core.js` (subcolección de versiones) |
 
 ## 4. Mejoras pendientes (en orden)
 
@@ -81,8 +87,7 @@ Datos en Firestore: `rtProyectos/{id}` y `rtProyectos/{id}/calculos/{clave}` (`c
 2. **Arco en DC** (baterías, FV) y tiempos con fusibles y curvas ANSI.
 3. **Malla en dos capas por método numérico** (sin resistividad equivalente) y potenciales fuera del cerramiento.
 4. **Cables de MT — IEC 60287 / Neher-McGrath** para bancos de ductos fuera de las condiciones de las tablas (resistividad térmica, disposición, más circuitos).
-5. **Historial de versiones**: guardar una copia de entradas y literales al generar cada memoria (`rtProyectos/{id}/versiones`), con comparación entre revisiones.
-6. **Cortocircuito**: redes malladas o con varias fuentes; corriente de corte Ib e Ik permanente.
-7. **Coordinación**: bandas de tolerancia de fusibles e interruptores de BT, reconectadores; apantallamiento con varios captadores.
-8. **Fotovoltaica avanzada**: HSP mensual (IDEAM / NASA POWER), simulación horaria con la curva de carga del usuario, varias orientaciones, sombras, bifaciales y flujo de caja con los beneficios de la Ley 1715.
-9. **Otros**: riesgo R2 a R4 (requiere las tablas de la NTC 4552-2 para RC, RM, RW y RZ), flujo de carga, campos EM en 3D.
+5. **Cortocircuito**: redes malladas o con varias fuentes; corriente de corte Ib e Ik permanente.
+6. **Coordinación**: bandas de tolerancia de fusibles e interruptores de BT, reconectadores; apantallamiento con varios captadores.
+7. **Fotovoltaica avanzada**: HSP mensual (IDEAM / NASA POWER), simulación horaria con la curva de carga del usuario, varias orientaciones, sombras, bifaciales y flujo de caja con los beneficios de la Ley 1715.
+8. **Otros**: riesgo R2 a R4 (requiere las tablas de la NTC 4552-2 para RC, RM, RW y RZ), flujo de carga, campos EM en 3D.

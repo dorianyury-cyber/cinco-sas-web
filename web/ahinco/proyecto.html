@@ -55,7 +55,7 @@
             <div><label for="dUbicacion">Ubicación</label><input id="dUbicacion" data-p="ubicacion"></div>
             <div><label for="dAltitud">Altitud (m s. n. m.)</label><input id="dAltitud" data-p="altitud" type="number" step="any"></div>
             <div><label for="dTemp">Temperatura ambiente de diseño (°C)</label><input id="dTemp" data-p="tempAmbiente" type="number" step="any"></div>
-            <div><label for="dTipo">Tipo de diseño</label><select id="dTipo" data-p="tipoDiseno"><option>Diseño detallado</option><option>Diseño simplificado</option></select></div>
+            <div><label for="dTipo">Tipo de diseño</label><select id="dTipo" data-p="tipoDiseno"><option>Diseño detallado</option><option>Diseño básico (vivienda, pequeño comercio o pequeña industria)</option><option>Diseño básico (ramal aéreo rural ≤ 50 kVA y 13,2 kV)</option></select></div>
             <div><label for="dRadicado">Código o radicado del documento</label><input id="dRadicado" data-p="radicado"></div>
             <div class="rt-solo-verif"><label for="dAutor">Diseño revisado: autor y matrícula</label><input id="dAutor" data-p="autorDiseno" placeholder="Ej. Ing. N. N., M.P. CN205-000000"></div>
             <div class="rt-solo-verif rt-ancho"><label for="dDocs">Documentos revisados (planos, memorias y versión)</label><input id="dDocs" data-p="documentosRevisados" placeholder="Ej. Unifilar HI-806-ORI rev. 0 del 12/04/2026"></div>
@@ -89,6 +89,24 @@
           <h2>Supuestos y datos pendientes</h2>
           <p class="text-muted" id="introSup"></p>
           <div id="tablaSup"></div>
+        </div>
+      </section>
+
+      <!-- Versiones -->
+      <section class="rt-seccion" data-seccion="versiones">
+        <div class="card">
+          <h2>Guardar una versión</h2>
+          <p class="text-muted">Una versión es una copia del proyecto completo (datos, literales y cálculos) que no se modifica. Guárdela al radicar una memoria o al recibir cada revisión del contratista, para poder compararlas, ver su memoria o restaurarla.</p>
+          <div class="rt-version-nueva"><input id="notaVersion" type="text" maxlength="300" placeholder="Nota, por ejemplo «Rev. 1 — respuesta a hallazgos» o «Radicada al operador de red»"><button type="button" class="btn" id="guardarVersionBtn">Guardar versión</button></div>
+        </div>
+        <div class="card">
+          <h2>Versiones guardadas</h2>
+          <div id="listaVersiones"><p class="text-muted">Cargando…</p></div>
+        </div>
+        <div class="card">
+          <h2>Comparar</h2>
+          <div class="rt-version-comparar"><label>Desde<select id="compA"></select></label><label>Hasta<select id="compB"></select></label><button type="button" class="btn secondary" id="compararBtn">Comparar</button></div>
+          <div id="resultadoComparacion"></div>
         </div>
       </section>
 

@@ -97,6 +97,7 @@ export function menuProyecto(ctx, { proyecto, guardados, resultados, activo }) {
       <div class="rt-nav-titulo">Entregables</div>
       ${sec("hallazgos", esVerificacion(proyecto) ? "🔎" : "🛠", modo.hallazgos, nHall ? `<span class="rt-nav-cuenta rt-nav-cuenta-mal">${nHall}</span>` : "")}
       ${sec("documentos", "📄", "Documentos")}
+      ${sec("versiones", "🕓", "Versiones")}
       <div class="rt-nav-titulo">Ayuda</div>
       <a href="acerca.html"><span class="rt-nav-icono">ℹ</span>Alcance y validación</a>
     </nav>${caja(ctx)}

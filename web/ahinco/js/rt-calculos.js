@@ -69,7 +69,7 @@ export function cargas(e) {
       { titulo: "Potencia aparente instalada por circuito", formula: "S = (Cantidad × P unitaria) / fp", sustitucion: "Por circuito (ver cuadro)", resultado: `S instalada total = ${fmt(sInst / 1000, 2)} kVA` },
       { titulo: "Demanda máxima", formula: "S dem = Σ S × FD", sustitucion: `Factores de demanda por circuito (NTC 2050 Sección 220)`, resultado: `${fmt(sDem / 1000, 2)} kVA` },
       { titulo: "Corriente por fase", formula: "I fase = S fase / V fase-neutro", sustitucion: `V fase-neutro = ${sis.VLN} V`, resultado: fasesSis.map((f) => `${f}: ${fmt(iFase[f], 1)} A`).join(" · ") },
-      { titulo: "Corriente del alimentador con motores", formula: "I alim = I fase máx + 0,25 × I motor mayor (NTC 2050 430-24)", sustitucion: `${fmt(iMax, 1)} + 0,25 × ${fmt(iMotorMayor, 1)}`, resultado: `${fmt(iAlim, 1)} A` }
+      { titulo: "Corriente del alimentador con motores", formula: "I alim = I fase máx + 0,25 × I motor mayor (NTC 2050 430.24)", sustitucion: `${fmt(iMax, 1)} + 0,25 × ${fmt(iMotorMayor, 1)}`, resultado: `${fmt(iAlim, 1)} A` }
     ],
     verificaciones,
     conclusion: veredicto(verificaciones, `La demanda máxima es de ${fmt(sDem / 1000, 2)} kVA en sistema ${sis.nombre}; el alimentador se diseña para ${fmt(iAlim, 1)} A.`, `La demanda máxima es de ${fmt(sDem / 1000, 2)} kVA; revise el balance de cargas.`)
@@ -97,7 +97,7 @@ export function seleccionarConductor({ corriente, continua, material = "Cu", tAi
     const protMax = limite ? Math.min(limite, ampFinal) : ampFinal;
     if (ampTerm < iDis || ampAisl < corriente) continue;
     const In = sigNormal(N.PROTECCIONES_NORMALIZADAS, iDis);
-    // 240-4(b): se permite la protección normalizada inmediatamente superior
+    // 240.4(B): se permite la protección normalizada inmediatamente superior
     // si la capacidad no coincide con un valor normalizado (≤ 800 A).
     const inPermitido = limite ? limite : (In <= 800 ? sigNormal(N.PROTECCIONES_NORMALIZADAS, ampFinal) : ampFinal);
     if (In == null || In > inPermitido) continue;
@@ -114,11 +114,11 @@ export function conductores(e, proyecto = {}) {
     const sel = seleccionarConductor({ corriente: I, continua: c.continua !== "No", material: mat, tAisl: num(c.tAisl, 90), tTerm: num(c.tTerm, 75), portadores: num(c.portadores, 3), tAmb: num(c.tAmb, tAmbDef) });
     const icc = num(c.icc, 0), icu = num(c.icu, 0);
     if (!sel.calibre) {
-      verificaciones.push({ criterio: `Circuito ${c.circuito}: conductor disponible`, norma: "NTC 2050 Tabla 310-16", valor: `${fmt(I, 1)} A`, limite: "≤ 1000 kcmil", cumple: false });
+      verificaciones.push({ criterio: `Circuito ${c.circuito}: conductor disponible`, norma: "NTC 2050 Tabla 310.15(B)(16)", valor: `${fmt(I, 1)} A`, limite: "≤ 1000 kcmil", cumple: false });
       return [c.circuito || "", c.descripcion || "", fmt(I, 1), mat, "—", "—", "—", "—", "—", "—"];
     }
-    verificaciones.push({ criterio: `Circuito ${c.circuito}: protección ≤ capacidad del conductor`, norma: "NTC 2050 240-3 y 240-4", valor: `${sel.In} A`, limite: `${fmt(sel.ampFinal, 1)} A (o normalizado inmediato)`, cumple: true });
-    if (icc > 0 && icu > 0) verificaciones.push({ criterio: `Circuito ${c.circuito}: capacidad de interrupción`, norma: "NTC 2050 110-9 / RETIE", valor: `${fmt(icu, 1)} kA`, limite: `≥ ${fmt(icc, 1)} kA`, cumple: icu >= icc });
+    verificaciones.push({ criterio: `Circuito ${c.circuito}: protección ≤ capacidad del conductor`, norma: "NTC 2050 240.4; RETIE 2024 art. 3.27.3 c", valor: `${sel.In} A`, limite: `${fmt(sel.ampFinal, 1)} A (o normalizado inmediato)`, cumple: true });
+    if (icc > 0 && icu > 0) verificaciones.push({ criterio: `Circuito ${c.circuito}: capacidad de interrupción`, norma: "NTC 2050 110.9; RETIE 2024 art. 3.17.19", valor: `${fmt(icu, 1)} kA`, limite: `≥ ${fmt(icc, 1)} kA`, cumple: icu >= icc });
     circ.push({ circuito: c.circuito || "", descripcion: c.descripcion || "", I, material: mat, calibre: sel.calibre, In: sel.In, icu });
     return [c.circuito || "", c.descripcion || "", fmt(I, 1), mat, N.etiquetaCalibre(sel.calibre), fmt(sel.ft, 2), fmt(sel.fa, 2), fmt(sel.ampFinal, 1), `${sel.In} A`, icu ? `${fmt(icu, 1)} kA` : "—"];
   });
@@ -127,10 +127,10 @@ export function conductores(e, proyecto = {}) {
     salidas: { circuitos: circ },
     tablas: [{ titulo: "Selección de conductores y protecciones", encabezados: ["Circ.", "Descripción", "I carga (A)", "Mat.", "Conductor", "Ft", "Fa", "Capacidad corregida (A)", "Protección", "Icu"], filas: tabla }],
     pasos: [
-      { titulo: "Corriente de diseño", formula: "I diseño = 1,25 × I carga continua + I no continua", sustitucion: "NTC 2050 210-19(a) y 215-2", resultado: "Por circuito" },
-      { titulo: "Capacidad corregida del conductor", formula: "I corregida = I tabla (T aislamiento) × Ft × Fa ≥ I carga", sustitucion: "Ft: Tabla 310-16 (temperatura ambiente); Fa: 310-15(b)(2)(a) (más de 3 portadores)", resultado: "Por circuito" },
-      { titulo: "Temperatura de los terminales", formula: "I tabla (T terminales) ≥ I diseño", sustitucion: "NTC 2050 110-14(c)", resultado: "Por circuito" },
-      { titulo: "Protección", formula: "I diseño ≤ In ≤ I corregida (o el normalizado inmediato superior, 240-4(b))", sustitucion: "Valores normalizados NTC 2050 240-6", resultado: "Por circuito" }
+      { titulo: "Corriente de diseño", formula: "I diseño = 1,25 × I carga continua + I no continua", sustitucion: "NTC 2050 210.19(A) y 215.2", resultado: "Por circuito" },
+      { titulo: "Capacidad corregida del conductor", formula: "I corregida = I tabla (T aislamiento) × Ft × Fa ≥ I carga", sustitucion: "Ft: Tabla 310.15(B)(16) (temperatura ambiente); Fa: 310.15(B)(3)(a) (más de 3 portadores)", resultado: "Por circuito" },
+      { titulo: "Temperatura de los terminales", formula: "I tabla (T terminales) ≥ I diseño", sustitucion: "NTC 2050 110.14(C)", resultado: "Por circuito" },
+      { titulo: "Protección", formula: "I diseño ≤ In ≤ I corregida (o el normalizado inmediato superior, 240.4(B))", sustitucion: "Valores normalizados NTC 2050 240.6(A)", resultado: "Por circuito" }
     ],
     verificaciones,
     conclusion: veredicto(verificaciones, "Todos los circuitos tienen conductor y protección coordinados según la NTC 2050.", "Hay circuitos que no cumplen.")
@@ -182,8 +182,8 @@ export function regulacion(e) {
   const verificaciones = [];
   const tabla = calc.map((c) => {
     const ac = acum(c);
-    verificaciones.push({ criterio: `Tramo ${c.t.tramo || c.t.hasta}: regulación parcial`, norma: "NTC 2050 210-19(a) NPN 4 / 215-2(b) NPN 2", valor: `${fmt(c.dVp, 2)} %`, limite: `≤ ${fmt(limP, 1)} %`, cumple: c.dVp <= limP });
-    verificaciones.push({ criterio: `Hasta ${c.t.hasta || c.t.tramo}: regulación acumulada`, norma: "NTC 2050 215-2(b) NPN 2", valor: `${fmt(ac, 2)} %`, limite: `≤ ${fmt(limT, 1)} %`, cumple: ac <= limT });
+    verificaciones.push({ criterio: `Tramo ${c.t.tramo || c.t.hasta}: regulación parcial`, norma: "RETIE 2024 Libro 3, Título 26 f (acometida ≤ 3 %); NTC 2050 210.19(A)(1) Nota informativa 4", valor: `${fmt(c.dVp, 2)} %`, limite: `≤ ${fmt(limP, 1)} %`, cumple: c.dVp <= limP });
+    verificaciones.push({ criterio: `Hasta ${c.t.hasta || c.t.tramo}: regulación acumulada`, norma: "RETIE 2024 Libro 3, Título 26 f (alimentadores y circuitos ramales ≤ 5 %); NTC 2050 215.2(A)(1) Nota informativa 2", valor: `${fmt(ac, 2)} %`, limite: `≤ ${fmt(limT, 1)} %`, cumple: ac <= limT });
     return [c.t.tramo || "", `${c.t.desde || ""} → ${c.t.hasta || ""}`, fmt(c.L * 1000, 1), fmt(c.S / 1000, 2), fmt(c.I, 1), `${c.n} × ${c.z.nombre}`, fmt(c.z.R, 4), fmt(c.z.X, 4), fmt(c.dV, 2), fmt(c.dVp, 2), fmt(ac, 2), fmt(c.perdidas / 1000, 3), fmt(c.S > 0 ? (c.perdidas / (c.S * fp)) * 100 : 0, 2)];
   });
   const totPerd = calc.reduce((s, c) => s + c.perdidas, 0);
@@ -200,6 +200,7 @@ export function regulacion(e) {
       { titulo: "Pérdidas de potencia", formula: `P pérd = ${kp} × I² × R × L / n`, sustitucion: "Por tramo", resultado: `${fmt(totPerd / 1000, 3)} kW en total` }
     ],
     verificaciones,
+    notas: ["RETIE 2024 (Libro 3, Título 26, literal f): la regulación en la acometida no puede superar el 3 %, calculada en el dispositivo de corte, y la caída de tensión en alimentadores y circuitos ramales a la carga plena de diseño no puede superar el 5 %. Si la acometida es un tramo de la tabla, el acumulado del 5 % se cuenta desde el dispositivo de corte (sin la acometida)."],
     conclusion: veredicto(verificaciones, `La regulación acumulada máxima es ${fmt(maxAc, 2)} %, dentro de los límites de diseño.`, "Hay tramos que superan la regulación admisible: aumente el calibre o el número de conductores en paralelo.")
   };
 }
@@ -258,7 +259,7 @@ export function transformador(e, proyecto = {}, ctx = {}) {
   const verificaciones = [
     { criterio: "Cargabilidad con la demanda actual", norma: "Criterio de diseño (NTC 2482 cargabilidad)", valor: `${fmt(carga, 1)} %`, limite: `≤ ${fmt(num(e.cargaMax, 100), 0)} %`, cumple: carga <= num(e.cargaMax, 100) },
     { criterio: "Cargabilidad con crecimiento proyectado", norma: "Criterio de diseño", valor: `${fmt(cargaFut, 1)} %`, limite: "≤ 100 %", cumple: cargaFut <= 100 },
-    { criterio: "Protección del secundario", norma: "NTC 2050 450-3(b)", valor: `${interruptor} A`, limite: `≤ ${fmt(1.25 * is, 0)} A (125 % In) o normalizado inmediato`, cumple: interruptor <= sigNormal(N.PROTECCIONES_NORMALIZADAS, 1.25 * is) }
+    { criterio: "Protección del secundario", norma: "NTC 2050 450.3(B)", valor: `${interruptor} A`, limite: `≤ ${fmt(1.25 * is, 0)} A (125 % In) o normalizado inmediato`, cumple: interruptor <= sigNormal(N.PROTECCIONES_NORMALIZADAS, 1.25 * is) }
   ];
   return {
     resumen: [
@@ -351,7 +352,7 @@ export function cortocircuito(e, proyecto = {}, ctx = {}) {
     barras.push({ nombre: nd.nombre, cable: nd.cable || null, z1: { ...zth }, ik3, ik3red, aporte: ik3 - ik3red, ip: kappa * Math.SQRT2 * ik3m + Math.SQRT2 * iGen, ik1, kappa, icu: num(nd.icu, 0) });
   });
   const ikMT = skq / (Math.sqrt(3) * UnMT);
-  const verificaciones = barras.filter((b) => b.icu > 0).map((b) => ({ criterio: `${b.nombre}: capacidad de interrupción`, norma: "RETIE / NTC 2050 110-9; IEC 60947-2", valor: `${fmt(b.icu, 1)} kA`, limite: `≥ ${fmt(b.ik3 / 1000, 2)} kA`, cumple: b.icu * 1000 >= b.ik3 }));
+  const verificaciones = barras.filter((b) => b.icu > 0).map((b) => ({ criterio: `${b.nombre}: capacidad de interrupción`, norma: "NTC 2050 110.9; RETIE 2024 art. 3.17.19; IEC 60947-2", valor: `${fmt(b.icu, 1)} kA`, limite: `≥ ${fmt(b.ik3 / 1000, 2)} kA`, cumple: b.icu * 1000 >= b.ik3 }));
   return {
     resumen: [
       { etiqueta: "Ik\" trifásica en la red (primario)", valor: fmt(ikMT / 1000, 2), unidad: "kA" },
@@ -548,6 +549,11 @@ export function malla(e) {
   const LS = 0.75 * LC + 0.85 * LR;
   const Es = (rho * Ks * Ki * IG) / LS;
   const ret = N.RETIE_RESISTENCIA_SPT[e.tipoInstalacion] || N.RETIE_RESISTENCIA_SPT.subMT;
+  // RETIE 2024 art. 3.12.1 g: sin capa superficial, la tensión de contacto tampoco puede
+  // superar la Tabla 3.12.1.a; la resistencia de la Tabla 3.12.3.a es solo de referencia.
+  const sinCapa = !(hs > 0 && rhos > 0);
+  const retC = N.retieContactoMax(tf, e.acceso);
+  const tensionesOk = Em <= Etouch && Es <= Estep && (!sinCapa || Em <= retC.v);
   // Suelo de dos capas: sensibilidad con la capa superior para paso y contacto y
   // la inferior para la resistencia (IEEE 80 §13.4.2.1), como referencia.
   const sens = suelo ? { em: (suelo.r1 * Km * Ki * IG) / LM, es: (suelo.r1 * Ks * Ki * IG) / LS, rg: (Rg * suelo.r2) / rho } : null;
@@ -563,7 +569,8 @@ export function malla(e) {
   const verificaciones = [
     { criterio: "Tensión de contacto (de malla)", norma: "IEEE 80-2013 §16", valor: `${fmt(Em, 1)} V`, limite: `≤ ${fmt(Etouch, 1)} V`, cumple: Em <= Etouch },
     { criterio: "Tensión de paso", norma: "IEEE 80-2013 §16", valor: `${fmt(Es, 1)} V`, limite: `≤ ${fmt(Estep, 1)} V`, cumple: Es <= Estep },
-    { criterio: "Resistencia de puesta a tierra", norma: `RETIE — valor de referencia: ${ret.nombre}`, valor: `${fmt(Rg, 2)} Ω`, limite: `≤ ${fmt(ret.max, 0)} Ω`, cumple: Rg <= ret.max },
+    ...(sinCapa ? [{ criterio: `Tensión de contacto sin capa superficial (${e.acceso === "ocupacional" ? "ocupacional" : "público en general"}, despeje ${retC.fila})`, norma: "RETIE 2024 Libro 3, art. 3.12.1 g, Tabla 3.12.1.a", valor: `${fmt(Em, 1)} V`, limite: `≤ ${fmt(retC.v, 0)} V`, cumple: Em <= retC.v }] : []),
+    { criterio: "Resistencia de puesta a tierra", norma: `RETIE 2024 Tabla 3.12.3.a (referencia): ${ret.nombre}`, valor: `${fmt(Rg, 2)} Ω`, limite: tensionesOk && Rg > ret.max ? `≤ ${fmt(ret.max, 0)} Ω de referencia; se acepta el valor de diseño porque las tensiones de paso y contacto cumplen (Parágrafo 1 del art. 3.12.3)` : `≤ ${fmt(ret.max, 0)} Ω (o tensiones de paso y contacto dentro de los límites)`, cumple: Rg <= ret.max || tensionesOk },
     { criterio: "Sección del conductor de la malla", norma: "IEEE 80-2013 ec. 37 (fusión)", valor: `${fmt(Acal, 1)} mm² (${N.etiquetaCalibre(cal)})`, limite: `≥ ${fmt(Areq, 1)} mm²`, cumple: Acal >= Areq }
   ];
   return {
@@ -678,6 +685,8 @@ export function aislamiento(e, proyecto = {}) {
     { criterio: "Tensión asignada frente a sobretensiones temporales", norma: "IEC 60099-5 — Ur ≥ TOV / T", valor: `${fmt(ur, 1)} kV`, limite: `≥ ${fmt(urMin, 1)} kV`, cumple: ur >= urMin },
     { criterio: "Margen de protección al impulso tipo rayo", norma: "IEEE C62.22 / IEC 60071-2 (≥ 20 %)", valor: `${fmt(margen, 1)} %`, limite: "≥ 20 %", cumple: margen >= 20 }
   ];
+  const icDps = num(e.icDps, 0), ikNodo = num(e.ikNodo, 0);
+  if (icDps > 0 && ikNodo > 0) verificaciones.push({ criterio: "Capacidad de cortocircuito del DPS frente a la falla en su nodo", norma: "RETIE 2024 Libro 3, art. 3.17.14 f", valor: `${fmt(icDps, 1)} kA${e.protSerie === "Sí" ? " (con protección en serie)" : ""}`, limite: `≥ ${fmt(ikNodo, 1)} kA o protección de sobrecorriente en serie`, cumple: icDps >= ikNodo || e.protSerie === "Sí" });
   if (normalizados.length) verificaciones.push({ criterio: "BIL del equipo frente a los niveles normalizados para Um", norma: "IEC 60071-1 Tabla 2", valor: `${fmt(bil, 0)} kV`, limite: `≥ ${Math.min(...normalizados)} kV (normalizados: ${normalizados.join(" / ")} kV)`, cumple: bil >= Math.min(...normalizados) });
   return {
     resumen: [
@@ -700,6 +709,7 @@ export function aislamiento(e, proyecto = {}) {
       { titulo: "Distancia mínima en aire", formula: "d = d(BIL) × Ka", sustitucion: `IEC 60071-1 Anexo A: ${fila[1]} mm para ${fila[0]} kV`, resultado: `${fmt(dAire, 0)} mm` }
     ],
     verificaciones,
+    notas: ["RETIE 2024 3.3.3.1: toda subestación (transformador) y toda transición de línea aérea a cable aislado de media, alta o extra alta tensión deben tener DPS; en los demás casos la necesidad se define con una evaluación del riesgo por sobretensiones (uso, coordinación de aislamiento, densidad de rayos, topografía y resistividad, personas y equipos).", "RETIE 2024 art. 3.17.14: coordinación según IEC 61643-12 (c.a.) o IEC 61643-32 (FV); conexión lo más corta posible (en BT, distancia «b» ≤ 50 cm); en media, alta y extra alta tensión los conductores de conexión a la red y a tierra no pueden ser menores que 6 AWG; la capacidad de cortocircuito del DPS debe coordinarse con la falla del nodo."],
     conclusion: veredicto(verificaciones, "El DPS seleccionado protege el aislamiento con margen suficiente.", "La coordinación de aislamiento no cumple: revise el DPS, su ubicación o el BIL del equipo.")
   };
 }
@@ -707,25 +717,48 @@ export function aislamiento(e, proyecto = {}) {
 // ================================================================ 11. DISTANCIAS DE SEGURIDAD (RETIE)
 export function distancias(e, proyecto = {}) {
   const H = num(e.altitud, num(proyecto.altitud, 0));
-  const fAlt = H > 1000 ? 1 + 0.0125 * ((H - 1000) / 100) : 1;
-  const verificaciones = [];
+  const D = N.RETIE_DISTANCIAS, verificaciones = [];
+  let altas = false, sobre98 = false;
   const tabla = filas(e.puntos).map((p) => {
-    const tipo = N.RETIE_DISTANCIAS.tipos[p.tipo] || N.RETIE_DISTANCIAS.tipos.e;
+    const tipo = D.tipos[p.tipo] || D.tipos.e;
     const base = num(p.exigida, NaN);
     const tablaV = tipo.v[p.tension];
+    const fAlt = N.factorAltitudDistancia(p.tension, H);
+    if (fAlt > 1) altas = true;
+    if (Number(p.tension) >= 230) sobre98 = true;
     const req = (Number.isFinite(base) ? base : tablaV ?? NaN) * fAlt;
     const dis = num(p.diseno);
     const ok = Number.isFinite(req) && dis >= req;
-    verificaciones.push({ criterio: `${p.punto || "Punto"}: ${tipo.nombre.toLowerCase()}`, norma: Number.isFinite(base) ? "Valor digitado por el diseñador" : "RETIE — distancias mínimas de seguridad", valor: `${fmt(dis, 2)} m`, limite: Number.isFinite(req) ? `≥ ${fmt(req, 2)} m` : "Digite la distancia exigida", cumple: Number.isFinite(req) ? ok : false });
-    return [p.punto || "", p.tension === "<1" ? "< 1 kV" : `${p.tension} kV`, tipo.nombre, Number.isFinite(req) ? fmt(req, 2) : "—", fmt(dis, 2), Number.isFinite(req) ? (ok ? "Cumple" : "No cumple") : "Sin dato"];
+    const tTxt = D.textoTension[p.tension] || `${p.tension} kV`;
+    verificaciones.push({ criterio: `${p.punto || "Punto"}: ${tipo.nombre}`, norma: Number.isFinite(base) ? "Valor digitado por el diseñador" : `RETIE 2024 ${tipo.tabla}${fAlt > 1 ? " y Nota 2 del art. 3.10" : ""}`, valor: `${fmt(dis, 2)} m`, limite: Number.isFinite(req) ? `≥ ${fmt(req, 2)} m` : `El RETIE 2024 (${tipo.tabla}) no da valor para ${tTxt}: digite la distancia exigida`, cumple: Number.isFinite(req) ? ok : false });
+    return [p.punto || "", tTxt, tipo.nombre, Number.isFinite(base) ? "Digitada" : `${tipo.tabla}`, fAlt > 1 ? fmt(fAlt, 3) : "1", Number.isFinite(req) ? fmt(req, 2) : "—", fmt(dis, 2), Number.isFinite(req) ? (ok ? "Cumple" : "No cumple") : "Sin dato"];
   });
+  const tablas = [{ titulo: "Distancias mínimas de seguridad", encabezados: ["Punto", "Tensión", "Tipo de distancia", "Fuente", "Factor altitud", "Exigida (m)", "Diseño (m)", "Resultado"], filas: tabla }];
+  const pasos = [{ titulo: "Distancia exigida", formula: "d exigida = d tabla RETIE × factor de altitud", sustitucion: H > 1000 ? `Altitud ${fmt(H, 0)} m: factor = 1 + 3 % × (H − 1000)/300 = ${fmt(1 + (0.03 * (H - 1000)) / 300, 3)}, solo para tensiones de más de 57,5 kV; a 57,5 kV o menos el factor es 1` : "Altitud ≤ 1000 m: factor 1", resultado: "Por punto" }];
+  const resumen = [{ etiqueta: "Puntos verificados", valor: String(tabla.length), unidad: "" }];
+  const S = N.RETIE_SERVIDUMBRE[e.servidumbre];
+  if (S?.ancho) {
+    const conEc = e.servidumbreEc === "si";
+    const sEc = 2 * (num(e.servA, 0) + num(e.servB, 0) + num(e.servC, 0));
+    const minimo = conEc ? Math.max(0.9 * S.ancho, sEc) : S.ancho;
+    const anchoD = num(e.servidumbreAncho, NaN);
+    pasos.push({ titulo: "Ancho de la zona de servidumbre", formula: conEc ? "S = 2 × (A + B + C); mínimo = máx(0,9 × ancho de la tabla; S)" : "Ancho mínimo de la Tabla 3.19.1.a", sustitucion: conEc ? `S = 2 × (${fmt(num(e.servA, 0), 2)} + ${fmt(num(e.servB, 0), 2)} + ${fmt(num(e.servC, 0), 2)}) = ${fmt(sEc, 2)} m; 0,9 × ${S.ancho} = ${fmt(0.9 * S.ancho, 2)} m` : `${S.nombre}: ${S.ancho} m`, resultado: `${fmt(minimo, 2)} m` });
+    verificaciones.push({ criterio: "Ancho de la zona de servidumbre ≥ mínimo", norma: conEc ? "RETIE 2024 art. 3.19.1 h, Tabla 3.19.1.a y Nota 5 (ecuación 7, CIGRE 348)" : "RETIE 2024 art. 3.19.1 h, Tabla 3.19.1.a", valor: Number.isFinite(anchoD) ? `${fmt(anchoD, 2)} m` : "Sin dato", limite: `≥ ${fmt(minimo, 2)} m`, cumple: Number.isFinite(anchoD) && anchoD >= minimo - 1e-9 });
+    if (e.servidumbreAmpliacion !== "si") verificaciones.push({ criterio: "Ancho de la zona de servidumbre ≤ máximo (tabla + 10 %)", norma: "RETIE 2024 Tabla 3.19.1.a, Nota 3", valor: Number.isFinite(anchoD) ? `${fmt(anchoD, 2)} m` : "Sin dato", limite: `≤ ${fmt(1.1 * S.ancho, 2)} m`, cumple: Number.isFinite(anchoD) && anchoD <= 1.1 * S.ancho + 1e-9 });
+    resumen.push({ etiqueta: "Ancho mínimo de servidumbre", valor: fmt(minimo, 2), unidad: "m" });
+    tablas.push({ titulo: "Zona de servidumbre", encabezados: ["Línea", "Ancho de la tabla (m)", "Mínimo exigido (m)", "Máximo (m)", "Diseño (m)"], filas: [[S.nombre, fmt(S.ancho, 0), fmt(minimo, 2), e.servidumbreAmpliacion === "si" ? "Reserva para ampliación" : fmt(1.1 * S.ancho, 2), Number.isFinite(anchoD) ? fmt(anchoD, 2) : "—"]] });
+  }
   return {
-    resumen: [{ etiqueta: "Puntos verificados", valor: String(tabla.length), unidad: "" }],
-    tablas: [{ titulo: "Distancias mínimas de seguridad", encabezados: ["Punto", "Tensión", "Tipo de distancia", "Exigida (m)", "Diseño (m)", "Resultado"], filas: tabla }],
-    pasos: [{ titulo: "Distancia exigida", formula: "d exigida = d tabla RETIE × factor de altitud", sustitucion: H > 1000 ? `Factor = 1 + 1,25 % por cada 100 m sobre 1000 m = ${fmt(fAlt, 3)}` : "Altitud ≤ 1000 m: factor 1", resultado: "Por punto" }],
-    verificaciones,
-    notas: ["Valores de la tabla de distancias mínimas de seguridad del RETIE. Verificar contra la versión vigente del reglamento antes de firmar la memoria; donde no hay valor cargado, el diseñador digita la distancia exigida."],
-    conclusion: veredicto(verificaciones, "Todas las distancias de diseño cumplen las mínimas de seguridad.", "Hay distancias de diseño por debajo de las mínimas de seguridad.")
+    resumen, tablas, pasos, verificaciones,
+    notas: [
+      "Distancias del RETIE 2024 (Res. 40117 de 2024, modificada por la Res. 40284 de 2026), Libro 3: Tabla 3.10.1.a (zonas con construcciones) y Tabla 3.10.2.a (lugares y situaciones). Se miden desde la parte energizada más cercana al sitio de posible contacto (Nota 3) y aplican a conductores desnudos; no se aplican a cable aislado con pantalla ni a conductores aislados de baja tensión (Nota 7).",
+      "Si la tensión no está en las tablas, se cumple la de la tensión inmediatamente superior (Nota 5). Para redes de media tensión con cable cubierto, espaciadores y señalización, la distancia horizontal de la Tabla 3.10.1.a puede reducirse hasta en 30 % (Nota 9): digite ese valor como distancia exigida.",
+      "En redes públicas no se permiten edificaciones debajo de los conductores ni redes de uso público sobre edificaciones; la distancia «a» solo aplica cuando el tenedor de la instalación tiene control absoluto de la instalación y de la edificación.",
+      ...(altas ? ["Corrección por altitud (Nota 2 del art. 3.10): para tensiones de más de 57,5 kV, las distancias aumentan 3 % por cada 300 m sobre 1000 m de altitud."] : []),
+      ...(sobre98 ? ["Para tensiones línea-tierra de más de 98 kV (230 y 500 kV), el RETIE exige aumentar las distancias de la Tabla 3.10.2.a o reducir el campo eléctrico para limitar a 5 mA rms la corriente de estado estacionario por efecto electrostático en el vehículo o equipo más grande esperado bajo la línea, con la flecha del conductor a 50 °C (Nota 1 de la Tabla 3.10.2.a)."] : []),
+      "Los cruces entre líneas (Tabla 3.10.3.a), las distancias entre conductores en la misma estructura (Tablas 3.10.4.a y b) y las distancias para trabajos cerca de partes energizadas (Tabla 3.10.5.b) se verifican digitando la distancia exigida."
+    ],
+    conclusion: veredicto(verificaciones, "Todas las distancias de diseño cumplen las mínimas de seguridad del RETIE 2024.", "Hay distancias de diseño por debajo de las mínimas de seguridad o fuera de los anchos de servidumbre.")
   };
 }
 
@@ -753,10 +786,11 @@ export function mecanico(e) {
   const maxF = res.length ? Math.max(...res.map((r) => r.flecha)) : 0;
   const alturaAmarre = num(e.alturaAmarre, 0), libre = num(e.distanciaMin, 0);
   const verificaciones = [
+    { criterio: "Tensión mecánica de tendido (EDS) frente al máximo del RETIE", norma: "RETIE 2024 Libro 3, art. 3.19.6 b y 3.20.6.1 a (≤ 25 % de la rotura)", valor: `${fmt(num(e.eds, 18), 1)} %`, limite: "≤ 25 %", cumple: num(e.eds, 18) <= 25 },
     { criterio: "Tensión de cada día (EDS)", norma: "Criterio de diseño (CIGRÉ: 18 a 22 % de la carga de rotura)", valor: `${fmt(num(e.eds, 18), 1)} %`, limite: `≤ ${fmt(num(e.edsMax, 22), 0)} %`, cumple: num(e.eds, 18) <= num(e.edsMax, 22) },
     { criterio: "Tensión máxima en las hipótesis de carga", norma: "Factor de seguridad ≥ 2 (≤ 50 % de la rotura)", valor: `${fmt(maxT / g, 0)} kgf (${fmt((maxT / rotN) * 100, 1)} %)`, limite: "≤ 50 %", cumple: maxT <= 0.5 * rotN }
   ];
-  if (alturaAmarre > 0 && libre > 0) verificaciones.push({ criterio: "Distancia al suelo con flecha máxima", norma: "RETIE — distancias mínimas de seguridad", valor: `${fmt(alturaAmarre - maxF, 2)} m`, limite: `≥ ${fmt(libre, 2)} m`, cumple: alturaAmarre - maxF >= libre });
+  if (alturaAmarre > 0 && libre > 0) verificaciones.push({ criterio: "Distancia al suelo con flecha máxima", norma: "RETIE 2024 art. 3.10.2, Tabla 3.10.2.a", valor: `${fmt(alturaAmarre - maxF, 2)} m`, limite: `≥ ${fmt(libre, 2)} m`, cumple: alturaAmarre - maxF >= libre });
   return {
     resumen: [
       { etiqueta: "Tensión máxima", valor: fmt(maxT / g, 0), unidad: "kgf" },
@@ -848,7 +882,7 @@ export function trafoPotencia(e) {
       { titulo: "Cortocircuito pasante", formula: "Ik\" MT = c × U MT / (√3 × (ZQ + ZT)); Ik visto desde AT = Ik\" MT × U MT / U AT", sustitucion: "IEC 60076-5 §4.1 (incluye la impedancia de la red)", resultado: `${fmt(ikMT, 2)} kA en MT; ${fmt(ikPasAT, 2)} kA en AT` }
     ],
     verificaciones,
-    notas: ["La impedancia uk se toma sobre la potencia indicada (normalmente la ONAN); confirme la base con el protocolo de pruebas del fabricante.", "La corriente de falla en el lado AT de los equipos se toma igual a la de la red (falla en la barra AT)."],
+    notas: ["RETIE 2024 Libro 3, art. 3.17.28: el transformador de más de 1000 V debe tener protección de sobrecorriente al menos en el primario, coordinada (literal i); si su potencia supera 2 MVA, debe protegerse contra sobrepresiones dinámicas por arco interno, con actuación en los primeros milisegundos, según la NFPA 850 (literal l); las distancias o barreras contra fuego siguen la IEC 61936-1 numeral 8.7.2 (literal d).", "La impedancia uk se toma sobre la potencia indicada (normalmente la ONAN); confirme la base con el protocolo de pruebas del fabricante.", "La corriente de falla en el lado AT de los equipos se toma igual a la de la red (falla en la barra AT)."],
     conclusion: veredicto(verificaciones, `El transformador de ${fmt(sOnan, 0)}/${fmt(sOnaf, 0)} MVA y los equipos asociados son coherentes con las corrientes nominales y de cortocircuito.`, "Hay incoherencias entre el transformador y los equipos o la soportabilidad especificada.")
   };
 }
@@ -909,7 +943,7 @@ export function cableMT(e, proyecto = {}, ctx = {}) {
     verificaciones.push({ criterio: `${nombre}: capacidad de corriente`, norma: manual ? "Datos del fabricante con factores de corrección (IEC 60502-2)" : `${tb.ref.replace(/, Detalle.*/, "")} con corrección por temperatura y profundidad`, valor: `${fmt(I, 0)} A`, limite: Number.isFinite(amp) ? `≤ ${fmt(amp, 0)} A` : "Sin capacidad de tabla para este calibre", cumple: I <= amp });
     if (ik > 0) verificaciones.push({ criterio: `${nombre}: soportabilidad al cortocircuito`, norma: `IEC 60949 (adiabático, K = ${K})`, valor: `${fmt(ik, 2)} kA`, limite: `≤ ${fmt(ikAdm, 2)} kA en ${fmt(t, 2)} s`, cumple: ik <= ikAdm });
     if (num(c.inCelda, 0)) verificaciones.push({ criterio: `${nombre}: celda o protección`, norma: "IEC 62271-200 — In de la celda ≥ corriente del circuito", valor: `${fmt(num(c.inCelda), 0)} A`, limite: `≥ ${fmt(I, 0)} A`, cumple: num(c.inCelda) >= I });
-    if (L > 0) verificaciones.push({ criterio: `${nombre}: caída de tensión`, norma: "RETIE — regulación (criterio del operador de red)", valor: `${fmt(dv, 2)} %`, limite: `≤ ${fmt(dvMax, 1)} %`, cumple: dv <= dvMax });
+    if (L > 0) verificaciones.push({ criterio: `${nombre}: caída de tensión`, norma: "Criterio del operador de red (RETIE 2024 3.3.1.1 literal p)", valor: `${fmt(dv, 2)} %`, limite: `≤ ${fmt(dvMax, 1)} %`, cumple: dv <= dvMax });
     return [nombre, `${mat} ${N.etiquetaCalibre(String(c.calibre))} ${ais}`, fmt(S, 1), manual ? `${fmt(base, 0)} (fabricante)` : `${fmt(base, 0)} (tabla${tb.notas.some((x) => x.includes("(S)")) ? ", S" : ""})`, fmt(amp, 0), fmt(I, 0), ik ? fmt(ik, 2) : "—", fmt(ikAdm, 2), L ? fmt(dv, 2) : "—"];
   });
   return {
@@ -990,11 +1024,11 @@ export function fvArreglo(e) {
   const iInversa = (np - 1) * isc * 1.25, fusibles = iInversa > fusMax;
   const ilrMin = num(e.ilrMin, 0.9), ilrMax = num(e.ilrMax, 1.35);
   const verificaciones = [
-    { criterio: "Tensión de circuito abierto del string a la temperatura mínima frente al inversor", norma: "IEC 62548 §6 / NTC 2050 690-7", valor: `${fmt(vOcStr, 0)} V`, limite: `≤ ${fmt(vdcMax, 0)} V`, cumple: vOcStr <= vdcMax },
+    { criterio: "Tensión de circuito abierto del string a la temperatura mínima frente al inversor", norma: "IEC 62548 §6 / NTC 2050 690.7", valor: `${fmt(vOcStr, 0)} V`, limite: `≤ ${fmt(vdcMax, 0)} V`, cumple: vOcStr <= vdcMax },
     { criterio: "Tensión de circuito abierto del string frente a la tensión máxima del módulo", norma: "IEC 61730 / ficha del módulo", valor: `${fmt(vOcStr, 0)} V`, limite: `≤ ${fmt(vmaxMod, 0)} V`, cumple: vOcStr <= vmaxMod },
     { criterio: "Tensión de máxima potencia a la temperatura máxima de celda dentro del rango MPPT", norma: "IEC 62548 / ficha del inversor", valor: `${fmt(vMpMinStr, 0)} V`, limite: `≥ ${fmt(vMin, 0)} V`, cumple: vMpMinStr >= vMin },
     { criterio: "Tensión de máxima potencia a la temperatura mínima dentro del rango MPPT", norma: "IEC 62548 / ficha del inversor", valor: `${fmt(vMpMaxStr, 0)} V`, limite: `≤ ${fmt(vMax, 0)} V`, cumple: vMpMaxStr <= vMax },
-    { criterio: "Corriente de cortocircuito por MPPT (1,25 × Isc)", norma: "NTC 2050 690-8(a) / ficha del inversor", valor: `${fmt(iMpptIsc, 1)} A`, limite: `≤ ${fmt(iscMax, 1)} A`, cumple: iMpptIsc <= iscMax },
+    { criterio: "Corriente de cortocircuito por MPPT (1,25 × Isc)", norma: "NTC 2050 690.8(A) / ficha del inversor", valor: `${fmt(iMpptIsc, 1)} A`, limite: `≤ ${fmt(iscMax, 1)} A`, cumple: iMpptIsc <= iscMax },
     { criterio: "Corriente de operación por MPPT", norma: "Ficha del inversor (corriente máxima de entrada)", valor: `${fmt(iMpptImp, 1)} A`, limite: `≤ ${fmt(idcMax, 1)} A`, cumple: iMpptImp <= idcMax },
     { criterio: "Entradas MPPT utilizadas", norma: "Ficha del inversor", valor: String(nUso), limite: `≤ ${nMppt}`, cumple: nUso <= nMppt },
     { criterio: "Relación DC/AC (potencia pico / potencia del inversor)", norma: "Criterio de diseño", valor: fmt(ilr, 2), limite: `${fmt(ilrMin, 2)} a ${fmt(ilrMax, 2)}`, cumple: ilr >= ilrMin && ilr <= ilrMax }
@@ -1026,7 +1060,7 @@ export function fvArreglo(e) {
       { titulo: "Tensión de circuito abierto máxima", formula: "Voc máx. = Voc × (1 + βVoc × (Tmín − 25))", sustitucion: `${fmt(voc, 2)} × (1 + ${fmt(bVoc, 2)} % × (${fmt(tmin, 1)} − 25))`, resultado: `${fmt(vocMax, 2)} V por módulo; ${fmt(vOcStr, 0)} V el string` },
       { titulo: "Tensión de máxima potencia mínima", formula: "Vmp mín. = Vmp × (1 + βVmp × (Tc máx. − 25))", sustitucion: `${fmt(vmp, 2)} × (1 + ${fmt(bVmp, 2)} % × (${fmt(tcMax, 1)} − 25))`, resultado: `${fmt(vmpMin, 2)} V por módulo; ${fmt(vMpMinStr, 0)} V el string` },
       { titulo: "Módulos en serie", formula: "Ns máx. = Vdc máx. / Voc máx.; Ns mín. = V MPPT mín. / Vmp mín.", sustitucion: `${fmt(Math.min(vdcMax, vmaxMod), 0)} / ${fmt(vocMax, 2)}; ${fmt(vMin, 0)} / ${fmt(vmpMin, 2)}`, resultado: `${nsMin} ≤ Ns ≤ ${Math.min(nsMax, nsMaxMppt)}` },
-      { titulo: "Corriente por MPPT", formula: "I = Np × 1,25 × Isc (NTC 2050 690-8)", sustitucion: `${np} × 1,25 × ${fmt(isc, 2)}`, resultado: `${fmt(iMpptIsc, 1)} A` },
+      { titulo: "Corriente por MPPT", formula: "I = Np × 1,25 × Isc (NTC 2050 690.8)", sustitucion: `${np} × 1,25 × ${fmt(isc, 2)}`, resultado: `${fmt(iMpptIsc, 1)} A` },
       { titulo: "Potencia y relación DC/AC", formula: "Pdc = N módulos × Pmod; DC/AC = Pdc / Pac", sustitucion: `${nMod} × ${fmt(pmod, 0)} W; ${fmt(pdc, 2)} / ${fmt(pac, 1)}`, resultado: `${fmt(pdc, 2)} kWp; ${fmt(ilr, 2)}` }
     ],
     verificaciones,
@@ -1091,7 +1125,7 @@ export function fvProduccion(e, proyecto = {}, ctx = {}) {
   };
 }
 
-// ================================================================ 18. CONDUCTORES Y PROTECCIONES DEL SISTEMA FV (NTC 2050 690-8)
+// ================================================================ 18. CONDUCTORES Y PROTECCIONES DEL SISTEMA FV (NTC 2050 690.8)
 export function fvConductores(e, proyecto = {}, ctx = {}) {
   const a = ctx.fvArreglo || {};
   const dvMax = num(e.dvMax, 1.5), dvTotalMax = num(e.dvTotalMax, 3);
@@ -1101,8 +1135,8 @@ export function fvConductores(e, proyecto = {}, ctx = {}) {
     const tipo = c.tipo || "DC string", dc = tipo.startsWith("DC");
     const base = num(c.corriente, NaN);
     const iBase = Number.isFinite(base) ? base : tipo === "DC string" ? a.isc ?? 0 : tipo === "DC agrupado" ? (a.isc ?? 0) * (a.np ?? 1) : a.iac ?? 0;
-    const iMax = dc ? iBase * 1.25 : iBase; // 690-8(a): 125 % de Isc por irradiancia
-    const iDis = iMax * 1.25; // 690-8(b) y 215-2: 125 % adicional
+    const iMax = dc ? iBase * 1.25 : iBase; // 690.8(A): 125 % de Isc por irradiancia
+    const iDis = iMax * 1.25; // 690.8(B) y 215.2: 125 % adicional
     const cal = String(c.calibre || "10"), mat = c.material === "Al" ? "Al" : "Cu";
     const tabla = N.AMPACIDAD[mat][cal] || [0, 0, 0];
     const tAmb = num(c.tAmb, num(proyecto.tempAmbiente, 30)) + num(c.adicional, 0);
@@ -1118,23 +1152,24 @@ export function fvConductores(e, proyecto = {}, ctx = {}) {
     if (dc) dvDC = Math.max(dvDC, dv); else dvAC = Math.max(dvAC, dv);
     const tierra = (N.TIERRA_EQUIPOS.find(([lim]) => prot <= lim) || N.TIERRA_EQUIPOS[N.TIERRA_EQUIPOS.length - 1])[1];
     const nom = c.tramo || tipo;
-    verificaciones.push({ criterio: `${nom}: capacidad corregida del conductor (90 °C)`, norma: "NTC 2050 690-8(b)(2) — I máx. con factores de corrección", valor: `${fmt(amp90, 1)} A`, limite: `≥ ${fmt(iMax, 1)} A`, cumple: amp90 >= iMax });
-    verificaciones.push({ criterio: `${nom}: capacidad en los terminales (75 °C)`, norma: "NTC 2050 690-8(b)(1) y 110-14(c) — 125 % de I máx.", valor: `${fmt(amp75, 1)} A`, limite: `≥ ${fmt(iDis, 1)} A`, cumple: amp75 >= iDis });
-    if (tipo === "DC string" && a.fusibles) verificaciones.push({ criterio: `${nom}: fusible de string`, norma: "NTC 2050 690-9 — entre 1,56 Isc y el fusible máximo del módulo", valor: `${fmt(prot, 0)} A`, limite: `${fmt(iDis, 1)} a ${fmt(a.fusMax ?? 25, 0)} A`, cumple: prot >= iDis - 1e-9 && prot <= (a.fusMax ?? 25) });
-    else if (tipo !== "DC string") verificaciones.push({ criterio: `${nom}: protección contra sobrecorriente`, norma: "NTC 2050 690-9 y 240-4", valor: `${fmt(prot, 0)} A`, limite: `≥ ${fmt(iDis, 1)} A y ≤ capacidad del conductor`, cumple: prot >= iDis - 1e-9 && prot <= (sigNormal(N.PROTECCIONES_NORMALIZADAS, amp90) || amp90) });
-    if (L > 0) verificaciones.push({ criterio: `${nom}: caída de tensión`, norma: "Criterio de diseño (IEC 62548 recomienda limitar las pérdidas DC)", valor: `${fmt(dv, 2)} %`, limite: `≤ ${fmt(dvMax, 1)} %`, cumple: dv <= dvMax });
+    verificaciones.push({ criterio: `${nom}: capacidad corregida del conductor (90 °C)`, norma: "NTC 2050 690.8(B)(2) — I máx. con factores de corrección", valor: `${fmt(amp90, 1)} A`, limite: `≥ ${fmt(iMax, 1)} A`, cumple: amp90 >= iMax });
+    verificaciones.push({ criterio: `${nom}: capacidad en los terminales (75 °C)`, norma: "NTC 2050 690.8(B)(1) y 110.14(C) — 125 % de I máx.", valor: `${fmt(amp75, 1)} A`, limite: `≥ ${fmt(iDis, 1)} A`, cumple: amp75 >= iDis });
+    if (tipo === "DC string" && a.fusibles) verificaciones.push({ criterio: `${nom}: fusible de string`, norma: "NTC 2050 690.9 — entre 1,56 Isc y el fusible máximo del módulo", valor: `${fmt(prot, 0)} A`, limite: `${fmt(iDis, 1)} a ${fmt(a.fusMax ?? 25, 0)} A`, cumple: prot >= iDis - 1e-9 && prot <= (a.fusMax ?? 25) });
+    else if (tipo !== "DC string") verificaciones.push({ criterio: `${nom}: protección contra sobrecorriente`, norma: "NTC 2050 690.9 y 240.4", valor: `${fmt(prot, 0)} A`, limite: `≥ ${fmt(iDis, 1)} A y ≤ capacidad del conductor`, cumple: prot >= iDis - 1e-9 && prot <= (sigNormal(N.PROTECCIONES_NORMALIZADAS, amp90) || amp90) });
+    if (L > 0) verificaciones.push({ criterio: `${nom}: caída de tensión`, norma: dc ? "Criterio de diseño (IEC 62548 recomienda limitar las pérdidas DC)" : "Criterio de diseño", valor: `${fmt(dv, 2)} %`, limite: `≤ ${fmt(dvMax, 1)} %`, cumple: dv <= dvMax });
     return [nom, `${mat} ${N.etiquetaCalibre(cal)}`, fmt(iBase, 1), fmt(iMax, 1), fmt(iDis, 1), fmt(amp90, 1), fmt(amp75, 0), tipo === "DC string" && !a.fusibles ? "No requerida" : `${fmt(prot, 0)} A`, N.etiquetaCalibre(tierra), L ? fmt(dv, 2) : "—"];
   });
+  if (dvAC > 0) verificaciones.push({ criterio: "Caída de tensión entre la salida del inversor y el punto de conexión", norma: "RETIE 2024 Libro 3, art. 3.17.21 d", valor: `${fmt(dvAC, 2)} %`, limite: "≤ 3 %", cumple: dvAC <= 3 + 1e-9 });
   if (dvDC + dvAC > 0) verificaciones.push({ criterio: "Caída de tensión total (DC más AC)", norma: "Criterio de diseño", valor: `${fmt(dvDC + dvAC, 2)} %`, limite: `≤ ${fmt(dvTotalMax, 1)} %`, cumple: dvDC + dvAC <= dvTotalMax });
   return {
     resumen: [{ etiqueta: "Circuitos verificados", valor: String(tabla.length), unidad: "" }, { etiqueta: "Caída de tensión DC + AC", valor: fmt(dvDC + dvAC, 2), unidad: "%" }],
     tablas: [{ titulo: "Conductores y protecciones del sistema fotovoltaico", encabezados: ["Circuito", "Conductor", "I base (A)", "I máx. (A)", "I diseño 125 % (A)", "Capacidad corregida 90 °C (A)", "Capacidad 75 °C (A)", "Protección", "Tierra de equipos", "ΔV (%)"], filas: tabla }],
     pasos: [
-      { titulo: "Corriente máxima", formula: "DC: I máx. = 1,25 × Isc (string) o 1,25 × Np × Isc (agrupado); AC: I máx. = I nominal del inversor", sustitucion: "NTC 2050 690-8(a)", resultado: "Por circuito" },
-      { titulo: "Corriente de diseño", formula: "I diseño = 1,25 × I máx. (DC: 1,56 × Isc)", sustitucion: "NTC 2050 690-8(b) y 215-2", resultado: "Por circuito" },
-      { titulo: "Capacidad del conductor", formula: "I 90 °C × Ft × Fa ≥ I máx.; I 75 °C ≥ I diseño", sustitucion: "NTC 2050 Tabla 310-16; temperatura con el incremento por exposición solar", resultado: "Por circuito" },
+      { titulo: "Corriente máxima", formula: "DC: I máx. = 1,25 × Isc (string) o 1,25 × Np × Isc (agrupado); AC: I máx. = I nominal del inversor", sustitucion: "NTC 2050 690.8(A)", resultado: "Por circuito" },
+      { titulo: "Corriente de diseño", formula: "I diseño = 1,25 × I máx. (DC: 1,56 × Isc)", sustitucion: "NTC 2050 690.8(B) y 215.2", resultado: "Por circuito" },
+      { titulo: "Capacidad del conductor", formula: "I 90 °C × Ft × Fa ≥ I máx.; I 75 °C ≥ I diseño", sustitucion: "NTC 2050 Tabla 310.15(B)(16); temperatura con el incremento por exposición solar", resultado: "Por circuito" },
       { titulo: "Caída de tensión", formula: "DC: ΔV = 2 I L R / V; AC trifásico: ΔV = √3 I L R / V", sustitucion: "R de la NTC 2050 Cap. 9 Tabla 9", resultado: `DC ${fmt(dvDC, 2)} %; AC ${fmt(dvAC, 2)} %` },
-      { titulo: "Puesta a tierra de equipos", formula: "Calibre según la protección", sustitucion: "NTC 2050 Tabla 250-122", resultado: "Por circuito" }
+      { titulo: "Puesta a tierra de equipos", formula: "Calibre según la protección", sustitucion: "NTC 2050 Tabla 250.122", resultado: "Por circuito" }
     ],
     verificaciones,
     notas: ["Para circuitos DC use conductor fotovoltaico (PV wire) de doble aislamiento, resistente a rayos UV, con tensión nominal ≥ Voc máx. del string."],
@@ -1160,11 +1195,11 @@ export function fvConexion(e, proyecto = {}, ctx = {}) {
   const verificaciones = [
     { criterio: `Potencia dentro del límite de ${tipo}`, norma: "CREG 174 de 2021 (AGPE y GD hasta 1 MW)", valor: `${fmt(pac, 1)} kW`, limite: "≤ 1.000 kW", cumple: pac <= 1000 },
     { criterio: "Elevación de tensión en el punto de conexión por la inyección", norma: "Criterio de diseño (verificar el límite con el operador de red; NTC 1340)", valor: `${fmt(dv, 2)} %`, limite: `≤ ${fmt(dvMax, 1)} %`, cumple: dv <= dvMax },
-    { criterio: "Inversor con protección anti-isla certificada", norma: "RETIE / CREG 174 de 2021 (IEC 62116, UL 1741 o IEEE 1547)", valor: e.antiIsla === "No" ? "No" : "Sí", limite: "Sí", cumple: e.antiIsla !== "No" },
+    { criterio: "Inversor con protección anti-isla certificada", norma: "CREG 174 de 2021 (IEC 62116, UL 1741 o IEEE 1547); RETIE 2024 art. 3.18.2", valor: e.antiIsla === "No" ? "No" : "Sí", limite: "Sí", cumple: e.antiIsla !== "No" },
     { criterio: "Medidor bidireccional en la frontera", norma: "CREG 174 de 2021 y código de medida (CREG 038 de 2014)", valor: e.medidor === "No" ? "No" : "Sí", limite: "Sí", cumple: e.medidor !== "No" }
   ];
   if (capDisp > 0) verificaciones.splice(1, 0, { criterio: "Potencia frente a la capacidad disponible publicada por el operador de red", norma: "CREG 174 de 2021 — disponibilidad de capacidad del circuito", valor: `${fmt(pac, 1)} kW`, limite: `≤ ${fmt(capDisp, 1)} kW`, cumple: pac <= capDisp });
-  if (icu > 0) verificaciones.push({ criterio: "Capacidad de interrupción de los equipos con el aporte del inversor", norma: "RETIE / IEC 60909 (aporte del inversor ≈ 1,1 a 1,5 In)", valor: `${fmt(icu, 1)} kA`, limite: `≥ ${fmt(ikTot, 2)} kA`, cumple: icu >= ikTot });
+  if (icu > 0) verificaciones.push({ criterio: "Capacidad de interrupción de los equipos con el aporte del inversor", norma: "IEC 60909-0 (aporte del inversor ≈ 1,1 a 1,5 In); RETIE 2024 art. 3.17.19", valor: `${fmt(icu, 1)} kA`, limite: `≥ ${fmt(ikTot, 2)} kA`, cumple: icu >= ikTot });
   return {
     resumen: [
       { etiqueta: "Clasificación", valor: tipo, unidad: "" },
@@ -1299,7 +1334,7 @@ export function arcoElectrico(e, proyecto = {}, ctx = {}) {
     const cat = N.CATEGORIAS_EPP.find(([lim]) => eCal <= lim);
     const nombre = p.punto || eq.nombre;
     if (r.fuera.length) verificaciones.push({ criterio: `${nombre}: dentro del rango de validez del modelo`, norma: "IEEE 1584-2018 §4.2", valor: r.fuera.join("; "), limite: "Dentro del rango", cumple: false });
-    verificaciones.push({ criterio: `${nombre}: energía incidente frente al EPP disponible`, norma: "NFPA 70E 130.5 / RETIE", valor: `${fmt(eCal, 2)} cal/cm²`, limite: `≤ ${fmt(eppDisp, 1)} cal/cm²`, cumple: eCal <= eppDisp });
+    verificaciones.push({ criterio: `${nombre}: energía incidente frente al EPP disponible`, norma: "NFPA 70E 130.5; RETIE 2024 art. 3.10.5", valor: `${fmt(eCal, 2)} cal/cm²`, limite: `≤ ${fmt(eppDisp, 1)} cal/cm²`, cumple: eCal <= eppDisp });
     verificaciones.push({ criterio: `${nombre}: energía incidente menor que 40 cal/cm²`, norma: "NFPA 70E (por encima no hay EPP normalizado: trabajar desenergizado)", valor: `${fmt(eCal, 2)} cal/cm²`, limite: "≤ 40 cal/cm²", cumple: eCal <= 40 });
     const catCorta = Number.isNaN(eCal) ? "Fuera del modelo" : !cat ? "No trabajar energizado (> 40 cal/cm²)" : cat[0] <= 1.2 ? "Sin requisito" : cat[1].replace(/ \(.*\)$/, "");
     return { nombre, r, eCal, afb, catCorta, cat: Number.isNaN(eCal) ? "Fuera del modelo IEEE 1584 (0,208 a 15 kV): use otro método" : cat ? cat[1] : "Mayor que 40 cal/cm²: no trabajar energizado", eq, p, ent };
@@ -1324,7 +1359,7 @@ export function arcoElectrico(e, proyecto = {}, ctx = {}) {
       { titulo: "Frontera de arco", formula: "Distancia a la que la energía incidente es 1,2 cal/cm² (5,0 J/cm²)", sustitucion: "Misma ecuación de energía despejada para D", resultado: "Por punto" }
     ],
     verificaciones,
-    notas: [...notasT, ...(filasT.some((f) => f.ent.deCorto) ? ["(S) Ibf tomada del cálculo de cortocircuito del proyecto (barra con el mismo nombre del punto)."] : []), "El tiempo de arco es el tiempo de despeje de la protección aguas arriba a la corriente de arco (tome los tiempos de la coordinación de protecciones). Con la corriente reducida el tiempo suele ser mayor.", "Cada equipo debe rotularse con la energía incidente, la frontera de arco y el EPP requerido."],
+    notas: [...notasT, ...(filasT.some((f) => f.eCal >= 1.2) ? [`Aviso obligatorio (RETIE 2024 Libro 3, art. 3.10.5 d): en ${filasT.filter((f) => f.eCal >= 1.2).map((f) => `«${f.nombre}»`).join(", ")} la energía incidente es igual o mayor que 5 J/cm² (1,2 cal/cm²); allí se debe fijar un aviso con la frontera de arco eléctrico, los datos de este riesgo y la leyenda «riesgo de arco eléctrico».`] : []), ...(filasT.some((f) => f.ent.deCorto) ? ["(S) Ibf tomada del cálculo de cortocircuito del proyecto (barra con el mismo nombre del punto)."] : []), "El tiempo de arco es el tiempo de despeje de la protección aguas arriba a la corriente de arco (tome los tiempos de la coordinación de protecciones). Con la corriente reducida el tiempo suele ser mayor.", "Cada equipo debe rotularse con la energía incidente, la frontera de arco y el EPP requerido."],
     conclusion: peor ? veredicto(verificaciones, `La mayor energía incidente es ${fmt(peor.eCal, 2)} cal/cm² en «${peor.nombre}» (${peor.cat}).`, "Hay puntos con energía incidente por encima del EPP disponible o fuera del rango del modelo: reduzca el tiempo de despeje o trabaje desenergizado.") : filasT.length ? "Ningún punto está dentro del rango de tensión del modelo IEEE 1584 (0,208 a 15 kV): use otro método." : "Agregue los puntos a evaluar."
   };
 }
@@ -1410,7 +1445,7 @@ export function camposEM(e) {
       { titulo: "Densidad de flujo magnético", formula: "B = Σ μ0 Ii / (2π |r − ri|) (Biot-Savart, sin imágenes)", sustitucion: "Corrientes de fase como fasores; la corriente inducida en los cables de guarda se desprecia", resultado: `Máximo ${fmt(bMax.B, 1)} µT en x = ${fmt(bMax.x, 1)} m` }
     ],
     verificaciones,
-    notas: ["Límites del RETIE 2024 (Resolución 40117, Libro 3, art. 3.11.1, Tabla 3.11.1.a), calculados a 1 m sobre el suelo: público 4,16 kV/m y 200 µT; ocupacional (8 h) 8,3 kV/m y 1000 µT.", ...zonas, "En edificaciones a menos de 15 m de partes energizadas de más de 100 kV, el RETIE exige calcular los campos en fachadas, balcones, azoteas y ventanas: agregue esos puntos con la altura de medida correspondiente.", "La altura de los conductores es la del punto más bajo de la catenaria (caso más desfavorable). Para subestaciones, modele los barrajes como conductores."],
+    notas: ["Límites del RETIE 2024 (Res. 40117, mod. Res. 40284 de 2026; Libro 3, art. 3.11.1, Tabla 3.11.1.a), calculados a 1 m sobre el suelo: público 4,16 kV/m y 200 µT; ocupacional (8 h) 8,3 kV/m y 1000 µT.", ...zonas, "RETIE 2024 3.3.3.2: en líneas de transmisión de 57,5 kV o más se verifica en el límite de la servidumbre; en edificaciones a menos de 15 m de partes de más de 100 kV, o a menos de 3 m de una servidumbre o de una subestación de más de 100 kV, se calculan los campos en fachadas, balcones, azoteas, ventanas y pisos más cercanos (agregue esos puntos con su altura); en proyectos con circuitos, acometidas o ramales de 1000 A o más se calcula donde haya permanencia prolongada o circulación del público, con los límites del público.", "La altura de los conductores es la del punto más bajo de la catenaria (caso más desfavorable). Para subestaciones, modele los barrajes como conductores."],
     conclusion: veredicto(verificaciones, `Los campos cumplen los límites de exposición: máximo ${fmt(eMax.E, 2)} kV/m y ${fmt(bMax.B, 1)} µT.`, "Hay puntos del perfil que superan los límites de exposición: aumente la altura o la servidumbre, o cambie la disposición de las fases.")
   };
 }
@@ -1451,7 +1486,7 @@ export function conductorEconomico(e) {
   const cp = cand.find((c) => c.cal === prop);
   const enRango = cp && imax >= cp.iInf - 1e-9 && imax <= cp.iSup + 1e-9;
   const notaDiseno = cp ? [enRango ? `El calibre de diseño ${N.etiquetaCalibre(prop)} está en su rango económico de corriente (${fmt(cp.iInf, 0)} a ${Number.isFinite(cp.iSup) ? fmt(cp.iSup, 0) : "∞"} A).` : `El calibre de diseño ${N.etiquetaCalibre(prop)} no es el económico: su rango económico es ${fmt(cp.iInf, 0)} a ${Number.isFinite(cp.iSup) ? fmt(cp.iSup, 0) : "∞"} A y la corriente es ${fmt(imax, 0)} A; con ${eco ? N.etiquetaCalibre(eco.cal) : "otro calibre"} el costo total en la vida útil baja ${eco ? fmt((cp.CT - eco.CT) / 1e6, 2) : "—"} millones (recomendación, no requisito del RETIE).`] : [];
-  if (cp) verificaciones.push({ criterio: `Calibre de diseño ${N.etiquetaCalibre(prop)} con capacidad de corriente suficiente`, norma: "NTC 2050 Tabla 310-16", valor: `${fmt(imax, 0)} A`, limite: `≤ ${fmt(cp.amp, 0)} A`, cumple: cp.adm });
+  if (cp) verificaciones.push({ criterio: `Calibre de diseño ${N.etiquetaCalibre(prop)} con capacidad de corriente suficiente`, norma: "NTC 2050 Tabla 310.15(B)(16)", valor: `${fmt(imax, 0)} A`, limite: `≤ ${fmt(cp.amp, 0)} A`, cumple: cp.adm });
   return {
     resumen: eco ? [
       { etiqueta: "Calibre económico", valor: N.etiquetaCalibre(eco.cal), unidad: "" },
@@ -1506,7 +1541,14 @@ export function armonicos(e, proyecto = {}, ctx = {}) {
   const iR = (sn * 1000) / (Math.sqrt(3) * V), fRed = Math.sqrt((1 + pec) / (1 + FHL * pec));
   const triples = [3, 9, 15, 21];
   const In = 3 * Math.sqrt(triples.reduce((s, h) => s + grupos.filter((g) => g.mono).reduce((t, g) => t + (g.I1 * g.esp[h]) / 100, 0) ** 2, 0));
+  // RETIE 2024 3.3.3.6: con THDi ≥ 15 % los conductores se dimensionan con el factor de la
+  // IEC 60364-5-52 Anexo E (Tabla E.52.1), según el contenido de tercer armónico de la fase.
+  const h3 = (grupos.filter((g) => g.mono).reduce((t, g) => t + (g.I1 * g.esp[3]) / 100, 0) / I1) * 100;
+  const e52 = N.factorArmonicosIEC(h3);
+  const iDim = (e52.base === "neutro" ? In : Irms) / e52.f;
+  const ampac = num(e.ampacidad, NaN);
   const verificaciones = [];
+  if (thdi >= 15 && ampac > 0) verificaciones.push({ criterio: `Ampacidad del conductor con armónicos (THDi ${fmt(thdi, 1)} % ≥ 15 %)`, norma: "RETIE 2024 Libro 3, 3.3.3.6; IEC 60364-5-52 Anexo E, Tabla E.52.1", valor: `${fmt(ampac, 0)} A`, limite: `≥ ${fmt(iDim, 0)} A`, cumple: ampac >= iDim - 1e-9 });
   if (Number.isFinite(ratio)) {
     verificaciones.push({ criterio: "Distorsión total de demanda de corriente TDD en el PCC", norma: `IEEE 519-2014 Tabla 2 (ISC/IL = ${fmt(ratio, 0)})`, valor: `${fmt(tdd, 1)} %`, limite: `≤ ${fmt(lim.tdd, 1)} %`, cumple: tdd <= lim.tdd + 1e-9 });
     const peorH = N.ORDENES_ARMONICOS.reduce((m, h) => { const p = (Ih[h] / IL) * 100 / lim.ind(h); return p > m.p ? { h, p } : m; }, { h: 0, p: -1 });
@@ -1520,7 +1562,8 @@ export function armonicos(e, proyecto = {}, ctx = {}) {
       { etiqueta: "THD de corriente", valor: fmt(thdi, 1), unidad: "%" },
       { etiqueta: "Factor K", valor: fmt(K, 2), unidad: "" },
       ...(Number.isFinite(thdv) && thdv > 0 ? [{ etiqueta: "THDv estimada en el PCC", valor: fmt(thdv, 2), unidad: "%" }] : []),
-      { etiqueta: "Corriente en el neutro por armónicos triples", valor: fmt(In, 0), unidad: "A" }
+      { etiqueta: "Corriente en el neutro por armónicos triples", valor: fmt(In, 0), unidad: "A" },
+      ...(thdi >= 15 ? [{ etiqueta: "Corriente para dimensionar el conductor (IEC 60364-5-52 Anexo E)", valor: fmt(iDim, 0), unidad: "A" }] : [])
     ],
     tablas: [
       { titulo: "Grupos de carga", encabezados: ["Grupo", "Espectro", "I fundamental (A)", "Monofásica"], filas: grupos.map((g) => [g.nombre, g.tipo, fmt(g.I1, 1), g.mono ? "Sí" : "No"]) },
@@ -1531,10 +1574,11 @@ export function armonicos(e, proyecto = {}, ctx = {}) {
       { titulo: "Distorsión de tensión en el PCC", formula: "Vh % = 100 × h × Ih / Isc; THDv = √(Σ Vh²) (fuente inductiva, sin resonancias)", sustitucion: Number.isFinite(Isc) ? `Isc = ${fmt(iscKA, 2)} kA; ISC/IL = ${fmt(ratio, 0)}` : "Sin corriente de cortocircuito", resultado: Number.isFinite(thdv) ? `THDv = ${fmt(thdv, 2)} %` : "—" },
       { titulo: "Factor K y FHL", formula: "K = Σ (Ih / Irms)² h²; FHL = Σ (Ih/I1)² h² / Σ (Ih/I1)² (iguales con el espectro completo)", sustitucion: "UL 1561 / IEEE C57.110", resultado: `K = ${fmt(K, 2)}` },
       { titulo: "Capacidad del transformador con armónicos", formula: "Imax / IR = √((1 + PEC-R) / (1 + FHL × PEC-R))", sustitucion: Number.isFinite(iR) ? `Sn = ${fmt(sn, 0)} kVA; IR = ${fmt(iR, 0)} A; PEC-R = ${fmt(pec * 100, 0)} %` : "Sin transformador", resultado: `${fmt(fRed * 100, 1)} % de la capacidad nominal` },
-      { titulo: "Corriente en el neutro", formula: "IN = 3 × √(Σ I²h triples de cargas monofásicas), h = 3, 9, 15, 21", sustitucion: "Cargas monofásicas equilibradas entre fases", resultado: `IN = ${fmt(In, 0)} A (${fmt((In / I1) * 100, 0)} % de la corriente de fase)` }
+      { titulo: "Corriente en el neutro", formula: "IN = 3 × √(Σ I²h triples de cargas monofásicas), h = 3, 9, 15, 21", sustitucion: "Cargas monofásicas equilibradas entre fases", resultado: `IN = ${fmt(In, 0)} A (${fmt((In / I1) * 100, 0)} % de la corriente de fase)` },
+      { titulo: "Dimensionamiento de conductores con armónicos (RETIE 2024 3.3.3.6)", formula: "IEC 60364-5-52 Tabla E.52.1: h3 ≤ 15 %: Irms; 15 a 33 %: Irms / 0,86; 33 a 45 %: IN / 0,86; > 45 %: IN", sustitucion: `Tercer armónico de las cargas monofásicas = ${fmt(h3, 1)} % de la fase; THDi = ${fmt(thdi, 1)} %${thdi >= 15 ? " (≥ 15 %: el RETIE exige aplicar el factor)" : " (< 15 %: el RETIE no exige el factor)"}`, resultado: `Factor ${fmt(e52.f, 2)} sobre la corriente de ${e52.base}: ${fmt(iDim, 0)} A` }
     ],
     verificaciones,
-    notas: [`Con armónicos triples altos, el neutro se cuenta como conductor portador de corriente (NTC 2050 310-15(b)(4)(c)) y puede requerir una sección igual o mayor que la de las fases: corriente estimada ${fmt(In, 0)} A.`, "Las corrientes armónicas de los grupos se suman en forma aritmética (caso más desfavorable). Si hay bancos de condensadores, verifique la resonancia paralela (h ≈ √(Scc / Qc)).", "Los espectros de convertidores son los teóricos y el de fuentes conmutadas es típico: con mediciones del sitio use el espectro personalizado."],
+    notas: [...(thdi >= 15 && !(ampac > 0) ? [`THDi ≥ 15 %: el RETIE 2024 (3.3.3.6) exige dimensionar los conductores o barras con el factor de la IEC 60364-5-52 Anexo E: corriente de dimensionamiento ${fmt(iDim, 0)} A. Digite la ampacidad del conductor previsto para verificarlo.`] : []), `Con armónicos triples altos, el neutro se cuenta como conductor portador de corriente (NTC 2050 310.15(B)(5)(c)) y puede requerir una sección igual o mayor que la de las fases: corriente estimada ${fmt(In, 0)} A.`, "Las corrientes armónicas de los grupos se suman en forma aritmética (caso más desfavorable). Si hay bancos de condensadores, verifique la resonancia paralela (h ≈ √(Scc / Qc)).", "Los espectros de convertidores son los teóricos y el de fuentes conmutadas es típico: con mediciones del sitio use el espectro personalizado."],
     conclusion: verificaciones.length ? veredicto(verificaciones, `La distorsión armónica cumple los límites; factor K = ${fmt(K, 1)}.`, "La distorsión armónica supera algún límite: considere filtros, reactancias de línea, convertidores de más pulsos o un transformador con factor K.") : `THDi = ${fmt(thdi, 1)} %; factor K = ${fmt(K, 1)}.`
   };
 }
@@ -1588,6 +1632,8 @@ export function riesgoElectrico(e) {
 // nivel viable. Niveles de tensión según la CREG 015 de 2018 (nivel 1 < 1 kV; 2: 1 a 30 kV;
 // 3: 30 a 57,5 kV; 4: 57,5 kV o más) y tensiones normalizadas de la NTC 1340.
 export const nivelCREG = (kv) => (kv < 1 ? 1 : kv < 30 ? 2 : kv < 57.5 ? 3 : 4);
+// RETIE 2024 Libro 3, Título 9 (fase-fase, c.a.): BT ≤ 1 kV; MT > 1 kV y < 57,5 kV; AT 57,5 a 230 kV; EAT > 230 kV.
+export const nivelRETIE = (kv) => (kv <= 1 ? "BT" : kv < 57.5 ? "MT" : kv <= 230 ? "AT" : "EAT");
 export function nivelTension(e, proyecto = {}, ctx = {}) {
   const s0 = num(e.demanda, NaN) > 0 ? num(e.demanda) : ctx.cargas?.sDemKVA ?? 0;
   const g = num(e.crecimiento, 0), n = num(e.anios, 0), S = s0 * Math.pow(1 + g / 100, n);
@@ -1614,7 +1660,7 @@ export function nivelTension(e, proyecto = {}, ctx = {}) {
       ...(adop ? [{ etiqueta: "Nivel adoptado", valor: adop.nombre, unidad: "" }] : [])
     ],
     salidas: { demanda: S, recomendado: rec?.nombre || "", adoptado: adop?.nombre || rec?.nombre || "", tension: (adop || rec)?.V ?? NaN },
-    tablas: [{ titulo: "Comparación de niveles de tensión", encabezados: ["Nivel", "Nivel CREG", "Conductor de referencia", "I (A)", "ΔV (%)", "Pérdidas (%)", "Resultado"], filas: cands.map((c) => [c.nombre + (c === rec ? " ★" : ""), String(c.creg), c.conductor, fmt(c.I, 1), fmt(c.dv, 2), fmt(c.perd, 2), c.viable ? "Viable" : `No viable: ${c.motivos.join("; ")}`]) }],
+    tablas: [{ titulo: "Comparación de niveles de tensión", encabezados: ["Nivel", "Nivel CREG", "RETIE (Título 9)", "Conductor de referencia", "I (A)", "ΔV (%)", "Pérdidas (%)", "Resultado"], filas: cands.map((c) => [c.nombre + (c === rec ? " ★" : ""), String(c.creg), nivelRETIE(c.V), c.conductor, fmt(c.I, 1), fmt(c.dv, 2), fmt(c.perd, 2), c.viable ? "Viable" : `No viable: ${c.motivos.join("; ")}`]) }],
     pasos: [
       { titulo: "Demanda proyectada", formula: "S = S0 × (1 + g)^n", sustitucion: `S0 = ${fmt(s0, 1)} kVA${num(e.demanda, NaN) > 0 ? "" : " (del cuadro de cargas)"}; g = ${fmt(g, 1)} %; n = ${fmt(n, 0)} años`, resultado: `S = ${fmt(S, 1)} kVA` },
       { titulo: "Corriente y caída de tensión por nivel", formula: "I = S / (√3 V); ΔV % = S × L × (R cos φ + X sen φ) / (10 V²)", sustitucion: `L = ${fmt(L, 3)} km; cos φ = ${fmt(fp, 2)}; límite ΔV = ${fmt(dvMax, 1)} %`, resultado: "Por nivel" },

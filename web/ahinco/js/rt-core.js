@@ -106,6 +106,8 @@ export async function actualizarProyecto(id, datos, user) {
 export async function eliminarProyecto(id) {
   const calc = await getDocs(collection(db, "rtProyectos", id, "calculos"));
   for (const d of calc.docs) await deleteDoc(d.ref);
+  const vers = await getDocs(collection(db, "rtProyectos", id, "versiones"));
+  for (const d of vers.docs) await deleteDoc(d.ref);
   await deleteDoc(doc(db, "rtProyectos", id));
 }
 export async function leerCalculos(id) {
@@ -115,6 +117,27 @@ export async function leerCalculos(id) {
 export async function guardarCalculo(id, clave, entradas, user, etiqueta = "") {
   await setDoc(doc(db, "rtProyectos", id, "calculos", clave), { entradas, etiqueta, actualizadoPor: user.email, actualizadoEn: serverTimestamp() });
   await updateDoc(doc(db, "rtProyectos", id), { actualizadoPor: user.email, actualizadoEn: serverTimestamp() });
+}
+
+// ---------------------------------------------------------------- versiones
+// Copia inmutable del proyecto (datos, literales y cálculos) con número, nota, autor y fecha.
+export async function listarVersiones(id) {
+  const snap = await getDocs(query(collection(db, "rtProyectos", id, "versiones"), orderBy("numero", "desc")));
+  return snap.docs.map((d) => ({ id: d.id, ...d.data() })).sort((x, y) => (y.numero || 0) - (x.numero || 0));
+}
+export async function guardarVersion(id, proyecto, guardados, user, nota = "", resumen = {}) {
+  const previas = await listarVersiones(id);
+  const numero = Math.max(0, ...previas.map((v) => Number(v.numero) || 0)) + 1;
+  const copia = exportarProyecto(proyecto, guardados);
+  await addDoc(collection(db, "rtProyectos", id, "versiones"), { numero, nota: String(nota || "").slice(0, 300), proyecto: copia.proyecto, calculos: copia.calculos, resumen, creadoPor: user.email, creadoEn: serverTimestamp() });
+  return numero;
+}
+// Reemplaza los datos y los cálculos del proyecto por los de una versión.
+export async function restaurarVersion(id, version, guardadosActuales, user) {
+  const datos = Object.fromEntries(CAMPOS_PROYECTO.filter((k) => version.proyecto?.[k] !== undefined).map((k) => [k, version.proyecto[k]]));
+  for (const clave of Object.keys(guardadosActuales)) if (!version.calculos?.[clave]) await deleteDoc(doc(db, "rtProyectos", id, "calculos", clave));
+  for (const [clave, c] of Object.entries(version.calculos || {})) await setDoc(doc(db, "rtProyectos", id, "calculos", clave), { entradas: c.entradas, etiqueta: c.etiqueta || "", actualizadoPor: user.email, actualizadoEn: serverTimestamp() });
+  await updateDoc(doc(db, "rtProyectos", id), { ...datos, actualizadoPor: user.email, actualizadoEn: serverTimestamp() });
 }
 
 // ---------------------------------------------------------------- exportar / importar

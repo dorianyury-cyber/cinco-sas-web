@@ -6,7 +6,7 @@
 // explicación en palabras; al final, un resumen de la selección.
 import * as N from "./rt-normas.js";
 import { MODULOS } from "./rt-modulos.js";
-import { LITERALES, FUENTE_LITERALES } from "./rt-literales.js";
+import { LITERALES, FUENTE_LITERALES, exigido } from "./rt-literales.js";
 import { SISTEMAS_BT, impedanciaConductor, ajusteDosCapas, ampacidadTablaMT, esTierra, paresCoordinacion, puntosPerfil, espectroGrupo } from "./rt-calculos.js";
 import { hallazgos, supuestos, esVerificacion } from "./rt-hallazgos.js";
 
@@ -25,8 +25,8 @@ function hojaTablas(wb) {
   const titulo = (t) => { ws.getCell(`A${r}`).value = t; ws.getCell(`A${r}`).font = { bold: true, color: { argb: NAVY } }; r++; };
   const enc = (h) => { h.forEach((v, i) => { const c = ws.getCell(r, i + 1); c.value = v; c.font = { bold: true, color: { argb: "FFFFFFFF" }, size: 9 }; c.fill = { type: "pattern", pattern: "solid", fgColor: { argb: NAVY } }; c.alignment = { wrapText: true, vertical: "middle" }; }); r++; };
   // Conductores BT.
-  titulo("NTC 2050 Tabla 310-16 (A), Cap. 9 Tabla 9 (Ω/km, 75 °C) y Tabla 5 (mm²)");
-  enc(["Calibre", "Cu 60 °C", "Cu 75 °C", "Cu 90 °C", "Al 60 °C", "Al 75 °C", "Al 90 °C", "Sección mm²", "R Cu PVC", "R Cu acero", "R Al PVC", "XL PVC", "XL acero", "Área THHN", "Límite 240-4(d) Cu", "Límite 240-4(d) Al"]);
+  titulo("NTC 2050 Tabla 310.15(B)(16) (A), Cap. 9 Tabla 9 (Ω/km, 75 °C) y Tabla 5 (mm²)");
+  enc(["Calibre", "Cu 60 °C", "Cu 75 °C", "Cu 90 °C", "Al 60 °C", "Al 75 °C", "Al 90 °C", "Sección mm²", "R Cu PVC", "R Cu acero", "R Al PVC", "XL PVC", "XL acero", "Área THHN", "Límite 240.4(D) Cu", "Límite 240.4(D) Al"]);
   const ini = r;
   N.CALIBRES.forEach((c) => {
     const cu = N.AMPACIDAD.Cu[c] || [null, null, null], al = N.AMPACIDAD.Al[c] || [null, null, null], t9 = N.TABLA9[c];
@@ -36,14 +36,14 @@ function hojaTablas(wb) {
   });
   T.cond = `Tablas!$A$${ini}:$P$${r - 1}`;
   r++;
-  titulo("Factor de corrección por temperatura ambiente (NTC 2050 Tabla 310-16); columna A = límite inferior del rango");
+  titulo("Factor de corrección por temperatura ambiente (NTC 2050 Tabla 310.15(B)(16)); columna A = límite inferior del rango");
   enc(["Desde °C", "60 °C", "75 °C", "90 °C"]);
   const iniT = r;
   let anterior = -100;
   N.FACTOR_TEMPERATURA.forEach(([hasta, a, b, c]) => { ws.addRow([anterior + 0.0001, a ?? 0, b ?? 0, c ?? 0]); anterior = hasta; r++; });
   T.temp = `Tablas!$A$${iniT}:$D$${r - 1}`; T.tempDesde = `Tablas!$A$${iniT}:$A$${r - 1}`;
   r++;
-  titulo("Factor de ajuste por más de 3 conductores portadores (NTC 2050 310-15(b)(2)(a))");
+  titulo("Factor de ajuste por más de 3 conductores portadores (NTC 2050 310.15(B)(3)(a))");
   enc(["Desde N.º", "Factor"]);
   const iniA = r;
   let antA = 0;
@@ -51,7 +51,7 @@ function hojaTablas(wb) {
   ws.getCell(`A${iniA}`).value = 0;
   T.agr = `Tablas!$A$${iniA}:$B$${r - 1}`; T.agrDesde = `Tablas!$A$${iniA}:$A$${r - 1}`;
   r++;
-  titulo("Corrientes normalizadas de protecciones (NTC 2050 240-6) y fusibles tipo K");
+  titulo("Corrientes normalizadas de protecciones (NTC 2050 240.6(A)) y fusibles tipo K");
   enc(["In (A)", "Fusible K (A)"]);
   const iniP = r;
   const largo = Math.max(N.PROTECCIONES_NORMALIZADAS.length, N.FUSIBLES_K.length);
@@ -76,7 +76,7 @@ function hojaTablas(wb) {
   Object.entries(N.CURVAS_IEC).forEach(([k, v]) => { ws.addRow([k, v.k, v.a, v.b]); r++; });
   T.curvas = `Tablas!$A${iniC}:$D${r - 1}`;
   r++;
-  titulo("Conductor de puesta a tierra de equipos (NTC 2050 Tabla 250-122)");
+  titulo("Conductor de puesta a tierra de equipos (NTC 2050 Tabla 250.122)");
   enc(["Protección hasta (A)", "Calibre Cu"]);
   const iniG = r;
   N.TIERRA_EQUIPOS.forEach(([lim, cal]) => { ws.addRow([lim, N.etiquetaCalibre(cal)]); r++; });
@@ -141,11 +141,11 @@ function formatoUnidad(u = "") {
 // Constantes y factores fijos que usan las fórmulas de cada hoja: se explican
 // en el encabezado para que nadie tenga que adivinar de dónde sale un número.
 const CONSTANTES = {
-  cargas: [["0,25", "", "Se suma el 25 % de la corriente del motor más grande a la corriente del alimentador", "NTC 2050 430-24"], ["0,90", "", "Factor de potencia mínimo de referencia (por debajo se cobra energía reactiva)", "Res. CREG 015 de 2018"], ["1000", "W/kW", "Conversión de vatios a kilovatios", ""]],
-  conductores: [["1,25", "", "Las cargas continuas (3 h o más) se dimensionan al 125 %", "NTC 2050 210-19 y 215-2"], ["60 / 75 / 90", "°C", "Columnas de temperatura de la tabla de capacidad de corriente", "NTC 2050 Tabla 310-16"], ["Factores Ft y Fa", "", "Corrección por temperatura ambiente y por más de 3 conductores portadores en la misma canalización", "NTC 2050 Tabla 310-16 y 310-15(b)(2)"]],
+  cargas: [["0,25", "", "Se suma el 25 % de la corriente del motor más grande a la corriente del alimentador", "NTC 2050 430.24"], ["0,90", "", "Factor de potencia mínimo de referencia (por debajo se cobra energía reactiva)", "Res. CREG 015 de 2018"], ["1000", "W/kW", "Conversión de vatios a kilovatios", ""]],
+  conductores: [["1,25", "", "Las cargas continuas (3 h o más) se dimensionan al 125 %", "NTC 2050 210.19 y 215.2"], ["60 / 75 / 90", "°C", "Columnas de temperatura de la tabla de capacidad de corriente", "NTC 2050 Tabla 310.15(B)(16)"], ["Factores Ft y Fa", "", "Corrección por temperatura ambiente y por más de 3 conductores portadores en la misma canalización", "NTC 2050 Tabla 310.15(B)(16) y 310.15(b)(2)"]],
   regulacion: [["√3 / 2", "", "Factor del sistema en la caída de tensión: √3 trifásico, 2 monofásico (ida y vuelta)", ""], ["3 / 2", "", "Número de conductores con pérdidas: 3 trifásico, 2 monofásico", ""]],
   canalizaciones: [["53 / 31 / 40", "%", "Llenado máximo: 1 conductor 53 %, 2 conductores 31 %, más de 2 conductores 40 %", "NTC 2050 Cap. 9 Tabla 1"]],
-  transformador: [["1,5", "", "El fusible primario tipo K se elige cerca de 1,5 veces la corriente nominal primaria", "Práctica del operador de red"], ["1,25", "", "La protección del secundario no debe superar el 125 % de la corriente nominal", "NTC 2050 450-3(b)"]],
+  transformador: [["1,5", "", "El fusible primario tipo K se elige cerca de 1,5 veces la corriente nominal primaria", "Práctica del operador de red"], ["1,25", "", "La protección del secundario no debe superar el 125 % de la corriente nominal", "NTC 2050 450.3(B)"]],
   trafoPotencia: [["c = 1,1", "", "Factor de tensión para el cortocircuito máximo en media y alta tensión", "IEC 60909-0 Tabla 1"], ["1,2", "", "Un TC soporta en forma permanente el 120 % de su corriente nominal (corriente térmica extendida)", "IEC 61869-2"], ["ALF", "", "Factor límite de precisión: un TC 5P20 mide bien hasta 20 veces su corriente nominal", "IEC 61869-2"]],
   cortocircuito: [["c", "", "Factor de tensión: 1,05 en BT (tolerancia +6 %) o 1,10 (BT +10 %, media y alta tensión)", "IEC 60909-0 Tabla 1"], ["1,1 (cmax)", "", "Factor de tensión máximo usado para la red equivalente y la corrección KT", "IEC 60909-0"], ["0,95 y 0,6", "", "Constantes de la corrección KT de la impedancia del transformador", "IEC 60909-0 ec. 12a"], ["1,02 / 0,98 / 3", "", "Constantes del factor κ para la corriente pico", "IEC 60909-0 ec. 55"], ["4", "", "La impedancia de secuencia cero de un cable se aproxima a 4 veces la de secuencia positiva", "IEC 60909-2"]],
   cableMT: [["K = 143 / 94", "A·√s/mm²", "Constante adiabática para conductor de cobre / aluminio con aislamiento XLPE o EPR (90 °C → 250 °C)", "IEC 60949"], ["K = 115 / 76", "A·√s/mm²", "Constante adiabática para aislamiento PVC (cobre / aluminio)", "IEC 60949"], ["0,017241 / 0,028264", "Ω·mm²/m", "Resistividad del cobre / aluminio a 20 °C (para la resistencia a 90 °C)", "IEC 60228"]],
@@ -154,13 +154,13 @@ const CONSTANTES = {
   rayos: [["3H", "m", "El área colectiva se extiende 3 veces la altura de la estructura", "IEC 62305-2 Anexo A"], ["40 · LL", "m²", "Área colectiva de la línea de servicio", "IEC 62305-2 Anexo A"], ["10⁻⁶", "", "Conversión de m² a km² (NG está en descargas por km² al año)", ""], ["8760", "h", "Horas de un año", ""], ["10⁻⁵", "", "Riesgo tolerable de pérdida de vidas humanas (R1)", "IEC 62305-2 Tabla 7"]],
   apantallamiento: [["2,2", "", "Constante de la corriente crítica Ic = 2,2 × BIL / Zs", "IEEE 998"], ["8 · k", "", "Distancia de impacto S = 8 k Ic^0,65 (k = 1,2 mástiles, 1 cables de guarda)", "IEEE 998"]],
   aislamiento: [["k", "", "Factor de falla a tierra: 1,3 neutro sólido, 1,4 efectivo, 1,73 aislado o no efectivo", "IEC 60071-2"], ["8150", "m", "Constante de la corrección por altitud Ka = e^(H/8150)", "IEC 60071-2"], ["300", "m/µs", "Velocidad de la onda en la línea", "IEC 60071-2"], ["20", "%", "Margen de protección mínimo recomendado", "IEEE C62.22"]],
-  distancias: [["1,25 %", "", "Por cada 100 m por encima de 1000 m de altitud la distancia aumenta 1,25 %", "RETIE"]],
-  fvArreglo: [["(NOCT − 20) / 800 × 1000", "°C", "Calentamiento de la celda sobre el ambiente con 1000 W/m² (método NOCT)", "IEC 61215"], ["1,25", "", "La corriente de cortocircuito del string se multiplica por 1,25 por irradiancias mayores que la de ensayo", "NTC 2050 690-8(a)"], ["25", "°C", "Temperatura de referencia de la ficha del módulo (condiciones STC)", "IEC 61215"]],
+  distancias: [["3 % por cada 300 m", "", "Aumento de la distancia sobre 1000 m de altitud, solo para tensiones de más de 57,5 kV", "RETIE 2024 Libro 3, art. 3.10, Nota 2"], ["Tablas 3.10.1.a y 3.10.2.a", "m", "Distancias mínimas de seguridad", "RETIE 2024 Libro 3"], ["Tabla 3.19.1.a", "m", "Ancho mínimo de la zona de servidumbre; máximo = tabla + 10 % (Nota 3)", "RETIE 2024 art. 3.19.1 h"]],
+  fvArreglo: [["(NOCT − 20) / 800 × 1000", "°C", "Calentamiento de la celda sobre el ambiente con 1000 W/m² (método NOCT)", "IEC 61215"], ["1,25", "", "La corriente de cortocircuito del string se multiplica por 1,25 por irradiancias mayores que la de ensayo", "NTC 2050 690.8(A)"], ["25", "°C", "Temperatura de referencia de la ficha del módulo (condiciones STC)", "IEC 61215"]],
   fvProduccion: [["365", "días", "Días del año para la energía anual", ""], ["(NOCT − 20) / 800", "°C·m²/W", "Calentamiento de la celda por unidad de irradiancia", "IEC 61215"], ["Permuta y venta", "", "Los excedentes hasta igualar las importaciones se permutan (tarifa menos comercialización); los que las superan se venden a precio de bolsa", "CREG 174 de 2021"]],
-  fvConductores: [["1,25 × 1,25 = 1,56", "", "DC: 125 % por irradiancia y 125 % adicional para el conductor y la protección", "NTC 2050 690-8"], ["1,25", "", "AC: la corriente nominal del inversor se toma al 125 % (carga continua)", "NTC 2050 690-8 y 215-2"], ["2 / √3", "", "Factor de la caída de tensión: 2 en DC y monofásico, √3 en trifásico", ""]],
+  fvConductores: [["1,25 × 1,25 = 1,56", "", "DC: 125 % por irradiancia y 125 % adicional para el conductor y la protección", "NTC 2050 690.8"], ["1,25", "", "AC: la corriente nominal del inversor se toma al 125 % (carga continua)", "NTC 2050 690.8 y 215.2"], ["2 / √3", "", "Factor de la caída de tensión: 2 en DC y monofásico, √3 en trifásico", ""]],
   fvConexion: [["1 MW", "", "Potencia máxima de AGPE y GD", "CREG 174 de 2021"], ["0,1 MW", "", "Hasta esta potencia el AGPE sigue el procedimiento simplificado sin estudio de conexión", "CREG 174 de 2021"], ["1,1 a 1,5", "× In", "Aporte típico de un inversor a la corriente de cortocircuito", "Fichas de inversores / IEEE 1547"]],
   arcoElectrico: [["12,552 / 50", "", "Constante de la ecuación de energía incidente (resultado en J/cm² con el tiempo en ms)", "IEEE 1584-2018 ec. 3 a 6"], ["5,0208", "J/cm²", "Energía en la frontera de arco: 1,2 cal/cm², umbral de quemadura de segundo grado", "IEEE 1584-2018 ec. 7 a 10"], ["4,184", "J/cal", "Conversión de julios a calorías", ""], ["0,6 / 2,7 / 14,3", "kV", "Tensiones de los modelos intermedios; entre ellas se interpola", "IEEE 1584-2018"], ["25,4 y 0,03937", "", "Conversión entre milímetros y pulgadas en el tamaño del encerramiento", ""], ["1,2 / 4 / 8 / 25 / 40", "cal/cm²", "Límites de las categorías de EPP", "NFPA 70E"]],
-  armonicos: [["100 × h × Ih / Isc", "%", "Tensión armónica en el PCC con fuente inductiva (Xh = h × X1)", "IEEE 519 / IEC 61000-3-6"], ["3", "", "Los armónicos triples (3, 9, 15, 21) de cargas monofásicas se suman en el neutro", "NTC 2050 310-15(b)(4)"], ["PEC-R", "%", "Pérdidas por corrientes parásitas del transformador a carga nominal (dato del fabricante)", "IEEE C57.110"]],
+  armonicos: [["100 × h × Ih / Isc", "%", "Tensión armónica en el PCC con fuente inductiva (Xh = h × X1)", "IEEE 519 / IEC 61000-3-6"], ["3", "", "Los armónicos triples (3, 9, 15, 21) de cargas monofásicas se suman en el neutro", "NTC 2050 310.15(B)(5)"], ["PEC-R", "%", "Pérdidas por corrientes parásitas del transformador a carga nominal (dato del fabricante)", "IEEE C57.110"]],
   conductorEconomico: [["8760", "h/año", "Horas del año (T = μ × 8760)", ""], ["(θ − θa)/3 + θa", "°C", "Temperatura media de operación para la resistencia", "IEC 60287-3-2 §4"], ["234,5 / 228", "°C", "Constante de temperatura de la resistencia del cobre / aluminio", "IEC 60287-1-1"], ["1000", "Wh/kWh", "Conversión del precio a $/Wh", ""]],
   camposEM: [["ε0 = 8,854 × 10⁻¹²", "F/m", "Permitividad del vacío (coeficientes de potencial)", ""], ["μ0 / 2π = 2 × 10⁻⁷", "T·m/A", "Constante de Biot-Savart (0,2 µT·m/A)", ""], ["4,16 kV/m y 200 µT", "", "Límites para el público en general", "RETIE 2024 Tabla 3.11.1.a"], ["8,3 kV/m y 1000 µT", "", "Límites de exposición ocupacional (8 h diarias)", "RETIE 2024 Tabla 3.11.1.a"], ["1 m", "", "Altura de cálculo sobre el suelo", "RETIE 2024 art. 3.11.1"]],
   mecanico: [["9,80665", "m/s²", "Gravedad: convierte kgf a N", ""], ["24", "", "Constante de la ecuación de cambio de estado (método parabólico)", ""], ["8", "", "Flecha parabólica f = w L² / (8 T)", ""], ["50", "%", "Tensión máxima admisible: la mitad de la carga de rotura (factor de seguridad 2)", "Criterio de diseño"]]
@@ -459,7 +459,7 @@ const vacias = (arr) => (arr || []).filter((f) => f && Object.values(f).some((v)
 // ---------------------------------------------------------------- hojas por módulo
 const HOJAS = {
   cargas(wb, e) {
-    const h = new Hoja(wb, "c-Cargas", "Cuadro de cargas y demanda (RETIE literal c; NTC 2050 Sección 220)");
+    const h = new Hoja(wb, "c-Cargas", "Cuadro de cargas y demanda (RETIE 2024 literal c; NTC 2050 Sección 220)");
     const sis = SISTEMAS_BT[e.sistema] || SISTEMAS_BT["3F208"];
     const vln = h.dato("Tensión fase-neutro", sis.VLN, "V", sis.nombre), vll = h.dato("Tensión línea-línea", sis.VLL, "V");
     const fasesSis = h.dato("Fases del sistema", sis.fases.join(""), "", "Letras de las fases disponibles");
@@ -485,14 +485,14 @@ const HOJAS = {
     const lista = `IF(LEN(${fasesSis})=1,${ia},IF(LEN(${fasesSis})=2,MAX(${ia},${ib}),MAX(${ia},${ib},${ic})))`;
     const imax = h.calc("Corriente de la fase más cargada", lista, "A");
     const des = h.calc("Desbalance entre fases", `IF(LEN(${fasesSis})=1,0,IF(LEN(${fasesSis})=2,(MAX(${ia},${ib})-MIN(${ia},${ib}))/AVERAGE(${ia},${ib}),(MAX(${ia},${ib},${ic})-MIN(${ia},${ib},${ic}))/AVERAGE(${ia},${ib},${ic})))*100`, "%");
-    const ialim = h.calc("Corriente de diseño del alimentador", `${imax}+0.25*MAX(${R("O")})`, "A", "NTC 2050 430-24");
+    const ialim = h.calc("Corriente de diseño del alimentador", `${imax}+0.25*MAX(${R("O")})`, "A", "NTC 2050 430.24");
     const dmax = h.dato("Desbalance máximo admisible", n(e.desbalanceMax, 10), "%");
     h.verif("Verificación del desbalance", `${des}<=${dmax}`, "Criterio de diseño");
     h.verif("Factor de potencia promedio ≥ 0,90", `SUMPRODUCT(${R("I")},${R("G")})/100/SUM(${R("K")})>=0.9`, "Referencia Res. CREG 015 de 2018");
     h.resumen([{ t: "Carga instalada", f: sInst, u: "kVA" }, { t: "Demanda máxima de diseño", f: demMax, u: "kVA", nota: "Base para dimensionar el transformador (literal h)" }, { t: "Corriente de diseño del alimentador", f: ialim, u: "A", nota: "Base para seleccionar el conductor y la protección del alimentador" }, { t: "Desbalance entre fases", f: des, u: "%" }]);
   },
   conductores(wb, e, r, p) {
-    const h = new Hoja(wb, "k-m Conductores", "Selección de conductores y protecciones (RETIE literales k y m; NTC 2050)");
+    const h = new Hoja(wb, "k-m Conductores", "Selección de conductores y protecciones (RETIE 2024 literales k y m; NTC 2050)");
     h.nota("El calibre adoptado es el que seleccionó AHÍNCO; cámbielo y la hoja verifica de nuevo capacidad, terminales y protección.");
     const sel = r?.tablas?.[0]?.filas || [];
     const filas = vacias(e.circuitos).map((f, i) => ({ ...f, cal: String(sel[i]?.[4] || "").replace(/ (AWG|kcmil)$/, "") || "4/0" }));
@@ -518,7 +518,7 @@ const HOJAS = {
     h.resumen(filas.map((f, i) => { const rr = t.r0 + i; return { t: `Circuito ${f.circuito || i + 1}`, texto: true, f: `A${rr}&" — "&B${rr}&": conductor "&J${rr}&" "&E${rr}&" ("&F${rr}&" °C), protección de "&Q${rr}&" A; capacidad final del conductor "&ROUND(P${rr},0)&" A"` }; }));
   },
   regulacion(wb, e) {
-    const h = new Hoja(wb, "o-p Regulación", "Regulación de tensión y pérdidas (RETIE literales o y p)");
+    const h = new Hoja(wb, "o-p Regulación", "Regulación de tensión y pérdidas (RETIE 2024 literales o y p)");
     const tri = e.sistema !== "1F";
     const V = h.dato("Tensión nominal", n(e.tension, 208), "V", tri ? "Trifásico (línea-línea)" : "Monofásico");
     const k = h.dato("Factor del sistema k", tri ? Math.sqrt(3) : 2, "", "√3 trifásico; 2 monofásico"), kp = h.dato("Factor de pérdidas", tri ? 3 : 2, "", "3 trifásico; 2 monofásico");
@@ -542,7 +542,7 @@ const HOJAS = {
     h.resumen([{ t: "Regulación acumulada máxima", f: `MAX(M${t.r0}:M${t.r1})`, u: "%", nota: "Debe ser menor que el límite de regulación acumulada" }, { t: "Pérdidas totales de potencia", f: perd, u: "kW" }, ...filas.map((f, i) => ({ t: `Tramo ${f.tramo || i + 1}`, texto: true, f: `F${t.r0 + i}&" — "&D${t.r0 + i}&" m, caída "&ROUND(L${t.r0 + i},2)&" % (acumulada "&ROUND(M${t.r0 + i},2)&" %)"` }))]);
   },
   canalizaciones(wb, e, r) {
-    const h = new Hoja(wb, "n Canalizaciones", "Canalizaciones — llenado de ductos (RETIE literal n; NTC 2050 Cap. 9)");
+    const h = new Hoja(wb, "n Canalizaciones", "Canalizaciones — llenado de ductos (RETIE 2024 literal n; NTC 2050 Cap. 9)");
     const filas = vacias(e.conductores);
     h.seccion("Conductores");
     const t = h.tabla([
@@ -562,7 +562,7 @@ const HOJAS = {
     h.resumen(ductos.map((d, i) => { const rr = t2.r0 + i; return { t: `Ducto ${d.ducto}`, texto: true, f: `"Tubería "&B${rr}&" de "&C${rr}&" pulgadas con "&D${rr}&" conductores: llenado "&ROUND(H${rr},1)&" % (máximo "&F${rr}&" %)"` }; }));
   },
   transformador(wb, e, r, p, ctx) {
-    const h = new Hoja(wb, "h Transformador", "Dimensionamiento del transformador (RETIE literal h; NTC 818/819; NTC 2050 450-3)");
+    const h = new Hoja(wb, "h Transformador", "Dimensionamiento del transformador (RETIE 2024 literal h; NTC 818/819; NTC 2050 450.3)");
     const s = r?.salidas || {};
     const tri = e.tipo !== "monofasico";
     const dem = h.dato("Demanda máxima", n(e.demanda, ctx.cargas?.sDemKVA ?? 0), "kVA");
@@ -580,11 +580,11 @@ const HOJAS = {
     const carga = h.calc("Cargabilidad actual", `${dem}/${sn}*100`, "%"), fut = h.calc("Cargabilidad con crecimiento", `${sreq}/${sn}*100`, "%");
     h.verif("Cargabilidad actual", `${carga}<=${cmax}`);
     h.verif("Cargabilidad con crecimiento", `${fut}<=100`);
-    h.verif("Protección del secundario (450-3(b))", `${inb}<=${sigNorm(`1.25*${is}`, T.prot)}`);
+    h.verif("Protección del secundario (450.3(B))", `${inb}<=${sigNorm(`1.25*${is}`, T.prot)}`);
     h.resumen([{ t: "Transformador adoptado", texto: true, f: `${sn}&" kVA, "&${vp}&" kV / "&${vs}&" V, Z = "&${z}&" %"` }, { t: "Fusible primario tipo K", f: fus, u: "A" }, { t: "Interruptor general de baja tensión", f: inb, u: "A" }, { t: "Corriente nominal secundaria", f: is, u: "A" }, { t: "Cargabilidad actual", f: carga, u: "%" }]);
   },
   cortocircuito(wb, e, r, p, ctx) {
-    const h = new Hoja(wb, "e Cortocircuito", "Cortocircuito según IEC 60909-0 (RETIE literales e y k)");
+    const h = new Hoja(wb, "e Cortocircuito", "Cortocircuito según IEC 60909-0 (RETIE 2024 literales e y k)");
     const un = h.dato("Tensión nominal del secundario Un", n(e.uBT, ctx.transformador?.vs ?? 208), "V");
     const c = h.dato("Factor de tensión c", n(e.factorC, 1.05), "", "IEC 60909-0 Tabla 1");
     const umt = h.dato("Tensión nominal MT", n(e.uMT, 13.2), "kV"), sk = h.dato("S\"kQ de la red", n(e.sk, 250), "MVA"), rx = h.dato("R/X de la red", n(e.rxRed, 0.1), "");
@@ -638,7 +638,7 @@ const HOJAS = {
     h.resumen(barras.map((b, i) => { const rr = tb.r0 + i; return { t: String(b.barra || `Barra ${i + 1}`), texto: true, f: `"Ik3 = "&ROUND(S${rr},2)&" kA"&IF(T${rr}>0.0005," (incluye "&ROUND(T${rr},2)&" kA de motores y generación)","")&"; Ik1 = "&ROUND(W${rr},2)&" kA; pico ip = "&ROUND(V${rr},2)&" kA → especificar equipos con capacidad de interrupción ≥ "&ROUND(MAX(S${rr},W${rr}),1)&" kA"` }; }));
   },
   coordinacion(wb, e) {
-    const h = new Hoja(wb, "m Coordinación", "Coordinación de protecciones IEC 60255-151 / IEEE C37.112 (RETIE literal m)");
+    const h = new Hoja(wb, "m Coordinación", "Coordinación de protecciones IEC 60255-151 / IEEE C37.112 (RETIE 2024 literal m)");
     const cti = h.dato("Margen de coordinación CTI", n(e.cti, 0.3), "s");
     h.seccion("Protecciones (de aguas abajo hacia aguas arriba)");
     const rels = vacias(e.protecciones);
@@ -674,7 +674,7 @@ const HOJAS = {
     h.resumen(rels.map((rl, i) => { const rr = t.r0 + i; return { t: String(rl.nombre || `Protección ${i + 1}`), texto: true, f: rl.curva === "PUNTOS" ? `B${rr}&": curva por puntos del fabricante"` : `B${rr}&", curva "&C${rr}&", arranque "&D${rr}&" A, TMS/TD "&E${rr}&IF(F${rr}>0,", instantánea "&F${rr}&" A en "&G${rr}&" s","")` }; }));
   },
   malla(wb, e, r) {
-    const h = new Hoja(wb, "i Puesta a tierra", "Malla de puesta a tierra — IEEE 80-2013 (RETIE literal i)");
+    const h = new Hoja(wb, "i Puesta a tierra", "Malla de puesta a tierra — IEEE 80-2013 (RETIE 2024 literal i)");
     const mat = N.MATERIALES_SPT[e.material] || N.MATERIALES_SPT.cuDuro;
     const cal = e.calibre || "2/0";
     // Modelo del suelo: uniforme digitado o dos capas a partir de las mediciones Wenner.
@@ -757,11 +757,15 @@ const HOJAS = {
       h.calc("Rg con ρ2 (capa inferior)", `${rg}*${r2}/${rho}`, "Ω", "Referencia cuando las varillas penetran la capa inferior");
     }
     const ret = N.RETIE_RESISTENCIA_SPT[e.tipoInstalacion] || N.RETIE_RESISTENCIA_SPT.subMT;
-    const rmax = h.dato("Resistencia de referencia RETIE", ret.max, "Ω", ret.nombre);
+    const rmax = h.dato("Resistencia de referencia (RETIE 2024 Tabla 3.12.3.a)", ret.max, "Ω", ret.nombre);
+    const sinCapa = h.calc("¿Sin capa superficial?", `IF(AND(${hs}>0,${rhos}>0),"No","Sí")`, "");
+    const col3 = e.acceso === "ocupacional" ? 2 : 1;
+    const retC = h.calc(`Máxima tensión de contacto sin capa (${e.acceso === "ocupacional" ? "ocupacional" : "público en general"})`, N.RETIE_CONTACTO.slice(0, -1).reduceRight((acc, f) => `IF(${tf}<=${f[0]},${f[col3]},${acc})`, String(N.RETIE_CONTACTO.at(-1)[col3])), "V", "RETIE 2024 Tabla 3.12.1.a (fila del tiempo inmediatamente mayor)");
     h.seccion("Verificaciones");
     h.verif("Em ≤ E contacto tolerable", `${em}<=${et}`, "IEEE 80");
     h.verif("Es ≤ E paso tolerable", `${ep}<=${es}`, "IEEE 80");
-    h.verif("Rg ≤ referencia RETIE", `${rg}<=${rmax}`, "RETIE");
+    h.verif("Sin capa superficial: Em ≤ Tabla 3.12.1.a", `OR(${sinCapa}="No",${em}<=${retC})`, "RETIE 2024 art. 3.12.1 g");
+    h.verif("Rg ≤ referencia, o tensiones de paso y contacto dentro de los límites", `OR(${rg}<=${rmax},AND(${em}<=${et},${ep}<=${es},OR(${sinCapa}="No",${em}<=${retC})))`, "RETIE 2024 Tabla 3.12.3.a y Parágrafo 1 del art. 3.12.3");
     h.verif("Sección del conductor ≥ mínima", `${acal}>=${areq}`, "IEEE 80 ec. 37");
     h.calc("Tensiones transferidas", `IF(${gpr}<=${et},"GPR menor que el contacto tolerable: sin riesgo por tensiones transferidas","GPR mayor que el contacto tolerable: aísle o separe los elementos metálicos que salen de la subestación")`, "", "IEEE 80 §16 (paso 7) y §17");
     h.resumen([
@@ -775,7 +779,7 @@ const HOJAS = {
     ]);
   },
   rayos(wb, e) {
-    const h = new Hoja(wb, "b Rayos", "Análisis de riesgo por rayos — R1 (RETIE literal b; NTC 4552-2 / IEC 62305-2)");
+    const h = new Hoja(wb, "b Rayos", "Análisis de riesgo por rayos — R1 (RETIE 2024 literal b; NTC 4552-2 / IEC 62305-2)");
     const v = (tabla, k, def) => (tabla[k] || tabla[def]).v;
     const L = h.dato("Largo L", n(e.largo, 30), "m"), W = h.dato("Ancho W", n(e.ancho, 15), "m"), H = h.dato("Altura H", n(e.alto, 9), "m"), ng = h.dato("NG", n(e.ng, 8), "descargas/km²·año");
     const cd = h.dato("CD (ubicación)", v(N.CD_UBICACION, e.ubicacion, "rodeada_iguales"), ""), ll = h.dato("Longitud línea LL", n(e.longLinea, 500), "m");
@@ -794,7 +798,7 @@ const HOJAS = {
     h.resumen([{ t: "Riesgo R1 con las medidas adoptadas", f: r1, fmt: "0.00E+00", nota: "Tolerable: ≤ 1,00E-05" }, { t: "Medidas de protección adoptadas", texto: true, valor: `${(N.PB_SIPRA[e.sipra] || N.PB_SIPRA.ninguno).nombre}; ${(N.PEB_DPS[e.dps] || N.PEB_DPS.ninguno).nombre}; ${(N.PTA_MEDIDAS[e.medidas] || N.PTA_MEDIDAS.ninguna).nombre}` }]);
   },
   aislamiento(wb, e, r, p) {
-    const h = new Hoja(wb, "d Aislamiento", "Coordinación de aislamiento y DPS (RETIE literal d; IEC 60071 / 60099-5)");
+    const h = new Hoja(wb, "d Aislamiento", "Coordinación de aislamiento y DPS (RETIE 2024 literal d; IEC 60071 / 60099-5)");
     h.dato("Um del equipo", n(e.um, 36), "kV");
     const um = h.dato("Us, tensión máxima de operación del sistema", n(e.us, 0) || n(e.um, 36), "kV"), k = h.dato("Factor de falla a tierra k", e.puestaTierra === "aislado" ? 1.73 : e.puestaTierra === "solido" ? 1.3 : 1.4, "");
     const H = h.dato("Altitud", n(e.altitud, n(p.altitud, 0)), "m"), bil = h.dato("BIL del equipo", n(e.bil, 170), "kV");
@@ -806,23 +810,46 @@ const HOJAS = {
     const mp = h.calc("Margen de protección", `((${bil}/${ka})/${ve}-1)*100`, "%");
     h.seccion("Verificaciones");
     h.verif("Uc ≥ Us/√3", `${uc}>=${ucm}`); h.verif("Ur ≥ TOV/T", `${ur}>=${urm}`); h.verif("Margen ≥ 20 %", `${mp}>=20`, "IEEE C62.22");
+    if (n(e.icDps, 0) > 0 && n(e.ikNodo, 0) > 0) {
+      const icd = h.dato("Capacidad de cortocircuito del DPS", n(e.icDps, 0), "kA"), ikn = h.dato("Corriente de falla en el nodo", n(e.ikNodo, 0), "kA"), ser = h.dato("Protección en serie con el DPS", e.protSerie === "Sí" ? "Sí" : "No", "");
+      h.verif("Capacidad del DPS ≥ falla del nodo (o protección en serie)", `OR(${icd}>=${ikn},${ser}="Sí")`, "RETIE 2024 art. 3.17.14 f");
+    }
     h.resumen([{ t: "DPS seleccionado", texto: true, f: `"Ur = "&${ur}&" kV; Uc = "&${uc}&" kV; tensión residual a 10 kA = "&${ures}&" kV, a "&${d}&" m del equipo"` }, { t: "Ur mínima exigida", f: urm, u: "kV" }, { t: "Uc mínima exigida", f: ucm, u: "kV" }, { t: "BIL del equipo protegido", f: bil, u: "kV" }, { t: "Margen de protección obtenido", f: mp, u: "%", nota: "Mínimo recomendado: 20 %" }]);
   },
   distancias(wb, e, r, p) {
-    const h = new Hoja(wb, "u Distancias", "Distancias de seguridad (RETIE literal u)");
+    const h = new Hoja(wb, "u Distancias", "Distancias de seguridad y servidumbre (RETIE 2024 literal u; Libro 3, art. 3.10 y 3.19.1)");
     const H = h.dato("Altitud", n(e.altitud, n(p.altitud, 0)), "m");
-    const f = h.calc("Factor de altitud", `IF(${H}>1000,1+0.0125*(${H}-1000)/100,1)`, "");
-    h.nota("Distancia base: tabla de distancias mínimas de seguridad del RETIE (verificar contra la versión vigente) o valor digitado.");
-    const filas = vacias(e.puntos).map((x) => { const tipo = N.RETIE_DISTANCIAS.tipos[x.tipo] || N.RETIE_DISTANCIAS.tipos.e; const base = n(x.exigida, NaN); return { ...x, tipoN: tipo.nombre, base: Number.isFinite(base) ? base : tipo.v[x.tension] ?? null }; });
+    const f = h.calc("Factor de altitud (solo tensiones de más de 57,5 kV)", `IF(${H}>1000,1+0.03*(${H}-1000)/300,1)`, "", "RETIE 2024 art. 3.10, Nota 2");
+    h.nota("Distancia base: RETIE 2024 Tabla 3.10.1.a o 3.10.2.a (columna «Fuente»), o el valor digitado por el diseñador.");
+    const D = N.RETIE_DISTANCIAS;
+    const filas = vacias(e.puntos).map((x) => { const tipo = D.tipos[x.tipo] || D.tipos.e; const base = n(x.exigida, NaN); return { ...x, tipoN: tipo.nombre, fuente: Number.isFinite(base) ? "Digitada" : `${tipo.tabla}`, corr: Number(x.tension) > D.altitud.desdeKV ? "Sí" : "No", base: Number.isFinite(base) ? base : tipo.v[x.tension] ?? null }; });
     const t = h.tabla([
-      { t: "Punto", v: (x) => String(x.punto || ""), ancho: 24 }, { t: "Tensión (kV)", v: (x) => String(x.tension || "") }, { t: "Tipo de distancia", v: (x) => x.tipoN, ancho: 40 },
-      { t: "Distancia base (m)", v: (x) => x.base, entrada: true }, { t: "Exigida (m)", v: (x, rr) => `=IF(D${rr}="","",D${rr}*${f})`, fmt: "0.00" },
-      { t: "Diseño (m)", v: (x) => n(x.diseno), entrada: true }, { t: "Resultado", v: (x, rr) => `=IF(E${rr}="","Sin dato",IF(F${rr}>=E${rr},"Cumple","No cumple"))` }
+      { t: "Punto", v: (x) => String(x.punto || ""), ancho: 24 }, { t: "Tensión", v: (x) => D.textoTension[x.tension] || String(x.tension || ""), ancho: 16 }, { t: "Tipo de distancia", v: (x) => x.tipoN, ancho: 48 },
+      { t: "Fuente", v: (x) => x.fuente, ancho: 14 }, { t: "Más de 57,5 kV", v: (x) => x.corr },
+      { t: "Distancia base (m)", v: (x) => x.base, entrada: true }, { t: "Exigida (m)", v: (x, rr) => `=IF(F${rr}="","",F${rr}*IF(E${rr}="Sí",${f},1))`, fmt: "0.00" },
+      { t: "Diseño (m)", v: (x) => n(x.diseno), entrada: true }, { t: "Resultado", v: (x, rr) => `=IF(G${rr}="","Sin dato",IF(H${rr}>=G${rr},"Cumple","No cumple"))` }
     ], filas);
-    h.resumen(filas.map((x, i) => { const rr = t.r0 + i; return { t: String(x.punto || `Punto ${i + 1}`), texto: true, f: `"Distancia de diseño "&F${rr}&" m frente a "&IF(E${rr}="","(sin dato exigido)",ROUND(E${rr},2)&" m exigidos")` }; }));
+    const res = filas.map((x, i) => { const rr = t.r0 + i; return { t: String(x.punto || `Punto ${i + 1}`), texto: true, f: `"Distancia de diseño "&H${rr}&" m frente a "&IF(G${rr}="","(sin dato exigido)",ROUND(G${rr},2)&" m exigidos")` }; });
+    const S = N.RETIE_SERVIDUMBRE[e.servidumbre];
+    if (S?.ancho) {
+      h.seccion(`Zona de servidumbre — ${S.nombre} (RETIE 2024 Tabla 3.19.1.a)`);
+      const at = h.dato("Ancho de la Tabla 3.19.1.a", S.ancho, "m");
+      const conEc = e.servidumbreEc === "si";
+      let minimo;
+      if (conEc) {
+        const A = h.dato("A: eje de la estructura al punto energizado más alejado", n(e.servA, 0), "m"), B = h.dato("B: desplazamiento por viento", n(e.servB, 0), "m"), C = h.dato("C: distancia de seguridad fase-tierra", n(e.servC, 0), "m");
+        const sEc = h.calc("S = 2 (A + B + C)", `2*(${A}+${B}+${C})`, "m", "RETIE 2024 Tabla 3.19.1.a, Nota 5 (ecuación 7)");
+        minimo = h.calc("Ancho mínimo = máx(0,9 × tabla; S)", `MAX(0.9*${at},${sEc})`, "m");
+      } else minimo = h.calc("Ancho mínimo", at, "m");
+      const ad = h.dato("Ancho de servidumbre del diseño", n(e.servidumbreAncho, 0), "m");
+      h.verif("Ancho del diseño ≥ mínimo", `${ad}>=${minimo}`, "RETIE 2024 art. 3.19.1 h");
+      if (e.servidumbreAmpliacion !== "si") h.verif("Ancho del diseño ≤ tabla + 10 %", `${ad}<=1.1*${at}`, "RETIE 2024 Tabla 3.19.1.a, Nota 3");
+      res.push({ t: "Ancho mínimo de servidumbre", f: minimo, u: "m" });
+    }
+    h.resumen(res);
   },
   mecanico(wb, e) {
-    const h = new Hoja(wb, "l Mecánico", "Cálculo mecánico de conductores — cambio de estado (RETIE literal l)");
+    const h = new Hoja(wb, "l Mecánico", "Cálculo mecánico de conductores — cambio de estado (RETIE 2024 literal l)");
     const base = N.CONDUCTORES_AEREOS[e.conductor];
     const c = base && e.conductor !== "personalizado" ? base : { nombre: "Personalizado", area: n(e.area, 100), diametro: n(e.diametro, 13), peso: n(e.peso, 0.35), rotura: n(e.rotura, 3000), E: n(e.modulo, 75000), alfa: n(e.alfa, 19e-6) };
     h.nota(c.nombre);
@@ -847,10 +874,12 @@ const HOJAS = {
     const ult = col(13);
     cols.push({ t: "Tensión (kgf)", v: (x, r) => `=${ult}${r}/9.80665`, fmt: "0" }, { t: "% rotura", v: (x, r) => `=${ult}${r}/9.80665/${rot}*100`, fmt: "0.0" }, { t: "Flecha (m)", v: (x, r) => `=D${r}*${L}^2/(8*${ult}${r})`, fmt: "0.00" }, { t: "≤ 50 % rotura", v: (x, r) => `=IF(${col(15)}${r}<=50,"Cumple","No cumple")` });
     const t = h.tabla(cols, hip);
+    h.seccion("Verificaciones");
+    h.verif("Tensión de tendido (EDS) ≤ 25 % de la rotura", `${eds}<=25`, "RETIE 2024 Libro 3, art. 3.19.6 b y 3.20.6.1 a");
     h.resumen([{ t: "Conductor", texto: true, valor: `${c.nombre}, vano de ${n(e.vano, 150)} m, EDS ${n(e.eds, 18)} %` }, { t: "Tensión máxima del conductor", f: `MAX(${col(14)}${t.r0}:${col(14)}${t.r1})`, u: "kgf" }, { t: "Porcentaje máximo de la rotura", f: `MAX(${col(15)}${t.r0}:${col(15)}${t.r1})`, u: "%", nota: "Máximo admisible: 50 %" }, { t: "Flecha máxima", f: `MAX(${col(16)}${t.r0}:${col(16)}${t.r1})`, u: "m" }]);
   },
   trafoPotencia(wb, e) {
-    const h = new Hoja(wb, "h Trafo potencia", "Transformador de potencia (RETIE literal h; IEC 60076-5; IEC 61869-2)");
+    const h = new Hoja(wb, "h Trafo potencia", "Transformador de potencia (RETIE 2024 literal h; IEC 60076-5; IEC 61869-2)");
     const sOnan = h.dato("Potencia ONAN", n(e.sOnan, 40), "MVA"), sOnaf = h.dato("Potencia ONAF", Math.max(n(e.sOnaf, 40), n(e.sOnan, 40)), "MVA");
     const uAT = h.dato("Tensión AT", n(e.uAT, 115), "kV"), uMT = h.dato("Tensión MT", n(e.uMT, 34.5), "kV"), tap = h.dato("Rango de tomas (±)", n(e.tapRango, 12.5), "%");
     const uk = h.dato("Impedancia uk", n(e.uk, 9.5), "%"), base = h.dato(`Potencia base de uk (${e.ukBase === "ONAF" ? "ONAF" : "ONAN"})`, e.ukBase === "ONAF" ? Math.max(n(e.sOnaf, 40), n(e.sOnan, 40)) : n(e.sOnan, 40), "MVA");
@@ -895,7 +924,7 @@ const HOJAS = {
     h.resumen([{ t: "Transformador", texto: true, f: `${sOnan}&"/"&${sOnaf}&" MVA, "&${uAT}&" / "&${uMT}&" kV, uk = "&${uk}&" %"` }, { t: "Corriente nominal en MT (ONAF)", f: iMT, u: "A", nota: "Corriente que deben soportar la llegada, el TC y la celda de MT" }, { t: "Corriente máxima en AT (toma extrema)", f: iAT, u: "A" }, { t: "Cortocircuito en la barra MT", f: ikMT, u: "kA", nota: "Capacidad de interrupción mínima de las celdas de MT" }, { t: "Cortocircuito pasante visto desde AT", f: ikPas, u: "kA", nota: "Debe ser menor que la soportabilidad especificada del transformador" }]);
   },
   cableMT(wb, e, r, p, ctx) {
-    const h = new Hoja(wb, "k Cables MT", "Cables de media tensión (RETIE literal k; IEC 60502-2; IEC 60949)");
+    const h = new Hoja(wb, "k Cables MT", "Cables de media tensión (RETIE 2024 literal k; IEC 60502-2; IEC 60949)");
     const U = h.dato("Tensión nominal", n(e.tension, ctx.trafoPotencia ? ctx.trafoPotencia.vs / 1000 : 34.5), "kV");
     const fp = h.dato("Factor de potencia", n(e.fp, 0.9), ""), sen = h.calc("sen φ", `SQRT(1-${fp}^2)`, ""), dvMax = h.dato("Caída de tensión máxima", n(e.dvMax, 3), "%");
     const ik3 = ctx.cortocircuito?.barras?.[0]?.ik3;
@@ -942,7 +971,7 @@ const HOJAS = {
     h.resumen(filasC.map((f, i) => { const rr = t.r0 + i; return { t: String(f.circuito || `Circuito ${i + 1}`), texto: true, f: `"Cable "&B${rr}&" "&C${rr}&" "&D${rr}&": capacidad "&ROUND(H${rr},0)&" A para "&I${rr}&" A; soporta "&ROUND(P${rr},1)&" kA durante "&N${rr}&" s"` }; }));
   },
   apantallamiento(wb, e) {
-    const h = new Hoja(wb, "b Apantallamiento", "Apantallamiento por esfera rodante (RETIE literal b; NTC 4552-3; IEEE 998)");
+    const h = new Hoja(wb, "b Apantallamiento", "Apantallamiento por esfera rodante (RETIE 2024 literal b; NTC 4552-3; IEEE 998)");
     let R;
     if (e.metodo === "ieee998") {
       const bil = h.dato("BIL de los equipos", n(e.bil, 550), "kV"), zs = h.dato("Impedancia de onda Zs", n(e.zs, 350), "Ω"), k = h.dato("k (mástil 1,2; cable 1)", e.captador === "cable" ? 1 : 1.2, "");
@@ -962,7 +991,7 @@ const HOJAS = {
     h.resumen([{ t: "Radio de la esfera rodante", f: R, u: "m" }, ...vacias(e.elementos).map((f, i) => { const rr = t.r0 + i; return { t: String(f.elemento || `Elemento ${i + 1}`), texto: true, f: `B${rr}&" de "&C${rr}&" m: protege un radio de "&ROUND(F${rr},2)&" m a "&D${rr}&" m de altura"` }; })]);
   },
   fvArreglo(wb, e) {
-    const h = new Hoja(wb, "x Arreglo FV", "Arreglo fotovoltaico e inversor (RETIE literal x; NTC 2050 Sección 690; IEC 62548)");
+    const h = new Hoja(wb, "x Arreglo FV", "Arreglo fotovoltaico e inversor (RETIE 2024 literal x; NTC 2050 Sección 690; IEC 62548)");
     h.seccion("Módulo fotovoltaico (ficha técnica)");
     const pmod = h.dato("Potencia máxima Pmax (STC)", n(e.pmod, 550), "W"), voc = h.dato("Tensión de circuito abierto Voc", n(e.voc, 49.9), "V"), vmp = h.dato("Tensión de máxima potencia Vmp", n(e.vmp, 41.96), "V");
     const isc = h.dato("Corriente de cortocircuito Isc", n(e.isc, 14), "A"), imp = h.dato("Corriente de máxima potencia Imp", n(e.imp, 13.11), "A");
@@ -990,11 +1019,11 @@ const HOJAS = {
     const iac = h.calc("Corriente nominal AC del inversor", `IF(${fases}=3,${pac}*1000/(SQRT(3)*${vac}),${pac}*1000/${vac})`, "A");
     const iInv = h.calc("Corriente inversa hacia un string en falla", `(${np}-1)*${isc}*1.25`, "A");
     h.seccion("Verificaciones");
-    h.verif("Voc del string ≤ tensión DC máxima del inversor", `${vOc}<=${vdcMax}`, "IEC 62548 / NTC 2050 690-7");
+    h.verif("Voc del string ≤ tensión DC máxima del inversor", `${vOc}<=${vdcMax}`, "IEC 62548 / NTC 2050 690.7");
     h.verif("Voc del string ≤ tensión máxima del módulo", `${vOc}<=${vmaxMod}`, "IEC 61730");
     h.verif("Vmp mínima del string ≥ tensión MPPT mínima", `${vMpMin}>=${vMin}`, "Ficha del inversor");
     h.verif("Vmp máxima del string ≤ tensión MPPT máxima", `${vMpMax}<=${vMax}`, "Ficha del inversor");
-    h.verif("Corriente de cortocircuito por MPPT ≤ admisible", `${iIsc}<=${iscMax}`, "NTC 2050 690-8");
+    h.verif("Corriente de cortocircuito por MPPT ≤ admisible", `${iIsc}<=${iscMax}`, "NTC 2050 690.8");
     h.verif("Corriente de operación por MPPT ≤ admisible", `${iImp}<=${idcMax}`, "Ficha del inversor");
     h.verif("Entradas MPPT utilizadas ≤ disponibles", `${nUso}<=${nMppt}`, "Ficha del inversor");
     h.verif("Relación DC/AC dentro del rango aceptado", `AND(${ilr}>=${ilrMin},${ilr}<=${ilrMax})`, "Criterio de diseño");
@@ -1008,7 +1037,7 @@ const HOJAS = {
     ]);
   },
   fvProduccion(wb, e, r, p, ctx) {
-    const h = new Hoja(wb, "x Producción FV", "Producción y balance energético (RETIE literal x; CREG 174 de 2021; IEC 61724-1)");
+    const h = new Hoja(wb, "x Producción FV", "Producción y balance energético (RETIE 2024 literal x; CREG 174 de 2021; IEC 61724-1)");
     const a = ctx.fvArreglo || {};
     const pdc = h.dato("Potencia pico del arreglo", n(e.pdc, a.pdc ?? 100), "kWp"), hsp = h.dato("Horas sol pico en el plano del arreglo", n(e.hsp, 5), "h/día");
     const tamb = h.dato("Temperatura ambiente media en horas de sol", n(e.tambSol, 30), "°C"), g = h.dato("Irradiancia media en horas de sol", n(e.gMedia, 800), "W/m²");
@@ -1040,7 +1069,7 @@ const HOJAS = {
     ]);
   },
   fvConductores(wb, e, r, p, ctx) {
-    const h = new Hoja(wb, "k-m Conductores FV", "Conductores y protecciones del sistema fotovoltaico (RETIE literales k y m; NTC 2050 690-8)");
+    const h = new Hoja(wb, "k-m Conductores FV", "Conductores y protecciones del sistema fotovoltaico (RETIE 2024 literales k y m; NTC 2050 690.8)");
     const a = ctx.fvArreglo || {};
     const dvMax = h.dato("Caída de tensión máxima por circuito", n(e.dvMax, 1.5), "%"), dvTot = h.dato("Caída de tensión máxima total (DC más AC)", n(e.dvTotalMax, 3), "%");
     const fases = h.dato("Fases del inversor (3 o 1)", a.tri === false ? 1 : 3, ""), fusReq = h.dato("Fusibles de string requeridos (1 = sí)", a.fusibles ? 1 : 0, "", "Resultado del arreglo FV"), fusMax = h.dato("Fusible máximo del módulo", a.fusMax ?? 25, "A");
@@ -1070,6 +1099,8 @@ const HOJAS = {
     ], filas);
     const R = (c) => `${c}${t.r0}:${c}${t.r1}`;
     const dvT = h.calc("Caída de tensión total (mayor DC más mayor AC)", `IFERROR(_xlfn.AGGREGATE(14,6,${R("Q")}/(LEFT(${R("B")},2)="DC"),1),0)+IFERROR(_xlfn.AGGREGATE(14,6,${R("Q")}/(${R("B")}="AC"),1),0)`, "%");
+    const dvA = h.calc("Mayor caída de tensión AC (inversor al punto de conexión)", `IFERROR(_xlfn.AGGREGATE(14,6,${R("Q")}/(${R("B")}="AC"),1),0)`, "%");
+    h.verif("Caída AC ≤ 3 %", `${dvA}<=3+1E-9`, "RETIE 2024 Libro 3, art. 3.17.21 d");
     h.verif("Caída de tensión total ≤ máxima", `${dvT}<=${dvTot}`, "Criterio de diseño");
     h.resumen(filas.map((f, i) => { const rr = t.r0 + i; return { t: String(f.tramo || f.tipo), texto: true, f: `"Conductor "&C${rr}&" "&D${rr}&" ("&B${rr}&"): capacidad "&ROUND(N${rr},1)&" A para "&ROUND(L${rr},1)&" A; protección "&IF(AND(B${rr}="DC string",${fusReq}=0),"no requerida",K${rr}&" A")&"; tierra "&R${rr}&"; caída "&ROUND(Q${rr},2)&" %"` }; }));
   },
@@ -1121,7 +1152,13 @@ const HOJAS = {
     const fr = h.calc("Capacidad del transformador con armónicos", `SQRT((1+${pec}/100)/(1+${K}*${pec}/100))*100`, "%", "IEEE C57.110: √((1 + PEC-R) / (1 + FHL × PEC-R))");
     const ir = h.calc("Corriente nominal del transformador", `IF(${sn}>0,${sn}*1000/(SQRT(3)*${V}),0)`, "A");
     const inn = h.calc("Corriente en el neutro por armónicos triples", `3*SQRT(SUMPRODUCT(((${R("A")}=3)+(${R("A")}=9)+(${R("A")}=15)+(${R("A")}=21))*${R(cM)}^2))`, "A", "Cargas monofásicas equilibradas: los triples se suman en el neutro");
+    h.seccion("Conductores con armónicos (RETIE 2024 3.3.3.6; IEC 60364-5-52 Anexo E, Tabla E.52.1)");
+    const h3 = h.calc("Tercer armónico de las cargas monofásicas (% de la fase)", `SUMPRODUCT((${R("A")}=3)*${R(cM)})/${I1}*100`, "%");
+    const f52 = h.calc("Factor de reducción", `IF(OR(${h3}<=15,${h3}>45),1,0.86)`, "", "≤ 15 %: 1; 15 a 45 %: 0,86; > 45 %: 1");
+    const idim = h.calc("Corriente para dimensionar el conductor", `IF(${h3}<=33,${irms},${inn})/${f52}`, "A", "h3 ≤ 33 %: sobre Irms de fase; > 33 %: sobre la corriente del neutro");
+    const amp = h.dato("Ampacidad del conductor previsto (0 = no se verifica)", n(e.ampacidad, 0), "A");
     h.seccion("Verificaciones");
+    h.verif("Si THDi ≥ 15 %: ampacidad ≥ corriente de dimensionamiento", `OR(${thdi}<15,${amp}<=0,${amp}>=${idim}-1E-9)`, "RETIE 2024 Libro 3, 3.3.3.6");
     h.verif("TDD ≤ límite IEEE 519", `OR(${isc}<=0,${tdd}<=${tddL}+1E-9)`, "IEEE 519-2014 Tabla 2");
     h.verif("Armónicos individuales ≤ límites IEEE 519", `OR(${isc}<=0,${peor}<=1+1E-9)`, "IEEE 519-2014 Tabla 2");
     h.verif("THDv ≤ límite IEEE 519", `OR(${isc}<=0,${thdv}<=${thdvL})`, "IEEE 519-2014 Tabla 1");
@@ -1181,7 +1218,8 @@ const HOJAS = {
       { t: "I (A)", v: (c, rr) => `=${S}/(SQRT(3)*B${rr})`, fmt: "0.0" },
       { t: "ΔV (%)", v: (c, rr) => `=${S}*${L}*(D${rr}*${fp}+E${rr}*${sen})/(10*B${rr}^2)`, fmt: "0.00" },
       { t: "Pérdidas (%)", v: (c, rr) => `=IF(${S}>0,3*I${rr}^2*D${rr}*${L}/1000/(${S}*${fp})*100,0)`, fmt: "0.00" },
-      { t: "Viabilidad", v: (c, rr) => `=IF(AND(OR(F${rr}=0,I${rr}<=F${rr}),J${rr}<=${dv},OR(G${rr}=0,${S}<=G${rr})),"Viable","No viable")` }
+      { t: "Viabilidad", v: (c, rr) => `=IF(AND(OR(F${rr}=0,I${rr}<=F${rr}),J${rr}<=${dv},OR(G${rr}=0,${S}<=G${rr})),"Viable","No viable")` },
+      { t: "RETIE (Título 9)", v: (c, rr) => `=IF(B${rr}<=1,"BT",IF(B${rr}<57.5,"MT",IF(B${rr}<=230,"AT","EAT")))` }
     ], cands);
     const R = (c) => `${c}${t.r0}:${c}${t.r1}`;
     const rec = h.calc("Menor nivel viable", `IFERROR(INDEX(${R("A")},MATCH("Viable",${R("L")},0)),"Ninguno")`, "", "El primero viable en orden de tensión");
@@ -1299,7 +1337,7 @@ const HOJAS = {
     ]);
   },
   arcoElectrico(wb, e, r, p, ctx) {
-    const h = new Hoja(wb, "e Arco eléctrico", "Arco eléctrico: energía incidente y frontera de arco (RETIE literal e; IEEE 1584-2018)");
+    const h = new Hoja(wb, "e Arco eléctrico", "Arco eléctrico: energía incidente y frontera de arco (RETIE 2024 literal e; IEEE 1584-2018)");
     const epp = h.dato("Calificación de arco del EPP disponible para el trabajo", n(e.eppDisponible, 8), "cal/cm²");
     const barras = ctx.cortocircuito?.barras || [], reles = ctx.coordinacion?.reles || [], vRefC = ctx.coordinacion?.tensionRef;
     const apert = h.dato("Tiempo de apertura del interruptor", n(e.tApertura, 50), "ms", "Se suma al tiempo del relé cuando el tiempo sale de la coordinación");
@@ -1403,7 +1441,7 @@ const HOJAS = {
     h.resumen(res.map((x) => ({ t: x.nombre, texto: true, f: `IF(ISNUMBER(${x.eCal}),ROUND(${x.eCal},2)&" cal/cm²; frontera de arco "&ROUND(${x.fa},2)&" m; EPP: ","")&${x.cat}` })));
   },
   fvConexion(wb, e, r, p, ctx) {
-    const h = new Hoja(wb, "x Conexión FV", "Conexión a la red de AGPE y GD (RETIE literal x; CREG 174 de 2021; IEEE 1547)");
+    const h = new Hoja(wb, "x Conexión FV", "Conexión a la red de AGPE y GD (RETIE 2024 literal x; CREG 174 de 2021; IEEE 1547)");
     const a = ctx.fvArreglo || {};
     const tipo = h.dato("Tipo de generador (AGPE o GD)", e.tipo === "GD" ? "GD" : "AGPE", "");
     const pac = h.dato("Potencia nominal AC", n(e.pac, a.pac ?? 100), "kW"), v = h.dato("Tensión del punto de conexión", n(e.tension, (a.vac ?? 480) / 1000), "kV");
@@ -1423,7 +1461,7 @@ const HOJAS = {
     h.verif("Potencia dentro del límite de AGPE o GD (1 MW)", `${pac}<=1000`, "CREG 174 de 2021");
     h.verif("Potencia ≤ capacidad disponible del operador de red (si hay dato)", `OR(${cap}=0,${pac}<=${cap})`, "CREG 174 de 2021");
     h.verif("Elevación de tensión ≤ máxima admitida", `${dv}<=${dvMax}`, "Criterio de diseño / operador de red");
-    h.verif("Capacidad de interrupción ≥ cortocircuito total (si hay dato)", `OR(${icu}=0,${icu}>=${ikt})`, "RETIE / IEC 60909");
+    h.verif("Capacidad de interrupción ≥ cortocircuito total (si hay dato)", `OR(${icu}=0,${icu}>=${ikt})`, "IEC 60909-0; RETIE 2024 art. 3.17.19");
     h.verif("Anti-isla certificada", `${ai}="Sí"`, "IEC 62116 / UL 1741");
     h.verif("Medidor bidireccional", `${med}="Sí"`, "CREG 174 de 2021");
     h.seccion("Ajustes de referencia de las protecciones de interconexión (IEEE 1547-2018, categoría II)");
@@ -1522,13 +1560,13 @@ export async function construirLibro({ proyecto, resultados, guardados, rapido =
   if (!rapido) {
   const lit = wb.addWorksheet("Literales RETIE", { properties: { tabColor: { argb: C_NAVY } }, pageSetup: { orientation: "landscape", fitToPage: true, fitToWidth: 1, fitToHeight: 0, paperSize: 9 } });
   lit.columns = [{ width: 6 }, { width: 62 }, { width: 9 }, { width: 80 }];
-  bandaTitulo(lit, "Diseño detallado según el RETIE: literales a) a x)", FUENTE_LITERALES, 4);
+  bandaTitulo(lit, "Memoria según los literales a) a x) del RETIE 2024 (numeral 3.3.1.1)", FUENTE_LITERALES, 4);
   ["Lit.", "Contenido exigido", "Aplica", "Desarrollo / cálculo / justificación"].forEach((h, i) => { const c = lit.getCell(4, i + 1); c.value = h; c.font = { bold: true, color: { argb: "FFFFFFFF" }, size: 10 }; c.fill = relleno(C_NAVY); c.border = BORDES; c.alignment = { vertical: "middle" }; });
   LITERALES.forEach((l, i) => {
     const d = proyecto.literales?.[l.l] || {};
     const mods = Object.entries(resultados).filter(([k, r]) => l.modulos.includes(r.modulo ?? k)).map(([k, r]) => `${MODULOS[r.modulo ?? k].titulo}${r.etiqueta ? ` — ${r.etiqueta}` : ""}`);
     const fila = lit.getRow(5 + i);
-    const texto = d.aplica === "No" ? `No aplica: ${d.texto || ""}` : [mods.length ? `Ver hoja: ${mods.join("; ")}` : "", d.texto || ""].filter(Boolean).join(" — ") || "Pendiente";
+    const texto = d.aplica === "No" ? `No aplica: ${d.texto || ""}` : [mods.length ? `Ver hoja: ${mods.join("; ")}` : "", d.texto || ""].filter(Boolean).join(" — ") || (exigido(proyecto.tipoDiseno, l.l) ? "Pendiente" : "No exigido en el diseño básico (RETIE 2024 3.3.1.2)");
     fila.values = [`${l.l})`, l.texto, d.aplica === "No" ? "No" : "Sí", texto];
     fila.alignment = { wrapText: true, vertical: "top" };
     fila.eachCell((c) => { c.border = BORDES; c.font = { size: 9.5 }; });

@@ -312,3 +312,18 @@ body.rt-verificacion .rt-solo-verif { display: block; }
 #impVista .tabla-scroll { max-height: 260px; overflow: auto; }
 .rt-imp-avisos { color: var(--danger); font-size: 12.5px; margin: 6px 0; padding-left: 18px; }
 .rt-imp-resumen { font-size: 13px; margin: 8px 0 4px; }
+
+/* ---- versiones */
+.rt-version-nueva { display: flex; gap: 10px; flex-wrap: wrap; }
+.rt-version-nueva input { flex: 1; min-width: 260px; }
+.rt-version-comparar { display: flex; gap: 12px; align-items: flex-end; flex-wrap: wrap; margin-bottom: 12px; }
+.rt-version-comparar label { display: flex; flex-direction: column; gap: 4px; font-size: 12.5px; min-width: 240px; }
+.rt-version-acciones { display: flex; gap: 6px; flex-wrap: wrap; }
+.rt-version-acciones button { border: 1px solid var(--border); background: none; color: var(--text); border-radius: 6px; padding: 3px 8px; font-size: 12px; cursor: pointer; }
+.rt-version-acciones button:hover { border-color: var(--cinco-orange-dark); }
+.rt-comp-bloque { margin: 12px 0; }
+.rt-comp-bloque h3 { font-size: 14px; margin: 10px 0 6px; }
+.rt-comp-cerrado { color: var(--success, #1e7b45); }
+.rt-comp-nuevo { color: var(--danger); }
+.rt-comp-kpis { display: flex; gap: 10px; flex-wrap: wrap; }
+.rt-comp-kpis .rt-kpi { min-width: 150px; }

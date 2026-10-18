@@ -19,12 +19,12 @@ export const ALCANCE = {
     limitaciones: ["Es un diagrama de una sola fuente y un transformador, con los circuitos que salen de una barra: no dibuja transferencias, plantas de emergencia, celdas de media tensión ni varios transformadores.", "No reemplaza el plano de construcción (literal s): úselo como base y complete marcas, referencias y cuadros de cargas."]
   },
   cargas: {
-    metodo: "Suma de cargas por circuito con factor de demanda, reparto por fase y corriente del alimentador con el 25 % del motor más grande (NTC 2050 Sección 220 y 430-24).",
+    metodo: "Suma de cargas por circuito con factor de demanda, reparto por fase y corriente del alimentador con el 25 % del motor más grande (NTC 2050 Sección 220 y 430.24).",
     limitaciones: ["No calcula armónicos ni el factor K de cargas no lineales: si hay variadores, UPS o iluminación LED en gran cantidad, el literal c) debe complementarse.", "Los factores de demanda los define el diseñador; no se aplican automáticamente las tablas de la Sección 220."]
   },
   conductores: {
-    metodo: "Capacidad de corriente de la NTC 2050 Tabla 310-16 con corrección por temperatura y agrupamiento, temperatura de terminales (110-14(c)), cargas continuas al 125 % y protección normalizada (240-6).",
-    limitaciones: ["Solo conductores de baja tensión (hasta 2000 V) en canalización o cable; no cubre instalación al aire libre ni bandejas (Tabla 310-17 / 392).", "No verifica la soportabilidad térmica del conductor al cortocircuito (I²t); para cables de media tensión use el cálculo «Cables de media tensión».", "La coordinación con las curvas de limitación de los interruptores (IEC 60947-2 Anexo A) no se calcula."]
+    metodo: "Capacidad de corriente de la NTC 2050 Tabla 310.15(B)(16) con corrección por temperatura y agrupamiento, temperatura de terminales (110.14(C)), cargas continuas al 125 % y protección normalizada (240.6(A)).",
+    limitaciones: ["Solo conductores de baja tensión (hasta 2000 V) en canalización o cable; no cubre instalación al aire libre ni bandejas (Tabla 310.15(B)(17) / 392).", "No verifica la soportabilidad térmica del conductor al cortocircuito (I²t); para cables de media tensión use el cálculo «Cables de media tensión».", "La coordinación con las curvas de limitación de los interruptores (IEC 60947-2 Anexo A) no se calcula."]
   },
   regulacion: {
     metodo: "Caída de tensión por tramo con R y X de la NTC 2050 Cap. 9 Tabla 9 (o de conductores aéreos), acumulada aguas abajo, y pérdidas I²R.",
@@ -35,7 +35,7 @@ export const ALCANCE = {
     limitaciones: ["Solo conductores THHN/THWN-2; otros aislamientos (XLPE, cables multiconductores de MT) deben digitarse como área equivalente.", "No calcula bandejas portacables, cajas, conduletas ni volumen de encerramientos (también parte del literal n)."]
   },
   transformador: {
-    metodo: "Potencia normalizada (NTC 818 / 819) a partir de la demanda y el crecimiento, corrientes nominales, cortocircuito en bornes con barra infinita y protecciones primaria (fusible K) y secundaria (450-3).",
+    metodo: "Potencia normalizada (NTC 818 / 819) a partir de la demanda y el crecimiento, corrientes nominales, cortocircuito en bornes con barra infinita y protecciones primaria (fusible K) y secundaria (450.3).",
     limitaciones: ["Para transformadores de distribución; para subestaciones de potencia use «Transformador de potencia».", "No considera la reducción de capacidad por armónicos (factor K, IEEE C57.110).", "El fusible primario es una referencia: el definitivo lo fija la norma del operador de red."]
   },
   trafoPotencia: {
@@ -87,11 +87,11 @@ export const ALCANCE = {
     limitaciones: ["Método simplificado: no reemplaza un estudio de transitorios electromagnéticos (EMTP/ATP) para sobretensiones de maniobra o subestaciones con cables largos.", "La tensión residual y la capacidad TOV del DPS deben tomarse del catálogo del fabricante."]
   },
   distancias: {
-    metodo: "Distancias mínimas de seguridad del RETIE en zonas con construcciones y vías, con corrección por altitud sobre 1000 m.",
-    limitaciones: ["Solo están cargados algunos tipos de distancia y, para 66, 115 y 230 kV, solo la distancia vertical a vías: en los demás casos el usuario digita la distancia exigida.", "Debe confirmarse contra la tabla del RETIE vigente antes de firmar.", "No calcula franjas de servidumbre ni distancias dentro de subestaciones (use la distancia en aire del cálculo de aislamiento)."]
+    metodo: "Distancias mínimas de seguridad del RETIE 2024 (Libro 3, Tablas 3.10.1.a y 3.10.2.a: construcciones, vías, zonas verdes, ferrocarriles, ríos y campos deportivos, de < 1 kV a 500 kV), con la corrección por altitud de la Nota 2 del art. 3.10 (3 % por cada 300 m sobre 1000 m, solo sobre 57,5 kV), y ancho de la zona de servidumbre de líneas de transmisión (Tabla 3.19.1.a, con la reducción de la Nota 5).",
+    limitaciones: ["Donde la tabla del RETIE no da valor para una tensión (por ejemplo, «a» o «c» sobre 44 kV), el usuario digita la distancia exigida.", "No calcula cruces entre líneas (Tabla 3.10.3.a), distancias entre conductores en la misma estructura (Tablas 3.10.4.a y b) ni distancias dentro de subestaciones: se digitan como distancia exigida (o use la distancia en aire del cálculo de aislamiento).", "No calcula la corriente electrostática de 5 mA exigida sobre 98 kV línea-tierra (Nota 1 de la Tabla 3.10.2.a) ni el desplazamiento B por viento de la ecuación de servidumbre: son datos del diseñador."]
   },
   fvArreglo: {
-    metodo: "Tensiones del string a la temperatura mínima (Voc) y a la temperatura máxima de celda (Vmp, método NOCT), rango de módulos en serie, corriente por MPPT con el 125 % de la NTC 2050 690-8, relación DC/AC, DPS de corriente continua y necesidad de fusibles de string (IEC 62548).",
+    metodo: "Tensiones del string a la temperatura mínima (Voc) y a la temperatura máxima de celda (Vmp, método NOCT), rango de módulos en serie, corriente por MPPT con el 125 % de la NTC 2050 690.8, relación DC/AC, DPS de corriente continua y necesidad de fusibles de string (IEC 62548).",
     limitaciones: ["Supone strings iguales (mismo número de módulos, orientación e inclinación) en todas las entradas MPPT usadas; arreglos con varias orientaciones deben calcularse como cálculos separados.", "No calcula el recorte (clipping) de potencia del inversor ni el comportamiento con sombras parciales.", "No incluye módulos bifaciales (ganancia por la cara posterior) ni microinversores u optimizadores."]
   },
   fvProduccion: {
@@ -99,8 +99,8 @@ export const ALCANCE = {
     limitaciones: ["Cálculo anual con un solo valor de horas sol pico: no hace simulación horaria ni mensual (PVsyst, SAM o PVGIS la hacen) ni considera la transposición al plano inclinado; las HSP deben estar ya en el plano del arreglo.", "La simultaneidad entre generación y consumo es un dato supuesto; para un balance preciso se requiere la curva de carga horaria del usuario.", "La valoración económica es indicativa: no incluye inversión, impuestos, beneficios tributarios de la Ley 1715 ni flujo de caja."]
   },
   fvConductores: {
-    metodo: "Corriente máxima y de diseño de los circuitos DC (1,25 × 1,25 × Isc) y AC (1,25 × In) según la NTC 2050 690-8, capacidad de la Tabla 310-16 corregida por temperatura (con el incremento por exposición solar que digita el usuario) y agrupamiento, temperatura de terminales, protección, conductor de puesta a tierra (Tabla 250-122) y caída de tensión.",
-    limitaciones: ["El incremento de temperatura por exposición solar sobre cubiertas lo digita el usuario (NTC 2050 310-15(b)(3)(c)).", "Usa la Tabla 310-16 (conductores en canalización); para conductores al aire libre o en bandeja la capacidad real es mayor.", "No dimensiona el seccionador DC, la caja combinadora ni la protección diferencial; deben especificarse según la ficha del inversor y la NTC 2050 690-13 a 690-17."]
+    metodo: "Corriente máxima y de diseño de los circuitos DC (1,25 × 1,25 × Isc) y AC (1,25 × In) según la NTC 2050 690.8, capacidad de la Tabla 310.15(B)(16) corregida por temperatura (con el incremento por exposición solar que digita el usuario) y agrupamiento, temperatura de terminales, protección, conductor de puesta a tierra (Tabla 250.122) y caída de tensión.",
+    limitaciones: ["El incremento de temperatura por exposición solar sobre cubiertas lo digita el usuario (NTC 2050 310.15(B)(3)(c)).", "Usa la Tabla 310.15(B)(16) (conductores en canalización); para conductores al aire libre o en bandeja la capacidad real es mayor.", "No dimensiona el seccionador DC, la caja combinadora ni la protección diferencial; deben especificarse según la ficha del inversor y la NTC 2050 690.13 a 690.17."]
   },
   fvConexion: {
     metodo: "Clasificación AGPE o GD y procedimiento de conexión (CREG 174 de 2021), elevación de tensión en el punto de conexión con la impedancia de la red ((P·R + Q·X) / U²), aporte del inversor al cortocircuito, y requisitos de anti-isla y medición bidireccional, con los ajustes de referencia de la IEEE 1547-2018.",
@@ -124,6 +124,7 @@ export const VALIDACION = [
   "Análisis de riesgos: la matriz reproduce la Tabla 1.5.1.4.1.a del RETIE 2024 (Libro 1). Nivel de tensión: la caída de tensión coincide con el cálculo manual ΔV % = S L (R cos φ + X sen φ) / (10 V²).",
   "El cálculo de malla se comprobó con el ejemplo 1 del Anexo B de la IEEE 80-2013 (Rg, Cs, tensión de contacto y tensión de malla coinciden).",
   "Las tablas normativas cargadas (NTC 2050, IEC, IEEE) se transcribieron de las normas citadas en cada hoja.",
+  "Revisión contra el RETIE 2024 compilado con la Resolución 40284 del 23 de junio de 2026 (texto oficial del Ministerio de Minas y Energía): literales a) a x) del 3.3.1.1 y diseño básico del 3.3.1.2; distancias de las Tablas 3.10.1.a y 3.10.2.a (hasta 500 kV) y corrección por altitud de la Nota 2 del art. 3.10; servidumbre de la Tabla 3.19.1.a; tensión de contacto sin capa de la Tabla 3.12.1.a y resistencia de referencia de la Tabla 3.12.3.a; límites de campos de la Tabla 3.11.1.a; matriz de riesgos de la Tabla 1.5.1.4.1.a; regulación del Título 26; DPS del 3.3.3.1 y del art. 3.17.14; armónicos del 3.3.3.6; aviso de arco del art. 3.10.5; inversores del art. 3.17.21; tensión de tendido de los art. 3.19.6 y 3.20.6.1, y referencias a la NTC 2050 Segunda Actualización.",
   "Pendiente: validación independiente de cortocircuito y coordinación contra un estudio hecho con software comercial (ETAP o DIgSILENT), y revisión de una memoria completa por un organismo de inspección acreditado."
 ];
 
@@ -132,14 +133,13 @@ export const LIMITACIONES_GENERALES = [
   "Los métodos son los de cálculo manual de las normas citadas, adecuados para memorias de distribución y para verificación de interventoría. Para subestaciones de alta tensión, el estudio definitivo de cortocircuito, coordinación y transitorios debe hacerse con software especializado.",
   "No incluye todavía flujo de carga, planos de construcción ni los riesgos por rayos R2 a R4 (servicio público, patrimonio cultural y pérdidas económicas): esos aspectos se desarrollan como texto.",
   "Los datos marcados «(S)» son supuestos: quedan listados en la sección de hallazgos o pendientes y deben confirmarse antes de firmar.",
-  "No guarda historial de versiones de un proyecto: use «Exportar proyecto» para conservar una copia de cada revisión."
+  "El historial de versiones guarda una copia de los datos, literales y cálculos de cada revisión; las versiones no se pueden modificar y solo el dueño del proyecto puede borrarlas (con el proyecto)."
 ];
 
 export const MEJORAS = [
   ["Alta", "Validar cortocircuito y coordinación contra un estudio en ETAP o DIgSILENT, y una memoria completa con un organismo de inspección."],
   ["Media", "Malla en suelo de dos capas por un método numérico (sin pasar por la resistividad uniforme equivalente) y potenciales en la superficie fuera del cerramiento."],
   ["Media", "Cálculo IEC 60287 / Neher-McGrath de cables de media tensión para bancos de ductos con otra resistividad del suelo, otra disposición o más circuitos que las tablas."],
-  ["Media", "Historial de versiones del proyecto y comparación entre revisiones de la memoria."],
   ["Media", "Coordinación con bandas de tolerancia de fusibles e interruptores de BT, reconectadores y protección diferencial; protección combinada de varios captadores en el apantallamiento."],
   ["Media", "Fotovoltaica: horas sol pico mensuales, simulación horaria con la curva de carga del usuario, varias orientaciones, sombras, módulos bifaciales y flujo de caja con los beneficios de la Ley 1715."],
   ["Media", "Riesgo por rayos R2 a R4 con los componentes de sistemas internos (RC, RM, RW, RZ) de la NTC 4552-2 / IEC 62305-2."],

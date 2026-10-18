@@ -6,7 +6,7 @@
 import { generarInformePDF } from "../../js/control/informes-pdf.js";
 import { generarInformeDocxBlob } from "../../js/control/informes-docx.js";
 import { MODULOS, NORMAS_GENERALES } from "./rt-modulos.js";
-import { LITERALES, FUENTE_LITERALES } from "./rt-literales.js";
+import { LITERALES, FUENTE_LITERALES, exigido, tipoDisenoDe, normalizarTipoDiseno } from "./rt-literales.js";
 import { svgTCC, svgAPng, svgUnifilar } from "./rt-grafico.js";
 import { esc, hoyISO, tituloCalculo, ORDEN_MODULOS } from "./rt-core.js";
 import { hallazgos, supuestos, esVerificacion } from "./rt-hallazgos.js";
@@ -69,11 +69,11 @@ export async function construirMemoria({ proyecto, resultados, guardados }) {
   // ---- Generalidades
   b.push(T(1, "Generalidades"));
   if (verif) b.push(P(`El presente informe contiene la <b>verificación de la interventoría</b> sobre la memoria de cálculo y los planos del proyecto <b>${esc(proyecto.nombre)}</b>${proyecto.descripcion ? `: ${esc(proyecto.descripcion)}` : ""}. Los cálculos se rehicieron con los datos del diseño revisado y se compararon con los criterios del RETIE y de las normas técnicas citadas; cada criterio que no cumple se reporta como un hallazgo numerado. Se organiza según los literales del ${esc(FUENTE_LITERALES)}.`));
-  else b.push(P(`La presente memoria de cálculo corresponde al ${esc((proyecto.tipoDiseno || "diseño detallado").toLowerCase())} de la instalación eléctrica del proyecto <b>${esc(proyecto.nombre)}</b>${proyecto.descripcion ? `: ${esc(proyecto.descripcion)}` : ""}. Se organiza según los literales del ${esc(FUENTE_LITERALES)}; los literales que no aplican a la instalación se mencionan expresamente con su justificación, como lo exige el parágrafo 1 del mismo artículo.`));
+  else b.push(P(`La presente memoria de cálculo corresponde al ${esc(normalizarTipoDiseno(proyecto.tipoDiseno).toLowerCase())} de la instalación eléctrica del proyecto <b>${esc(proyecto.nombre)}</b>${proyecto.descripcion ? `: ${esc(proyecto.descripcion)}` : ""}. Se organiza según los literales del ${esc(FUENTE_LITERALES)}; los literales que no aplican a la instalación se mencionan expresamente con su justificación, como lo exige el parágrafo 1 del mismo artículo.`));
   b.push(tabla("Datos generales del proyecto", ["Dato", "Valor"], [
     ["Proyecto", proyecto.nombre], ["Cliente", proyecto.cliente || "—"], ["Ubicación", proyecto.ubicacion || "—"],
     ["Altitud", `${proyecto.altitud ?? "—"} m s. n. m.`], ["Temperatura ambiente de diseño", `${proyecto.tempAmbiente ?? "—"} °C`],
-    ["Tipo de diseño", proyecto.tipoDiseno || "Diseño detallado"],
+    ["Tipo de diseño", `${normalizarTipoDiseno(proyecto.tipoDiseno)}${tipoDisenoDe(proyecto.tipoDiseno)?.ref ? ` (RETIE 2024 ${tipoDisenoDe(proyecto.tipoDiseno).ref})` : ""}`],
     ...(verif ? [["Diseño revisado", proyecto.autorDiseno || "—"], ["Documentos revisados", proyecto.documentosRevisados || "—"]] : []),
     [verif ? "Interventor que verifica" : "Diseñador", `${proyecto.disenador || "—"}${proyecto.matricula ? ` — M.P. ${proyecto.matricula}` : ""}`]
   ]));
@@ -81,6 +81,7 @@ export async function construirMemoria({ proyecto, resultados, guardados }) {
   b.push(tabla("Alcance de la memoria por literal del RETIE", ["Lit.", "Contenido exigido", "Aplica", "Desarrollo"], LITERALES.map((l) => {
     const d = lits[l.l] || {};
     const calc = calculosDe(l, resultados).map(tituloCalculo);
+    if (!exigido(proyecto.tipoDiseno, l.l) && !calc.length && !d.texto) return [`${l.l})`, l.texto, "—", "No exigido en el diseño básico (RETIE 2024 3.3.1.2)"];
     return [`${l.l})`, l.texto, d.aplica === "No" ? "No" : "Sí", d.aplica === "No" ? `No aplica: ${d.texto || "sin justificación"}` : calc.length ? `Cálculo: ${calc.join("; ")}` : d.texto ? "Desarrollo escrito" : "Pendiente"];
   })));
   // ---- verificación: hallazgos y supuestos al inicio, listos para el oficio
@@ -95,11 +96,12 @@ export async function construirMemoria({ proyecto, resultados, guardados }) {
     }
   }
   // ---- un capítulo con una sección por literal (sin salto de página entre literales)
-  b.push(T(1, "Diseño detallado según los literales a) a x) del RETIE"));
+  b.push(T(1, "Desarrollo según los literales a) a x) del RETIE 2024 (numeral 3.3.1.1)"));
   const yaIncluido = {};
   for (const l of LITERALES) {
     const d = lits[l.l] || {};
     b.push(T(2, `Literal ${l.l}) ${l.texto.replace(/\.$/, "")}`));
+    if (!exigido(proyecto.tipoDiseno, l.l) && !d.texto && !calculosDe(l, resultados).length) { b.push(P("No exigido en el diseño básico (RETIE 2024, numeral 3.3.1.2).")); continue; }
     if (d.aplica === "No") { b.push(P(`<b>No aplica.</b> ${esc(d.texto || "El diseñador no registró la justificación.")}`)); continue; }
     if (d.texto) b.push(P(esc(d.texto).replace(/\n/g, "<br>")));
     const mods = calculosDe(l, resultados);

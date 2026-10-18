@@ -18,7 +18,7 @@ export const SECCION_MM2 = {
   "400": 202.7, "500": 253.4, "600": 304, "750": 380, "1000": 506.7
 };
 
-// NTC 2050 Tabla 310-16: capacidad de corriente (A) de no más de 3
+// NTC 2050 Tabla 310.15(B)(16): capacidad de corriente (A) de no más de 3
 // conductores portadores en canalización, temperatura ambiente 30 °C.
 // Columnas: 60 °C, 75 °C, 90 °C.
 export const AMPACIDAD = {
@@ -39,10 +39,10 @@ export const AMPACIDAD = {
 };
 export const COLUMNA_TEMP = { 60: 0, 75: 1, 90: 2 };
 
-// NTC 2050 240-4(d): protección máxima de conductores pequeños.
+// NTC 2050 240.4(D): protección máxima de conductores pequeños.
 export const LIMITE_PEQUENOS = { Cu: { "14": 15, "12": 20, "10": 30 }, Al: { "12": 15, "10": 25 } };
 
-// NTC 2050 Tabla 310-16, factores de corrección por temperatura ambiente
+// NTC 2050 Tabla 310.15(B)(16), factores de corrección por temperatura ambiente
 // (base 30 °C). [hasta °C, f60, f75, f90]; null = no se permite.
 export const FACTOR_TEMPERATURA = [
   [25, 1.08, 1.05, 1.04], [30, 1.0, 1.0, 1.0], [35, 0.91, 0.94, 0.96], [40, 0.82, 0.88, 0.91],
@@ -50,7 +50,7 @@ export const FACTOR_TEMPERATURA = [
   [70, null, 0.33, 0.58], [80, null, null, 0.41]
 ];
 
-// NTC 2050 310-15(b)(2)(a): más de 3 conductores portadores en canalización.
+// NTC 2050 310.15(B)(3)(a): más de 3 conductores portadores en canalización.
 export const FACTOR_AGRUPAMIENTO = [[3, 1.0], [6, 0.8], [9, 0.7], [20, 0.5], [30, 0.45], [40, 0.4], [Infinity, 0.35]];
 
 // NTC 2050 Cap. 9 Tabla 9: resistencia CA a 75 °C y reactancia (Ω/km) para
@@ -83,8 +83,8 @@ export const TUBERIAS = {
 // NTC 2050 Cap. 9 Tabla 1: porcentaje máximo de llenado.
 export const LLENADO_MAX = (n) => (n <= 1 ? 53 : n === 2 ? 31 : 40);
 
-// NTC 2050 240-6: corrientes nominales normalizadas de interruptores y fusibles (A).
-// NTC 2050 Tabla 250-122: conductor de puesta a tierra de equipos (cobre)
+// NTC 2050 240.6(A): corrientes nominales normalizadas de interruptores y fusibles (A).
+// NTC 2050 Tabla 250.122: conductor de puesta a tierra de equipos (cobre)
 // según la corriente de la protección contra sobrecorriente (A → calibre).
 export const TIERRA_EQUIPOS = [[15, "14"], [20, "12"], [60, "10"], [100, "8"], [200, "6"], [300, "4"], [400, "3"], [500, "2"], [600, "1"], [800, "1/0"], [1000, "2/0"], [1200, "3/0"], [1600, "4/0"], [2000, "250"], [2500, "350"], [3000, "400"], [4000, "500"], [5000, "700"], [6000, "800"]];
 
@@ -163,6 +163,18 @@ export const MATERIALES_SPT = {
 export const DIAMETRO_COBRE_DESNUDO = { "2": 7.42, "1/0": 9.35, "2/0": 10.52, "3/0": 11.79, "4/0": 13.26, "250": 14.6, "300": 16.0, "350": 17.3, "500": 20.6 };
 
 // RETIE: valores de referencia de resistencia de puesta a tierra (Ω).
+// RETIE 2024 (mod. Res. 40284 de 2026), Libro 3, art. 3.12.1 literal g, Tabla 3.12.1.a:
+// máxima tensión de contacto (V rms) sin capa superficial, según el tiempo de despeje (s).
+// [tiempo, público en general (IEC 60479-1), ocupacional (IEEE 80, 50 kg)]; la última fila
+// es «mayor a 2 s». Entre filas se toma la del tiempo inmediatamente mayor (conservador).
+export const RETIE_CONTACTO = [[0.05, 345, 518], [0.1, 320, 366], [0.15, 300, 299], [0.2, 270, 259], [0.3, 200, 211], [0.4, 130, 183], [0.5, 80, 164], [0.7, 70, 138], [1, 55, 116], [Infinity, 50, 82]];
+export function retieContactoMax(tf, acceso) {
+  const f = RETIE_CONTACTO.find((r) => tf <= r[0] + 1e-9) || RETIE_CONTACTO.at(-1);
+  return { v: acceso === "ocupacional" ? f[2] : f[1], fila: f[0] === Infinity ? "mayor a 1 s (fila «mayor a 2 s»)" : f[0] < 1 ? `${Math.round(f[0] * 1000)} ms` : "1 s" };
+}
+
+// RETIE 2024, Libro 3, Tabla 3.12.3.a: valores de REFERENCIA (Parágrafo 1: vale el valor del
+// diseño si se garantizan las tensiones de paso, contacto y transferidas).
 export const RETIE_RESISTENCIA_SPT = {
   subAT: { nombre: "Subestaciones de alta y extra alta tensión", max: 1 },
   subMT: { nombre: "Subestaciones de media tensión", max: 10 },
@@ -204,19 +216,67 @@ export const DISTANCIA_AIRE_BIL = [
 
 // ---------------------------------------------------------------- distancias de seguridad (RETIE)
 
-// RETIE, distancias mínimas de seguridad en zonas con construcciones (m).
-// Tensión nominal entre fases (kV). Verificar contra la tabla del RETIE vigente;
-// null = valor no cargado: el usuario debe digitar la distancia exigida.
+// RETIE 2024 (Res. 40117 de 2024, modificada por la Res. 40284 de 2026), Libro 3:
+// Tabla 3.10.1.a (zonas con construcciones) y Tabla 3.10.2.a (lugares y situaciones), en m.
+// Tensión nominal entre fases (kV): "13.2" = 13,8/13,2/11,4/7,6; "34.5" = 44/34,5/33;
+// "66" = 66/57,5; "115" = 115/110; "230" = 230/220. null = la tabla no da valor para
+// esa tensión (no se permite o no aplica): el diseñador digita la distancia exigida.
+// Las claves a, b, d y e se conservan por compatibilidad con los proyectos guardados;
+// el nombre lleva la letra que usa el RETIE 2024.
 export const RETIE_DISTANCIAS = {
-  verificar: true,
-  tensiones: ["<1", "13.2", "34.5", "66", "115", "230"],
+  tensiones: ["<1", "13.2", "34.5", "66", "115", "230", "500"],
+  textoTension: { "<1": "< 1 kV", "13.2": "13,8/13,2/11,4/7,6 kV", "34.5": "44/34,5/33 kV", "66": "66/57,5 kV", "115": "115/110 kV", "230": "230/220 kV", "500": "500 kV" },
+  // Nota 2 del art. 3.10: sobre 57,5 kV, +3 % por cada 300 m sobre 1000 m de altitud.
+  altitud: { desdeKV: 57.5, base: 1000, paso: 300, incremento: 0.03 },
   tipos: {
-    a: { nombre: "Vertical sobre techos y proyecciones (zonas de muy difícil acceso)", v: { "<1": 0.45, "13.2": 3.8, "34.5": 3.8, "66": null, "115": null, "230": null } },
-    b: { nombre: "Horizontal a muros, proyecciones y ventanas", v: { "<1": 1.7, "13.2": 2.3, "34.5": 2.3, "66": null, "115": null, "230": null } },
-    d: { nombre: "Vertical sobre o debajo de balcones y techos de fácil acceso", v: { "<1": 3.5, "13.2": 4.1, "34.5": 4.1, "66": null, "115": null, "230": null } },
-    e: { nombre: "Vertical a carreteras, calles y zonas de tránsito vehicular", v: { "<1": 5.0, "13.2": 5.6, "34.5": 5.6, "66": 5.8, "115": 6.1, "230": 6.8 } }
+    a: { nombre: "«a» vertical sobre techos y proyecciones (muy difícil acceso, con control absoluto)", tabla: "Tabla 3.10.1.a", v: { "<1": 0.45, "13.2": 3.8, "34.5": 3.8, "66": null, "115": null, "230": null, "500": null } },
+    b: { nombre: "«b» horizontal a muros, balcones, salientes y ventanas", tabla: "Tabla 3.10.1.a", v: { "<1": 1.7, "13.2": 2.3, "34.5": 2.3, "66": 2.5, "115": null, "230": null, "500": null } },
+    d: { nombre: "«c» vertical sobre o debajo de balcones o techos de fácil acceso", tabla: "Tabla 3.10.1.a", v: { "<1": 3.5, "13.2": 4.1, "34.5": 4.1, "66": null, "115": null, "230": null, "500": null } },
+    e: { nombre: "«d» al suelo en cruces con carreteras, calles y zonas de tráfico vehicular o peatonal", tabla: "Tabla 3.10.2.a", v: { "<1": 5.0, "13.2": 5.6, "34.5": 5.6, "66": 5.8, "115": 6.1, "230": 8.5, "500": 11.5 } },
+    acom: { nombre: "Acometida aérea de baja tensión que atraviesa vías vehiculares", tabla: "Título 26 literal a", v: { "<1": 5.5, "13.2": null, "34.5": null, "66": null, "115": null, "230": null, "500": null } },
+    bta: { nombre: "Cruce de líneas aéreas de baja tensión en grandes avenidas", tabla: "Tabla 3.10.2.a", v: { "<1": 5.6, "13.2": null, "34.5": null, "66": null, "115": null, "230": null, "500": null } },
+    d1: { nombre: "«d1» al suelo desde líneas que recorren avenidas, carreteras y calles", tabla: "Tabla 3.10.2.a", v: { "<1": 5.0, "13.2": 5.6, "34.5": 5.6, "66": 5.8, "115": 6.1, "230": 8.0, "500": 11.5 } },
+    bosque: { nombre: "«d» al suelo en bosques de arbustos, cultivos, pastos y huertos (con control de altura)", tabla: "Tabla 3.10.2.a", v: { "<1": 5.0, "13.2": 5.6, "34.5": 5.6, "66": 5.8, "115": 6.1, "230": 6.8, "500": 8.6 } },
+    ee: { nombre: "«e» bosques y huertos sin control de crecimiento, maquinaria alta o ferrocarril sin electrificar", tabla: "Tabla 3.10.2.a", v: { "<1": 7.5, "13.2": 8.1, "34.5": 8.1, "66": 8.3, "115": 8.6, "230": 9.3, "500": 11.1 } },
+    f: { nombre: "«f» vertical a alimentadores de ferrocarriles electrificados, teleféricos, tranvías y trolebuses", tabla: "Tabla 3.10.2.a", v: { "<1": 1.2, "13.2": 1.8, "34.5": 1.8, "66": 2.0, "115": 2.3, "230": 3.0, "500": 4.8 } },
+    g1: { nombre: "«g» sobre el nivel máximo del agua, ríos navegables (embarcaciones de 2 m a 7 m)", tabla: "Tabla 3.10.2.a", v: { "<1": 9.6, "13.2": 10.2, "34.5": 10.2, "66": 10.4, "115": 10.6, "230": 11.3, "500": 12.9 } },
+    g2: { nombre: "«g» sobre el nivel máximo del agua, ríos no navegables por embarcaciones de más de 2 m", tabla: "Tabla 3.10.2.a", v: { "<1": 4.6, "13.2": 5.2, "34.5": 5.2, "66": 5.4, "115": 5.6, "230": 6.3, "500": 7.9 } },
+    dep: { nombre: "Vertical al piso sobre campos deportivos abiertos sin infraestructura", tabla: "Tabla 3.10.2.a", v: { "<1": 12, "13.2": 12, "34.5": 12, "66": 12, "115": 12, "230": 12.8, "500": 14.6 } },
+    deph: { nombre: "Horizontal a campos deportivos con graderías, casetas u otra infraestructura", tabla: "Tabla 3.10.2.a", v: { "<1": 7.0, "13.2": 7.0, "34.5": 7.0, "66": 7.0, "115": 7.0, "230": 9.3, "500": 11.1 } }
   }
 };
+// Factor de altitud del RETIE 2024 (Libro 3, art. 3.10, Nota 2): solo para más de 57,5 kV.
+export function factorAltitudDistancia(tension, H) {
+  const A = RETIE_DISTANCIAS.altitud, kv = Number(tension);
+  return Number.isFinite(kv) && kv > A.desdeKV && H > A.base ? 1 + (A.incremento * (H - A.base)) / A.paso : 1;
+}
+
+// RETIE 2024, Libro 3, art. 3.19.1 literal h, Tabla 3.19.1.a: ancho mínimo de la zona de
+// servidumbre de líneas de transmisión (m), centrado en el eje de la línea.
+export const RETIE_SERVIDUMBRE = {
+  no: { nombre: "No aplica (sin línea de transmisión)", ancho: null },
+  "66": { nombre: "57,5/66 kV, torres o postes, 1 o 2 circuitos", ancho: 15 },
+  "115p": { nombre: "110/115 kV, postes, 1 o 2 circuitos", ancho: 15 },
+  "115t": { nombre: "110/115 kV, torres, 1 o 2 circuitos", ancho: 20 },
+  "230p1": { nombre: "220/230 kV, postes, 1 circuito", ancho: 28 },
+  "230p2": { nombre: "220/230 kV, postes, 2 circuitos", ancho: 30 },
+  "230t1": { nombre: "220/230 kV, torres, 1 circuito", ancho: 30 },
+  "230t2": { nombre: "220/230 kV, torres, 2 circuitos", ancho: 32 },
+  "345a": { nombre: "345 kV, torres o postes, 1 circuito", ancho: 34 },
+  "345b": { nombre: "345 kV, torres o postes, 2 circuitos", ancho: 37 },
+  "500a": { nombre: "500 kV, torres o postes, 1 circuito", ancho: 60 },
+  "500b": { nombre: "500 kV, torres o postes, 2 circuitos", ancho: 65 }
+};
+
+// IEC 60364-5-52 Anexo E, Tabla E.52.1 (exigida por el RETIE 2024, Libro 3, 3.3.3.6, cuando
+// THDi ≥ 15 %): factor de reducción según el contenido de tercer armónico de la corriente de
+// fase, y corriente sobre la que se dimensiona (fase o neutro).
+export function factorArmonicosIEC(h3) {
+  if (h3 <= 15) return { f: 1, base: "fase" };
+  if (h3 <= 33) return { f: 0.86, base: "fase" };
+  if (h3 <= 45) return { f: 0.86, base: "neutro" };
+  return { f: 1, base: "neutro" };
+}
 
 // ---------------------------------------------------------------- arco eléctrico (IEEE 1584-2018)
 // Tablas 1 a 5 y 7 de la IEEE 1584-2018, en el mismo formato en que las

@@ -1,16 +1,17 @@
 // Página del proyecto, organizada en secciones del menú lateral: Resumen,
 // Datos del proyecto, Literales a) a x), Hallazgos (o pendientes) y
 // Documentos. La sección visible sale del #hash de la dirección.
-import { iniciarPagina, leerProyecto, leerCalculos, actualizarProyecto, eliminarProyecto, calcularProyecto, estadoModulo, clavesDe, tituloCalculo, exportarProyecto, ORDEN_MODULOS, esc, mostrarAlerta, limpiarAlerta, errorAmigable } from "./rt-core.js";
+import { iniciarPagina, leerProyecto, leerCalculos, actualizarProyecto, eliminarProyecto, calcularProyecto, estadoModulo, clavesDe, tituloCalculo, exportarProyecto, ORDEN_MODULOS, esc, mostrarAlerta, limpiarAlerta, errorAmigable, listarVersiones, guardarVersion, restaurarVersion, fechaCorta } from "./rt-core.js";
+import { compararVersiones } from "./rt-versiones.js";
 import { MODULOS, AREAS } from "./rt-modulos.js";
-import { LITERALES, FUENTE_LITERALES, estadoLiteral } from "./rt-literales.js";
+import { LITERALES, FUENTE_LITERALES, estadoLiteral, normalizarTipoDiseno } from "./rt-literales.js";
 import { hallazgos, supuestos, modoDe, esVerificacion } from "./rt-hallazgos.js";
 import { menuProyecto, marcarSeccion, urlCalculo } from "./rt-shell.js";
 
 const ctx = await iniciarPagina();
 const id = new URLSearchParams(location.search).get("id");
 const alerta = document.getElementById("alerta");
-const SECCIONES = ["resumen", "datos", "literales", "hallazgos", "documentos"];
+const SECCIONES = ["resumen", "datos", "literales", "hallazgos", "documentos", "versiones"];
 
 if (ctx) {
   const proyecto = id ? await leerProyecto(id) : null;
@@ -53,7 +54,7 @@ function iniciar(proyecto, guardados) {
     const hall = hallazgos(proyecto, resultados);
     const calcs = Object.values(resultados);
     const cumplen = calcs.filter((r) => estadoModulo(r).clase === "ok").length;
-    const estados = LITERALES.map((l) => estadoLiteral(l, literales[l.l], resultados));
+    const estados = LITERALES.map((l) => estadoLiteral(l, literales[l.l], resultados, proyecto.tipoDiseno));
     const listos = estados.filter((e) => e.clase !== "warn" && e.texto !== "No aplica sin justificación").length;
     const kpi = (valor, etiqueta, clase = "") => `<div class="rt-kpi ${clase}"><div class="valor">${valor}</div><div class="etiqueta">${esc(etiqueta)}</div></div>`;
     document.getElementById("kpis").innerHTML = kpi(calcs.length, "Cálculos") + kpi(cumplen, "Cumplen", "ok") + kpi(hall.length, modo.hallazgos, hall.length ? "mal" : "ok") + kpi(`${listos}/${LITERALES.length}`, "Literales desarrollados", listos === LITERALES.length ? "ok" : "");
@@ -72,7 +73,7 @@ function iniciar(proyecto, guardados) {
 
   // ---- datos del proyecto
   const form = document.getElementById("datosForm");
-  form.querySelectorAll("[data-p]").forEach((el) => { el.value = proyecto[el.dataset.p] ?? ""; });
+  form.querySelectorAll("[data-p]").forEach((el) => { el.value = el.dataset.p === "tipoDiseno" ? normalizarTipoDiseno(proyecto.tipoDiseno) : proyecto[el.dataset.p] ?? ""; });
   const radios = document.querySelectorAll('input[name="modo"]');
   const pintarModo = (modo) => {
     radios.forEach((r) => { r.checked = r.value === modo; r.closest(".rt-modo-op").classList.toggle("activo", r.value === modo); });
@@ -112,7 +113,7 @@ function iniciar(proyecto, guardados) {
       <thead><tr><th>Lit.</th><th>Contenido exigido por el RETIE</th><th>Cálculos</th><th>Aplica</th><th>Desarrollo / justificación si no aplica</th></tr></thead>
       <tbody>${LITERALES.map((lit) => {
         const d = literales[lit.l] || {};
-        const e = estadoLiteral(lit, d, resultados);
+        const e = estadoLiteral(lit, d, resultados, proyecto.tipoDiseno);
         return `<tr><td><strong>${lit.l})</strong><br><span class="rt-punto rt-punto-${e.clase === "ok" ? "ok" : e.clase === "danger" ? "mal" : e.clase === "warn" ? "pend" : "nulo"}" title="${esc(e.texto)}"></span></td>
           <td>${esc(lit.texto)}${lit.guia ? `<span class="rt-nota">${esc(lit.guia)}</span>` : ""}</td>
           <td>${lit.modulos.length ? lit.modulos.map(badgeMod).join("") : '<span class="text-muted">Desarrollo escrito</span>'}<span class="badge ${e.clase}">${esc(e.texto)}</span></td>
@@ -196,6 +197,86 @@ function iniciar(proyecto, guardados) {
       btn.disabled = false; btn.classList.remove("generando");
     }
   }
+  // ---- versiones: copias del proyecto para comparar, ver su memoria o restaurar
+  let versiones = [];
+  const actual = () => ({ proyecto: { ...proyecto, literales }, calculos: guardados });
+  const hallazgosDe = (p, g) => hallazgos(p, calcularProyecto(p, g));
+  const nombreV = (v) => `V${v.numero}${v.nota ? ` — ${v.nota}` : ""} (${fechaCorta(v.creadoEn)})`;
+  const descargarJson = (obj, nombre) => {
+    const a = document.createElement("a");
+    a.href = URL.createObjectURL(new Blob([JSON.stringify(obj, null, 1)], { type: "application/json" }));
+    a.download = nombre.replace(/[\\/:*?"<>|]/g, "-"); document.body.appendChild(a); a.click(); a.remove();
+  };
+  async function pintarVersiones() {
+    const lista = document.getElementById("listaVersiones");
+    try { versiones = await listarVersiones(proyecto.id); } catch (err) { lista.innerHTML = `<p class="alert error">${esc(errorAmigable(err))}</p>`; return; }
+    const modo = modoDe(proyecto);
+    lista.innerHTML = versiones.length
+      ? tablaHtml(["N.º", "Fecha", "Autor", "Nota", "Cálculos", modo.hallazgos, "Acciones"], versiones.map((v) => [`<b>V${v.numero}</b>`, esc(fechaCorta(v.creadoEn)), esc(v.creadoPor || ""), esc(v.nota || "—"), String(Object.keys(v.calculos || {}).length), String(v.resumen?.hallazgos ?? "—"),
+        `<span class="rt-version-acciones"><button type="button" data-vcomp="${esc(v.id)}">Comparar con la actual</button><button type="button" data-vver="${esc(v.id)}">Ver memoria</button><button type="button" data-vexp="${esc(v.id)}">Exportar</button><button type="button" data-vres="${esc(v.id)}">Restaurar</button></span>`]))
+      : '<p class="rt-vacio">Todavía no hay versiones guardadas.</p>';
+    const opciones = ['<option value="actual">Estado actual</option>', ...versiones.map((v) => `<option value="${esc(v.id)}">${esc(nombreV(v))}</option>`)].join("");
+    const a = document.getElementById("compA"), b = document.getElementById("compB");
+    a.innerHTML = opciones; b.innerHTML = opciones;
+    a.value = versiones[0]?.id || "actual"; b.value = "actual";
+  }
+  const snapshot = (vid) => (vid === "actual" ? actual() : (() => { const v = versiones.find((x) => x.id === vid); return { proyecto: { ...v.proyecto, id: proyecto.id }, calculos: v.calculos || {} }; })());
+  const etiquetaDe = (vid) => (vid === "actual" ? "estado actual" : `V${versiones.find((x) => x.id === vid)?.numero}`);
+  function pintarComparacion(aId, bId) {
+    const r = compararVersiones(snapshot(aId), snapshot(bId), { hallazgosDe });
+    const modo = modoDe(proyecto), cont = document.getElementById("resultadoComparacion");
+    const lista = (items) => `<ul>${items.map((x) => `<li>${x}</li>`).join("")}</ul>`;
+    const h = r.hallazgos;
+    cont.innerHTML = `<p class="text-muted">De <b>${esc(etiquetaDe(aId))}</b> a <b>${esc(etiquetaDe(bId))}</b>.</p>
+      <div class="rt-comp-kpis"><div class="rt-kpi"><div class="valor">${h.antes} → ${h.despues}</div><div class="etiqueta">${esc(modo.hallazgos)}</div></div><div class="rt-kpi ok"><div class="valor">${h.cerrados.length}</div><div class="etiqueta">Cerrados</div></div><div class="rt-kpi ${h.nuevos.length ? "mal" : ""}"><div class="valor">${h.nuevos.length}</div><div class="etiqueta">Nuevos</div></div><div class="rt-kpi"><div class="valor">${r.cambiados.length + r.agregados.length + r.quitados.length}</div><div class="etiqueta">Cálculos con cambios</div></div></div>
+      ${h.cerrados.length ? `<div class="rt-comp-bloque"><h3 class="rt-comp-cerrado">✔ ${esc(modo.hallazgos)} cerrados</h3>${lista(h.cerrados.map((x) => `<b>${esc(x.calculo)}</b>: ${esc(x.criterio)} (${esc(x.valor)}; límite ${esc(x.limite)})`))}</div>` : ""}
+      ${h.nuevos.length ? `<div class="rt-comp-bloque"><h3 class="rt-comp-nuevo">✖ ${esc(modo.hallazgos)} nuevos</h3>${lista(h.nuevos.map((x) => `<b>${esc(x.calculo)}</b>: ${esc(x.criterio)} (${esc(x.valor)}; límite ${esc(x.limite)})`))}</div>` : ""}
+      ${h.siguen.length ? `<div class="rt-comp-bloque"><h3>Siguen abiertos (${h.siguen.length})</h3>${lista(h.siguen.map((x) => `${esc(x.calculo)}: ${esc(x.criterio)}`))}</div>` : ""}
+      ${r.sinCambios ? '<p class="rt-vacio">No hay diferencias en los datos.</p>' : ""}
+      ${r.proyecto.length ? `<div class="rt-comp-bloque"><h3>Datos del proyecto</h3>${tablaHtml(["Dato", "Antes", "Después"], r.proyecto.map((x) => [esc(x.campo), esc(x.antes), esc(x.despues)]))}</div>` : ""}
+      ${r.literales.length ? `<div class="rt-comp-bloque"><h3>Literales</h3>${lista(r.literales.map((x) => `${esc(x.literal)}) ${esc(x.cambio)}`))}</div>` : ""}
+      ${r.agregados.length ? `<div class="rt-comp-bloque"><h3>Cálculos agregados</h3>${lista(r.agregados.map(esc))}</div>` : ""}
+      ${r.quitados.length ? `<div class="rt-comp-bloque"><h3>Cálculos quitados</h3>${lista(r.quitados.map(esc))}</div>` : ""}
+      ${r.cambiados.map((c) => `<div class="rt-comp-bloque"><h3>${esc(c.titulo)}</h3>
+        ${c.campos.length ? tablaHtml(["Dato", "Antes", "Después"], c.campos.map((x) => [esc(x.campo), esc(x.antes), esc(x.despues)])) : ""}
+        ${c.tablas.map((t) => `<p><b>${esc(t.tabla)}</b>: ${t.antes} → ${t.despues} filas${t.celdas.length ? `; ${t.celdas.length} celda${t.celdas.length === 1 ? "" : "s"} cambiada${t.celdas.length === 1 ? "" : "s"}` : ""}.</p>${t.celdas.length ? tablaHtml(["Fila", "Columna", "Antes", "Después"], t.celdas.slice(0, 40).map((x) => [String(x.fila), esc(x.columna), esc(x.antes), esc(x.despues)])) : ""}`).join("")}</div>`).join("")}`;
+  }
+  document.getElementById("guardarVersionBtn").addEventListener("click", async (e) => {
+    const btn = e.currentTarget; btn.disabled = true; limpiarAlerta(alerta);
+    try {
+      const n = await guardarVersion(proyecto.id, { ...proyecto, literales }, guardados, ctx.user, document.getElementById("notaVersion").value.trim(), { calculos: Object.keys(guardados).length, hallazgos: hallazgos(proyecto, resultados).length });
+      document.getElementById("notaVersion").value = "";
+      mostrarAlerta(alerta, `Versión V${n} guardada.`, "success");
+      await pintarVersiones();
+    } catch (err) { mostrarAlerta(alerta, errorAmigable(err)); } finally { btn.disabled = false; }
+  });
+  document.getElementById("compararBtn").addEventListener("click", () => pintarComparacion(document.getElementById("compA").value, document.getElementById("compB").value));
+  document.getElementById("listaVersiones").addEventListener("click", async (e) => {
+    const b = e.target.closest("button"); if (!b) return;
+    const v = versiones.find((x) => x.id === (b.dataset.vcomp || b.dataset.vver || b.dataset.vexp || b.dataset.vres));
+    if (!v) return;
+    limpiarAlerta(alerta);
+    if (b.dataset.vcomp) { document.getElementById("compA").value = v.id; document.getElementById("compB").value = "actual"; pintarComparacion(v.id, "actual"); document.getElementById("resultadoComparacion").scrollIntoView({ behavior: "smooth" }); }
+    if (b.dataset.vexp) descargarJson(exportarProyecto(v.proyecto, v.calculos || {}), `${proyecto.nombre} - V${v.numero}.ahinco.json`);
+    if (b.dataset.vver) {
+      try {
+        const [{ verPdf }, M] = await Promise.all([import("./rt-visor.js"), import("./rt-memoria.js")]);
+        const p = { ...v.proyecto, id: proyecto.id }, datos = { proyecto: p, resultados: calcularProyecto(p, v.calculos || {}), guardados: v.calculos || {} };
+        await verPdf({ titulo: `Memoria de la versión V${v.numero}${v.nota ? ` — ${v.nota}` : ""}`, generar: () => M.pdfMemoria(datos), nombre: M.nombreMemoria(datos).replace(/\.pdf$/, ` - V${v.numero}.pdf`), acciones: [{ texto: "⬇ Word", fn: () => M.descargarMemoria(datos, "word") }] });
+      } catch (err) { mostrarAlerta(alerta, errorAmigable(err)); }
+    }
+    if (b.dataset.vres) {
+      if (!confirm(`¿Restaurar la versión V${v.numero}? Los datos y cálculos actuales se reemplazan por los de esa versión; antes se guarda una copia del estado actual como versión nueva.`)) return;
+      b.disabled = true;
+      try {
+        await guardarVersion(proyecto.id, { ...proyecto, literales }, guardados, ctx.user, `Copia automática antes de restaurar la V${v.numero}`, { calculos: Object.keys(guardados).length, hallazgos: hallazgos(proyecto, resultados).length });
+        await restaurarVersion(proyecto.id, v, guardados, ctx.user);
+        location.reload();
+      } catch (err) { mostrarAlerta(alerta, errorAmigable(err)); b.disabled = false; }
+    }
+  });
+  pintarVersiones();
+
   document.getElementById("verMemoriaBtn").addEventListener("click", (e) => generar("verMemoria", e.currentTarget));
   document.getElementById("verExcelBtn").addEventListener("click", (e) => generar("verExcel", e.currentTarget));
   document.getElementById("pdfBtn").addEventListener("click", (e) => generar("pdf", e.currentTarget));
