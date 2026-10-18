@@ -170,13 +170,19 @@ function iniciar(proyecto, guardados) {
   const pendientesSinJustificar = () => LITERALES.filter((l) => literales[l.l]?.aplica === "No" && !(literales[l.l]?.texto || "").trim()).map((l) => `${l.l})`);
   async function generar(tipo, btn) {
     limpiarAlerta(alerta);
-    if (!Object.keys(resultados).length && tipo !== "excel") { mostrarAlerta(alerta, "Todavía no hay cálculos guardados en este proyecto."); return; }
+    if (!Object.keys(resultados).length && tipo !== "excel" && tipo !== "verExcel") { mostrarAlerta(alerta, "Todavía no hay cálculos guardados en este proyecto."); return; }
     const sinJust = pendientesSinJustificar();
-    if (sinJust.length && !confirm(`Los literales ${sinJust.join(", ")} están marcados «No aplica» sin justificación (el RETIE exige mencionarla). ¿Generar de todas formas?`)) return;
+    if (tipo !== "verMemoria" && tipo !== "verExcel" && sinJust.length && !confirm(`Los literales ${sinJust.join(", ")} están marcados «No aplica» sin justificación (el RETIE exige mencionarla). ¿Generar de todas formas?`)) return;
     btn.disabled = true; btn.classList.add("generando");
     try {
       const datos = { proyecto: { ...proyecto, literales }, resultados, guardados };
-      if (tipo === "excel") {
+      if (tipo === "verMemoria") {
+        const [{ verPdf }, M] = await Promise.all([import("./rt-visor.js"), import("./rt-memoria.js")]);
+        await verPdf({ titulo: `Vista previa — ${proyecto.nombre}`, generar: () => M.pdfMemoria(datos), nombre: M.nombreMemoria(datos), acciones: [{ texto: "⬇ Word", fn: () => M.descargarMemoria(datos, "word") }] });
+      } else if (tipo === "verExcel") {
+        const [{ verLibro }, X] = await Promise.all([import("./rt-visor.js"), import("./rt-excel.js")]);
+        await verLibro(await X.construirLibro(datos), X.nombreExcel(datos));
+      } else if (tipo === "excel") {
         const { descargarExcel } = await import("./rt-excel.js");
         await descargarExcel(datos);
       } else {
@@ -190,6 +196,8 @@ function iniciar(proyecto, guardados) {
       btn.disabled = false; btn.classList.remove("generando");
     }
   }
+  document.getElementById("verMemoriaBtn").addEventListener("click", (e) => generar("verMemoria", e.currentTarget));
+  document.getElementById("verExcelBtn").addEventListener("click", (e) => generar("verExcel", e.currentTarget));
   document.getElementById("pdfBtn").addEventListener("click", (e) => generar("pdf", e.currentTarget));
   document.getElementById("wordBtn").addEventListener("click", (e) => generar("word", e.currentTarget));
   document.getElementById("excelBtn").addEventListener("click", (e) => generar("excel", e.currentTarget));

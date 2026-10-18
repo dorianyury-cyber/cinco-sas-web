@@ -92,3 +92,84 @@ export function svgAPng(svg, escala = 2) {
     img.src = url;
   });
 }
+
+// ---------------------------------------------------------------- diagrama unifilar
+// Tronco vertical: red, DPS, protección de MT, transformador, medida y las barras hasta la de
+// los circuitos; de esa barra salen los tableros siguientes (alimentadores), los circuitos y
+// la generación solar.
+const escX = (t) => String(t ?? "").replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;").replace(/"/g, "&quot;");
+const nf = (v, d = 1) => (Number.isFinite(v) ? v.toLocaleString("es-CO", { maximumFractionDigits: d }) : "—");
+export function svgUnifilar(g) {
+  const C = "#1f2732", NAR = "#d9820b", AZ = "#1f6fb2", VE = "#2e9e5b";
+  const posteriores = g.barras.slice(g.barraC + 1);
+  const salidas = [...posteriores.map((b) => ({ tipo: "b", ...b })), ...g.circuitos.map((c) => ({ tipo: "c", ...c })), ...(g.fv ? [{ tipo: "fv" }] : [])];
+  const largoNombre = Math.max(10, ...g.barras.map((b) => String(b.nombre).length));
+  const paso = 100, x0 = Math.min(330, 60 + largoNombre * 6.4), W = Math.max(780, x0 + 40 + salidas.length * paso);
+  let y = 26, s = "";
+  const linea = (x1, y1, x2, y2, color = C, ancho = 2) => { s += `<line x1="${x1}" y1="${y1}" x2="${x2}" y2="${y2}" stroke="${color}" stroke-width="${ancho}"/>`; };
+  const texto = (x, yy, t, { a = "start", t2 = 11, peso = "normal", color = "#222" } = {}) => { s += `<text x="${x}" y="${yy}" text-anchor="${a}" font-size="${t2}" font-weight="${peso}" fill="${color}">${escX(t)}</text>`; };
+  const interruptor = (x, yy) => { s += `<rect x="${x - 7}" y="${yy}" width="14" height="14" fill="#fff" stroke="${C}" stroke-width="2"/><line x1="${x - 7}" y1="${yy}" x2="${x + 7}" y2="${yy + 14}" stroke="${C}" stroke-width="1.5"/>`; };
+  // Red del operador.
+  s += `<circle cx="${x0}" cy="${y + 12}" r="12" fill="#fff" stroke="${C}" stroke-width="2"/><path d="M${x0 - 7} ${y + 12} q 3.5 -7 7 0 t 7 0" fill="none" stroke="${C}" stroke-width="1.8"/>`;
+  texto(x0 + 22, y + 9, "Red del operador", { peso: "bold" }); texto(x0 + 22, y + 23, `${nf(g.red.kv)} kV${g.red.sk ? ` · S"k ${nf(g.red.sk, 0)} MVA` : ""}`);
+  y += 24; linea(x0, y, x0, y + 50);
+  if (g.dps) {
+    linea(x0, y + 12, x0 - 40, y + 12);
+    s += `<rect x="${x0 - 50}" y="${y + 12}" width="20" height="24" fill="#fff" stroke="${C}" stroke-width="1.6"/><path d="M${x0 - 40} ${y + 15} l -4 8 h 8 l -4 8" fill="none" stroke="${C}" stroke-width="1.4"/><line x1="${x0 - 40}" y1="${y + 36}" x2="${x0 - 40}" y2="${y + 44}" stroke="${C}" stroke-width="1.6"/><line x1="${x0 - 47}" y1="${y + 44}" x2="${x0 - 33}" y2="${y + 44}" stroke="${C}" stroke-width="2"/>`;
+    texto(x0 - 58, y + 28, "DPS", { a: "end" });
+  }
+  if (g.protMT) { s += `<rect x="${x0 - 6}" y="${y + 14}" width="12" height="26" fill="#fff" stroke="${C}" stroke-width="2"/><line x1="${x0}" y1="${y + 14}" x2="${x0}" y2="${y + 40}" stroke="${C}" stroke-width="1"/>`; texto(x0 + 16, y + 31, g.protMT); }
+  y += 50;
+  // Transformador.
+  if (g.trafo) {
+    s += `<circle cx="${x0}" cy="${y + 15}" r="15" fill="none" stroke="${NAR}" stroke-width="2.2"/><circle cx="${x0}" cy="${y + 37}" r="15" fill="none" stroke="${NAR}" stroke-width="2.2"/>`;
+    texto(x0 + 26, y + 20, `T1 · ${nf(g.trafo.kva, 0)} kVA`, { peso: "bold" });
+    texto(x0 + 26, y + 34, `${nf(g.trafo.vp, 1)} / ${nf(g.trafo.vs, 3)} kV · ${g.trafo.grupo}${g.trafo.z ? ` · Z ${nf(g.trafo.z, 1)} %` : ""}`);
+    y += 52;
+  }
+  linea(x0, y, x0, y + 16); y += 16;
+  if (g.medidor) { linea(x0, y, x0 + 18, y, C, 1.2); s += `<rect x="${x0 + 18}" y="${y - 10}" width="22" height="20" rx="3" fill="#fff" stroke="${C}" stroke-width="1.5"/>`; texto(x0 + 29, y + 4, "M", { a: "middle", peso: "bold", t2: 10 }); texto(x0 + 48, y + 4, g.medidor, { t2: 10 }); linea(x0, y, x0, y + 16); y += 16; }
+  // Barras en cascada hasta la de los circuitos.
+  const barraEtiqueta = (b, yy, xIzq) => { texto(xIzq - 8, yy + 4, b.nombre, { a: "end", peso: "bold" }); texto(xIzq - 8, yy + 17, `${Number.isFinite(b.ik3) ? `Ik" ${nf(b.ik3, 2)} kA` : ""}${b.icu ? ` · Icu ${nf(b.icu, 1)} kA` : ""}`, { a: "end", t2: 10, color: "#555" }); };
+  g.barras.slice(0, g.barraC + 1).forEach((b, i) => {
+    if (i) { interruptor(x0, y); linea(x0, y + 14, x0, y + 36); texto(x0 + 14, y + 11, b.cable, { t2: 10, color: "#444" }); y += 36; }
+    const ultima = i === g.barraC;
+    const xIzq = x0 - 30, largo = ultima ? Math.max(240, salidas.length * paso + 40) : 200;
+    linea(xIzq, y, xIzq + largo, y, ultima ? AZ : C, 5);
+    barraEtiqueta(b, y, xIzq);
+    if (!ultima) { linea(x0, y, x0, y + 16); y += 16; }
+  });
+  // Salidas de la barra de los circuitos.
+  const yC = y;
+  salidas.forEach((c, k) => {
+    const x = x0 + 10 + k * paso;
+    linea(x, yC, x, yC + 18);
+    if (c.tipo === "fv") {
+      s += `<rect x="${x - 16}" y="${yC + 18}" width="32" height="28" fill="#fff" stroke="${VE}" stroke-width="2"/>`; texto(x, yC + 31, "~", { a: "middle", peso: "bold", color: VE, t2: 12 }); texto(x, yC + 43, "=", { a: "middle", peso: "bold", color: VE, t2: 12 });
+      linea(x, yC + 46, x, yC + 62, VE);
+      s += `<rect x="${x - 18}" y="${yC + 62}" width="36" height="22" fill="#fff4cc" stroke="${VE}" stroke-width="2"/><line x1="${x - 18}" y1="${yC + 73}" x2="${x + 18}" y2="${yC + 73}" stroke="${VE}" stroke-width="1"/>`;
+      texto(x, yC + 100, "Solar FV", { a: "middle", peso: "bold", t2: 10 }); texto(x, yC + 113, `${nf(g.fv.kwp, 1)} kWp`, { a: "middle", t2: 10 }); texto(x, yC + 126, `${nf(g.fv.kw, 1)} kW AC`, { a: "middle", t2: 10 });
+      return;
+    }
+    interruptor(x, yC + 18);
+    if (c.tipo === "b") {
+      linea(x, yC + 32, x, yC + 76);
+      linea(x - 34, yC + 76, x + 34, yC + 76, C, 4);
+      texto(x, yC + 94, c.nombre, { a: "middle", peso: "bold", t2: 10 });
+      texto(x, yC + 107, Number.isFinite(c.ik3) ? `Ik" ${nf(c.ik3, 2)} kA` : "", { a: "middle", t2: 9.5, color: "#555" });
+      s += `<text x="${x + 6}" y="${yC + 46}" font-size="9.5" fill="#444">${escX(c.cable).slice(0, 34)}</text>`;
+      return;
+    }
+    linea(x, yC + 32, x, yC + 70);
+    texto(x + 10, yC + 30, `${c.In} A`, { t2: 10, peso: "bold" });
+    s += `<path d="M${x - 6} ${yC + 70} l 6 10 l 6 -10 z" fill="${C}"/>`;
+    texto(x, yC + 96, `C${c.nombre}`, { a: "middle", peso: "bold", t2: 10 });
+    // Descripción en líneas cortas (cabe en el paso entre circuitos).
+    const corto = (t, n = 17) => (String(t).length > n ? `${String(t).slice(0, n - 1)}…` : String(t));
+    texto(x, yC + 109, corto(c.desc || ""), { a: "middle", t2: 9.5, color: "#333" });
+    texto(x, yC + 121, c.conductor, { a: "middle", t2: 9.5, color: "#333" });
+    texto(x, yC + 133, `${nf(c.I, 1)} A`, { a: "middle", t2: 9.5, color: "#555" });
+  });
+  const H = yC + (salidas.length ? 150 : 40);
+  return `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 ${W} ${H}" width="${W}" height="${H}" font-family="Arial, Helvetica, sans-serif"><rect x="0" y="0" width="${W}" height="${H}" fill="#ffffff"/>${s}</svg>`;
+}

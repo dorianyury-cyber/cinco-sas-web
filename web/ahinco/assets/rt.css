@@ -28,6 +28,7 @@
 .rt-area h2 { display: flex; align-items: center; gap: 10px; font-size: 17px; margin: 0 0 4px; }
 .rt-area h2::before { content: ""; width: 6px; height: 22px; border-radius: 3px; background: var(--rt-color, var(--cinco-orange)); }
 .rt-area > p { margin: 0 0 12px; font-size: 13px; }
+.rt-area-gen { --rt-color: #6b5bd6; }
 .rt-area-bt { --rt-color: #2f7dd1; }
 .rt-area-mt { --rt-color: #d9820b; }
 .rt-area-spt { --rt-color: #2e9e5b; }
@@ -286,3 +287,28 @@ body.rt-verificacion .rt-solo-verif { display: block; }
 .rt-tabla-acciones { display: flex; flex-wrap: wrap; gap: 8px; }
 .rt-vaciar { margin-top: 6px; border: 1px dashed var(--border); background: none; color: var(--danger); border-radius: 8px; padding: 6px 12px; cursor: pointer; font-weight: 600; font-size: 12.5px; }
 .rt-tabla-edit td:first-child { text-align: center; }
+
+/* ---- visores (memoria y Excel) */
+.rt-docs-ver { margin-bottom: 14px; }
+.rt-doc-ver { border-style: dashed; }
+.rt-visor-botones { display: flex; flex-wrap: wrap; gap: 8px; }
+.ip-visor-informe .rt-visor-cuerpo { flex: 1; min-height: 0; }
+.rt-visor-libro { overflow: auto; }
+.rt-visor-hoja { overflow: auto; max-height: calc(92vh - 170px); }
+.rt-visor-hoja table { font-size: 12px; }
+.rt-visor-hoja td { white-space: pre-wrap; vertical-align: top; max-width: 420px; }
+.rt-visor-hoja .rt-visor-n { color: var(--text-muted); font-weight: 400; width: 34px; text-align: right; }
+.rt-visor-entrada { background: #fff4cc; color: #1f4e9a; font-weight: 600; }
+.rt-visor-formula { color: var(--text-muted); font-style: italic; }
+:root[data-theme="dark"] .rt-visor-entrada { background: #4a4020; color: #ffe08a; }
+@media (prefers-color-scheme: dark) { :root:not([data-theme="light"]) .rt-visor-entrada { background: #4a4020; color: #ffe08a; } }
+
+/* ---- importar filas desde Excel */
+.rt-tabla-acciones .rt-importar-btn { margin-top: 6px; border: 1px dashed var(--border); background: none; color: var(--text-muted); border-radius: 8px; padding: 6px 12px; cursor: pointer; font-weight: 600; font-size: 12.5px; }
+#impDialogo textarea { width: 100%; font-family: Consolas, monospace; font-size: 12px; padding: 8px; border: 1px solid var(--border); border-radius: 8px; background: var(--input-bg); color: var(--text); }
+.rt-imp-archivo { display: flex; align-items: center; gap: 10px; margin: 8px 0; flex-wrap: wrap; }
+.rt-imp-modo { display: flex; gap: 18px; flex-wrap: wrap; margin: 10px 0; font-size: 13px; }
+.rt-imp-modo input { width: auto; }
+#impVista .tabla-scroll { max-height: 260px; overflow: auto; }
+.rt-imp-avisos { color: var(--danger); font-size: 12.5px; margin: 6px 0; padding-left: 18px; }
+.rt-imp-resumen { font-size: 13px; margin: 8px 0 4px; }

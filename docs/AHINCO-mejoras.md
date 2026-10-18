@@ -68,6 +68,9 @@ Datos en Firestore: `rtProyectos/{id}` y `rtProyectos/{id}/calculos/{clave}` (`c
 | Armónicos (literal c) | Suma aritmética de grupos; THDv sin resonancias; espectros teóricos o típicos. | `armonicos()`, `ESPECTROS` e `IEEE519_*` en `rt-normas.js` |
 | Cálculo económico (literal j) | Costos digitados; resistencia de la Tabla 9; sin pérdidas en pantallas. | `conductorEconomico()`, `factorEconomico()` |
 | Riesgo por rayos R2 a R4 | No implementado: requiere los componentes RC, RM, RW y RZ con las tablas de la NTC 4552-2 / IEC 62305-2. | `rayos()` |
+| Riesgos eléctricos (literal a) | Matriz del RETIE 2024 (Tabla 1.5.1.4.1.a); la valoración la hace el diseñador. | `riesgoElectrico()`, `MATRIZ_RIESGO` en `rt-normas.js` |
+| Nivel de tensión (literal f) | Conductores de referencia y límites del operador digitados; sin costos. | `nivelTension()` |
+| Diagrama unifilar (literal r) | Una fuente, un transformador y los circuitos de una barra. | `unifilar()`, `svgUnifilar()` en `rt-grafico.js` |
 | Proyecto | Sin historial de versiones (se usa «Exportar»). | `rt-core.js` (subcolección de versiones) |
 
 ## 4. Mejoras pendientes (en orden)

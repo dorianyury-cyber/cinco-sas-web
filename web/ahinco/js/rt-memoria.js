@@ -7,7 +7,7 @@ import { generarInformePDF } from "../../js/control/informes-pdf.js";
 import { generarInformeDocxBlob } from "../../js/control/informes-docx.js";
 import { MODULOS, NORMAS_GENERALES } from "./rt-modulos.js";
 import { LITERALES, FUENTE_LITERALES } from "./rt-literales.js";
-import { svgTCC, svgAPng } from "./rt-grafico.js";
+import { svgTCC, svgAPng, svgUnifilar } from "./rt-grafico.js";
 import { esc, hoyISO, tituloCalculo, ORDEN_MODULOS } from "./rt-core.js";
 import { hallazgos, supuestos, esVerificacion } from "./rt-hallazgos.js";
 import { ALCANCE } from "./rt-alcance.js";
@@ -44,6 +44,9 @@ async function seccionModulo(r, entradas, nivel) {
   (r.tablas || []).forEach((t) => b.push(tabla(t.titulo, t.encabezados, t.filas)));
   if (r.grafico?.tipo === "tcc") {
     try { b.push({ tipo: "imagen", url: await svgAPng(svgTCC(r.grafico)), nombre: "Curvas tiempo-corriente de las protecciones", pieDeFoto: "", tamano: 95 }); } catch (e) { /* sin gráfico */ }
+  }
+  if (r.grafico?.tipo === "unifilar") {
+    try { b.push({ tipo: "imagen", url: await svgAPng(svgUnifilar(r.grafico)), nombre: "Diagrama unifilar", pieDeFoto: "Diagrama unifilar generado con los datos de los cálculos del proyecto", tamano: 100 }); } catch (e) { /* sin gráfico */ }
   }
   // Verificación y conclusión.
   if ((r.verificaciones || []).length) b.push(tabla(`Verificación normativa — ${titulo}`, ["Criterio", "Norma o referencia", "Valor", "Límite", "Resultado"], r.verificaciones.map((v) => [v.criterio, v.norma, v.valor, v.limite, v.cumple ? "Cumple" : "No cumple"])));
@@ -163,7 +166,14 @@ function sanearPDF(v) {
   return pdfSeguro(v);
 }
 
+// Nombre del PDF de la memoria (lo usa también el visor).
+export const nombreMemoria = (datos, ext = "pdf") => (datos.rapido ? `${nombreCalculo(datos)}.${ext}` : nombreArchivo(datos.proyecto, ext));
+// Documento de jsPDF de la memoria completa o de un cálculo rápido, sin descargarlo.
+export async function pdfMemoria(datos) {
+  return generarInformePDF(sanearPDF(datos.rapido ? await informeCalculo(datos) : datosInforme(datos.proyecto, await construirMemoria(datos))));
+}
 export async function descargarMemoria(datos, tipo) {
+  if (datos.rapido) return descargarCalculo(datos, tipo);
   const bloques = await construirMemoria(datos);
   const informe = datosInforme(datos.proyecto, bloques);
   if (tipo === "word") {
@@ -176,14 +186,18 @@ export async function descargarMemoria(datos, tipo) {
 
 // Documento de un solo cálculo (cálculo rápido, sin proyecto): el desarrollo del
 // cálculo con sus datos, método, verificaciones y conclusión.
-export async function descargarCalculo(datos, tipo) {
+const nombreCalculo = (datos) => `Calculo - ${tituloCalculo(Object.values(datos.resultados)[0]).replace(/[\\/:*?"<>|]/g, "-").slice(0, 90)}`;
+async function informeCalculo(datos) {
   const { proyecto, resultados, guardados } = datos;
   const r = Object.values(resultados)[0];
   const b = await seccionModulo(r, guardados[r.clave]?.entradas || {}, 1);
   b.splice(1, 0, P(`<i>Cálculo realizado con AHÍNCO sin proyecto asociado (cálculo rápido). Condiciones del sitio: altitud ${esc(String(proyecto.altitud ?? "—"))} m s. n. m. y temperatura ambiente ${esc(String(proyecto.tempAmbiente ?? "—"))} °C.</i>`));
   b.push({ tipo: "firma", etiqueta: "Elaboró", firmantes: [{ nombre: proyecto.disenador || "", cargo: "Cinco S.A.S.", firmaUrl: null }] });
-  const informe = { ...datosInforme(proyecto, b), titulo: `Cálculo — ${tituloCalculo(r)}`, radicado: "Cálculo rápido", contratoNombre: tituloCalculo(r) };
-  const nombre = `Calculo - ${tituloCalculo(r).replace(/[\/:*?"<>|]/g, "-").slice(0, 90)}`;
+  return { ...datosInforme(proyecto, b), titulo: `Cálculo — ${tituloCalculo(r)}`, radicado: "Cálculo rápido", contratoNombre: tituloCalculo(r) };
+}
+export async function descargarCalculo(datos, tipo) {
+  const informe = await informeCalculo(datos);
+  const nombre = nombreCalculo(datos);
   if (tipo === "word") descargarBlob(await generarInformeDocxBlob(informe), `${nombre}.docx`);
   else descargarBlob((await generarInformePDF(sanearPDF(informe))).output("blob"), `${nombre}.pdf`);
 }

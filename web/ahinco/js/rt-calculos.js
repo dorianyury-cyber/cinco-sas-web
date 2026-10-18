@@ -108,7 +108,7 @@ export function seleccionarConductor({ corriente, continua, material = "Cu", tAi
 
 export function conductores(e, proyecto = {}) {
   const tAmbDef = num(proyecto.tempAmbiente, 30);
-  const verificaciones = [];
+  const verificaciones = [], circ = [];
   const tabla = filas(e.circuitos).map((c) => {
     const I = num(c.corriente), mat = c.material === "Al" ? "Al" : "Cu";
     const sel = seleccionarConductor({ corriente: I, continua: c.continua !== "No", material: mat, tAisl: num(c.tAisl, 90), tTerm: num(c.tTerm, 75), portadores: num(c.portadores, 3), tAmb: num(c.tAmb, tAmbDef) });
@@ -119,10 +119,12 @@ export function conductores(e, proyecto = {}) {
     }
     verificaciones.push({ criterio: `Circuito ${c.circuito}: protección ≤ capacidad del conductor`, norma: "NTC 2050 240-3 y 240-4", valor: `${sel.In} A`, limite: `${fmt(sel.ampFinal, 1)} A (o normalizado inmediato)`, cumple: true });
     if (icc > 0 && icu > 0) verificaciones.push({ criterio: `Circuito ${c.circuito}: capacidad de interrupción`, norma: "NTC 2050 110-9 / RETIE", valor: `${fmt(icu, 1)} kA`, limite: `≥ ${fmt(icc, 1)} kA`, cumple: icu >= icc });
+    circ.push({ circuito: c.circuito || "", descripcion: c.descripcion || "", I, material: mat, calibre: sel.calibre, In: sel.In, icu });
     return [c.circuito || "", c.descripcion || "", fmt(I, 1), mat, N.etiquetaCalibre(sel.calibre), fmt(sel.ft, 2), fmt(sel.fa, 2), fmt(sel.ampFinal, 1), `${sel.In} A`, icu ? `${fmt(icu, 1)} kA` : "—"];
   });
   return {
     resumen: [{ etiqueta: "Circuitos dimensionados", valor: String(tabla.length), unidad: "" }],
+    salidas: { circuitos: circ },
     tablas: [{ titulo: "Selección de conductores y protecciones", encabezados: ["Circ.", "Descripción", "I carga (A)", "Mat.", "Conductor", "Ft", "Fa", "Capacidad corregida (A)", "Protección", "Icu"], filas: tabla }],
     pasos: [
       { titulo: "Corriente de diseño", formula: "I diseño = 1,25 × I carga continua + I no continua", sustitucion: "NTC 2050 210-19(a) y 215-2", resultado: "Por circuito" },
@@ -330,7 +332,7 @@ export function cortocircuito(e, proyecto = {}, ctx = {}) {
     const r0 = num(cb.r0, NaN), x0 = num(cb.x0, NaN);
     const zc0 = Number.isFinite(r0) && Number.isFinite(x0) ? cplx((r0 * L) / n, (x0 * L) / n) : esc(z, 4); // Z0 del fabricante o ≈ 4 Z1
     z1 = suma(z1, z); z0 = suma(z0, zc0);
-    nodos.push({ nombre: cb.barra || "Barra", icu: cb.icu, zs: z, z1red: { ...z1 }, z0: { ...z0 } });
+    nodos.push({ nombre: cb.barra || "Barra", icu: cb.icu, zs: z, z1red: { ...z1 }, z0: { ...z0 }, cable: { conductor: cb.conductor, longitud: num(cb.longitud), paralelos: n } });
   });
   // Motores de cada barra en paralelo (null = sin motores).
   const zMot = nodos.map((nd) => motores.filter((m) => m.barra === clave(nd.nombre)).reduce((z, m) => (z ? par(z, m.z) : m.z), null));
@@ -346,7 +348,7 @@ export function cortocircuito(e, proyecto = {}, ctx = {}) {
     const ik3 = ik3m + iGen; // los inversores se suman en forma aritmética (conservador)
     const kappa = 1.02 + 0.98 * Math.exp(-3 * (zth.r / Math.max(zth.x, 1e-9)));
     const ik1 = (Math.sqrt(3) * c * Un) / mod(suma(esc(zth, 2), nd.z0)) + iGen;
-    barras.push({ nombre: nd.nombre, z1: { ...zth }, ik3, ik3red, aporte: ik3 - ik3red, ip: kappa * Math.SQRT2 * ik3m + Math.SQRT2 * iGen, ik1, kappa, icu: num(nd.icu, 0) });
+    barras.push({ nombre: nd.nombre, cable: nd.cable || null, z1: { ...zth }, ik3, ik3red, aporte: ik3 - ik3red, ip: kappa * Math.SQRT2 * ik3m + Math.SQRT2 * iGen, ik1, kappa, icu: num(nd.icu, 0) });
   });
   const ikMT = skq / (Math.sqrt(3) * UnMT);
   const verificaciones = barras.filter((b) => b.icu > 0).map((b) => ({ criterio: `${b.nombre}: capacidad de interrupción`, norma: "RETIE / NTC 2050 110-9; IEC 60947-2", valor: `${fmt(b.icu, 1)} kA`, limite: `≥ ${fmt(b.ik3 / 1000, 2)} kA`, cumple: b.icu * 1000 >= b.ik3 }));
@@ -356,7 +358,7 @@ export function cortocircuito(e, proyecto = {}, ctx = {}) {
       { etiqueta: "Ik\" trifásica en el secundario", valor: fmt(barras[0].ik3 / 1000, 2), unidad: "kA" },
       { etiqueta: "Ik\" monofásica en el secundario", valor: fmt(barras[0].ik1 / 1000, 2), unidad: "kA" }
     ],
-    salidas: { barras: barras.map((b) => ({ nombre: b.nombre, ik3: b.ik3, ik1: b.ik1 })) },
+    salidas: { barras: barras.map((b) => ({ nombre: b.nombre, ik3: b.ik3, ik1: b.ik1, icu: b.icu, cable: b.cable })), uMT: UnMT / 1000, uBT: Un, sk: skq / 1e6, motores: motores.map((m) => ({ barra: m.nombre, kw: m.P / 1000 })), generacion: gens.map((g) => ({ barra: g.nombre, kva: g.S / 1000 })) },
     tablas: [
       { titulo: "Impedancias referidas al secundario", encabezados: ["Elemento", "R (mΩ)", "X (mΩ)", "Z (mΩ)"], filas: [
         ["Red equivalente", fmt(zq.r * 1000, 3), fmt(zq.x * 1000, 3), fmt(mod(zq) * 1000, 3)],
@@ -1537,4 +1539,134 @@ export function armonicos(e, proyecto = {}, ctx = {}) {
   };
 }
 
-export const CALCULOS = { cargas, conductores, regulacion, canalizaciones, transformador, cortocircuito, coordinacion, malla, rayos, aislamiento, distancias, mecanico, trafoPotencia, cableMT, apantallamiento, fvArreglo, fvProduccion, fvConductores, fvConexion, arcoElectrico, camposEM, conductorEconomico, armonicos };
+// ================================================================ 24. ANÁLISIS DE RIESGOS ELÉCTRICOS (RETIE 2024, literal a)
+// Matriz de la Tabla 1.5.1.4.1.a: para cada riesgo se cruza la probabilidad con la consecuencia
+// de cada clase (personas, económicas, ambientales e imagen) y se toma el caso más crítico;
+// se evalúa antes y después de las medidas de mitigación (riesgo residual).
+export function riesgoElectrico(e) {
+  const maxRiesgo = e.maximoResidual || "Medio";
+  const rango = (n) => N.NIVELES_RIESGO.indexOf(n);
+  const verificaciones = [];
+  const filasR = filas(e.riesgos).map((r, i) => {
+    const cons = ["personas", "economicas", "ambientales", "imagen"].map((k) => Math.min(5, Math.max(1, num(r[k], 1))));
+    const niveles = cons.map((c) => N.nivelRiesgo(c, r.probabilidad));
+    const inicial = niveles.reduce((m, x) => (rango(x) > rango(m) ? x : m), "Muy bajo");
+    const consRes = Math.min(5, Math.max(1, num(r.consecuenciaResidual, Math.max(...cons))));
+    const residual = N.nivelRiesgo(consRes, r.probabilidadResidual || r.probabilidad);
+    const nombre = `${r.evento || "Riesgo"} por ${String(r.factor || "—").toLowerCase()}${r.fuente ? ` en ${r.fuente}` : ""}`;
+    verificaciones.push({ criterio: `${nombre}: riesgo residual con las medidas adoptadas`, norma: "RETIE 2024 Libro 1, 1.5.1.4.1 (Tablas 1.5.1.4.1.a y b)", valor: residual, limite: `≤ ${maxRiesgo}`, cumple: rango(residual) <= rango(maxRiesgo) });
+    return { n: i + 1, nombre, r, cons, inicial, residual, consRes };
+  });
+  const peorIni = filasR.reduce((m, f) => (rango(f.inicial) > rango(m) ? f.inicial : m), "Muy bajo");
+  const peorRes = filasR.reduce((m, f) => (rango(f.residual) > rango(m) ? f.residual : m), "Muy bajo");
+  const conteo = (campo) => N.NIVELES_RIESGO.slice().reverse().map((n) => `${n}: ${filasR.filter((f) => f[campo] === n).length}`).join(" · ");
+  return {
+    resumen: [
+      { etiqueta: "Riesgos evaluados", valor: String(filasR.length), unidad: "" },
+      { etiqueta: "Mayor riesgo sin medidas", valor: peorIni, unidad: "" },
+      { etiqueta: "Mayor riesgo residual", valor: peorRes, unidad: "" }
+    ],
+    tablas: [
+      { titulo: "Matriz de análisis de riesgos (RETIE 2024, Tabla 1.5.1.4.1.a)", encabezados: ["N.º", "Riesgo (evento por factor en la fuente)", "Tipo", "Prob.", "Consecuencias P / E / A / I", "Nivel sin medidas", "Medidas de mitigación", "Prob. y cons. residual", "Nivel residual"], filas: filasR.map((f) => [String(f.n), f.nombre, f.r.tipo || "Potencial", f.r.probabilidad || "E", f.cons.join(" / "), f.inicial, f.r.medidas || "—", `${f.r.probabilidadResidual || f.r.probabilidad || "E"} / ${f.consRes}`, f.residual]) },
+      { titulo: "Decisiones y acciones según el nivel residual (Tabla 1.5.1.4.1.b)", encabezados: ["N.º", "Nivel residual", "Decisión y control"], filas: filasR.map((f) => [String(f.n), f.residual, N.DECISIONES_RIESGO[f.residual]]) }
+    ],
+    pasos: [
+      { titulo: "Valoración por clase de consecuencia", formula: "Nivel = Matriz(consecuencia 1 a 5, probabilidad E a A) para personas, económicas, ambientales e imagen", sustitucion: "RETIE 2024 Libro 1, Tabla 1.5.1.4.1.a", resultado: `Sin medidas: ${conteo("inicial")}` },
+      { titulo: "Nivel del riesgo", formula: "Se toma el caso más crítico de los cuatro cruces", sustitucion: "RETIE 2024 1.5.1.4.1 literal f", resultado: `Mayor: ${peorIni}` },
+      { titulo: "Riesgo residual", formula: "Matriz(consecuencia residual, probabilidad residual) con las medidas de mitigación adoptadas", sustitucion: `Máximo admitido en el diseño: ${maxRiesgo}`, resultado: `Residual: ${conteo("residual")}` }
+    ],
+    verificaciones,
+    notas: ["Consecuencias: 1 molestia funcional / daños leves / sin efecto / interna; 2 lesión menor / daños importantes / efecto menor / local; 3 incapacidad temporal / daños severos / contaminación localizada / regional; 4 incapacidad permanente parcial / daños mayores / contaminación mayor / nacional; 5 una o más muertes / daño grave / contaminación irreparable / internacional.", "En instalaciones con ALTO RIESGO o PELIGRO INMINENTE se debe interrumpir el funcionamiento, salvo donde la interrupción cause un riesgo mayor (RETIE 2024 1.5.1.4.3)."],
+    conclusion: filasR.length ? veredicto(verificaciones, `Con las medidas adoptadas, ningún riesgo residual supera el nivel «${maxRiesgo}» (mayor residual: ${peorRes}).`, `Hay riesgos cuyo nivel residual supera «${maxRiesgo}»: adopte medidas adicionales de mitigación.`) : "Agregue los riesgos a evaluar."
+  };
+}
+
+// ================================================================ 25. NIVEL DE TENSIÓN REQUERIDO (literal f)
+// Compara los niveles de tensión candidatos para alimentar la demanda proyectada: corriente,
+// caída de tensión (ΔV % = S × L × (R cos φ + X sen φ) / (10 V²), con S en kVA, L en km y V en kV),
+// pérdidas y potencia máxima que el operador de red conecta en ese nivel. Recomienda el menor
+// nivel viable. Niveles de tensión según la CREG 015 de 2018 (nivel 1 < 1 kV; 2: 1 a 30 kV;
+// 3: 30 a 57,5 kV; 4: 57,5 kV o más) y tensiones normalizadas de la NTC 1340.
+export const nivelCREG = (kv) => (kv < 1 ? 1 : kv < 30 ? 2 : kv < 57.5 ? 3 : 4);
+export function nivelTension(e, proyecto = {}, ctx = {}) {
+  const s0 = num(e.demanda, NaN) > 0 ? num(e.demanda) : ctx.cargas?.sDemKVA ?? 0;
+  const g = num(e.crecimiento, 0), n = num(e.anios, 0), S = s0 * Math.pow(1 + g / 100, n);
+  const fp = Math.min(1, Math.max(0.1, num(e.fp, 0.9))), sen = Math.sqrt(1 - fp * fp), L = num(e.distancia, 0) / 1000, dvMax = num(e.dvMax, 3);
+  const cands = filas(e.candidatos).map((c) => {
+    const V = num(c.tension, 0), R = num(c.r, 0), X = num(c.x, 0), cap = num(c.capacidad, 0), lim = num(c.limiteOR, 0);
+    const I = V > 0 ? S / (Math.sqrt(3) * V) : NaN;
+    const dv = V > 0 ? (S * L * (R * fp + X * sen)) / (10 * V * V) : NaN;
+    const perd = V > 0 && S > 0 ? ((3 * I * I * R * L) / 1000 / (S * fp)) * 100 : 0;
+    const motivos = [];
+    if (cap > 0 && I > cap) motivos.push(`corriente ${fmt(I, 0)} A > capacidad ${fmt(cap, 0)} A`);
+    if (dv > dvMax) motivos.push(`caída ${fmt(dv, 2)} % > ${fmt(dvMax, 1)} %`);
+    if (lim > 0 && S > lim) motivos.push(`demanda ${fmt(S, 0)} kVA > límite del operador ${fmt(lim, 0)} kVA`);
+    return { nombre: c.nivel || `${fmt(V, 3)} kV`, V, conductor: c.conductor || "", I, dv, perd, cap, lim, viable: V > 0 && !motivos.length, motivos, creg: nivelCREG(V) };
+  }).filter((c) => c.V > 0).sort((a, b) => a.V - b.V);
+  const rec = cands.find((c) => c.viable);
+  const adop = cands.find((c) => c.nombre === e.adoptado) || null;
+  const verificaciones = [];
+  if (adop) verificaciones.push({ criterio: `Nivel adoptado «${adop.nombre}»: capacidad, caída de tensión y límite del operador`, norma: "RETIE 2024 literal f) / CREG 015 de 2018 / NTC 1340", valor: adop.viable ? `I = ${fmt(adop.I, 0)} A; ΔV = ${fmt(adop.dv, 2)} %` : adop.motivos.join("; "), limite: `Capacidad ${adop.cap ? fmt(adop.cap, 0) + " A" : "—"}; ΔV ≤ ${fmt(dvMax, 1)} %`, cumple: adop.viable });
+  return {
+    resumen: [
+      { etiqueta: "Demanda proyectada", valor: fmt(S, 1), unidad: "kVA" },
+      { etiqueta: "Menor nivel viable", valor: rec ? rec.nombre : "Ninguno", unidad: "" },
+      ...(adop ? [{ etiqueta: "Nivel adoptado", valor: adop.nombre, unidad: "" }] : [])
+    ],
+    salidas: { demanda: S, recomendado: rec?.nombre || "", adoptado: adop?.nombre || rec?.nombre || "", tension: (adop || rec)?.V ?? NaN },
+    tablas: [{ titulo: "Comparación de niveles de tensión", encabezados: ["Nivel", "Nivel CREG", "Conductor de referencia", "I (A)", "ΔV (%)", "Pérdidas (%)", "Resultado"], filas: cands.map((c) => [c.nombre + (c === rec ? " ★" : ""), String(c.creg), c.conductor, fmt(c.I, 1), fmt(c.dv, 2), fmt(c.perd, 2), c.viable ? "Viable" : `No viable: ${c.motivos.join("; ")}`]) }],
+    pasos: [
+      { titulo: "Demanda proyectada", formula: "S = S0 × (1 + g)^n", sustitucion: `S0 = ${fmt(s0, 1)} kVA${num(e.demanda, NaN) > 0 ? "" : " (del cuadro de cargas)"}; g = ${fmt(g, 1)} %; n = ${fmt(n, 0)} años`, resultado: `S = ${fmt(S, 1)} kVA` },
+      { titulo: "Corriente y caída de tensión por nivel", formula: "I = S / (√3 V); ΔV % = S × L × (R cos φ + X sen φ) / (10 V²)", sustitucion: `L = ${fmt(L, 3)} km; cos φ = ${fmt(fp, 2)}; límite ΔV = ${fmt(dvMax, 1)} %`, resultado: "Por nivel" },
+      { titulo: "Pérdidas", formula: "P pérdidas = 3 I² R L; % = P pérdidas / (S cos φ)", sustitucion: "R del conductor de referencia de cada nivel", resultado: "Por nivel" },
+      { titulo: "Selección", formula: "Menor nivel que cumple capacidad, caída de tensión y límite del operador de red", sustitucion: "Niveles CREG 015 de 2018: 1 (< 1 kV), 2 (1 a 30 kV), 3 (30 a 57,5 kV), 4 (≥ 57,5 kV)", resultado: rec ? rec.nombre : "Ningún nivel candidato es viable" }
+    ],
+    verificaciones,
+    notas: ["Los conductores de referencia, su capacidad y el límite de potencia por nivel son datos de entrada: tome los de la norma del operador de red del área (potencia máxima que conecta en baja tensión y en cada nivel de media tensión) y de la disponibilidad de su red.", "El nivel recomendado es el técnicamente viable de menor tensión; la decisión final considera también el costo de la conexión (transformador propio o red del operador) y la factibilidad que expida el operador de red."],
+    conclusion: rec ? (adop ? veredicto(verificaciones, `El nivel adoptado «${adop.nombre}» es viable para ${fmt(S, 0)} kVA; el menor nivel viable es «${rec.nombre}».`, `El nivel adoptado «${adop.nombre}» no es viable; el menor nivel viable es «${rec.nombre}».`) : `Para ${fmt(S, 0)} kVA el menor nivel de tensión viable es «${rec.nombre}».`) : (S > 0 ? "Ningún nivel candidato es viable: revise los conductores o agregue un nivel de tensión mayor." : "Indique la demanda (o haga el cuadro de cargas).")
+  };
+}
+
+// ================================================================ 26. DIAGRAMA UNIFILAR (literal r)
+// Se arma con los datos del proyecto: red del operador, transformador (de distribución o de
+// potencia), barras y cables del cortocircuito, circuitos con sus protecciones y calibres, y
+// generación solar si la hay. Los datos que falten se digitan en el formulario.
+const textoConductor = (cond) => { const [t, c] = String(cond || "").split(":"); return t === "aereo" ? (N.CONDUCTORES_AEREOS[c]?.nombre || c) : `${t === "Al" ? "Al" : "Cu"} ${N.etiquetaCalibre(c || "")}`; };
+export function unifilar(e, proyecto = {}, ctx = {}) {
+  const tp = ctx.trafoPotencia, td = ctx.transformador, cc = ctx.cortocircuito;
+  const kvRed = num(e.tensionRed, NaN) > 0 ? num(e.tensionRed) : tp ? tp.vp / 1000 : td ? td.vp / 1000 : cc?.uMT ?? 13.2;
+  const kva = num(e.potencia, NaN) > 0 ? num(e.potencia) : tp ? tp.sn : td?.sn ?? NaN;
+  const vs = num(e.tensionSec, NaN) > 0 ? num(e.tensionSec) : tp ? tp.vs : td?.vs ?? cc?.uBT ?? NaN;
+  const z = tp ? tp.z : td?.z;
+  const barras = (cc?.barras || []).map((b) => ({ nombre: b.nombre, ik3: b.ik3 / 1000, icu: b.icu || 0, cable: b.cable ? `${b.cable.paralelos > 1 ? `${b.cable.paralelos}× ` : ""}${textoConductor(b.cable.conductor)}, ${fmt(b.cable.longitud, 0)} m` : "" }));
+  if (!barras.length) barras.push({ nombre: e.barraManual || (vs > 1000 ? "Barra del secundario" : "Tablero general"), ik3: NaN, icu: 0, cable: "" });
+  const iCirc = Math.max(0, barras.findIndex((b) => b.nombre.trim().toLowerCase() === String(e.barraCircuitos || "").trim().toLowerCase()));
+  const barraC = e.barraCircuitos && barras.some((b) => b.nombre.trim().toLowerCase() === String(e.barraCircuitos).trim().toLowerCase()) ? iCirc : barras.length > 1 ? 1 : 0;
+  const circuitos = (ctx.conductores?.circuitos || []).map((c) => ({ nombre: c.circuito, desc: c.descripcion, In: c.In, conductor: `${c.material} ${N.etiquetaCalibre(c.calibre)}`, I: c.I }));
+  const fv = ctx.fvArreglo ? { kwp: ctx.fvArreglo.pdc, kw: ctx.fvArreglo.pac } : null;
+  const motores = cc?.motores || [];
+  const g = { tipo: "unifilar", red: { kv: kvRed, sk: cc?.sk }, protMT: e.proteccionMT || "", dps: e.dpsMT !== "No", medidor: e.medidor || "", trafo: Number.isFinite(kva) ? { kva, vp: kvRed, vs: vs / 1000, z, grupo: e.grupo || (tp ? "YNyn0(d)" : "Dyn5") } : null, barras, barraC, circuitos, fv, motores, subestacion: !!tp };
+  const elementos = [
+    ["Red del operador", `${fmt(kvRed, 1)} kV${cc?.sk ? `; S"k = ${fmt(cc.sk, 0)} MVA` : ""}`],
+    ...(g.dps ? [["DPS", "Descargadores de sobretensión en la llegada"]] : []),
+    ...(g.protMT ? [["Protección de media tensión", g.protMT]] : []),
+    ...(g.trafo ? [["Transformador", `${fmt(kva, 0)} kVA; ${fmt(kvRed, 1)} / ${fmt(vs / 1000, 3)} kV; ${g.trafo.grupo}${z ? `; Z = ${fmt(z, 1)} %` : ""}`]] : []),
+    ...(g.medidor ? [["Medida", g.medidor]] : []),
+    ...barras.map((b, i) => [i ? `Barra ${b.nombre}` : `Barra ${b.nombre} (bornes)`, `${b.cable ? `${b.cable}; ` : ""}${Number.isFinite(b.ik3) ? `Ik" = ${fmt(b.ik3, 2)} kA` : ""}${b.icu ? `; Icu = ${fmt(b.icu, 1)} kA` : ""}`]),
+    ...circuitos.map((c) => [`Circuito ${c.nombre}`, `${c.desc}; ${c.conductor}; protección ${c.In} A; ${fmt(c.I, 1)} A`]),
+    ...(fv ? [["Generación solar fotovoltaica", `${fmt(fv.kwp, 1)} kWp / ${fmt(fv.kw, 1)} kW AC`]] : []),
+    ...motores.map((m) => ["Grupo de motores", `${m.barra}: ${fmt(m.kw, 1)} kW`])
+  ];
+  const faltan = [!g.trafo && "transformador (cálculo del transformador o potencia digitada)", !(cc?.barras || []).length && "barras y cables (cálculo de cortocircuito)", !circuitos.length && "circuitos (cálculo de conductores)"].filter(Boolean);
+  return {
+    resumen: [{ etiqueta: "Elementos del diagrama", valor: String(elementos.length), unidad: "" }, { etiqueta: "Circuitos", valor: String(circuitos.length), unidad: "" }],
+    grafico: g,
+    tablas: [{ titulo: "Elementos del diagrama unifilar", encabezados: ["Elemento", "Características"], filas: elementos }],
+    pasos: [{ titulo: "Origen de los datos", formula: "El diagrama se genera con los cálculos del proyecto", sustitucion: "Transformador: cálculo del transformador o del transformador de potencia; barras, cables e Ik\": cortocircuito; circuitos: conductores y protecciones; generación: arreglo fotovoltaico", resultado: faltan.length ? `Faltan: ${faltan.join("; ")}` : "Completo" }],
+    verificaciones: [],
+    notas: ["El diagrama se actualiza solo cuando cambian los cálculos del proyecto. Para el plano de construcción (literal s), use este diagrama como base y complete la información de detalle (marcas, referencias y cuadros de cargas)."],
+    conclusion: faltan.length ? `Diagrama unifilar parcial: faltan ${faltan.join("; ")}.` : `Diagrama unifilar generado con ${circuitos.length} circuito(s) y ${barras.length} barra(s).`
+  };
+}
+
+export const CALCULOS = { cargas, conductores, regulacion, canalizaciones, transformador, cortocircuito, coordinacion, malla, rayos, aislamiento, distancias, mecanico, trafoPotencia, cableMT, apantallamiento, fvArreglo, fvProduccion, fvConductores, fvConexion, arcoElectrico, camposEM, conductorEconomico, armonicos, riesgoElectrico, nivelTension, unifilar };

@@ -6,6 +6,18 @@
 // Al mejorar un cálculo: actualice aquí su "metodo" y quite la limitación.
 
 export const ALCANCE = {
+  riesgoElectrico: {
+    metodo: "Matriz de análisis de riesgos del RETIE 2024 (Libro 1, Tabla 1.5.1.4.1.a): para cada riesgo se cruza la probabilidad (E a A) con la consecuencia (1 a 5) en personas, económicas, ambientales y de imagen, se toma el caso más crítico y se repite con las medidas de mitigación para obtener el riesgo residual; las decisiones salen de la Tabla 1.5.1.4.1.b.",
+    limitaciones: ["La identificación de los riesgos, la probabilidad y las consecuencias las define el diseñador: el aplicativo aplica la matriz, no reemplaza el criterio del ingeniero.", "El riesgo residual se valora con una sola consecuencia (la mayor después de las medidas) y una probabilidad."]
+  },
+  nivelTension: {
+    metodo: "Compara los niveles de tensión candidatos para la demanda proyectada: corriente, caída de tensión y pérdidas en la acometida con un conductor de referencia por nivel, y potencia máxima que el operador de red conecta en cada nivel; recomienda el menor nivel viable. Niveles según la CREG 015 de 2018 y tensiones de la NTC 1340.",
+    limitaciones: ["Los conductores de referencia, su capacidad y los límites de potencia del operador de red son datos de entrada (los de ejemplo son ilustrativos): tómelos de la norma del operador del área.", "No incluye el costo de la conexión ni la disponibilidad de la red, que definen la decisión final junto con la factibilidad del operador."]
+  },
+  unifilar: {
+    metodo: "Diagrama unifilar generado con los datos de los cálculos del proyecto: red del operador, DPS y protección de media tensión, transformador, medida, barras con sus cables y corrientes de cortocircuito, circuitos con su protección y calibre, tableros derivados y generación solar.",
+    limitaciones: ["Es un diagrama de una sola fuente y un transformador, con los circuitos que salen de una barra: no dibuja transferencias, plantas de emergencia, celdas de media tensión ni varios transformadores.", "No reemplaza el plano de construcción (literal s): úselo como base y complete marcas, referencias y cuadros de cargas."]
+  },
   cargas: {
     metodo: "Suma de cargas por circuito con factor de demanda, reparto por fase y corriente del alimentador con el 25 % del motor más grande (NTC 2050 Sección 220 y 430-24).",
     limitaciones: ["No calcula armónicos ni el factor K de cargas no lineales: si hay variadores, UPS o iluminación LED en gran cantidad, el literal c) debe complementarse.", "Los factores de demanda los define el diseñador; no se aplican automáticamente las tablas de la Sección 220."]
@@ -109,6 +121,7 @@ export const VALIDACION = [
   "Las curvas IEEE C37.112 reproducen los valores de la norma (VI: 0,6891 s con M = 10 y TD = 1; EI: 1,2967 s con M = 5) y la curva por puntos interpola exactamente en escala log-log. El aporte de motores coincide con c × (ILR/IrM) × IrM en sus bornes, y el Excel formulado (con funciones de números complejos) reproduce el cálculo de la pantalla.",
   "Campos electromagnéticos: el cálculo reproduce las soluciones analíticas de un conductor sobre el suelo (E en el suelo = 2V / (h ln(2h/r)) y B = μ0 I / (2π r)), el radio equivalente de haces y la simetría del perfil; el Excel (MINVERSE) da los mismos resultados.",
   "Armónicos: con el convertidor de 6 pulsos teórico da THD = 29,04 % y K = FHL = 8,30 (valores analíticos), los límites de la IEEE 519-2014 y la reducción de capacidad de la IEEE C57.110. Cálculo económico: Q coincide con la suma de la serie y en el límite económico entre dos calibres sus costos totales se igualan (IEC 60287-3-2 ec. 12 y 13). El Excel reproduce ambos cálculos.",
+  "Análisis de riesgos: la matriz reproduce la Tabla 1.5.1.4.1.a del RETIE 2024 (Libro 1). Nivel de tensión: la caída de tensión coincide con el cálculo manual ΔV % = S L (R cos φ + X sen φ) / (10 V²).",
   "El cálculo de malla se comprobó con el ejemplo 1 del Anexo B de la IEEE 80-2013 (Rg, Cs, tensión de contacto y tensión de malla coinciden).",
   "Las tablas normativas cargadas (NTC 2050, IEC, IEEE) se transcribieron de las normas citadas en cada hoja.",
   "Pendiente: validación independiente de cortocircuito y coordinación contra un estudio hecho con software comercial (ETAP o DIgSILENT), y revisión de una memoria completa por un organismo de inspección acreditado."
@@ -117,7 +130,7 @@ export const VALIDACION = [
 export const LIMITACIONES_GENERALES = [
   "AHÍNCO es una herramienta de cálculo y de verificación. La responsabilidad del diseño es del ingeniero que firma la memoria, que debe revisar los datos de entrada y los resultados.",
   "Los métodos son los de cálculo manual de las normas citadas, adecuados para memorias de distribución y para verificación de interventoría. Para subestaciones de alta tensión, el estudio definitivo de cortocircuito, coordinación y transitorios debe hacerse con software especializado.",
-  "No incluye todavía flujo de carga ni los riesgos por rayos R2 a R4 (servicio público, patrimonio cultural y pérdidas económicas): esos aspectos se desarrollan como texto.",
+  "No incluye todavía flujo de carga, planos de construcción ni los riesgos por rayos R2 a R4 (servicio público, patrimonio cultural y pérdidas económicas): esos aspectos se desarrollan como texto.",
   "Los datos marcados «(S)» son supuestos: quedan listados en la sección de hallazgos o pendientes y deben confirmarse antes de firmar.",
   "No guarda historial de versiones de un proyecto: use «Exportar proyecto» para conservar una copia de cada revisión."
 ];

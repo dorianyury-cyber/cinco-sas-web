@@ -346,3 +346,36 @@ export const ESPECTROS = {
 export const IEEE519_CORRIENTE = [[20, 4, 2, 1.5, 0.6, 0.3, 5], [50, 7, 3.5, 2.5, 1, 0.5, 8], [100, 10, 4.5, 4, 1.5, 0.7, 12], [1000, 12, 5.5, 5, 2, 1, 15], [Infinity, 15, 7, 6, 2.5, 1.4, 20]];
 // IEEE 519-2014 Tabla 1: distorsión de tensión (% individual, THD) según la tensión en el PCC.
 export const IEEE519_TENSION = [[1, 5, 8], [69, 3, 5], [161, 1.5, 2.5], [Infinity, 1, 1.5]];
+
+// ---------------------------------------------------------------- análisis de riesgos (literal a)
+// RETIE 2024 (Res. 40117) Libro 1, 1.5.1.4.1, Tabla 1.5.1.4.1.a: nivel de riesgo según la
+// consecuencia (1 a 5) y la probabilidad (E a A). Filas de la consecuencia 1 a la 5; columnas E, D, C, B, A.
+export const PROBABILIDADES = { E: "E — No ha ocurrido en el sector", D: "D — Ha ocurrido en el sector", C: "C — Ha ocurrido en la empresa", B: "B — Sucede varias veces al año en la empresa", A: "A — Sucede varias veces al mes en la empresa" };
+export const NIVELES_RIESGO = ["Muy bajo", "Bajo", "Medio", "Alto", "Muy alto"];
+export const MATRIZ_RIESGO = [
+  ["Muy bajo", "Bajo", "Bajo", "Bajo", "Medio"],
+  ["Bajo", "Bajo", "Medio", "Medio", "Medio"],
+  ["Bajo", "Medio", "Medio", "Medio", "Alto"],
+  ["Medio", "Medio", "Medio", "Alto", "Alto"],
+  ["Medio", "Alto", "Alto", "Alto", "Muy alto"]
+];
+// Descripción de cada consecuencia por clase (personas, económicas, ambientales, imagen).
+export const CONSECUENCIAS = {
+  personas: ["Molestia funcional (afecta el rendimiento laboral)", "Lesión menor (sin incapacidad)", "Incapacidad temporal (> 1 día)", "Incapacidad parcial permanente", "Una o más muertes"],
+  economicas: ["Daños leves; no interrupción", "Daños importantes; interrupción breve", "Daños severos; interrupción temporal", "Daños mayores; salida de subestación", "Daño grave en infraestructura; interrupción regional"],
+  ambientales: ["Sin efecto", "Efecto menor", "Contaminación localizada", "Contaminación mayor", "Contaminación irreparable"],
+  imagen: ["Interna", "Local", "Regional", "Nacional", "Internacional"]
+};
+// Tabla 1.5.1.4.1.b: decisiones y acciones por nivel de riesgo.
+export const DECISIONES_RIESGO = {
+  "Muy alto": "Inadmisible para trabajar: eliminar las fuentes potenciales, hacer reingeniería o minimizarlo y volver a valorarlo en grupo hasta reducirlo. Requiere permiso especial de trabajo (ATS aprobado por la alta dirección y PES).",
+  Alto: "Minimizarlo: buscar alternativas de menor riesgo, demostrar cómo se controla, aislar con barreras o distancia y usar EPP. Requiere permiso especial de trabajo (ATS y PT aprobados por el jefe del área).",
+  Medio: "Aceptarlo aplicando los sistemas de control (minimizar, aislar, EPP, procedimientos, protocolos y listas de verificación). Requiere permiso de trabajo.",
+  Bajo: "Asumirlo con control administrativo rutinario, siguiendo los procedimientos establecidos y usando EPP. No requiere permiso especial de trabajo.",
+  "Muy bajo": "Vigilar posibles cambios. No afecta la secuencia de las actividades."
+};
+export const FACTORES_RIESGO = ["Arco eléctrico", "Ausencia de electricidad", "Contacto directo", "Contacto indirecto", "Cortocircuito", "Electricidad estática", "Equipo defectuoso", "Rayos", "Sobrecarga", "Tensión de contacto", "Tensión de paso", "Tensiones transferidas", "Sobretensiones", "Incendio o explosión de origen eléctrico", "Otro"];
+export const nivelRiesgo = (consecuencia, probabilidad) => {
+  const c = Math.min(5, Math.max(1, Math.round(Number(consecuencia) || 1))), p = ["E", "D", "C", "B", "A"].indexOf(String(probabilidad || "E").toUpperCase());
+  return MATRIZ_RIESGO[c - 1][Math.max(0, p)];
+};

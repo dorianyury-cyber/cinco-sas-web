@@ -1080,6 +1080,7 @@ const HOJAS = {
     const ilD = h.dato("Corriente de demanda IL (0 = suma de las fundamentales)", n(e.corrienteDemanda, 0), "A");
     const sn = h.dato("Potencia del transformador", n(e.snTrafo, ctx.transformador?.sn ?? 0), "kVA"), pec = h.dato("Pérdidas por corrientes parásitas PEC-R", n(e.pec, 8), "%");
     const gs = vacias(e.grupos).filter((g) => n(g.corriente, 0) > 0);
+    if (!gs.length) { h.nota("Sin datos: agregue al menos un grupo de carga con su corriente fundamental para calcular los armónicos."); return; }
     h.seccion("Grupos de carga");
     const tg = h.tabla([{ t: "Grupo", v: (g) => String(g.grupo || ""), ancho: 24 }, { t: "Espectro", v: (g) => (N.ESPECTROS[g.espectro] || N.ESPECTROS.lineal).nombre, ancho: 30 },
       { t: "I fundamental (A)", v: (g) => n(g.corriente, 0), entrada: true }, { t: "Monofásica", v: (g) => (g.monofasica === "Sí" ? "Sí" : "No"), entrada: true, lista: ["Sí", "No"] }], gs);
@@ -1131,6 +1132,70 @@ const HOJAS = {
       { t: "THDv estimada en el PCC", f: thdv, u: "%" },
       { t: "Corriente en el neutro", texto: true, f: `ROUND(${inn},0)&" A ("&ROUND(${inn}/${I1}*100,0)&" % de la corriente de fase)"` }
     ]);
+  },
+  riesgoElectrico(wb, e) {
+    const h = new Hoja(wb, "a Riesgos eléctricos", "Análisis de riesgos de origen eléctrico (RETIE 2024 literal a; Libro 1, Tabla 1.5.1.4.1.a)");
+    const maxR = h.dato("Nivel máximo admitido para el riesgo residual", e.maximoResidual || "Medio", "", "Bajo o Medio");
+    h.ws.getCell(maxR.replace(/\$/g, "")).dataValidation = { type: "list", allowBlank: false, formulae: ['"Bajo,Medio"'] };
+    const NIV = '{"Muy bajo","Bajo","Medio","Alto","Muy alto"}';
+    const MAT = `{${N.MATRIZ_RIESGO.map((f) => f.map((x) => `"${x}"`).join(",")).join(";")}}`;
+    const nivel = (c, p) => `INDEX(${MAT},${c},MATCH(${p},{"E","D","C","B","A"},0))`;
+    const rango = (x) => `MATCH(${x},${NIV},0)`;
+    h.nota("Probabilidad: E no ha ocurrido en el sector; D ha ocurrido en el sector; C ha ocurrido en la empresa; B sucede varias veces al año en la empresa; A sucede varias veces al mes. Consecuencias de 1 (molestia funcional, daños leves, sin efecto, interna) a 5 (una o más muertes, daño grave, contaminación irreparable, internacional).");
+    const filasR = vacias(e.riesgos);
+    const decision = (x) => `CHOOSE(${rango(x)},${N.NIVELES_RIESGO.map((n) => `"${N.DECISIONES_RIESGO[n].replace(/"/g, "'")}"`).join(",")})`;
+    const t = h.tabla([
+      { t: "Riesgo (evento por factor en la fuente)", v: (r) => `${r.evento || "Riesgo"} por ${String(r.factor || "—").toLowerCase()}${r.fuente ? ` en ${r.fuente}` : ""}`, ancho: 30 },
+      { t: "Prob. (E a A)", v: (r) => String(r.probabilidad || "E"), entrada: true, lista: ["E", "D", "C", "B", "A"] },
+      { t: "Personas", v: (r) => n(r.personas, 1), entrada: true, lista: ["1", "2", "3", "4", "5"] }, { t: "Económicas", v: (r) => n(r.economicas, 1), entrada: true, lista: ["1", "2", "3", "4", "5"] },
+      { t: "Ambientales", v: (r) => n(r.ambientales, 1), entrada: true, lista: ["1", "2", "3", "4", "5"] }, { t: "Imagen", v: (r) => n(r.imagen, 1), entrada: true, lista: ["1", "2", "3", "4", "5"] },
+      { t: "Nivel sin medidas", v: (r, rr) => `=INDEX(${NIV},MAX(${["C", "D", "E", "F"].map((c) => rango(nivel(`${c}${rr}`, `B${rr}`))).join(",")}))` },
+      { t: "Medidas de mitigación", v: (r) => String(r.medidas || ""), entrada: true, ancho: 30 },
+      { t: "Prob. residual", v: (r) => String(r.probabilidadResidual || r.probabilidad || "E"), entrada: true, lista: ["E", "D", "C", "B", "A"] },
+      { t: "Cons. residual", v: (r) => n(r.consecuenciaResidual, Math.max(n(r.personas, 1), n(r.economicas, 1), n(r.ambientales, 1), n(r.imagen, 1))), entrada: true, lista: ["1", "2", "3", "4", "5"] },
+      { t: "Nivel residual", v: (r, rr) => `=${nivel(`J${rr}`, `I${rr}`)}` },
+      { t: "Resultado", v: (r, rr) => `=IF(${rango(`K${rr}`)}<=${rango(maxR)},"Cumple","No cumple")` },
+      { t: "Decisión y control (Tabla 1.5.1.4.1.b)", v: (r, rr) => `=${decision(`K${rr}`)}`, ancho: 40 }
+    ], filasR);
+    const R = (c) => `${c}${t.r0}:${c}${t.r1}`;
+    h.resumen([
+      { t: "Mayor riesgo sin medidas", texto: true, f: `INDEX(${NIV},_xlfn.AGGREGATE(14,6,MATCH(${R("G")},${NIV},0),1))` },
+      { t: "Mayor riesgo residual", texto: true, f: `INDEX(${NIV},_xlfn.AGGREGATE(14,6,MATCH(${R("K")},${NIV},0),1))` },
+      { t: "Riesgos evaluados", f: `COUNTA(${R("A")})`, u: "", fmt: "0" }
+    ]);
+  },
+  nivelTension(wb, e, r, p, ctx) {
+    const h = new Hoja(wb, "f Nivel de tensión", "Nivel de tensión requerido (RETIE 2024 literal f; CREG 015 de 2018; NTC 1340)");
+    const s0 = h.dato("Demanda máxima actual S0", n(e.demanda, NaN) > 0 ? n(e.demanda) : ctx.cargas?.sDemKVA ?? 0, "kVA", n(e.demanda, NaN) > 0 ? "" : "Del cuadro de cargas");
+    const g = h.dato("Crecimiento anual de la demanda", n(e.crecimiento, 0), "%"), na = h.dato("Horizonte de proyección", n(e.anios, 0), "años");
+    const fp = h.dato("Factor de potencia", n(e.fp, 0.9), ""), L = h.dato("Distancia al punto de conexión", n(e.distancia, 0) / 1000, "km"), dv = h.dato("Caída de tensión máxima", n(e.dvMax, 3), "%");
+    const S = h.calc("Demanda proyectada S", `${s0}*(1+${g}/100)^${na}`, "kVA"), sen = h.calc("sen φ", `SQRT(1-${fp}^2)`, "");
+    h.seccion("Comparación de niveles de tensión (de menor a mayor tensión)");
+    const cands = vacias(e.candidatos).filter((c) => n(c.tension, 0) > 0).sort((a, b) => n(a.tension) - n(b.tension));
+    const t = h.tabla([
+      { t: "Nivel", v: (c) => String(c.nivel || ""), ancho: 16 }, { t: "Tensión (kV)", v: (c) => n(c.tension), entrada: true, fmt: "0.000" },
+      { t: "Conductor de referencia", v: (c) => String(c.conductor || ""), entrada: true, ancho: 20 },
+      { t: "R (Ω/km)", v: (c) => n(c.r), entrada: true, fmt: "0.000" }, { t: "X (Ω/km)", v: (c) => n(c.x), entrada: true, fmt: "0.000" },
+      { t: "Capacidad (A)", v: (c) => n(c.capacidad), entrada: true, fmt: "0" }, { t: "Límite del operador (kVA)", v: (c) => n(c.limiteOR), entrada: true, fmt: "0" },
+      { t: "Nivel CREG", v: (c, rr) => `=IF(B${rr}<1,1,IF(B${rr}<30,2,IF(B${rr}<57.5,3,4)))`, fmt: "0" },
+      { t: "I (A)", v: (c, rr) => `=${S}/(SQRT(3)*B${rr})`, fmt: "0.0" },
+      { t: "ΔV (%)", v: (c, rr) => `=${S}*${L}*(D${rr}*${fp}+E${rr}*${sen})/(10*B${rr}^2)`, fmt: "0.00" },
+      { t: "Pérdidas (%)", v: (c, rr) => `=IF(${S}>0,3*I${rr}^2*D${rr}*${L}/1000/(${S}*${fp})*100,0)`, fmt: "0.00" },
+      { t: "Viabilidad", v: (c, rr) => `=IF(AND(OR(F${rr}=0,I${rr}<=F${rr}),J${rr}<=${dv},OR(G${rr}=0,${S}<=G${rr})),"Viable","No viable")` }
+    ], cands);
+    const R = (c) => `${c}${t.r0}:${c}${t.r1}`;
+    const rec = h.calc("Menor nivel viable", `IFERROR(INDEX(${R("A")},MATCH("Viable",${R("L")},0)),"Ninguno")`, "", "El primero viable en orden de tensión");
+    if (e.adoptado) {
+      const ad = h.dato("Nivel adoptado en el diseño", String(e.adoptado), "");
+      h.verif("Nivel adoptado viable (capacidad, caída de tensión y límite del operador)", `IFERROR(INDEX(${R("L")},MATCH(${ad},${R("A")},0))="Viable",FALSE)`, "RETIE 2024 literal f");
+    }
+    h.resumen([{ t: "Demanda proyectada", f: S, u: "kVA" }, { t: "Menor nivel de tensión viable", texto: true, f: rec }]);
+  },
+  unifilar(wb, e, r) {
+    const h = new Hoja(wb, "r Unifilar", "Diagrama unifilar — elementos (RETIE 2024 literal r)");
+    h.nota("El dibujo del diagrama unifilar está en la memoria PDF y Word. Esta hoja lista sus elementos con los datos de los cálculos del proyecto.");
+    h.tabla([{ t: "Elemento", v: (f) => f[0], ancho: 30 }, { t: "Características", v: (f) => f[1], ancho: 80 }], r.tablas?.[0]?.filas || []);
+    h.resumen([{ t: "Elementos del diagrama", f: String((r.tablas?.[0]?.filas || []).length), u: "", fmt: "0" }]);
   },
   conductorEconomico(wb, e) {
     const h = new Hoja(wb, "j Cálculo económico", "Cálculo económico de conductores (RETIE 2024 literal j; IEC 60287-3-2)");
@@ -1389,6 +1454,9 @@ const DESCRIPCION_HOJA = {
   aislamiento: "Selección del DPS y margen de protección del aislamiento",
   distancias: "Distancias mínimas de seguridad",
   mecanico: "Tensiones y flechas del conductor por cambio de estado",
+  riesgoElectrico: "Matriz de riesgos del RETIE: nivel sin medidas, medidas de mitigación y riesgo residual",
+  nivelTension: "Comparación de niveles de tensión para la demanda proyectada",
+  unifilar: "Elementos del diagrama unifilar (el dibujo está en la memoria)",
   armonicos: "Distorsión armónica de corriente y tensión, factor K y neutro (IEEE 519 / C57.110)",
   conductorEconomico: "Costo total por calibre en la vida útil y rango económico de corriente (IEC 60287-3-2)",
   camposEM: "Perfil de campo eléctrico y magnético a 1 m frente a los límites del RETIE 2024",
@@ -1513,14 +1581,15 @@ export async function construirLibro({ proyecto, resultados, guardados, rapido =
   // ---- hojas de cálculo en el orden de los literales
   const ctx = {};
   Object.entries(resultados).forEach(([k, r]) => { const m = r.modulo ?? k; if (r.salidas && !ctx[m]) ctx[m] = r.salidas; });
-  const orden = ["rayos", "apantallamiento", "cargas", "armonicos", "aislamiento", "cortocircuito", "arcoElectrico", "transformador", "trafoPotencia", "malla", "conductores", "conductorEconomico", "cableMT", "mecanico", "coordinacion", "canalizaciones", "regulacion", "distancias", "camposEM", "fvArreglo", "fvProduccion", "fvConductores", "fvConexion"];
+  const orden = ["riesgoElectrico", "rayos", "apantallamiento", "cargas", "armonicos", "nivelTension", "aislamiento", "cortocircuito", "arcoElectrico", "transformador", "trafoPotencia", "malla", "conductores", "conductorEconomico", "cableMT", "mecanico", "coordinacion", "canalizaciones", "regulacion", "distancias", "camposEM", "fvArreglo", "fvProduccion", "fvConductores", "fvConexion", "unifilar"];
   const indice = [];
   for (const m of orden) {
     for (const [clave, r] of Object.entries(resultados)) {
       if ((r.modulo ?? clave) !== m || !guardados[clave]?.entradas) continue;
       etiquetaActual = r.etiqueta || ""; moduloActual = m;
       const antes = hojasCreadas.length;
-      HOJAS[m](wb, guardados[clave].entradas, r, proyecto, ctx);
+      if (r.sinDatos) { const h = new Hoja(wb, MODULOS[m].titulo.slice(0, 24), MODULOS[m].titulo); h.nota(r.conclusion); } // sin datos: no se escriben fórmulas vacías
+      else HOJAS[m](wb, guardados[clave].entradas, r, proyecto, ctx);
       if (hojasCreadas.length > antes) indice.push({ hoja: hojasCreadas[hojasCreadas.length - 1].ws.name, texto: `${MODULOS[m].titulo}${r.etiqueta ? ` — ${r.etiqueta}` : ""}`, desc: DESCRIPCION_HOJA[m] || "" });
     }
   }
@@ -1560,6 +1629,8 @@ function i0Muestras(ws, filaPaso1) {
   return true;
 }
 
+// Nombre del archivo del Excel formulado (lo usa también el visor).
+export const nombreExcel = (datos) => `${datos.rapido ? "Calculo" : esVerificacion(datos.proyecto) ? "Verificacion" : "Memoria de calculo"} formulada - ${String(datos.proyecto.nombre || "proyecto").replace(/[\\/:*?"<>|]/g, "-").slice(0, 80)}.xlsx`;
 export async function descargarExcel(datos) {
   const { proyecto } = datos;
   const wb = await construirLibro(datos);

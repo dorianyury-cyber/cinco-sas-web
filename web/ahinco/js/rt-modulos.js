@@ -10,6 +10,7 @@ const CALIBRES_OP = N.CALIBRES.map((c) => ({ valor: c, texto: N.etiquetaCalibre(
 const SI_NO = lista(["Sí", "No"]);
 
 export const AREAS = {
+  gen: { nombre: "Generales del diseño", desc: "Análisis de riesgos eléctricos, nivel de tensión y diagrama unifilar", clase: "rt-area-gen" },
   bt: { nombre: "Baja tensión", desc: "Cargas, conductores, protecciones, regulación y canalizaciones", clase: "rt-area-bt" },
   mt: { nombre: "Media tensión", desc: "Transformadores, cortocircuito y coordinación de protecciones", clase: "rt-area-mt" },
   spt: { nombre: "Puesta a tierra y rayos", desc: "Malla de puesta a tierra y análisis de riesgo por rayos", clase: "rt-area-spt" },
@@ -18,6 +19,67 @@ export const AREAS = {
 };
 
 export const MODULOS = {
+  riesgoElectrico: {
+    area: "gen", icono: "⚠️", titulo: "Análisis de riesgos eléctricos", literalPrincipal: "a",
+    objeto: "Identificar los factores de riesgo de origen eléctrico de la instalación, valorarlos con la matriz del RETIE (probabilidad frente a consecuencias en personas, económicas, ambientales y de imagen) y definir las medidas para mitigarlos hasta un riesgo residual aceptable.",
+    normas: ["RETIE 2024 (Resolución 40117) Libro 1, 1.5.1.4: matriz de análisis de riesgos (Tabla 1.5.1.4.1.a) y decisiones (Tabla 1.5.1.4.1.b)", "RETIE 2024 — literal a) del diseño detallado"],
+    campos: [
+      { key: "maximoResidual", label: "Nivel máximo admitido para el riesgo residual", tipo: "select", opciones: lista(["Bajo", "Medio"]), def: "Medio" },
+      { key: "riesgos", label: "Riesgos (consecuencias de 1 a 5 en personas / económicas / ambientales / imagen)", tipo: "tabla", columnas: [
+        { key: "factor", label: "Factor de riesgo", tipo: "select", opciones: lista(N.FACTORES_RIESGO), ancho: 13 }, { key: "evento", label: "Evento o efecto", tipo: "texto", ancho: 11 }, { key: "fuente", label: "Fuente", tipo: "texto", ancho: 11 },
+        { key: "tipo", label: "Tipo", tipo: "select", opciones: lista(["Potencial", "Materializado"]), ancho: 8 },
+        { key: "probabilidad", label: "Prob.", tipo: "select", opciones: Object.entries(N.PROBABILIDADES).map(([valor, texto]) => ({ valor, texto })), ancho: 9 },
+        { key: "personas", label: "Pers.", tipo: "select", opciones: lista([1, 2, 3, 4, 5]), ancho: 5 }, { key: "economicas", label: "Econ.", tipo: "select", opciones: lista([1, 2, 3, 4, 5]), ancho: 5 },
+        { key: "ambientales", label: "Amb.", tipo: "select", opciones: lista([1, 2, 3, 4, 5]), ancho: 5 }, { key: "imagen", label: "Imagen", tipo: "select", opciones: lista([1, 2, 3, 4, 5]), ancho: 5 },
+        { key: "medidas", label: "Medidas de mitigación", tipo: "texto", ancho: 16 },
+        { key: "probabilidadResidual", label: "Prob. residual", tipo: "select", opciones: Object.entries(N.PROBABILIDADES).map(([valor, texto]) => ({ valor, texto })), ancho: 9 },
+        { key: "consecuenciaResidual", label: "Cons. residual", tipo: "select", opciones: lista([1, 2, 3, 4, 5]), ancho: 5 }
+      ], nueva: { factor: "Contacto directo", tipo: "Potencial", probabilidad: "D", personas: "3", economicas: "1", ambientales: "1", imagen: "1", probabilidadResidual: "E", consecuenciaResidual: "3" }, def: [
+        { factor: "Arco eléctrico", evento: "Quemaduras", fuente: "Celdas de media tensión", tipo: "Potencial", probabilidad: "D", personas: "5", economicas: "3", ambientales: "1", imagen: "3", medidas: "Estudio de arco eléctrico, rotulado, EPP por categoría, maniobra a distancia y protección instantánea", probabilidadResidual: "E", consecuenciaResidual: "3" },
+        { factor: "Contacto directo", evento: "Electrocución", fuente: "Tableros de baja tensión", tipo: "Potencial", probabilidad: "C", personas: "4", economicas: "1", ambientales: "1", imagen: "2", medidas: "Tableros con grado IP2X, barreras, señalización y bloqueo y etiquetado", probabilidadResidual: "E", consecuenciaResidual: "3" },
+        { factor: "Tensión de contacto", evento: "Electrocución", fuente: "Subestación y estructuras metálicas", tipo: "Potencial", probabilidad: "D", personas: "5", economicas: "2", ambientales: "1", imagen: "3", medidas: "Malla de puesta a tierra según IEEE 80 con capa superficial y equipotencialización", probabilidadResidual: "E", consecuenciaResidual: "4" },
+        { factor: "Rayos", evento: "Daño en equipos e incendio", fuente: "Edificación", tipo: "Potencial", probabilidad: "C", personas: "3", economicas: "3", ambientales: "1", imagen: "2", medidas: "SIPRA según el análisis de riesgo por rayos y DPS coordinados", probabilidadResidual: "D", consecuenciaResidual: "2" }
+      ] }
+    ]
+  },
+  nivelTension: {
+    area: "gen", icono: "📶", titulo: "Nivel de tensión requerido", literalPrincipal: "f",
+    objeto: "Determinar el nivel de tensión con el que debe alimentarse la instalación, comparando para la demanda proyectada la corriente, la caída de tensión y las pérdidas de cada nivel candidato y la potencia que el operador de red conecta en cada uno.",
+    normas: ["RETIE 2024 — literal f) del diseño detallado", "CREG 015 de 2018 (niveles de tensión 1 a 4)", "NTC 1340 (tensiones normalizadas)", "Norma técnica del operador de red del área"],
+    campos: [
+      { key: "demanda", label: "Demanda máxima actual (vacío = la del cuadro de cargas)", tipo: "numero", unidad: "kVA", def: "" },
+      { key: "crecimiento", label: "Crecimiento anual de la demanda", tipo: "numero", unidad: "%", def: 2 },
+      { key: "anios", label: "Horizonte de proyección", tipo: "numero", unidad: "años", def: 10 },
+      { key: "fp", label: "Factor de potencia", tipo: "numero", def: 0.9 },
+      { key: "distancia", label: "Distancia al punto de conexión de la red del operador", tipo: "numero", unidad: "m", def: 150 },
+      { key: "dvMax", label: "Caída de tensión máxima admitida en la acometida", tipo: "numero", unidad: "%", def: 3 },
+      { key: "adoptado", label: "Nivel adoptado en el diseño (nombre exacto de la tabla; opcional)", tipo: "texto", def: "MT 13,2 kV" },
+      { key: "candidatos", label: "Niveles candidatos (conductor de referencia de la acometida y límite de potencia del operador de red)", tipo: "tabla", columnas: [
+        { key: "nivel", label: "Nivel", tipo: "texto", ancho: 16 }, { key: "tension", label: "Tensión (kV)", tipo: "numero", ancho: 9 }, { key: "conductor", label: "Conductor de referencia", tipo: "texto", ancho: 18 },
+        { key: "r", label: "R (Ω/km)", tipo: "numero", ancho: 8 }, { key: "x", label: "X (Ω/km)", tipo: "numero", ancho: 8 }, { key: "capacidad", label: "Capacidad (A)", tipo: "numero", ancho: 9 }, { key: "limiteOR", label: "Límite del operador (kVA, 0 = sin límite)", tipo: "numero", ancho: 12 }
+      ], nueva: {}, def: [
+        { nivel: "BT 208 V", tension: 0.208, conductor: "Cu 2 × 4/0 AWG por fase", r: 0.103, x: 0.08, capacidad: 460, limiteOR: 75 },
+        { nivel: "BT 480 V", tension: 0.48, conductor: "Cu 4/0 AWG", r: 0.205, x: 0.16, capacidad: 230, limiteOR: 150 },
+        { nivel: "MT 13,2 kV", tension: 13.2, conductor: "ACSR 2/0 AWG", r: 0.447, x: 0.40, capacidad: 270, limiteOR: 0 },
+        { nivel: "MT 34,5 kV", tension: 34.5, conductor: "ACSR 4/0 AWG", r: 0.273, x: 0.42, capacidad: 340, limiteOR: 0 }
+      ] }
+    ]
+  },
+  unifilar: {
+    area: "gen", icono: "🔀", titulo: "Diagrama unifilar", literalPrincipal: "r",
+    objeto: "Generar el diagrama unifilar de la instalación con los datos de los cálculos del proyecto: red del operador, protección de media tensión, transformador, medida, barras y cables con sus corrientes de cortocircuito, circuitos con sus protecciones y calibres, y generación solar.",
+    normas: ["RETIE 2024 — literal r) del diseño detallado (diagramas unifilares)", "NTC 2050 y IEC 60617 (símbolos gráficos)"],
+    campos: [
+      { key: "tensionRed", label: "Tensión de la red (vacío = la del transformador o del cortocircuito)", tipo: "numero", unidad: "kV", def: "" },
+      { key: "potencia", label: "Potencia del transformador (vacío = la del cálculo del transformador)", tipo: "numero", unidad: "kVA", def: "" },
+      { key: "tensionSec", label: "Tensión del secundario (vacío = la del transformador)", tipo: "numero", unidad: "V", def: "" },
+      { key: "grupo", label: "Grupo de conexión (vacío = Dyn5 o YNyn0(d) en subestaciones)", tipo: "texto", def: "" },
+      { key: "proteccionMT", label: "Protección de media tensión", tipo: "texto", def: "Cortacircuitos con fusible tipo K" },
+      { key: "dpsMT", label: "DPS en la llegada", tipo: "select", opciones: SI_NO, def: "Sí" },
+      { key: "medidor", label: "Medida", tipo: "texto", def: "Medida semidirecta en baja tensión" },
+      { key: "barraCircuitos", label: "Barra de la que salen los circuitos (nombre del cortocircuito; vacío = la segunda barra)", tipo: "texto", def: "" }
+    ]
+  },
   cargas: {
     area: "bt", icono: "📋", titulo: "Cuadro de cargas y demanda",
     objeto: "Determinar la carga instalada, la demanda máxima, el balance de fases y la corriente de diseño del alimentador.",
@@ -582,7 +644,7 @@ export const MODULOS = {
 
 // Tablas sin las cuales el cálculo no tiene sentido (las demás son opcionales):
 // si están vacías no se calcula, para no dar conclusiones sin datos.
-export const TABLAS_REQUERIDAS = { cargas: ["circuitos"], conductores: ["circuitos"], regulacion: ["tramos"], canalizaciones: ["conductores"], coordinacion: ["protecciones", "fallas"], distancias: ["puntos"], mecanico: ["hipotesis"], cableMT: ["circuitos"], armonicos: ["grupos"], conductorEconomico: ["candidatos"], camposEM: ["conductores"], arcoElectrico: ["puntos"], apantallamiento: ["elementos"], fvConductores: ["circuitos"] };
+export const TABLAS_REQUERIDAS = { riesgoElectrico: ["riesgos"], nivelTension: ["candidatos"], cargas: ["circuitos"], conductores: ["circuitos"], regulacion: ["tramos"], canalizaciones: ["conductores"], coordinacion: ["protecciones", "fallas"], distancias: ["puntos"], mecanico: ["hipotesis"], cableMT: ["circuitos"], armonicos: ["grupos"], conductorEconomico: ["candidatos"], camposEM: ["conductores"], arcoElectrico: ["puntos"], apantallamiento: ["elementos"], fvConductores: ["circuitos"] };
 const conDatos = (filas) => (filas || []).some((f) => f && Object.values(f).some((v) => v !== "" && v != null));
 // Nombres de las tablas requeridas que están vacías.
 export const tablasFaltantes = (id, entradas) => (TABLAS_REQUERIDAS[id] || []).filter((k) => !conDatos(entradas?.[k])).map((k) => MODULOS[id].campos.find((c) => c.key === k).label.replace(/\s*\(.*\)\s*$/, ""));

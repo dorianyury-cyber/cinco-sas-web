@@ -9,12 +9,12 @@
 export const FUENTE_LITERALES = "RETIE (Res. 40117 de 2024 del MinEnergía), numeral 3.3.1.1 «Diseño detallado»";
 
 export const LITERALES = [
-  { l: "a", texto: "Análisis de riesgos de origen eléctrico y medidas para mitigarlos.", modulos: [], guia: "Describa los factores de riesgo potenciales o presentes (contacto directo e indirecto, arco, sobretensiones, incendio) y las medidas adoptadas para minimizarlos (parágrafo 3)." },
+  { l: "a", texto: "Análisis de riesgos de origen eléctrico y medidas para mitigarlos.", modulos: ["riesgoElectrico"], guia: "Describa los factores de riesgo potenciales o presentes (contacto directo e indirecto, arco, sobretensiones, incendio) y las medidas adoptadas para minimizarlos (parágrafo 3)." },
   { l: "b", texto: "Análisis de riesgos por descargas eléctricas atmosféricas (rayos) y medidas de protección.", modulos: ["rayos", "apantallamiento"] },
   { l: "c", texto: "Análisis y cálculo de cargas iniciales y futuras, incluyendo factor de potencia y armónicos.", modulos: ["cargas", "fvProduccion", "armonicos"], guia: "Cargas por circuito y, si hay cargas no lineales, el análisis de armónicos (IEEE 519) y el factor K del transformador." },
   { l: "d", texto: "Coordinación de aislamiento eléctrico.", modulos: ["aislamiento", "fvArreglo"] },
   { l: "e", texto: "Análisis y cálculos de cortocircuito, arco eléctrico y falla a tierra.", modulos: ["cortocircuito", "arcoElectrico"], guia: "Cortocircuito trifásico y falla a tierra (IEC 60909) y energía incidente por arco eléctrico con su frontera y EPP (IEEE 1584-2018)." },
-  { l: "f", texto: "Análisis del nivel tensión requerido.", modulos: [], guia: "Justifique el nivel de tensión de conexión según la demanda (literal c) y la disponibilidad del operador de red." },
+  { l: "f", texto: "Análisis del nivel tensión requerido.", modulos: ["nivelTension"], guia: "Justifique el nivel de tensión de conexión según la demanda (literal c) y la disponibilidad del operador de red." },
   { l: "g", texto: "Cálculos de campos electromagnéticos.", modulos: ["camposEM"], guia: "Perfil de campo eléctrico y magnético a 1 m del suelo frente a los límites del RETIE 2024 (Tabla 3.11.1.a); obligatorio en subestaciones de 57,5 kV o más y en edificaciones a menos de 15 m de partes de más de 100 kV." },
   { l: "h", texto: "Cálculo de transformadores incluyendo efectos de los armónicos y factor de potencia en la carga.", modulos: ["transformador", "trafoPotencia"] },
   { l: "i", texto: "Sistema de puesta a tierra.", modulos: ["malla"] },
@@ -26,7 +26,7 @@ export const LITERALES = [
   { l: "o", texto: "Cálculo de pérdidas de energía, teniendo en cuenta los efectos de armónicos y factor de potencia.", modulos: ["regulacion", "fvProduccion"] },
   { l: "p", texto: "Cálculos de regulación de tensión.", modulos: ["regulacion", "fvConductores", "fvConexion"] },
   { l: "q", texto: "Áreas clasificadas como peligrosas.", modulos: [], guia: "Indique si existen áreas clasificadas (NTC 2050 Sección 500) y su tratamiento." },
-  { l: "r", texto: "Diagramas unifilares.", modulos: [], guia: "Relacione los planos de diagramas unifilares que acompañan la memoria." },
+  { l: "r", texto: "Diagramas unifilares.", modulos: ["unifilar"], guia: "Relacione los planos de diagramas unifilares que acompañan la memoria." },
   { l: "s", texto: "Planos eléctricos para construcción.", modulos: [], guia: "Relacione los planos eléctricos de construcción (número y nombre)." },
   { l: "t", texto: "Especificaciones de construcción complementarias a los planos, incluyendo las de tipo técnico de equipos y materiales y sus condiciones particulares.", modulos: [] },
   { l: "u", texto: "Distancias de seguridad o servidumbre requeridas.", modulos: ["distancias"] },
