@@ -329,3 +329,20 @@ export const INSTALACIONES_MT = {
   enterradoTri: { nombre: "Cable tripolar directamente enterrado", cu: "83", al: "84", detalles: { 1: 5, 2: 6 } },
   enterradoTriplex: { nombre: "Cables unipolares en tríplex, directamente enterrados", cu: "85", al: "86", detalles: { 1: 7, 2: 8 } }
 };
+
+// ---------------------------------------------------------------- armónicos
+export const ORDENES_ARMONICOS = [3, 5, 7, 9, 11, 13, 15, 17, 19, 21, 23, 25];
+// Espectros de corriente (% de la fundamental). Los de convertidores son los teóricos (Ih = I1/h);
+// el de fuentes conmutadas es un espectro típico de computadores y debe confirmarse con medición.
+export const ESPECTROS = {
+  lineal: { nombre: "Lineal (sin armónicos)", h: {} },
+  p6: { nombre: "Convertidor de 6 pulsos (variadores, rectificadores; teórico 1/h)", h: { 5: 20, 7: 14.29, 11: 9.09, 13: 7.69, 17: 5.88, 19: 5.26, 23: 4.35, 25: 4 } },
+  p12: { nombre: "Convertidor de 12 pulsos (teórico 1/h)", h: { 11: 9.09, 13: 7.69, 23: 4.35, 25: 4 } },
+  smps: { nombre: "Fuente conmutada monofásica (computadores, LED; espectro típico)", h: { 3: 81.1, 5: 60.6, 7: 37, 9: 15.7, 11: 2.4, 13: 6.3, 15: 7.9, 17: 5, 19: 0.8, 21: 2, 23: 2.6, 25: 1.6 } },
+  personalizado: { nombre: "Personalizado (medición: «h:%; h:%»)", h: {} }
+};
+// IEEE 519-2014 Tabla 2 (120 V a 69 kV): límites de distorsión de corriente en % de IL según ISC/IL.
+// Columnas: ISC/IL hasta, h < 11, 11 ≤ h < 17, 17 ≤ h < 23, 23 ≤ h < 35, 35 ≤ h ≤ 50, TDD.
+export const IEEE519_CORRIENTE = [[20, 4, 2, 1.5, 0.6, 0.3, 5], [50, 7, 3.5, 2.5, 1, 0.5, 8], [100, 10, 4.5, 4, 1.5, 0.7, 12], [1000, 12, 5.5, 5, 2, 1, 15], [Infinity, 15, 7, 6, 2.5, 1.4, 20]];
+// IEEE 519-2014 Tabla 1: distorsión de tensión (% individual, THD) según la tensión en el PCC.
+export const IEEE519_TENSION = [[1, 5, 8], [69, 3, 5], [161, 1.5, 2.5], [Infinity, 1, 1.5]];

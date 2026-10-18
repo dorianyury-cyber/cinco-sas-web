@@ -50,6 +50,18 @@ export const ALCANCE = {
     metodo: "IEC 62305-2 / NTC 4552-2: componentes RA, RB, RU y RV del riesgo de pérdida de vidas humanas R1, con búsqueda de la combinación mínima de SIPRA y DPS.",
     limitaciones: ["Solo R1. No calcula R2 (servicio público), R3 (patrimonio) ni R4 (pérdidas económicas), ni las componentes RC, RM, RW y RZ, necesarias en hospitales, estructuras con riesgo de explosión o redes de servicio público.", "Una sola zona y una sola línea de servicio por estructura."]
   },
+  armonicos: {
+    metodo: "Espectro de corriente por grupo de carga (convertidores de 6 y 12 pulsos teóricos, fuentes conmutadas típicas o espectro medido), THDi y TDD frente a los límites de la IEEE 519-2014 según ISC/IL, distorsión de tensión estimada en el PCC, factor K (UL 1561) y capacidad del transformador con armónicos (IEEE C57.110), y corriente en el neutro por armónicos triples.",
+    limitaciones: ["Las corrientes armónicas de los grupos se suman en forma aritmética (sin diversidad de ángulos), lo que da el caso más desfavorable.", "La distorsión de tensión supone una fuente inductiva sin resonancias: no modela bancos de condensadores ni filtros (verifique la resonancia paralela h ≈ √(Scc / Qc)).", "Los espectros de convertidores son teóricos y el de fuentes conmutadas es típico: el estudio definitivo debe usar mediciones del sitio (IEEE 519 se evalúa con mediciones en el PCC)."]
+  },
+  conductorEconomico: {
+    metodo: "IEC 60287-3-2: costo total en la vida útil por calibre (costo instalado más valor presente de las pérdidas Joule con crecimiento de carga y de precio y tasa de descuento), con resistencia a la temperatura media de operación, rango económico de corriente de cada calibre y selección del de menor costo entre los que tienen capacidad de corriente suficiente.",
+    limitaciones: ["Los costos instalados por metro los digita el usuario (los de ejemplo son ilustrativos).", "La resistencia AC es la de la NTC 2050 Cap. 9 Tabla 9 en tubo de PVC, corregida a la temperatura media; no incluye pérdidas en pantallas ni armaduras de cables de media tensión.", "El calibre económico es una recomendación: el RETIE exige el cálculo, no que se adopte el calibre de menor costo."]
+  },
+  camposEM: {
+    metodo: "Perfil lateral a 1 m del suelo (o a la altura indicada): campo eléctrico por simulación de cargas con imágenes (coeficientes de potencial de Maxwell, haces con radio equivalente, cables de guarda a tierra) y densidad de flujo magnético por Biot-Savart, frente a los límites del público y ocupacional del RETIE 2024 (Tabla 3.11.1.a); identifica las zonas de más de 200 µT y de más de 1000 µT.",
+    limitaciones: ["Conductores rectos, paralelos e infinitos a la altura del punto más bajo de la flecha (caso más desfavorable); no modela la catenaria en 3D, los extremos de los vanos ni estructuras metálicas cercanas.", "El suelo es plano y conductor para el campo eléctrico; para el campo magnético se desprecian las imágenes y la corriente inducida en los cables de guarda (ambas lo reducen levemente).", "En subestaciones, los barrajes y conexiones se modelan como conductores de este perfil: para geometrías complejas (equipos, transformadores, edificaciones cercanas) use software 3D."]
+  },
   arcoElectrico: {
     metodo: "Modelo empírico de la IEEE 1584-2018 para sistemas trifásicos de 0,208 a 15 kV: corriente de arco por interpolación entre 600, 2700 y 14 300 V (ecuación 25 en BT), corriente reducida por el factor de variación, factor de tamaño del encerramiento y energía incidente con el mayor valor entre corriente plena y reducida; frontera de arco a 1,2 cal/cm² y categoría de EPP según NFPA 70E.",
     limitaciones: ["Fuera de 0,208 a 15 kV (por ejemplo 34,5 kV o más) el modelo no aplica: el punto se marca «Fuera del modelo» y debe usarse otro método (NFPA 70E Anexo D, método de Lee o software especializado).", "Los tiempos de despeje se toman de la protección de la coordinación indicada en cada punto (curvas IEC y tiempo instantáneo, más la apertura del interruptor, con máximo de 2 s), o se digitan: no se modelan fusibles, curvas ANSI ni la protección de baja tensión propia del tablero si no está en la coordinación.", "Solo sistemas trifásicos de corriente alterna: no cubre arco en corriente continua (bancos de baterías, arreglos fotovoltaicos) ni sistemas monofásicos.", "Las dimensiones de encerramiento, la separación entre electrodos y la distancia de trabajo vacías toman los valores típicos de la Tabla 8 de la norma: confírmelas con el fabricante del equipo."]
@@ -95,6 +107,8 @@ export const VALIDACION = [
   "La interpretación de las mediciones Wenner en dos capas reproduce la Tabla 3 de la IEEE 81-2012 (ρ1 = 300 Ω·m, h = 6,1 m, ρ2 = 100 Ω·m y su inversa): el ajuste da 300,1 / 100,2 Ω·m y 6,08 m. La resistividad equivalente ρa(av2) coincide con la Tabla E.1 de la IEEE 80 (193 Ω·m) y el factor de división calculado con el ejemplo de la IEEE 80 §15.9 (Zeq de la línea 4,22 + j1,04 Ω; Sf 0,36 frente a 0,37 publicado).",
   "Las capacidades de corriente de cables de media tensión son las de las Tablas 310.60(C)(77) a (86) de la NEC 2017 (iguales en la NTC 2050), contrastadas celda por celda con las verificaciones publicadas por CalcWare. El tiempo de arco tomado de la coordinación coincide con el cálculo manual de la curva IEC.",
   "Las curvas IEEE C37.112 reproducen los valores de la norma (VI: 0,6891 s con M = 10 y TD = 1; EI: 1,2967 s con M = 5) y la curva por puntos interpola exactamente en escala log-log. El aporte de motores coincide con c × (ILR/IrM) × IrM en sus bornes, y el Excel formulado (con funciones de números complejos) reproduce el cálculo de la pantalla.",
+  "Campos electromagnéticos: el cálculo reproduce las soluciones analíticas de un conductor sobre el suelo (E en el suelo = 2V / (h ln(2h/r)) y B = μ0 I / (2π r)), el radio equivalente de haces y la simetría del perfil; el Excel (MINVERSE) da los mismos resultados.",
+  "Armónicos: con el convertidor de 6 pulsos teórico da THD = 29,04 % y K = FHL = 8,30 (valores analíticos), los límites de la IEEE 519-2014 y la reducción de capacidad de la IEEE C57.110. Cálculo económico: Q coincide con la suma de la serie y en el límite económico entre dos calibres sus costos totales se igualan (IEC 60287-3-2 ec. 12 y 13). El Excel reproduce ambos cálculos.",
   "El cálculo de malla se comprobó con el ejemplo 1 del Anexo B de la IEEE 80-2013 (Rg, Cs, tensión de contacto y tensión de malla coinciden).",
   "Las tablas normativas cargadas (NTC 2050, IEC, IEEE) se transcribieron de las normas citadas en cada hoja.",
   "Pendiente: validación independiente de cortocircuito y coordinación contra un estudio hecho con software comercial (ETAP o DIgSILENT), y revisión de una memoria completa por un organismo de inspección acreditado."
@@ -103,7 +117,7 @@ export const VALIDACION = [
 export const LIMITACIONES_GENERALES = [
   "AHÍNCO es una herramienta de cálculo y de verificación. La responsabilidad del diseño es del ingeniero que firma la memoria, que debe revisar los datos de entrada y los resultados.",
   "Los métodos son los de cálculo manual de las normas citadas, adecuados para memorias de distribución y para verificación de interventoría. Para subestaciones de alta tensión, el estudio definitivo de cortocircuito, coordinación y transitorios debe hacerse con software especializado.",
-  "No incluye todavía: campos electromagnéticos, flujo de carga y armónicos, ni cálculo económico de conductores; esos literales se desarrollan como texto.",
+  "No incluye todavía flujo de carga ni los riesgos por rayos R2 a R4 (servicio público, patrimonio cultural y pérdidas económicas): esos aspectos se desarrollan como texto.",
   "Los datos marcados «(S)» son supuestos: quedan listados en la sección de hallazgos o pendientes y deben confirmarse antes de firmar.",
   "No guarda historial de versiones de un proyecto: use «Exportar proyecto» para conservar una copia de cada revisión."
 ];
@@ -115,5 +129,6 @@ export const MEJORAS = [
   ["Media", "Historial de versiones del proyecto y comparación entre revisiones de la memoria."],
   ["Media", "Coordinación con bandas de tolerancia de fusibles e interruptores de BT, reconectadores y protección diferencial; protección combinada de varios captadores en el apantallamiento."],
   ["Media", "Fotovoltaica: horas sol pico mensuales, simulación horaria con la curva de carga del usuario, varias orientaciones, sombras, módulos bifaciales y flujo de caja con los beneficios de la Ley 1715."],
-  ["Baja", "Riesgo por rayos R2 a R4, armónicos y factor K, cálculo económico de conductores y campos electromagnéticos."]
+  ["Media", "Riesgo por rayos R2 a R4 con los componentes de sistemas internos (RC, RM, RW, RZ) de la NTC 4552-2 / IEC 62305-2."],
+  ["Baja", "Flujo de carga; campos electromagnéticos en 3D para subestaciones con geometría compleja."]
 ];

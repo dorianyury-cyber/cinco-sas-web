@@ -360,6 +360,81 @@ export const MODULOS = {
       ] }
     ]
   },
+  armonicos: {
+    area: "bt", icono: "〰️", titulo: "Armónicos y factor K", literalPrincipal: "c",
+    objeto: "Estimar la distorsión armónica de corriente y de tensión que producen las cargas no lineales, verificar los límites de la IEEE 519 en el punto de conexión, y calcular el factor K y la capacidad del transformador con armónicos y la corriente en el neutro.",
+    normas: ["RETIE 2024 — literal c) del diseño detallado (cargas, factor de potencia y armónicos)", "IEEE 519-2014 (límites de distorsión armónica)", "IEEE C57.110 / UL 1561 (transformadores con corrientes no sinusoidales, factor K)", "NTC 2050 310-15(b)(4) (neutro con armónicos)"],
+    campos: [
+      { key: "tension", label: "Tensión línea-línea en el punto de conexión (vacío = la del transformador)", tipo: "numero", unidad: "V", def: 208 },
+      { key: "isc", label: "Corriente de cortocircuito en el punto de conexión (vacío = la del cálculo de cortocircuito)", tipo: "numero", unidad: "kA", def: 20 },
+      { key: "corrienteDemanda", label: "Corriente de demanda máxima IL (vacío = suma de las fundamentales)", tipo: "numero", unidad: "A", def: "" },
+      { key: "snTrafo", label: "Potencia del transformador (vacío = la del cálculo del transformador)", tipo: "numero", unidad: "kVA", def: 150 },
+      { key: "pec", label: "Pérdidas por corrientes parásitas del transformador PEC-R (seco ≈ 8 a 15 %; aceite ≈ 1 a 5 %)", tipo: "numero", unidad: "%", def: 8 },
+      { key: "grupos", label: "Grupos de carga (corriente fundamental por fase; espectro personalizado: «h:%; h:%»)", tipo: "tabla", columnas: [
+        { key: "grupo", label: "Grupo", tipo: "texto", ancho: 20 }, { key: "espectro", label: "Espectro", tipo: "select", opciones: op(N.ESPECTROS), ancho: 30 },
+        { key: "corriente", label: "I fundamental (A)", tipo: "numero", ancho: 12 }, { key: "monofasica", label: "Monofásica", tipo: "select", opciones: SI_NO, ancho: 10 },
+        { key: "personalizado", label: "Espectro personalizado", tipo: "texto", ancho: 28 }
+      ], nueva: { espectro: "lineal", monofasica: "No" }, def: [
+        { grupo: "Computadores e iluminación LED", espectro: "smps", corriente: 25, monofasica: "Sí" },
+        { grupo: "Variadores de bombas", espectro: "p6", corriente: 40, monofasica: "No" },
+        { grupo: "Cargas lineales", espectro: "lineal", corriente: 300, monofasica: "No" }
+      ] }
+    ]
+  },
+  conductorEconomico: {
+    area: "bt", icono: "💰", titulo: "Cálculo económico de conductores", literalPrincipal: "j",
+    objeto: "Seleccionar el calibre que minimiza el costo total durante la vida útil —inversión inicial más el valor presente de las pérdidas de energía—, con el rango económico de corriente de cada calibre, y verificar el calibre de diseño.",
+    normas: ["RETIE 2024 — literal j) del diseño detallado (cálculo económico de conductores)", "IEC 60287-3-2 (optimización económica de la sección de cables)", "NTC 2050 Cap. 9 Tabla 9 y Tabla 310-16"],
+    campos: [
+      { key: "material", label: "Material", tipo: "select", opciones: lista(["Cu", "Al"]), def: "Cu" },
+      { key: "imax", label: "Corriente máxima del primer año", tipo: "numero", unidad: "A", def: 180 },
+      { key: "longitud", label: "Longitud del circuito", tipo: "numero", unidad: "m", def: 80 },
+      { key: "np", label: "Conductores con corriente por circuito (3 trifásico, 2 monofásico)", tipo: "numero", def: 3 },
+      { key: "nc", label: "Circuitos iguales", tipo: "numero", def: 1 },
+      { key: "tempMax", label: "Temperatura máxima del conductor", tipo: "select", opciones: [{ valor: "75", texto: "75 °C" }, { valor: "90", texto: "90 °C" }], def: "75" },
+      { key: "tempAmb", label: "Temperatura ambiente media", tipo: "numero", unidad: "°C", def: 30 },
+      { key: "factorPerdidas", label: "Factor de pérdidas μ (T = μ × 8760 h)", tipo: "numero", def: 0.4 },
+      { key: "precioEnergia", label: "Precio de la energía", tipo: "numero", unidad: "$/kWh", def: 900 },
+      { key: "cargoDemanda", label: "Cargo por capacidad (0 si no aplica)", tipo: "numero", unidad: "$/kW-año", def: 0 },
+      { key: "vida", label: "Vida útil", tipo: "numero", unidad: "años", def: 25 },
+      { key: "descuento", label: "Tasa de descuento (real, sin inflación)", tipo: "numero", unidad: "%", def: 8 },
+      { key: "crecimientoCarga", label: "Crecimiento anual de la carga", tipo: "numero", unidad: "%", def: 1 },
+      { key: "crecimientoPrecio", label: "Crecimiento anual real del precio de la energía", tipo: "numero", unidad: "%", def: 0 },
+      { key: "crecimientoPerdidas", label: "Crecimiento anual del factor de pérdidas", tipo: "numero", unidad: "%", def: 0 },
+      { key: "calibreDiseno", label: "Calibre de diseño a verificar (opcional)", tipo: "select", opciones: [{ valor: "", texto: "—" }, ...CALIBRES_OP], def: "3/0" },
+      { key: "candidatos", label: "Calibres candidatos y costo instalado del circuito por metro (conductores, canalización y mano de obra; valores de ejemplo)", tipo: "tabla", columnas: [
+        { key: "calibre", label: "Calibre", tipo: "select", opciones: CALIBRES_OP, ancho: 50 }, { key: "costo", label: "Costo instalado ($/m de circuito)", tipo: "numero", ancho: 50 }
+      ], nueva: {}, def: [
+        { calibre: "2/0", costo: 150000 }, { calibre: "3/0", costo: 185000 }, { calibre: "4/0", costo: 228000 }, { calibre: "250", costo: 268000 }, { calibre: "350", costo: 360000 }, { calibre: "500", costo: 500000 }
+      ] }
+    ]
+  },
+  camposEM: {
+    area: "at", icono: "🧲", titulo: "Campos electromagnéticos", literalPrincipal: "g",
+    objeto: "Calcular el perfil lateral del campo eléctrico y de la densidad de flujo magnético a 1 m sobre el suelo, bajo líneas y en subestaciones, y verificar los valores límite de exposición del público y ocupacional del RETIE.",
+    normas: ["RETIE 2024 (Resolución 40117) Libro 3, Título 11, art. 3.11.1 y Tabla 3.11.1.a", "EPRI — Transmission Line Reference Book (simulación de cargas, Biot-Savart)", "IEEE 644 (medición de campos de líneas de potencia)"],
+    campos: [
+      { key: "alturaMedida", label: "Altura de cálculo sobre el suelo", tipo: "numero", unidad: "m", def: 1 },
+      { key: "servidumbre", label: "Ancho total de la zona de servidumbre (0 = sin servidumbre, todo es público)", tipo: "numero", unidad: "m", def: 20 },
+      { key: "xDesde", label: "Perfil desde (distancia al eje)", tipo: "numero", unidad: "m", def: -30 },
+      { key: "xHasta", label: "Perfil hasta", tipo: "numero", unidad: "m", def: 30 },
+      { key: "paso", label: "Paso del perfil", tipo: "numero", unidad: "m", def: 1 },
+      { key: "ePublico", label: "Límite de campo eléctrico, público", tipo: "numero", unidad: "kV/m", def: 4.16 },
+      { key: "bPublico", label: "Límite de densidad de flujo magnético, público", tipo: "numero", unidad: "µT", def: 200 },
+      { key: "eOcupacional", label: "Límite de campo eléctrico, ocupacional (8 h)", tipo: "numero", unidad: "kV/m", def: 8.3 },
+      { key: "bOcupacional", label: "Límite de densidad de flujo magnético, ocupacional (8 h)", tipo: "numero", unidad: "µT", def: 1000 },
+      { key: "conductores", label: "Conductores (altura en el punto más bajo de la flecha; tensión 0 = cable de guarda)", tipo: "tabla", columnas: [
+        { key: "conductor", label: "Conductor", tipo: "texto", ancho: 14 }, { key: "x", label: "x (m)", tipo: "numero", ancho: 8 }, { key: "y", label: "Altura (m)", tipo: "numero", ancho: 8 },
+        { key: "diametro", label: "Diámetro (mm)", tipo: "numero", ancho: 9 }, { key: "subconductores", label: "Subcond.", tipo: "numero", ancho: 8 }, { key: "separacion", label: "Separación haz (mm)", tipo: "numero", ancho: 9 },
+        { key: "tension", label: "Tensión F-F (kV)", tipo: "numero", ancho: 9 }, { key: "angulo", label: "Ángulo (°)", tipo: "numero", ancho: 8 }, { key: "corriente", label: "Corriente (A)", tipo: "numero", ancho: 9 }
+      ], nueva: { subconductores: 1, angulo: 0 }, def: [
+        { conductor: "Fase A", x: -3.5, y: 14, diametro: 21.8, subconductores: 1, separacion: 0, tension: 115, angulo: 0, corriente: 400 },
+        { conductor: "Fase B", x: 3.5, y: 14, diametro: 21.8, subconductores: 1, separacion: 0, tension: 115, angulo: -120, corriente: 400 },
+        { conductor: "Fase C", x: 0, y: 17.5, diametro: 21.8, subconductores: 1, separacion: 0, tension: 115, angulo: 120, corriente: 400 },
+        { conductor: "Cable de guarda", x: 0, y: 21, diametro: 9.5, subconductores: 1, separacion: 0, tension: 0, angulo: 0, corriente: 0 }
+      ] }
+    ]
+  },
   arcoElectrico: {
     area: "mt", icono: "🔥", titulo: "Arco eléctrico (IEEE 1584-2018)", literalPrincipal: "e",
     objeto: "Calcular la corriente de arco, la energía incidente y la frontera de arco en los puntos de trabajo energizado, y definir la categoría de equipo de protección personal (EPP) requerida.",

@@ -41,6 +41,7 @@ Datos en Firestore: `rtProyectos/{id}` y `rtProyectos/{id}/calculos/{clave}` (`c
 - Cables de MT: los valores de `AMPACIDAD_MT` se extrajeron de las verificaciones de CalcWare (NEC 2017) y se compararon celda por celda (0 diferencias); dos erratas de la NEC impresa (Tabla 85 Det. 7 350 kcmil 105 °C: 580 → 530; Tabla 84 Det. 6 6 AWG 35 kV 105 °C: 95 → 87) se reemplazaron por el valor coherente con el cálculo Neher-McGrath.
 - Arco con tiempos de la coordinación: `tiempoArcoDesdeRele()` coincide con el cálculo manual de la curva IEC (2,33 kA en SI 200 A TMS 0,1 → 328 ms con 50 ms de apertura) y con el Excel.
 - Coordinación: curvas IEEE C37.112 (VI 0,6891 s con M = 10, TD = 1; EI 1,2967 s con M = 5) y curva por puntos (interpolación log-log exacta en el punto medio geométrico). Cortocircuito: aporte de motores = c × (ILR/IrM) × IrM en bornes; motores aguas abajo aportan a las barras de aguas arriba; Excel = pantalla.
+- Campos EM: soluciones analíticas de un conductor (E en el suelo = 2V/(h ln(2h/r)); B = μ0 I/(2π r)), radio equivalente de haces y simetría. Armónicos: 6 pulsos teórico (THD 29,04 %, K 8,30). Cálculo económico: Q cerrado = suma; igualdad de CT en los límites económicos. Excel = pantalla en los tres.
 - **Pendiente:** validación independiente de cortocircuito y coordinación contra un estudio en ETAP o DIgSILENT, y revisión de una memoria completa por un organismo de inspección acreditado.
 
 ## 3. Limitaciones conocidas por cálculo
@@ -63,6 +64,10 @@ Datos en Firestore: `rtProyectos/{id}` y `rtProyectos/{id}/calculos/{clave}` (`c
 | FV — producción | Energía anual con un solo valor de HSP (sin simulación horaria ni transposición al plano); simultaneidad supuesta; economía indicativa sin flujo de caja. | `fvProduccion()`; agregar HSP mensual y curva de carga |
 | FV — conductores | Incremento de temperatura por sol digitado; Tabla 310-16 para todos los casos; no dimensiona seccionador DC ni caja combinadora. | `fvConductores()` |
 | FV — conexión | Sin flujo de carga del circuito; capacidad disponible, Sk y ajustes los da el operador de red; no reemplaza el estudio de conexión simplificado (> 0,1 MW). | `fvConexion()`; `AJUSTES_IEEE1547` en `rt-normas.js` |
+| Campos EM (literal g) | Conductores rectos e infinitos a la altura de la flecha; suelo plano; sin corrientes inducidas en guardas. | `camposEM()`, `camposPerfil()`; Excel con MINVERSE |
+| Armónicos (literal c) | Suma aritmética de grupos; THDv sin resonancias; espectros teóricos o típicos. | `armonicos()`, `ESPECTROS` e `IEEE519_*` en `rt-normas.js` |
+| Cálculo económico (literal j) | Costos digitados; resistencia de la Tabla 9; sin pérdidas en pantallas. | `conductorEconomico()`, `factorEconomico()` |
+| Riesgo por rayos R2 a R4 | No implementado: requiere los componentes RC, RM, RW y RZ con las tablas de la NTC 4552-2 / IEC 62305-2. | `rayos()` |
 | Proyecto | Sin historial de versiones (se usa «Exportar»). | `rt-core.js` (subcolección de versiones) |
 
 ## 4. Mejoras pendientes (en orden)
@@ -75,4 +80,4 @@ Datos en Firestore: `rtProyectos/{id}` y `rtProyectos/{id}/calculos/{clave}` (`c
 6. **Cortocircuito**: redes malladas o con varias fuentes; corriente de corte Ib e Ik permanente.
 7. **Coordinación**: bandas de tolerancia de fusibles e interruptores de BT, reconectadores; apantallamiento con varios captadores.
 8. **Fotovoltaica avanzada**: HSP mensual (IDEAM / NASA POWER), simulación horaria con la curva de carga del usuario, varias orientaciones, sombras, bifaciales y flujo de caja con los beneficios de la Ley 1715.
-9. **Otros**: riesgo R2 a R4, armónicos y factor K, cálculo económico de conductores (literal j), campos electromagnéticos (literal g).
+9. **Otros**: riesgo R2 a R4 (requiere las tablas de la NTC 4552-2 para RC, RM, RW y RZ), flujo de carga, campos EM en 3D.

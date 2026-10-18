@@ -1327,4 +1327,214 @@ export function arcoElectrico(e, proyecto = {}, ctx = {}) {
   };
 }
 
-export const CALCULOS = { cargas, conductores, regulacion, canalizaciones, transformador, cortocircuito, coordinacion, malla, rayos, aislamiento, distancias, mecanico, trafoPotencia, cableMT, apantallamiento, fvArreglo, fvProduccion, fvConductores, fvConexion, arcoElectrico };
+// ================================================================ 21. CAMPOS ELECTROMAGNÉTICOS (RETIE)
+// Campo eléctrico por simulación de cargas con imágenes (coeficientes de potencial de Maxwell)
+// y campo magnético por Biot-Savart sin imágenes (la profundidad de retorno por tierra a 60 Hz
+// es de cientos de metros), para conductores rectos e infinitos a la altura de la flecha.
+const EPS0 = 8.854187817e-12, MU0 = 4e-7 * Math.PI;
+function resolverLineal(A, b) {
+  const n = b.length, M = A.map((f, i) => [...f, b[i]]);
+  for (let k = 0; k < n; k++) {
+    let p = k;
+    for (let i = k + 1; i < n; i++) if (Math.abs(M[i][k]) > Math.abs(M[p][k])) p = i;
+    [M[k], M[p]] = [M[p], M[k]];
+    for (let i = k + 1; i < n; i++) { const f = M[i][k] / M[k][k]; for (let j = k; j <= n; j++) M[i][j] -= f * M[k][j]; }
+  }
+  const x = new Array(n).fill(0);
+  for (let i = n - 1; i >= 0; i--) { let s = M[i][n]; for (let j = i + 1; j < n; j++) s -= M[i][j] * x[j]; x[i] = s / M[i][i]; }
+  return x;
+}
+// Radio equivalente de un haz de n subconductores de diámetro d (mm) con separación s (mm).
+export const radioEquivalente = (dmm, n = 1, smm = 0) => { const r = dmm / 2000; if (n <= 1) return r; const R = smm / 1000 / (2 * Math.sin(Math.PI / n)); return Math.pow(n * r * Math.pow(R, n - 1), 1 / n); };
+export function camposPerfil(conds, puntos, yp = 1) {
+  const n = conds.length;
+  const P = conds.map((a, i) => conds.map((b, j) => (i === j ? Math.log((2 * a.y) / a.req) : Math.log(Math.hypot(a.x - b.x, a.y + b.y) / Math.hypot(a.x - b.x, a.y - b.y))) / (2 * Math.PI * EPS0)));
+  const vre = conds.map((c) => c.v * Math.cos(c.ang)), vim = conds.map((c) => c.v * Math.sin(c.ang));
+  const qre = resolverLineal(P, vre), qim = resolverLineal(P, vim);
+  const k = 1 / (2 * Math.PI * EPS0);
+  return { P, qre, qim, perfil: puntos.map((xp) => {
+    let exr = 0, exi = 0, eyr = 0, eyi = 0, bxr = 0, bxi = 0, byr = 0, byi = 0;
+    conds.forEach((c, i) => {
+      const dx = xp - c.x, d1 = dx * dx + (yp - c.y) ** 2, d2 = dx * dx + (yp + c.y) ** 2;
+      const fx = k * (dx / d1 - dx / d2), fy = k * ((yp - c.y) / d1 - (yp + c.y) / d2);
+      exr += qre[i] * fx; exi += qim[i] * fx; eyr += qre[i] * fy; eyi += qim[i] * fy;
+      const g = MU0 / (2 * Math.PI * d1), ir = c.i * Math.cos(c.ang), ii = c.i * Math.sin(c.ang);
+      bxr += -ir * (yp - c.y) * g; bxi += -ii * (yp - c.y) * g; byr += ir * dx * g; byi += ii * dx * g;
+    });
+    return { x: xp, E: Math.sqrt(exr ** 2 + exi ** 2 + eyr ** 2 + eyi ** 2) / 1000, B: Math.sqrt(bxr ** 2 + bxi ** 2 + byr ** 2 + byi ** 2) * 1e6 };
+  }) };
+}
+export function puntosPerfil(desde, hasta, paso, borde) {
+  const s = new Set();
+  for (let x = desde; x <= hasta + 1e-9; x += paso) s.add(Math.round(x * 1000) / 1000);
+  if (borde > 0) { s.add(-borde); s.add(borde); }
+  return [...s].sort((a, b) => a - b);
+}
+export function camposEM(e) {
+  const yp = num(e.alturaMedida, 1), anchoServ = num(e.servidumbre, 0), borde = anchoServ / 2;
+  const lim = { eP: num(e.ePublico, 4.16), bP: num(e.bPublico, 200), eO: num(e.eOcupacional, 8.3), bO: num(e.bOcupacional, 1000) };
+  const conds = filas(e.conductores).map((c) => ({ nombre: c.conductor || "", x: num(c.x, 0), y: num(c.y, 10), req: radioEquivalente(num(c.diametro, 20), num(c.subconductores, 1), num(c.separacion, 0)), v: (num(c.tension, 0) * 1000) / Math.sqrt(3), ang: (num(c.angulo, 0) * Math.PI) / 180, i: num(c.corriente, 0), d: num(c.diametro, 20) })).filter((c) => c.y > 0);
+  if (!conds.length) return { resumen: [], tablas: [], pasos: [], verificaciones: [], conclusion: "Agregue los conductores." };
+  const pts = puntosPerfil(num(e.xDesde, -30), num(e.xHasta, 30), Math.max(0.1, num(e.paso, 1)), borde);
+  const { perfil } = camposPerfil(conds, pts, yp);
+  const maxDe = (f, filtro = () => true) => perfil.filter(filtro).reduce((m, p) => (p[f] > (m?.[f] ?? -1) ? p : m), null);
+  const eMax = maxDe("E"), bMax = maxDe("B");
+  const dentro = (p) => borde <= 0 || Math.abs(p.x) <= borde + 1e-9, enBorde = (p) => borde > 0 && Math.abs(Math.abs(p.x) - borde) < 1e-6, fuera = (p) => borde <= 0 || Math.abs(p.x) >= borde - 1e-9;
+  const eDentro = maxDe("E", dentro), bDentro = maxDe("B", dentro), eFuera = maxDe("E", fuera), bFuera = maxDe("B", fuera);
+  const verificaciones = [];
+  if (borde > 0) {
+    verificaciones.push({ criterio: "Campo eléctrico dentro de la servidumbre (exposición ocupacional)", norma: "RETIE 2024 art. 3.11.1, Tabla 3.11.1.a", valor: `${fmt(eDentro.E, 2)} kV/m`, limite: `≤ ${fmt(lim.eO, 2)} kV/m`, cumple: eDentro.E <= lim.eO });
+    verificaciones.push({ criterio: "Densidad de flujo magnético dentro de la servidumbre (exposición ocupacional)", norma: "RETIE 2024 art. 3.11.1, Tabla 3.11.1.a", valor: `${fmt(bDentro.B, 1)} µT`, limite: `≤ ${fmt(lim.bO, 0)} µT`, cumple: bDentro.B <= lim.bO });
+  }
+  verificaciones.push({ criterio: borde > 0 ? "Campo eléctrico desde el borde de la servidumbre hacia afuera (público)" : "Campo eléctrico en todo el perfil (público)", norma: "RETIE 2024 art. 3.11.1, Tabla 3.11.1.a", valor: `${fmt(eFuera.E, 2)} kV/m`, limite: `≤ ${fmt(lim.eP, 2)} kV/m`, cumple: eFuera.E <= lim.eP });
+  verificaciones.push({ criterio: borde > 0 ? "Densidad de flujo magnético desde el borde de la servidumbre hacia afuera (público)" : "Densidad de flujo magnético en todo el perfil (público)", norma: "RETIE 2024 art. 3.11.1, Tabla 3.11.1.a", valor: `${fmt(bFuera.B, 1)} µT`, limite: `≤ ${fmt(lim.bP, 0)} µT`, cumple: bFuera.B <= lim.bP });
+  const z200 = perfil.filter((p) => p.B > 200), z1000 = perfil.filter((p) => p.B > 1000);
+  const rango = (z) => `de ${fmt(Math.min(...z.map((p) => p.x)), 1)} a ${fmt(Math.max(...z.map((p) => p.x)), 1)} m del eje`;
+  const zonas = [...(z200.length ? [`Zona con más de 200 µT (${rango(z200)}): debe señalarse en el plano (RETIE 2024 art. 3.11.1).`] : []), ...(z1000.length ? [`Zona con más de 1000 µT (${rango(z1000)}): acceso restringido (RETIE 2024 art. 3.11.1).`] : [])];
+  const muestra = perfil.filter((p, i) => enBorde(p) || i % Math.max(1, Math.round(perfil.length / 25)) === 0 || p === eMax || p === bMax);
+  return {
+    resumen: [
+      { etiqueta: "Campo eléctrico máximo", valor: fmt(eMax.E, 2), unidad: "kV/m" },
+      { etiqueta: "Densidad de flujo magnético máxima", valor: fmt(bMax.B, 1), unidad: "µT" },
+      ...(borde > 0 ? [{ etiqueta: "En el borde de la servidumbre (E / B)", valor: `${fmt(maxDe("E", enBorde).E, 2)} / ${fmt(maxDe("B", enBorde).B, 1)}`, unidad: "kV/m / µT" }] : [])
+    ],
+    tablas: [
+      { titulo: "Conductores", encabezados: ["Conductor", "x (m)", "Altura (m)", "Radio equivalente (mm)", "Tensión fase-tierra (kV)", "Ángulo (°)", "Corriente (A)"], filas: conds.map((c) => [c.nombre, fmt(c.x, 2), fmt(c.y, 2), fmt(c.req * 1000, 2), fmt(c.v / 1000, 2), fmt((c.ang * 180) / Math.PI, 0), fmt(c.i, 0)]) },
+      { titulo: `Perfil lateral a ${fmt(yp, 2)} m sobre el suelo`, encabezados: ["Distancia al eje (m)", "E (kV/m)", "B (µT)", "Zona"], filas: muestra.map((p) => [fmt(p.x, 1), fmt(p.E, 3), fmt(p.B, 2), borde > 0 ? (enBorde(p) ? "Borde de la servidumbre" : dentro(p) ? "Servidumbre" : "Público") : "—"]) }
+    ],
+    pasos: [
+      { titulo: "Cargas de los conductores", formula: "[q] = [P]⁻¹ [V]; Pii = ln(2 hi / req) / (2π ε0); Pij = ln(D'ij / Dij) / (2π ε0)", sustitucion: "Coeficientes de potencial de Maxwell con imágenes en el suelo; haces con radio equivalente req = (n r R^(n−1))^(1/n); cables de guarda a potencial cero", resultado: `${conds.length} conductores` },
+      { titulo: "Campo eléctrico", formula: "E = Σ qi / (2π ε0) × (r − ri) / |r − ri|² − (r − ri') / |r − ri'|² (con la imagen ri')", sustitucion: `Componentes horizontal y vertical como fasores; E = √(|Ex|² + |Ey|²) a ${fmt(yp, 2)} m`, resultado: `Máximo ${fmt(eMax.E, 2)} kV/m en x = ${fmt(eMax.x, 1)} m` },
+      { titulo: "Densidad de flujo magnético", formula: "B = Σ μ0 Ii / (2π |r − ri|) (Biot-Savart, sin imágenes)", sustitucion: "Corrientes de fase como fasores; la corriente inducida en los cables de guarda se desprecia", resultado: `Máximo ${fmt(bMax.B, 1)} µT en x = ${fmt(bMax.x, 1)} m` }
+    ],
+    verificaciones,
+    notas: ["Límites del RETIE 2024 (Resolución 40117, Libro 3, art. 3.11.1, Tabla 3.11.1.a), calculados a 1 m sobre el suelo: público 4,16 kV/m y 200 µT; ocupacional (8 h) 8,3 kV/m y 1000 µT.", ...zonas, "En edificaciones a menos de 15 m de partes energizadas de más de 100 kV, el RETIE exige calcular los campos en fachadas, balcones, azoteas y ventanas: agregue esos puntos con la altura de medida correspondiente.", "La altura de los conductores es la del punto más bajo de la catenaria (caso más desfavorable). Para subestaciones, modele los barrajes como conductores."],
+    conclusion: veredicto(verificaciones, `Los campos cumplen los límites de exposición: máximo ${fmt(eMax.E, 2)} kV/m y ${fmt(bMax.B, 1)} µT.`, "Hay puntos del perfil que superan los límites de exposición: aumente la altura o la servidumbre, o cambie la disposición de las fases.")
+  };
+}
+
+// ================================================================ 22. CÁLCULO ECONÓMICO DE CONDUCTORES (IEC 60287-3-2)
+// CT = CI + I²max × RL × L × F; F = Np × Nc × (T × P + D) × Q / (1 + i/100);
+// Q = Σ r^(n−1) = (1 − r^N)/(1 − r); r = (1 + a/100)² (1 + b/100)(1 + c/100)/(1 + i/100).
+// RL a la temperatura (θ − θa)/3 + θa (IEC 60287-3-2 §4), a partir de la resistencia AC a 75 °C de
+// la NTC 2050 Cap. 9 Tabla 9 (tubo de PVC).
+export function factorEconomico({ np = 3, nc = 1, T, P, D = 0, N, a = 0, b = 0, c = 0, i }) {
+  const r = (Math.pow(1 + a / 100, 2) * (1 + b / 100) * (1 + c / 100)) / (1 + i / 100);
+  const Q = Math.abs(r - 1) < 1e-12 ? N : (1 - Math.pow(r, N)) / (1 - r);
+  return { r, Q, F: (np * nc * (T * P + D) * Q) / (1 + i / 100) };
+}
+export function conductorEconomico(e) {
+  const mat = e.material === "Al" ? "Al" : "Cu", imax = num(e.imax, 150), L = num(e.longitud, 100);
+  const tmax = num(e.tempMax, 75), ta = num(e.tempAmb, 30), tm = (tmax - ta) / 3 + ta, k0 = mat === "Cu" ? 234.5 : 228;
+  const mu = num(e.factorPerdidas, 0.5), T = mu * 8760;
+  const P = num(e.precioEnergia, 900) / 1000, D = num(e.cargoDemanda, 0) / 1000; // COP/Wh y COP/(W·año)
+  const ef = factorEconomico({ np: num(e.np, 3), nc: num(e.nc, 1), T, P, D, N: num(e.vida, 25), a: num(e.crecimientoCarga, 1), b: num(e.crecimientoPrecio, 0), c: num(e.crecimientoPerdidas, 0), i: num(e.descuento, 8) });
+  const col = tmax >= 90 ? 2 : tmax >= 75 ? 1 : 0;
+  const cand = filas(e.candidatos).map((f) => {
+    const cal = String(f.calibre), t9 = N.TABLA9[cal], S = N.SECCION_MM2[cal] || 0;
+    const r75 = t9 ? t9[mat === "Cu" ? 2 : 4] : NaN, RL = (r75 * (k0 + tm)) / (k0 + 75) / 1000; // Ω/m
+    const CI = num(f.costo, 0) * L, CJ = imax * imax * RL * L * ef.F;
+    const amp = (N.AMPACIDAD[mat][cal] || [])[col] ?? NaN;
+    return { cal, S, RL, CI, CJ, CT: CI + CJ, amp, adm: amp >= imax };
+  }).filter((c) => c.S > 0 && Number.isFinite(c.RL)).sort((p, q) => p.S - q.S);
+  // Rango económico de corriente de cada calibre (IEC 60287-3-2 ec. 12 y 13).
+  cand.forEach((c, k) => {
+    const lim = (o) => (o ? Math.sqrt(Math.abs(c.CI - o.CI) / (ef.F * L * Math.abs(o.RL - c.RL))) : NaN);
+    c.iInf = k > 0 ? lim(cand[k - 1]) : 0; c.iSup = k < cand.length - 1 ? lim(cand[k + 1]) : Infinity;
+  });
+  const adm = cand.filter((c) => c.adm);
+  const eco = adm.reduce((m, c) => (c.CT < (m?.CT ?? Infinity) ? c : m), null), tec = adm[0];
+  const verificaciones = [];
+  const prop = String(e.calibreDiseno || "");
+  const cp = cand.find((c) => c.cal === prop);
+  const enRango = cp && imax >= cp.iInf - 1e-9 && imax <= cp.iSup + 1e-9;
+  const notaDiseno = cp ? [enRango ? `El calibre de diseño ${N.etiquetaCalibre(prop)} está en su rango económico de corriente (${fmt(cp.iInf, 0)} a ${Number.isFinite(cp.iSup) ? fmt(cp.iSup, 0) : "∞"} A).` : `El calibre de diseño ${N.etiquetaCalibre(prop)} no es el económico: su rango económico es ${fmt(cp.iInf, 0)} a ${Number.isFinite(cp.iSup) ? fmt(cp.iSup, 0) : "∞"} A y la corriente es ${fmt(imax, 0)} A; con ${eco ? N.etiquetaCalibre(eco.cal) : "otro calibre"} el costo total en la vida útil baja ${eco ? fmt((cp.CT - eco.CT) / 1e6, 2) : "—"} millones (recomendación, no requisito del RETIE).`] : [];
+  if (cp) verificaciones.push({ criterio: `Calibre de diseño ${N.etiquetaCalibre(prop)} con capacidad de corriente suficiente`, norma: "NTC 2050 Tabla 310-16", valor: `${fmt(imax, 0)} A`, limite: `≤ ${fmt(cp.amp, 0)} A`, cumple: cp.adm });
+  return {
+    resumen: eco ? [
+      { etiqueta: "Calibre económico", valor: N.etiquetaCalibre(eco.cal), unidad: "" },
+      { etiqueta: "Costo total en la vida útil", valor: fmt(eco.CT / 1e6, 2), unidad: "millones" },
+      ...(tec && tec !== eco ? [{ etiqueta: "Ahorro frente al calibre mínimo técnico", valor: fmt((tec.CT - eco.CT) / 1e6, 2), unidad: "millones" }] : [])
+    ] : [],
+    tablas: [{ titulo: "Costo total por calibre (valor presente)", encabezados: ["Calibre", "S (mm²)", `RL a ${fmt(tm, 1)} °C (Ω/km)`, "Capacidad (A)", "CI (millones)", "CJ (millones)", "CT (millones)", "Rango económico (A)"], filas: cand.map((c) => [N.etiquetaCalibre(c.cal) + (c === eco ? " ★" : ""), fmt(c.S, 1), fmt(c.RL * 1000, 4), `${fmt(c.amp, 0)}${c.adm ? "" : " (insuficiente)"}`, fmt(c.CI / 1e6, 2), fmt(c.CJ / 1e6, 2), fmt(c.CT / 1e6, 2), `${fmt(c.iInf, 0)} a ${Number.isFinite(c.iSup) ? fmt(c.iSup, 0) : "∞"}`]) }],
+    pasos: [
+      { titulo: "Factor económico", formula: "F = Np × Nc × (T × P + D) × Q / (1 + i/100); Q = (1 − r^N)/(1 − r); r = (1 + a/100)² (1 + b/100)(1 + c/100)/(1 + i/100)", sustitucion: `T = ${fmt(mu, 2)} × 8760 = ${fmt(T, 0)} h/año; P = ${fmt(P * 1000, 1)} $/kWh; N = ${fmt(num(e.vida, 25), 0)} años; i = ${fmt(num(e.descuento, 8), 1)} %; r = ${fmt(ef.r, 5)}; Q = ${fmt(ef.Q, 3)}`, resultado: `F = ${fmt(ef.F, 2)} $/W` },
+      { titulo: "Resistencia de operación", formula: "RL a θm = (θ − θa)/3 + θa; RL(θm) = R75 × (k + θm)/(k + 75)", sustitucion: `θ = ${fmt(tmax, 0)} °C; θa = ${fmt(ta, 0)} °C; k = ${k0} (${mat})`, resultado: `θm = ${fmt(tm, 1)} °C` },
+      { titulo: "Costo total por calibre", formula: "CT = CI + I²max × RL × L × F", sustitucion: `Imax = ${fmt(imax, 0)} A; L = ${fmt(L, 0)} m`, resultado: eco ? `Mínimo: ${N.etiquetaCalibre(eco.cal)}` : "Sin calibres con capacidad suficiente" },
+      { titulo: "Rango económico de corriente", formula: "I = √((CI − CI1) / (F × L × (RL1 − RL)))", sustitucion: "Límite inferior con el calibre menor y superior con el mayor (IEC 60287-3-2 ec. 12 y 13)", resultado: "Por calibre" }
+    ],
+    verificaciones,
+    notas: [...notaDiseno, "Los costos instalados por metro de circuito son datos del proyecto (cotizaciones de conductor, canalización y mano de obra); los valores de ejemplo son ilustrativos.", "El calibre económico suele ser mayor que el mínimo por capacidad de corriente: la inversión adicional se recupera con menores pérdidas durante la vida útil."],
+    conclusion: eco ? (verificaciones.length ? veredicto(verificaciones, `El calibre de menor costo total en la vida útil es ${N.etiquetaCalibre(eco.cal)} (${fmt(eco.CT / 1e6, 2)} millones)${enRango ? "; el calibre de diseño está en su rango económico" : ""}.`, "El calibre de diseño no tiene capacidad de corriente suficiente.") : `El calibre de menor costo total en la vida útil es ${N.etiquetaCalibre(eco.cal)} (${fmt(eco.CT / 1e6, 2)} millones).`) : "Ningún calibre candidato tiene capacidad de corriente suficiente."
+  };
+}
+
+// ================================================================ 23. ARMÓNICOS Y FACTOR K (IEEE 519 / IEEE C57.110)
+// Corrientes armónicas de cada grupo de carga sumadas en forma aritmética por orden (conservador);
+// THDi, TDD, distorsión de tensión estimada en el PCC (Vh % = 100 × h × Ih / Isc), factor K
+// (UL 1561), factor de pérdidas armónicas FHL y reducción de capacidad del transformador
+// (IEEE C57.110), y corriente en el neutro por armónicos triples de cargas monofásicas.
+export function espectroGrupo(g) {
+  const base = g.espectro === "personalizado" ? Object.fromEntries(N.puntosCurva(String(g.personalizado || "").replace(/%/g, ""))) : (N.ESPECTROS[g.espectro] || N.ESPECTROS.lineal).h;
+  return Object.fromEntries(N.ORDENES_ARMONICOS.map((h) => [h, num(base[h], 0)]));
+}
+export function limitesIEEE519(iscIl, kv) {
+  const c = N.IEEE519_CORRIENTE.find(([hasta]) => iscIl < hasta) || N.IEEE519_CORRIENTE.at(-1);
+  const v = N.IEEE519_TENSION.find(([hasta]) => kv <= hasta) || N.IEEE519_TENSION.at(-1);
+  const ind = (h) => (h < 11 ? c[1] : h < 17 ? c[2] : h < 23 ? c[3] : h < 35 ? c[4] : c[5]);
+  return { ind, tdd: c[6], vInd: v[1], thdv: v[2] };
+}
+export function armonicos(e, proyecto = {}, ctx = {}) {
+  const V = num(e.tension, ctx.transformador?.vs ?? 208);
+  const grupos = filas(e.grupos).map((g) => ({ nombre: g.grupo || "", I1: num(g.corriente, 0), mono: g.monofasica === "Sí", esp: espectroGrupo(g), tipo: (N.ESPECTROS[g.espectro] || N.ESPECTROS.lineal).nombre })).filter((g) => g.I1 > 0);
+  if (!grupos.length) return { resumen: [], tablas: [], pasos: [], verificaciones: [], conclusion: "Agregue los grupos de carga." };
+  const I1 = grupos.reduce((s, g) => s + g.I1, 0);
+  const Ih = Object.fromEntries(N.ORDENES_ARMONICOS.map((h) => [h, grupos.reduce((s, g) => s + (g.I1 * g.esp[h]) / 100, 0)]));
+  const sumH2 = N.ORDENES_ARMONICOS.reduce((s, h) => s + Ih[h] ** 2, 0);
+  const Irms = Math.sqrt(I1 * I1 + sumH2), thdi = (Math.sqrt(sumH2) / I1) * 100;
+  const IL = num(e.corrienteDemanda, NaN) > 0 ? num(e.corrienteDemanda) : I1;
+  const iscKA = num(e.isc, NaN) > 0 ? num(e.isc) : (ctx.cortocircuito?.barras?.[0]?.ik3 ?? NaN) / 1000;
+  const Isc = iscKA * 1000, ratio = Isc / IL, tdd = (Math.sqrt(sumH2) / IL) * 100;
+  const lim = limitesIEEE519(Number.isFinite(ratio) ? ratio : 0, V / 1000);
+  const vh = Object.fromEntries(N.ORDENES_ARMONICOS.map((h) => [h, Number.isFinite(Isc) ? (100 * h * Ih[h]) / Isc : NaN]));
+  const thdv = Math.sqrt(N.ORDENES_ARMONICOS.reduce((s, h) => s + (vh[h] || 0) ** 2, 0));
+  const sumH2h2 = N.ORDENES_ARMONICOS.reduce((s, h) => s + (Ih[h] * h) ** 2, 0);
+  const K = (I1 * I1 + sumH2h2) / (Irms * Irms), FHL = K; // con todas las corrientes, K (UL 1561) = FHL (IEEE C57.110)
+  const sn = num(e.snTrafo, ctx.transformador?.sn ?? NaN), pec = num(e.pec, 8) / 100;
+  const iR = (sn * 1000) / (Math.sqrt(3) * V), fRed = Math.sqrt((1 + pec) / (1 + FHL * pec));
+  const triples = [3, 9, 15, 21];
+  const In = 3 * Math.sqrt(triples.reduce((s, h) => s + grupos.filter((g) => g.mono).reduce((t, g) => t + (g.I1 * g.esp[h]) / 100, 0) ** 2, 0));
+  const verificaciones = [];
+  if (Number.isFinite(ratio)) {
+    verificaciones.push({ criterio: "Distorsión total de demanda de corriente TDD en el PCC", norma: `IEEE 519-2014 Tabla 2 (ISC/IL = ${fmt(ratio, 0)})`, valor: `${fmt(tdd, 1)} %`, limite: `≤ ${fmt(lim.tdd, 1)} %`, cumple: tdd <= lim.tdd + 1e-9 });
+    const peorH = N.ORDENES_ARMONICOS.reduce((m, h) => { const p = (Ih[h] / IL) * 100 / lim.ind(h); return p > m.p ? { h, p } : m; }, { h: 0, p: -1 });
+    if (peorH.h) verificaciones.push({ criterio: `Armónico individual de corriente más exigido (orden ${peorH.h})`, norma: "IEEE 519-2014 Tabla 2", valor: `${fmt((Ih[peorH.h] / IL) * 100, 2)} %`, limite: `≤ ${fmt(lim.ind(peorH.h), 1)} %`, cumple: peorH.p <= 1 + 1e-9 });
+    verificaciones.push({ criterio: "Distorsión armónica total de tensión THDv estimada en el PCC", norma: "IEEE 519-2014 Tabla 1", valor: `${fmt(thdv, 2)} %`, limite: `≤ ${fmt(lim.thdv, 1)} %`, cumple: thdv <= lim.thdv });
+  }
+  if (Number.isFinite(iR) && iR > 0) verificaciones.push({ criterio: "Corriente de la carga frente a la capacidad reducida del transformador por armónicos", norma: `IEEE C57.110 (FHL = ${fmt(FHL, 2)}, PEC-R = ${fmt(pec * 100, 0)} %)`, valor: `${fmt(Irms, 0)} A`, limite: `≤ ${fmt(fRed * iR, 0)} A (${fmt(fRed * 100, 1)} % de ${fmt(iR, 0)} A)`, cumple: Irms <= fRed * iR });
+  const H = N.ORDENES_ARMONICOS;
+  return {
+    resumen: [
+      { etiqueta: "THD de corriente", valor: fmt(thdi, 1), unidad: "%" },
+      { etiqueta: "Factor K", valor: fmt(K, 2), unidad: "" },
+      ...(Number.isFinite(thdv) && thdv > 0 ? [{ etiqueta: "THDv estimada en el PCC", valor: fmt(thdv, 2), unidad: "%" }] : []),
+      { etiqueta: "Corriente en el neutro por armónicos triples", valor: fmt(In, 0), unidad: "A" }
+    ],
+    tablas: [
+      { titulo: "Grupos de carga", encabezados: ["Grupo", "Espectro", "I fundamental (A)", "Monofásica"], filas: grupos.map((g) => [g.nombre, g.tipo, fmt(g.I1, 1), g.mono ? "Sí" : "No"]) },
+      { titulo: "Espectro total de corriente", encabezados: ["Orden h", "Ih (A)", "Ih / I1 (%)", "Ih / IL (%)", "Límite IEEE 519 (%)", "Vh estimada (%)"], filas: H.filter((h) => Ih[h] > 0).map((h) => [String(h), fmt(Ih[h], 2), fmt((Ih[h] / I1) * 100, 2), fmt((Ih[h] / IL) * 100, 2), Number.isFinite(ratio) ? fmt(lim.ind(h), 1) : "—", Number.isFinite(vh[h]) ? fmt(vh[h], 2) : "—"]) }
+    ],
+    pasos: [
+      { titulo: "Distorsión de corriente", formula: "THDi = √(Σ Ih²) / I1; TDD = √(Σ Ih²) / IL", sustitucion: `I1 = ${fmt(I1, 1)} A; IL = ${fmt(IL, 1)} A (corriente de demanda); Irms = ${fmt(Irms, 1)} A`, resultado: `THDi = ${fmt(thdi, 1)} %; TDD = ${fmt(tdd, 1)} %` },
+      { titulo: "Distorsión de tensión en el PCC", formula: "Vh % = 100 × h × Ih / Isc; THDv = √(Σ Vh²) (fuente inductiva, sin resonancias)", sustitucion: Number.isFinite(Isc) ? `Isc = ${fmt(iscKA, 2)} kA; ISC/IL = ${fmt(ratio, 0)}` : "Sin corriente de cortocircuito", resultado: Number.isFinite(thdv) ? `THDv = ${fmt(thdv, 2)} %` : "—" },
+      { titulo: "Factor K y FHL", formula: "K = Σ (Ih / Irms)² h²; FHL = Σ (Ih/I1)² h² / Σ (Ih/I1)² (iguales con el espectro completo)", sustitucion: "UL 1561 / IEEE C57.110", resultado: `K = ${fmt(K, 2)}` },
+      { titulo: "Capacidad del transformador con armónicos", formula: "Imax / IR = √((1 + PEC-R) / (1 + FHL × PEC-R))", sustitucion: Number.isFinite(iR) ? `Sn = ${fmt(sn, 0)} kVA; IR = ${fmt(iR, 0)} A; PEC-R = ${fmt(pec * 100, 0)} %` : "Sin transformador", resultado: `${fmt(fRed * 100, 1)} % de la capacidad nominal` },
+      { titulo: "Corriente en el neutro", formula: "IN = 3 × √(Σ I²h triples de cargas monofásicas), h = 3, 9, 15, 21", sustitucion: "Cargas monofásicas equilibradas entre fases", resultado: `IN = ${fmt(In, 0)} A (${fmt((In / I1) * 100, 0)} % de la corriente de fase)` }
+    ],
+    verificaciones,
+    notas: [`Con armónicos triples altos, el neutro se cuenta como conductor portador de corriente (NTC 2050 310-15(b)(4)(c)) y puede requerir una sección igual o mayor que la de las fases: corriente estimada ${fmt(In, 0)} A.`, "Las corrientes armónicas de los grupos se suman en forma aritmética (caso más desfavorable). Si hay bancos de condensadores, verifique la resonancia paralela (h ≈ √(Scc / Qc)).", "Los espectros de convertidores son los teóricos y el de fuentes conmutadas es típico: con mediciones del sitio use el espectro personalizado."],
+    conclusion: verificaciones.length ? veredicto(verificaciones, `La distorsión armónica cumple los límites; factor K = ${fmt(K, 1)}.`, "La distorsión armónica supera algún límite: considere filtros, reactancias de línea, convertidores de más pulsos o un transformador con factor K.") : `THDi = ${fmt(thdi, 1)} %; factor K = ${fmt(K, 1)}.`
+  };
+}
+
+export const CALCULOS = { cargas, conductores, regulacion, canalizaciones, transformador, cortocircuito, coordinacion, malla, rayos, aislamiento, distancias, mecanico, trafoPotencia, cableMT, apantallamiento, fvArreglo, fvProduccion, fvConductores, fvConexion, arcoElectrico, camposEM, conductorEconomico, armonicos };
