@@ -38,6 +38,8 @@ Datos en Firestore: `rtProyectos/{id}` y `rtProyectos/{id}/calculos/{clave}` (`c
 - Arco eléctrico (IEEE 1584-2018): coincide con los ejemplos D.1 (4,16 kV: Iarc 12,979 kA, E 12,152 J/cm², AFB 1606 mm; reducida 13,343 J/cm²) y D.2 (480 V: E 11,585 J/cm², AFB 1029 mm; reducida 53,156 J/cm²) del Anexo D, en la pantalla y en el Excel. Prueba: `arco1584()` en `rt-calculos.js`.
 - Suelo de dos capas: la serie de Sunde reproduce la Tabla 3 de la IEEE 81-2012 (error ≤ 0,8 %, redondeo de la tabla) y el ajuste da ρ1 = 300,1, ρ2 = 100,2 Ω·m, h = 6,08 m (RMS 0,27 %), igual que XGSLab en el benchmark de la IEEE 80-2013 Anexo H. ρa(av2) = 193 Ω·m con la Tabla E.2 de la IEEE 80. Con la malla del Anexo H (70 × 70 m, 20 varillas de 7,5 m, 140 Ω·m) Rg = 1,022 Ω y GPR = 761 V, iguales a la norma; Em y Es salen 5 % menores que la columna «STD 80» del benchmark en las dos mallas (mismo factor: corriente de malla del ejemplo).
 - Factor de división (Endrenyi): ejemplo de la IEEE 80 §15.9 — Zeq de la línea 4,22 + j1,04 Ω (igual), Sf 0,36 frente a 0,37 publicado (la norma redondea el neutro del alimentador a 1,88 + j0,89 Ω; la fórmula da 1,88 + j0,81 Ω).
+- Cables de MT: los valores de `AMPACIDAD_MT` se extrajeron de las verificaciones de CalcWare (NEC 2017) y se compararon celda por celda (0 diferencias); dos erratas de la NEC impresa (Tabla 85 Det. 7 350 kcmil 105 °C: 580 → 530; Tabla 84 Det. 6 6 AWG 35 kV 105 °C: 95 → 87) se reemplazaron por el valor coherente con el cálculo Neher-McGrath.
+- Arco con tiempos de la coordinación: `tiempoArcoDesdeRele()` coincide con el cálculo manual de la curva IEC (2,33 kA en SI 200 A TMS 0,1 → 328 ms con 50 ms de apertura) y con el Excel.
 - **Pendiente:** validación independiente de cortocircuito y coordinación contra un estudio en ETAP o DIgSILENT, y revisión de una memoria completa por un organismo de inspección acreditado.
 
 ## 3. Limitaciones conocidas por cálculo
@@ -46,8 +48,8 @@ Datos en Firestore: `rtProyectos/{id}` y `rtProyectos/{id}/calculos/{clave}` (`c
 |---|---|---|
 | Cortocircuito | Radial, una fuente; sin aporte de motores ni generación distribuida. Z0 aproximada (transformador ≈ Z1, cables ≈ 4 Z1, zig-zag con su X0). Sin Ib ni Ik permanente. | `cortocircuito()` en `rt-calculos.js`; columnas R0/X0 en `HOJAS.cortocircuito` |
 | Malla (IEEE 80) | Dos capas por resistividad equivalente ρa(av2), no por cálculo numérico de dos capas (Em puede quedar baja con K < 0; se muestra la referencia con ρ1). Malla rectangular. Sf por Endrenyi sin acoples mutuos. Transferidas solo GPR frente al contacto tolerable. | `malla()`, `ajusteDosCapas()`, `factorDivision()` en `rt-calculos.js` |
-| Arco eléctrico | Solo 0,208 a 15 kV trifásico AC (fuera: «Fuera del modelo»); tiempos de despeje digitados; sin arco DC. | `arco1584()` y `arcoElectrico()`; tablas `IEEE1584` en `rt-normas.js` |
-| Cables de MT | Ampacidad digitada por el usuario; sin IEC 60287 ni tablas 310-77 a 310-86; pantalla no verificada. | `cableMT()` y `rt-normas.js` (tablas nuevas) |
+| Arco eléctrico | Solo 0,208 a 15 kV trifásico AC (fuera: «Fuera del modelo»); tiempos de la coordinación solo con curvas IEC (sin fusibles ni ANSI); sin arco DC. | `arco1584()` y `arcoElectrico()`; tablas `IEEE1584` en `rt-normas.js` |
+| Cables de MT | Tablas 310.60(C)(77) a (86) (`AMPACIDAD_MT`, `INSTALACIONES_MT` en `rt-normas.js`; `ampacidadTablaMT()`) solo para suelo de 90 °C·cm/W y las disposiciones de la Figura 310.60; sin IEC 60287; pantalla no verificada. | `cableMT()`; agregar Neher-McGrath (NEC Anexo B) |
 | Coordinación | Solo sobrecorriente de fase IEC; sin ANSI, fusibles, 51N, 87, 21; corrientes referidas a una tensión por el usuario. | `coordinacion()`, `CURVAS_IEC` en `rt-normas.js`, gráfico en `rt-grafico.js` |
 | Apantallamiento | Un captador por elemento, en el plano; sin protección combinada ni planta. | `apantallamiento()` |
 | Riesgo por rayos | Solo R1 (RA, RB, RU, RV); una zona y una línea. | `rayos()` |
@@ -65,9 +67,9 @@ Datos en Firestore: `rtProyectos/{id}` y `rtProyectos/{id}/calculos/{clave}` (`c
 ## 4. Mejoras pendientes (en orden)
 
 1. **Validación independiente** (cortocircuito, coordinación, memoria completa). No requiere código, pero es lo que más credibilidad da. Registrar el resultado en la sección 2 y en `VALIDACION` (`rt-alcance.js`).
-2. **Arco eléctrico — tiempos automáticos**: leer el tiempo de despeje de las curvas de `coordinacion()` a la corriente de arco plena y reducida (hoy se digitan). Arco en DC (baterías, FV).
+2. **Arco en DC** (baterías, FV) y tiempos con fusibles y curvas ANSI.
 3. **Malla en dos capas por método numérico** (sin resistividad equivalente) y potenciales fuera del cerramiento.
-4. **Cables de MT**: cargar las Tablas 310-77 a 310-86 de la NTC 2050 en `rt-normas.js` y, como opción, IEC 60287 para bancos de ductos (resistividad térmica, profundidad, agrupamiento).
+4. **Cables de MT — IEC 60287 / Neher-McGrath** para bancos de ductos fuera de las condiciones de las tablas (resistividad térmica, disposición, más circuitos).
 5. **Historial de versiones**: guardar una copia de entradas y literales al generar cada memoria (`rtProyectos/{id}/versiones`), con comparación entre revisiones.
 6. **Cortocircuito ampliado**: aporte de motores y generación, impedancias de secuencia cero del fabricante.
 7. **Coordinación ampliada**: curvas ANSI, fusibles, 51N; apantallamiento con varios captadores.

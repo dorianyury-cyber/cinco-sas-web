@@ -143,6 +143,7 @@ export const MODULOS = {
     normas: ["RETIE — cálculo y coordinación de protecciones", "IEC 60255-151 (curvas de tiempo inverso)", "IEEE 242 (Buff Book) — márgenes de coordinación"],
     campos: [
       { key: "cti", label: "Margen de coordinación (CTI)", tipo: "numero", unidad: "s", def: 0.3 },
+      { key: "tensionRef", label: "Tensión a la que están referidas las corrientes (la usa el arco eléctrico)", tipo: "numero", unidad: "kV", def: "" },
       { key: "iInrush", label: "Corriente de energización del transformador (opcional, ≈ 8–12 In)", tipo: "numero", unidad: "A", def: "" },
       { key: "protecciones", label: "Protecciones (de aguas abajo hacia aguas arriba, referidas a la misma tensión)", tipo: "tabla", columnas: [
         { key: "nombre", label: "Protección", tipo: "texto", ancho: 16 }, { key: "curva", label: "Curva", tipo: "select", opciones: op(N.CURVAS_IEC), ancho: 18 },
@@ -328,16 +329,21 @@ export const MODULOS = {
       { key: "tension", label: "Tensión nominal (vacío = MT del transformador de potencia)", tipo: "numero", unidad: "kV", def: "" },
       { key: "fp", label: "Factor de potencia", tipo: "numero", def: 0.9 },
       { key: "dvMax", label: "Caída de tensión máxima", tipo: "numero", unidad: "%", def: 3 },
-      { key: "circuitos", label: "Circuitos (Ik vacío = cortocircuito de la barra)", tipo: "tabla", columnas: [
-        { key: "circuito", label: "Circuito", tipo: "texto", ancho: 14 }, { key: "material", label: "Mat.", tipo: "select", opciones: lista(["Al", "Cu"]), ancho: 6 },
-        { key: "calibre", label: "Calibre", tipo: "select", opciones: CALIBRES_OP, ancho: 10 }, { key: "aislamiento", label: "Aisl.", tipo: "select", opciones: lista(["XLPE", "EPR", "PVC"]), ancho: 7 },
-        { key: "ampacidad", label: "Ampacidad base (A)", tipo: "numero", ancho: 9 }, { key: "factor", label: "Factor corr.", tipo: "numero", ancho: 7 },
-        { key: "corriente", label: "I diseño (A)", tipo: "numero", ancho: 8 }, { key: "longitud", label: "L (m)", tipo: "numero", ancho: 7 },
-        { key: "r", label: "R (Ω/km, opc.)", tipo: "numero", ancho: 8 }, { key: "x", label: "X (Ω/km)", tipo: "numero", ancho: 7 },
-        { key: "icc", label: "Ik (kA)", tipo: "numero", ancho: 7 }, { key: "tDespeje", label: "t despeje (s)", tipo: "numero", ancho: 7 },
-        { key: "inCelda", label: "In celda (A)", tipo: "numero", ancho: 7 }
+      { key: "instalacion", label: "Instalación (NTC 2050 Tablas 310.60(C)(77) a (86))", tipo: "select", opciones: op(N.INSTALACIONES_MT), def: "ductoUni" },
+      { key: "nCircuitos", label: "Circuitos en el banco o la zanja", tipo: "select", opciones: lista([1, 2, 3, 6]), def: "1" },
+      { key: "tempConductor", label: "Temperatura del conductor (MV-90 o MV-105)", tipo: "select", opciones: [{ valor: "90", texto: "90 °C (MV-90, XLPE)" }, { valor: "105", texto: "105 °C (MV-105, EPR)" }], def: "90" },
+      { key: "tempSuelo", label: "Temperatura del suelo", tipo: "numero", unidad: "°C", def: 20 },
+      { key: "profundidadExtra", label: "Profundidad adicional a la de la Figura 310.60", tipo: "numero", unidad: "m", def: 0 },
+      { key: "circuitos", label: "Circuitos (ampacidad base vacía = tabla NTC 2050; Ik vacío = cortocircuito de la barra)", tipo: "tabla", columnas: [
+        { key: "circuito", label: "Circuito", tipo: "texto", ancho: 12 }, { key: "material", label: "Mat.", tipo: "select", opciones: lista(["Al", "Cu"]), ancho: 8 },
+        { key: "calibre", label: "Calibre", tipo: "select", opciones: CALIBRES_OP, ancho: 11 }, { key: "aislamiento", label: "Aisl.", tipo: "select", opciones: lista(["XLPE", "EPR", "PVC"]), ancho: 9 },
+        { key: "ampacidad", label: "Ampacidad fabricante (A, opc.)", tipo: "numero", ancho: 8 }, { key: "factor", label: "Factor adic.", tipo: "numero", ancho: 6 },
+        { key: "corriente", label: "I diseño (A)", tipo: "numero", ancho: 7 }, { key: "longitud", label: "L (m)", tipo: "numero", ancho: 6 },
+        { key: "r", label: "R (Ω/km, opc.)", tipo: "numero", ancho: 6 }, { key: "x", label: "X (Ω/km)", tipo: "numero", ancho: 6 },
+        { key: "icc", label: "Ik (kA)", tipo: "numero", ancho: 6 }, { key: "tDespeje", label: "t despeje (s)", tipo: "numero", ancho: 6 },
+        { key: "inCelda", label: "In celda (A)", tipo: "numero", ancho: 6 }
       ], nueva: { material: "Al", calibre: "750", aislamiento: "XLPE", factor: 1, x: 0.13, tDespeje: 0.5 }, def: [
-        { circuito: "Circuito 1", material: "Al", calibre: "750", aislamiento: "XLPE", ampacidad: 520, factor: 0.85, corriente: 300, longitud: 300, x: 0.13, tDespeje: 0.5, inCelda: 630 }
+        { circuito: "Circuito 1", material: "Al", calibre: "750", aislamiento: "XLPE", ampacidad: "", factor: 1, corriente: 300, longitud: 300, x: 0.13, tDespeje: 0.5, inCelda: 630 }
       ] }
     ]
   },
@@ -347,13 +353,14 @@ export const MODULOS = {
     normas: ["RETIE — análisis de riesgo por arco eléctrico", "IEEE 1584-2018 (cálculo de riesgo por arco eléctrico)", "NFPA 70E (categorías de EPP y frontera de arco)"],
     campos: [
       { key: "eppDisponible", label: "Calificación de arco del EPP disponible para el trabajo", tipo: "numero", unidad: "cal/cm²", def: 8 },
-      { key: "puntos", label: "Puntos de trabajo (vacíos = valores típicos del equipo; Ibf vacía = la barra del cortocircuito con el mismo nombre)", tipo: "tabla", columnas: [
-        { key: "punto", label: "Punto", tipo: "texto", ancho: 14 }, { key: "equipo", label: "Equipo", tipo: "select", opciones: op(N.IEEE1584.equipos), ancho: 16 },
+      { key: "tApertura", label: "Tiempo de apertura del interruptor (se suma al del relé de la coordinación)", tipo: "numero", unidad: "ms", def: 50 },
+      { key: "puntos", label: "Puntos de trabajo (vacíos = valores típicos del equipo; Ibf vacía = la barra del cortocircuito con el mismo nombre; tiempos vacíos = curva de la protección de la coordinación con el nombre indicado)", tipo: "tabla", columnas: [
+        { key: "punto", label: "Punto", tipo: "texto", ancho: 12 }, { key: "equipo", label: "Equipo", tipo: "select", opciones: op(N.IEEE1584.equipos), ancho: 14 },
         { key: "configuracion", label: "Electrodos", tipo: "select", opciones: Object.keys(N.IEEE1584.configuraciones).map((k) => ({ valor: k, texto: k })), ancho: 10 },
         { key: "tension", label: "Voc (kV)", tipo: "numero", ancho: 7 }, { key: "ibf", label: "Ibf (kA)", tipo: "numero", ancho: 7 },
-        { key: "tiempo", label: "t a Iarc (ms)", tipo: "numero", ancho: 7 }, { key: "tiempoMin", label: "t a Iarc red. (ms)", tipo: "numero", ancho: 7 },
-        { key: "gap", label: "G (mm)", tipo: "numero", ancho: 6 }, { key: "distancia", label: "D trabajo (mm)", tipo: "numero", ancho: 7 },
-        { key: "alto", label: "Alto (mm)", tipo: "numero", ancho: 6 }, { key: "ancho", label: "Ancho (mm)", tipo: "numero", ancho: 6 }, { key: "fondo", label: "Fondo (mm)", tipo: "numero", ancho: 6 }
+        { key: "proteccion", label: "Protección (coordinación)", tipo: "texto", ancho: 12 }, { key: "tiempo", label: "t a Iarc (ms)", tipo: "numero", ancho: 6 }, { key: "tiempoMin", label: "t a Iarc red. (ms)", tipo: "numero", ancho: 6 },
+        { key: "gap", label: "G (mm)", tipo: "numero", ancho: 5 }, { key: "distancia", label: "D trabajo (mm)", tipo: "numero", ancho: 6 },
+        { key: "alto", label: "Alto (mm)", tipo: "numero", ancho: 5 }, { key: "ancho", label: "Ancho (mm)", tipo: "numero", ancho: 5 }, { key: "fondo", label: "Fondo (mm)", tipo: "numero", ancho: 5 }
       ], nueva: { equipo: "swBT", configuracion: "VCB", tension: 0.48 }, def: [
         { punto: "Celdas de 13,2 kV", equipo: "sw15", configuracion: "VCB", tension: 13.2, ibf: 6, tiempo: 250, tiempoMin: 300 },
         { punto: "Tablero general BT", equipo: "swBT", configuracion: "VCB", tension: 0.48, ibf: 25, tiempo: 50, tiempoMin: 120 },

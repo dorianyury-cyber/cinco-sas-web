@@ -376,6 +376,7 @@ export function coordinacion(e) {
   }
   return {
     resumen: [{ etiqueta: "Pares coordinados", valor: `${verificaciones.filter((v) => v.cumple).length} de ${verificaciones.length}`, unidad: "" }],
+    salidas: { reles: rels.map((r) => ({ ...r })), tensionRef: num(e.tensionRef, NaN) },
     tablas: [
       { titulo: "Ajustes de las protecciones", encabezados: ["Protección", "Curva", "I arranque (A)", "TMS / t (s)", "I instantánea (A)", "t inst. (s)"], filas: rels.map((r) => [r.nombre || "", (N.CURVAS_IEC[r.curva] || N.CURVAS_IEC.SI).nombre, fmt(num(r.pickup), 0), fmt(num(r.tms), 3), num(r.inst) ? fmt(num(r.inst), 0) : "—", num(r.inst) ? fmt(num(r.tinst, 0.05), 2) : "—"]) },
       { titulo: "Tiempos de operación (s) por corriente de falla", encabezados: ["Punto de falla", "I (A)", ...rels.map((r) => r.nombre || "")], filas: tabla }
@@ -798,15 +799,47 @@ export function trafoPotencia(e) {
 // Capacidad de corriente con factores de corrección, soportabilidad al
 // cortocircuito (método adiabático IEC 60949) y caída de tensión.
 const K_ADIABATICO = { "Cu-XLPE": 143, "Al-XLPE": 94, "Cu-EPR": 143, "Al-EPR": 94, "Cu-PVC": 115, "Al-PVC": 76 };
+// Capacidad de corriente de cables de 2001 a 35 000 V enterrados (NTC 2050 / NEC Tablas
+// 310.60(C)(77) a (86)). Calibres intermedios (300, 400, 600 kcmil) se interpolan por sección.
+export function ampacidadTablaMT({ instalacion = "ductoUni", material = "Al", circuitos = 1, kV = 13.2, tc = 90, calibre }) {
+  const inst = N.INSTALACIONES_MT[instalacion];
+  if (!inst) return { amp: NaN, ref: "" };
+  const tabla = material === "Cu" ? inst.cu : inst.al;
+  const disponibles = Object.keys(inst.detalles).map(Number);
+  const nc = disponibles.find((c) => c >= circuitos) ?? Math.max(...disponibles);
+  const det = inst.detalles[nc], clase = kV <= 5 ? 5 : 35, col = Number(tc) >= 105 ? 105 : 90;
+  const fila = N.AMPACIDAD_MT[`${tabla}|${det}`][clase][col];
+  const ref = `NTC 2050 Tabla 310.60(C)(${tabla}), Detalle ${det}, ${clase === 5 ? "2001-5000 V" : "5001-35 000 V"}, ${col} °C`;
+  const notas = [];
+  if (circuitos > nc) notas.push(`la tabla llega a ${nc} circuitos y hay ${circuitos}: requiere cálculo IEC 60287 / Neher-McGrath (S)`);
+  else if (nc !== circuitos) notas.push(`se usó la tabla de ${nc} circuitos (la siguiente mayor)`);
+  const i = N.CALIBRES_MT.indexOf(String(calibre));
+  if (i >= 0) return { amp: fila[i] ?? NaN, ref, notas: fila[i] == null ? [...notas, "calibre no listado para esta tensión"] : notas };
+  const S = N.SECCION_MM2[calibre];
+  const sec = N.CALIBRES_MT.map((c) => N.SECCION_MM2[c]);
+  const k = sec.findIndex((x) => x > S);
+  if (!S || k <= 0 || fila[k - 1] == null || fila[k] == null) return { amp: NaN, ref, notas: [...notas, "calibre fuera de la tabla"] };
+  const amp = fila[k - 1] + ((fila[k] - fila[k - 1]) * (S - sec[k - 1])) / (sec[k] - sec[k - 1]);
+  return { amp, ref, notas: [...notas, `interpolada por sección entre ${N.CALIBRES_MT[k - 1]} y ${N.CALIBRES_MT[k]} (S)`] };
+}
+
 export function cableMT(e, proyecto = {}, ctx = {}) {
   const U = num(e.tension, ctx.trafoPotencia ? ctx.trafoPotencia.vs / 1000 : 34.5), dvMax = num(e.dvMax, 3);
   const ik3cc = ctx.cortocircuito?.barras?.[0]?.ik3;
   const ikDef = ctx.trafoPotencia?.ikMT ?? (Number.isFinite(ik3cc) ? ik3cc / 1000 : 0);
   const verificaciones = [];
+  const inst = e.instalacion || "ductoUni", nCirc = num(e.nCircuitos, 1), tcMT = num(e.tempConductor, 90) >= 105 ? 105 : 90;
+  const tSuelo = num(e.tempSuelo, 20), extra = num(e.profundidadExtra, 0);
+  const fTemp = Math.sqrt(Math.max(0, tcMT - tSuelo) / (tcMT - 20)), fProf = Math.max(0, 1 - (0.06 * extra) / 0.3);
+  const notasAmp = [];
   const tabla = filas(e.circuitos).map((c) => {
     const mat = c.material === "Cu" ? "Cu" : "Al", ais = c.aislamiento || "XLPE";
     const S = N.SECCION_MM2[c.calibre] ?? num(c.calibre, 0);
-    const amp = num(c.ampacidad) * num(c.factor, 1);
+    const manual = Number.isFinite(num(c.ampacidad, NaN)) && num(c.ampacidad, 0) > 0;
+    const tb = manual ? null : ampacidadTablaMT({ instalacion: inst, material: mat, circuitos: nCirc, kV: U, tc: tcMT, calibre: String(c.calibre) });
+    const base = manual ? num(c.ampacidad) : tb.amp;
+    const amp = base * num(c.factor, 1) * (manual ? 1 : fTemp * fProf);
+    if (tb) notasAmp.push(`${c.circuito || "Circuito"}: ${tb.ref}${tb.notas.length ? ` — ${tb.notas.join("; ")}` : ""}.`);
     const I = num(c.corriente), L = num(c.longitud) / 1000;
     const rho20 = mat === "Cu" ? 0.017241 : 0.028264, alfa = mat === "Cu" ? 0.00393 : 0.00403;
     const R = num(c.r, 0) || (S > 0 ? (rho20 / S) * 1000 * (1 + alfa * 70) : 0), X = num(c.x, 0.13);
@@ -815,22 +848,22 @@ export function cableMT(e, proyecto = {}, ctx = {}) {
     const K = K_ADIABATICO[`${mat}-${ais}`] || 94, t = num(c.tDespeje, 0.5);
     const ikAdm = (K * S) / Math.sqrt(t) / 1000, ik = num(c.icc, ikDef);
     const nombre = c.circuito || "Circuito";
-    verificaciones.push({ criterio: `${nombre}: capacidad de corriente`, norma: "NTC 2050 Sec. 310 (> 2 kV) / IEC 60502-2 — datos del fabricante con factores de corrección", valor: `${fmt(I, 0)} A`, limite: `≤ ${fmt(amp, 0)} A`, cumple: I <= amp });
+    verificaciones.push({ criterio: `${nombre}: capacidad de corriente`, norma: manual ? "Datos del fabricante con factores de corrección (IEC 60502-2)" : `${tb.ref.replace(/, Detalle.*/, "")} con corrección por temperatura y profundidad`, valor: `${fmt(I, 0)} A`, limite: Number.isFinite(amp) ? `≤ ${fmt(amp, 0)} A` : "Sin capacidad de tabla para este calibre", cumple: I <= amp });
     if (ik > 0) verificaciones.push({ criterio: `${nombre}: soportabilidad al cortocircuito`, norma: `IEC 60949 (adiabático, K = ${K})`, valor: `${fmt(ik, 2)} kA`, limite: `≤ ${fmt(ikAdm, 2)} kA en ${fmt(t, 2)} s`, cumple: ik <= ikAdm });
     if (num(c.inCelda, 0)) verificaciones.push({ criterio: `${nombre}: celda o protección`, norma: "IEC 62271-200 — In de la celda ≥ corriente del circuito", valor: `${fmt(num(c.inCelda), 0)} A`, limite: `≥ ${fmt(I, 0)} A`, cumple: num(c.inCelda) >= I });
     if (L > 0) verificaciones.push({ criterio: `${nombre}: caída de tensión`, norma: "RETIE — regulación (criterio del operador de red)", valor: `${fmt(dv, 2)} %`, limite: `≤ ${fmt(dvMax, 1)} %`, cumple: dv <= dvMax });
-    return [nombre, `${mat} ${N.etiquetaCalibre(String(c.calibre))} ${ais}`, fmt(S, 1), fmt(amp, 0), fmt(I, 0), ik ? fmt(ik, 2) : "—", fmt(ikAdm, 2), L ? fmt(dv, 2) : "—"];
+    return [nombre, `${mat} ${N.etiquetaCalibre(String(c.calibre))} ${ais}`, fmt(S, 1), manual ? `${fmt(base, 0)} (fabricante)` : `${fmt(base, 0)} (tabla${tb.notas.some((x) => x.includes("(S)")) ? ", S" : ""})`, fmt(amp, 0), fmt(I, 0), ik ? fmt(ik, 2) : "—", fmt(ikAdm, 2), L ? fmt(dv, 2) : "—"];
   });
   return {
     resumen: [{ etiqueta: "Circuitos verificados", valor: String(tabla.length), unidad: "" }, { etiqueta: "Ik\" en la barra", valor: ikDef ? fmt(ikDef, 2) : "—", unidad: "kA" }],
-    tablas: [{ titulo: "Verificación de cables de media tensión", encabezados: ["Circuito", "Cable", "S (mm²)", "Ampacidad corregida (A)", "I diseño (A)", "Ik (kA)", "Ik admisible (kA)", "ΔV (%)"], filas: tabla }],
+    tablas: [{ titulo: "Verificación de cables de media tensión", encabezados: ["Circuito", "Cable", "S (mm²)", "Ampacidad base (A)", "Ampacidad corregida (A)", "I diseño (A)", "Ik (kA)", "Ik admisible (kA)", "ΔV (%)"], filas: tabla }],
     pasos: [
-      { titulo: "Capacidad de corriente", formula: "I adm = I tabla × factores de corrección (temperatura, agrupamiento, resistividad térmica)", sustitucion: "Valor base de la tabla del fabricante o NTC 2050 Tablas 310-77 a 310-86", resultado: "Por circuito" },
+      { titulo: "Capacidad de corriente", formula: "I adm = I tabla × √((Tc − Ts)/(Tc − 20)) × (1 − 0,06 × Δprof/0,3 m) × factor adicional (NTC 2050 310.60(C)(4) y nota de profundidad)", sustitucion: `${(N.INSTALACIONES_MT[inst] || {}).nombre || inst}; ${nCirc} circuito(s); conductor a ${tcMT} °C; suelo a ${fmt(tSuelo, 0)} °C (Ft = ${fmt(fTemp, 3)}); ${fmt(extra, 2)} m más profundo que la Figura 310.60 (Fp = ${fmt(fProf, 3)}). Con ampacidad del fabricante se aplica solo el factor adicional`, resultado: "Por circuito" },
       { titulo: "Cortocircuito en el conductor", formula: "I adm = K × S / √t (IEC 60949, 90 → 250 °C)", sustitucion: "K = 143 (Cu XLPE), 94 (Al XLPE)", resultado: "Por circuito" },
       { titulo: "Caída de tensión", formula: "ΔV % = √3 × I × L × (R cos φ + X sen φ) / U × 100", sustitucion: `U = ${fmt(U, 1)} kV; R a 90 °C (calculada si no se digita)`, resultado: "Por circuito" }
     ],
     verificaciones,
-    notas: ["La pantalla metálica del cable debe verificarse para la corriente de falla a tierra con los datos del fabricante."],
+    notas: [...notasAmp, "Las tablas suponen resistividad térmica del suelo de 90 °C·cm/W y factor de carga 100 %: con otro suelo o más circuitos, use el factor adicional o un cálculo IEC 60287 / Neher-McGrath.", "La pantalla metálica del cable debe verificarse para la corriente de falla a tierra con los datos del fabricante."],
     conclusion: veredicto(verificaciones, "Los cables de media tensión cumplen capacidad de corriente, cortocircuito y regulación.", "Hay cables de media tensión que no cumplen.")
   };
 }
@@ -1161,15 +1194,46 @@ export function arco1584({ ec = "VCB", voc, ibf, g, dist, h, w, d, tFull, tMin }
   return { full, min, varCf, red, enc, fuera };
 }
 
+// Tiempo de despeje (ms) de una protección de la coordinación para una corriente de arco
+// (kA en la tensión del punto): se refiere la corriente a la tensión de la coordinación,
+// se suma la apertura del interruptor y se limita a 2 s (IEEE 1584-2018 §6.9.1).
+export function tiempoArcoDesdeRele(rel, iarcKA, vPunto, vRef, aperturaMs) {
+  const iRef = (iarcKA * 1000 * vPunto) / (Number.isFinite(vRef) && vRef > 0 ? vRef : vPunto);
+  const t = tiempoRele(rel, iRef);
+  if (!Number.isFinite(t)) return { ms: 2000, iRef, nota: "la protección no opera con esa corriente: se limita a 2 s (S)" };
+  const ms = t * 1000 + aperturaMs;
+  return ms > 2000 ? { ms: 2000, iRef, nota: "tiempo mayor que 2 s: se limita a 2 s (S)" } : { ms, iRef, nota: "" };
+}
+
 export function arcoElectrico(e, proyecto = {}, ctx = {}) {
-  const eppDisp = num(e.eppDisponible, 8);
-  const verificaciones = [];
+  const eppDisp = num(e.eppDisponible, 8), apertura = num(e.tApertura, 50);
+  const reles = ctx.coordinacion?.reles || [], vRef = ctx.coordinacion?.tensionRef;
+  const verificaciones = [], notasT = [];
   const filasT = filas(e.puntos).map((p) => {
     const eq = N.IEEE1584.equipos[p.equipo] || N.IEEE1584.equipos.swBT;
     const dato = (k, def) => { const x = num(p[k], NaN); return Number.isFinite(x) ? x : def; };
     const barra = (ctx.cortocircuito?.barras || []).find((b) => b.nombre.trim().toLowerCase() === String(p.punto || "").trim().toLowerCase());
     const ent = { ec: p.configuracion || "VCB", voc: dato("tension", 0.48), ibf: dato("ibf", barra ? barra.ik3 / 1000 : 25), deCorto: !Number.isFinite(num(p.ibf, NaN)) && !!barra };
-    const r = arco1584({ ec: ent.ec, voc: ent.voc, ibf: ent.ibf, g: dato("gap", eq.G), dist: dato("distancia", eq.D), h: dato("alto", eq.h), w: dato("ancho", eq.w), d: dato("fondo", eq.d), tFull: dato("tiempo", 100), tMin: dato("tiempoMin", dato("tiempo", 100)) });
+    const geo = { ec: ent.ec, voc: ent.voc, ibf: ent.ibf, g: dato("gap", eq.G), dist: dato("distancia", eq.D), h: dato("alto", eq.h), w: dato("ancho", eq.w), d: dato("fondo", eq.d) };
+    // Tiempos: digitados, o de la protección de la coordinación con el mismo nombre (con la
+    // corriente de arco plena y la reducida), o 100 ms supuestos.
+    const rel = reles.find((x) => String(x.nombre || "").trim().toLowerCase() === String(p.proteccion || "").trim().toLowerCase() && p.proteccion);
+    let tFull = dato("tiempo", NaN), tMin = dato("tiempoMin", NaN);
+    ent.origenT = "digitado";
+    if (!Number.isFinite(tFull) && rel) {
+      const pre = arco1584({ ...geo, tFull: 1, tMin: 1 });
+      const a = tiempoArcoDesdeRele(rel, pre.full.iarc, ent.voc, vRef, apertura), b = tiempoArcoDesdeRele(rel, pre.min.iarc, ent.voc, vRef, apertura);
+      tFull = a.ms; if (!Number.isFinite(tMin)) tMin = b.ms;
+      ent.origenT = `curva de «${rel.nombre}»`;
+      notasT.push(`${p.punto || eq.nombre}: tiempos de «${rel.nombre}» con ${fmt(a.iRef, 0)} A y ${fmt(b.iRef, 0)} A referidos a ${fmt(Number.isFinite(vRef) ? vRef : ent.voc, 2)} kV, más ${fmt(apertura, 0)} ms de apertura${[a.nota, b.nota].filter(Boolean).length ? ` — ${[...new Set([a.nota, b.nota].filter(Boolean))].join("; ")}` : ""}.`);
+      if (!Number.isFinite(vRef)) notasT.push("(S) La coordinación no indica a qué tensión están referidas sus corrientes: se supuso la tensión de cada punto.");
+    } else if (!Number.isFinite(tFull)) {
+      tFull = 100; ent.origenT = "supuesto";
+      notasT.push(`(S) ${p.punto || eq.nombre}: sin tiempo digitado ni protección de la coordinación; se supusieron 100 ms.`);
+    }
+    if (!Number.isFinite(tMin)) tMin = tFull;
+    ent.t = tFull; ent.tm = tMin;
+    const r = arco1584({ ...geo, tFull, tMin });
     // Fuera de 0,208 a 15 kV el modelo extrapola sin sentido: no se reportan valores.
     if (ent.voc < 0.208 || ent.voc > 15) [r.full, r.min].forEach((c) => { c.iarc = c.e = c.afb = NaN; });
     const eCal = Math.max(r.full.e, r.min.e) / 4.184, afb = r.full.e >= r.min.e ? r.full.afb : r.min.afb;
@@ -1190,7 +1254,7 @@ export function arcoElectrico(e, proyecto = {}, ctx = {}) {
     ] : [],
     tablas: [
       { titulo: "Energía incidente y frontera de arco por punto (IEEE 1584-2018)", encabezados: ["Punto", "Voc (kV)", "Ibf (kA)", "Iarc (kA)", "Iarc red. (kA)", "E (cal/cm²)", "Frontera (m)", "EPP mínimo"], filas: filasT.map((f) => [f.nombre, fmt(f.ent.voc, f.ent.voc < 1 ? 3 : 1), fmt(f.ent.ibf, 1) + (f.ent.deCorto ? " (S)" : ""), fmt(f.r.full.iarc, 2), fmt(f.r.min.iarc, 2), fmt(f.eCal, 2), fmt(f.afb / 1000, 2), f.catCorta]) },
-      { titulo: "Detalle del cálculo por punto", encabezados: ["Punto", "Electrodos", "Encerramiento (EES, tipo)", "CF", "VarCf / factor", "E plena (J/cm²)", "E reducida (J/cm²)", "Gobierna"], filas: filasT.map((f) => [f.nombre, f.ent.ec, f.r.enc.ees ? `${fmt(f.r.enc.ees, 2)} pulg., ${f.r.enc.tipo}` : f.r.enc.tipo, fmt(f.r.enc.cf, 3), `${fmt(f.r.varCf, 3)} / ${fmt(f.r.red, 3)}`, fmt(f.r.full.e, 2), fmt(f.r.min.e, 2), f.r.full.e >= f.r.min.e ? "Corriente plena" : "Corriente reducida"]) }
+      { titulo: "Detalle del cálculo por punto", encabezados: ["Punto", "Electrodos", "Encerramiento (EES, tipo)", "CF", "VarCf / factor", "t plena / reducida (ms)", "E plena (J/cm²)", "E reducida (J/cm²)", "Gobierna"], filas: filasT.map((f) => [f.nombre, f.ent.ec, f.r.enc.ees ? `${fmt(f.r.enc.ees, 2)} pulg., ${f.r.enc.tipo}` : f.r.enc.tipo, fmt(f.r.enc.cf, 3), `${fmt(f.r.varCf, 3)} / ${fmt(f.r.red, 3)}`, `${fmt(f.ent.t, 0)} / ${fmt(f.ent.tm, 0)} (${f.ent.origenT})`, fmt(f.r.full.e, 2), fmt(f.r.min.e, 2), f.r.full.e >= f.r.min.e ? "Corriente plena" : "Corriente reducida"]) }
     ],
     pasos: [
       { titulo: "Corriente de arco intermedia", formula: "Iarc,Voc = 10^(k1 + k2 lg Ibf + k3 lg G) × (k4 Ibf⁶ + … + k9 Ibf + k10)", sustitucion: "Tabla 1 de la IEEE 1584-2018 a 600, 2700 y 14 300 V", resultado: "Por punto" },
@@ -1201,7 +1265,7 @@ export function arcoElectrico(e, proyecto = {}, ctx = {}) {
       { titulo: "Frontera de arco", formula: "Distancia a la que la energía incidente es 1,2 cal/cm² (5,0 J/cm²)", sustitucion: "Misma ecuación de energía despejada para D", resultado: "Por punto" }
     ],
     verificaciones,
-    notas: [...(filasT.some((f) => f.ent.deCorto) ? ["(S) Ibf tomada del cálculo de cortocircuito del proyecto (barra con el mismo nombre del punto)."] : []), "El tiempo de arco es el tiempo de despeje de la protección aguas arriba a la corriente de arco (tome los tiempos de la coordinación de protecciones). Con la corriente reducida el tiempo suele ser mayor.", "Cada equipo debe rotularse con la energía incidente, la frontera de arco y el EPP requerido."],
+    notas: [...notasT, ...(filasT.some((f) => f.ent.deCorto) ? ["(S) Ibf tomada del cálculo de cortocircuito del proyecto (barra con el mismo nombre del punto)."] : []), "El tiempo de arco es el tiempo de despeje de la protección aguas arriba a la corriente de arco (tome los tiempos de la coordinación de protecciones). Con la corriente reducida el tiempo suele ser mayor.", "Cada equipo debe rotularse con la energía incidente, la frontera de arco y el EPP requerido."],
     conclusion: peor ? veredicto(verificaciones, `La mayor energía incidente es ${fmt(peor.eCal, 2)} cal/cm² en «${peor.nombre}» (${peor.cat}).`, "Hay puntos con energía incidente por encima del EPP disponible o fuera del rango del modelo: reduzca el tiempo de despeje o trabaje desenergizado.") : filasT.length ? "Ningún punto está dentro del rango de tensión del modelo IEEE 1584 (0,208 a 15 kV): use otro método." : "Agregue los puntos a evaluar."
   };
 }

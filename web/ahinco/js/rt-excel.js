@@ -7,7 +7,7 @@
 import * as N from "./rt-normas.js";
 import { MODULOS } from "./rt-modulos.js";
 import { LITERALES, FUENTE_LITERALES } from "./rt-literales.js";
-import { SISTEMAS_BT, impedanciaConductor, ajusteDosCapas } from "./rt-calculos.js";
+import { SISTEMAS_BT, impedanciaConductor, ajusteDosCapas, ampacidadTablaMT } from "./rt-calculos.js";
 import { hallazgos, supuestos, esVerificacion } from "./rt-hallazgos.js";
 
 const NAVY = "FF1F2732", AMARILLO = "FFFFF4CC", GRIS = "FFF2F3F5";
@@ -92,6 +92,12 @@ function hojaTablas(wb) {
   const iniS = r;
   for (let k = 1; k <= 300; k++) { ws.addRow([k]); r++; }
   T.nSerie = `Tablas!$A$${iniS}:$A$${r - 1}`;
+  r++; titulo("NTC 2050 / NEC Tablas 310.60(C)(77) a (86): capacidad de corriente de cables de 2001 a 35 000 V enterrados (A); clave tabla|detalle|clase (5 o 35 kV)|temperatura del conductor");
+  enc(["Clave", ...N.CALIBRES_MT]);
+  T.ampMTcal = `Tablas!$B$${r - 1}:$${col(N.CALIBRES_MT.length)}$${r - 1}`;
+  const iniMT = r;
+  Object.entries(N.AMPACIDAD_MT).forEach(([k, v]) => [5, 35].forEach((cl) => [90, 105].forEach((tc) => { ws.addRow([`${k}|${cl}|${tc}`, ...v[cl][tc]]); r++; })));
+  T.ampMT = `Tablas!$A$${iniMT}:$${col(N.CALIBRES_MT.length)}$${r - 1}`; T.ampMTk = `Tablas!$A$${iniMT}:$A$${r - 1}`;
   const I = N.IEEE1584;
   tabla1584("IEEE 1584-2018 Tabla 1: corriente de arco intermedia (configuración|kV)", "a1", Object.entries(I.t1), 10);
   tabla1584("IEEE 1584-2018 Tabla 2: factor de variación VarCf", "a2", Object.entries(I.t2), 7);
@@ -156,7 +162,7 @@ const CONSTANTES = {
 };
 
 // Nombres legibles de los rangos de la hoja "Tablas" para las explicaciones.
-const NOMBRE_TABLA = { cond: "tabla de conductores (hoja Tablas)", temp: "factores de temperatura (hoja Tablas)", tempDesde: "rangos de temperatura (hoja Tablas)", agr: "factores de agrupamiento (hoja Tablas)", agrDesde: "rangos de agrupamiento (hoja Tablas)", prot: "corrientes normalizadas de protecciones (hoja Tablas)", fusK: "fusibles tipo K normalizados (hoja Tablas)", tub: "áreas de tuberías (hoja Tablas)", curvas: "curvas IEC (hoja Tablas)", tierraLim: "límites de protección (hoja Tablas)", tierraCal: "calibres de puesta a tierra (hoja Tablas)", a1: "Tabla 1 IEEE 1584", a1k: "claves de la Tabla 1 IEEE 1584", a2: "Tabla 2 IEEE 1584", a2k: "claves de la Tabla 2 IEEE 1584", aE: "Tablas 3 a 5 IEEE 1584", aEk: "claves de las Tablas 3 a 5 IEEE 1584", a7: "Tabla 7 IEEE 1584", a7k: "claves de la Tabla 7 IEEE 1584", nSerie: "n = 1 a 300" };
+const NOMBRE_TABLA = { cond: "tabla de conductores (hoja Tablas)", temp: "factores de temperatura (hoja Tablas)", tempDesde: "rangos de temperatura (hoja Tablas)", agr: "factores de agrupamiento (hoja Tablas)", agrDesde: "rangos de agrupamiento (hoja Tablas)", prot: "corrientes normalizadas de protecciones (hoja Tablas)", fusK: "fusibles tipo K normalizados (hoja Tablas)", tub: "áreas de tuberías (hoja Tablas)", curvas: "curvas IEC (hoja Tablas)", tierraLim: "límites de protección (hoja Tablas)", tierraCal: "calibres de puesta a tierra (hoja Tablas)", a1: "Tabla 1 IEEE 1584", a1k: "claves de la Tabla 1 IEEE 1584", a2: "Tabla 2 IEEE 1584", a2k: "claves de la Tabla 2 IEEE 1584", aE: "Tablas 3 a 5 IEEE 1584", aEk: "claves de las Tablas 3 a 5 IEEE 1584", a7: "Tabla 7 IEEE 1584", a7k: "claves de la Tabla 7 IEEE 1584", nSerie: "n = 1 a 300", ampMT: "Tablas 310.60(C)(77) a (86)", ampMTk: "claves de las Tablas 310.60(C)(77) a (86)", ampMTcal: "calibres de las Tablas 310.60(C)(77) a (86)" };
 const FUNCIONES = [["NOT", "NO"], ["_xlfn.AGGREGATE", "AGREGAR"], ["ROUNDDOWN", "REDONDEAR.MENOS"], ["ROUNDUP", "REDONDEAR.MAS"], ["LEFT", "IZQUIERDA"], ["IFERROR", "SI.ERROR"], ["SUMPRODUCT", "SUMAPRODUCTO"], ["SUMIF", "SUMAR.SI"], ["COUNTIF", "CONTAR.SI"], ["VLOOKUP", "BUSCARV"], ["INDEX", "INDICE"], ["MATCH", "COINCIDIR"], ["ISNUMBER", "ESNUMERO"], ["ISTEXT", "ESTEXTO"], ["SEARCH", "HALLAR"], ["AVERAGE", "PROMEDIO"], ["COUNT", "CONTAR"], ["ROUND", "REDONDEAR"], ["SQRT", "√"], ["EXP", "e^"], ["LN", "ln"], ["LEN", "LARGO"], ["AND", "Y"], ["OR", "O"], ["IF", "SI"], ["MAX", "MÁX"], ["MIN", "MÍN"], ["SUM", "SUMA"]];
 
 // Traduce una fórmula de Excel a una explicación legible: las celdas se
@@ -844,13 +850,32 @@ const HOJAS = {
     const fp = h.dato("Factor de potencia", n(e.fp, 0.9), ""), sen = h.calc("sen φ", `SQRT(1-${fp}^2)`, ""), dvMax = h.dato("Caída de tensión máxima", n(e.dvMax, 3), "%");
     const ik3 = ctx.cortocircuito?.barras?.[0]?.ik3;
     const ikDef = ctx.trafoPotencia?.ikMT ?? (Number.isFinite(ik3) ? ik3 / 1000 : 0);
+    const inst = N.INSTALACIONES_MT[e.instalacion] || N.INSTALACIONES_MT.ductoUni, nCirc = n(e.nCircuitos, 1);
+    const ref = ampacidadTablaMT({ instalacion: e.instalacion || "ductoUni", material: "Cu", circuitos: nCirc, kV: n(e.tension, ctx.trafoPotencia ? ctx.trafoPotencia.vs / 1000 : 34.5), tc: n(e.tempConductor, 90), calibre: "500" });
+    const det = Number(ref.ref.match(/Detalle (\d+)/)?.[1] || 1);
+    h.seccion(`Capacidad de corriente: ${inst.nombre}`);
+    const tCu = h.dato("Tabla NTC 2050 para cobre", inst.cu, "", "Tabla 310.60(C)(n)"), tAl = h.dato("Tabla NTC 2050 para aluminio", inst.al, "");
+    const dt = h.dato("Detalle de la Figura 310.60", det, "", `${nCirc} circuito(s) en el banco o la zanja${ref.notas?.length ? `; ${ref.notas.join("; ")}` : ""}`);
+    const cl = h.calc("Clase de tensión de la tabla", `IF(${U}<=5,5,35)`, "kV", "5 = 2001 a 5000 V; 35 = 5001 a 35 000 V");
+    const tcc = h.dato("Temperatura del conductor", n(e.tempConductor, 90) >= 105 ? 105 : 90, "°C", "90 (MV-90) o 105 (MV-105)");
+    const ts = h.dato("Temperatura del suelo", n(e.tempSuelo, 20), "°C", "Las tablas son para 20 °C");
+    const pe = h.dato("Profundidad adicional a la de la Figura 310.60", n(e.profundidadExtra, 0), "m");
+    const ft = h.calc("Factor por temperatura del suelo", `SQRT((${tcc}-${ts})/(${tcc}-20))`, "", "NTC 2050 310.60(C)(4)");
+    const fpr = h.calc("Factor por profundidad", `MAX(0,1-0.06*${pe}/0.3)`, "", "6 % por cada 300 mm adicionales (nota de las tablas)");
+    h.seccion("Circuitos");
     h.nota("K adiabático (IEC 60949): Cu XLPE/EPR 143, Al XLPE/EPR 94, Cu PVC 115, Al PVC 76. R vacía en AHÍNCO = resistencia a 90 °C calculada.");
+    // Origen de la ampacidad base: fabricante (digitada), tabla (búsqueda viva) o interpolada (valor fijo).
+    const filasC = vacias(e.circuitos).map((f) => {
+      if (n(f.ampacidad, 0) > 0) return { ...f, origen: "Fabricante", base: n(f.ampacidad) };
+      const tb = ampacidadTablaMT({ instalacion: e.instalacion || "ductoUni", material: f.material === "Cu" ? "Cu" : "Al", circuitos: nCirc, kV: n(e.tension, ctx.trafoPotencia ? ctx.trafoPotencia.vs / 1000 : 34.5), tc: n(e.tempConductor, 90), calibre: String(f.calibre) });
+      return N.CALIBRES_MT.includes(String(f.calibre)) && Number.isFinite(tb.amp) ? { ...f, origen: "Tabla" } : { ...f, origen: "Interpolada (S)", base: Number.isFinite(tb.amp) ? Math.round(tb.amp * 10) / 10 : 0 };
+    });
     const t = h.tabla([
       { t: "Circuito", v: (f) => String(f.circuito || ""), ancho: 16 }, { t: "Mat. (Cu/Al)", v: (f) => (f.material === "Cu" ? "Cu" : "Al"), entrada: true, lista: ["Cu", "Al"] },
       { t: "Calibre", v: (f) => String(f.calibre || "750"), entrada: true }, { t: "Aisl.", v: (f) => String(f.aislamiento || "XLPE"), entrada: true, lista: ["XLPE", "EPR", "PVC"] },
       { t: "S (mm²)", v: (f, rr) => `=VLOOKUP(C${rr},${T.cond},8,FALSE)`, fmt: "0.0" },
-      { t: "Ampacidad base (A)", v: (f) => n(f.ampacidad), entrada: true }, { t: "Factor", v: (f) => n(f.factor, 1), entrada: true },
-      { t: "Ampacidad corregida (A)", v: (f, rr) => `=F${rr}*G${rr}`, fmt: "0" }, { t: "I diseño (A)", v: (f) => n(f.corriente), entrada: true },
+      { t: "Ampacidad base (A)", v: (f, rr) => (f.origen === "Tabla" ? `=INDEX(${T.ampMT},MATCH(IF(B${rr}="Cu",${tCu},${tAl})&"|"&${dt}&"|"&${cl}&"|"&${tcc},${T.ampMTk},0),MATCH(C${rr},${T.ampMTcal},0)+1)` : f.base), entrada: false, fmt: "0" }, { t: "Factor adicional", v: (f) => n(f.factor, 1), entrada: true },
+      { t: "Ampacidad corregida (A)", v: (f, rr) => `=F${rr}*G${rr}*IF(T${rr}="Fabricante",1,${ft}*${fpr})`, fmt: "0" }, { t: "I diseño (A)", v: (f) => n(f.corriente), entrada: true },
       { t: "L (m)", v: (f) => n(f.longitud), entrada: true },
       { t: "R (Ω/km)", v: (f) => { const S = N.SECCION_MM2[f.calibre] || 0, cu = f.material === "Cu"; return n(f.r, 0) || (S ? ((cu ? 0.017241 : 0.028264) / S) * 1000 * (1 + (cu ? 0.00393 : 0.00403) * 70) : 0); }, entrada: true, fmt: "0.0000" },
       { t: "X (Ω/km)", v: (f) => n(f.x, 0.13), entrada: true, fmt: "0.000" },
@@ -859,9 +884,12 @@ const HOJAS = {
       { t: "Ik admisible (kA)", v: (f, rr) => `=M${rr}*E${rr}/SQRT(N${rr})/1000`, fmt: "0.00" },
       { t: "ΔV (%)", v: (f, rr) => `=SQRT(3)*I${rr}*J${rr}/1000*(K${rr}*${fp}+L${rr}*${sen})/(${U}*1000)*100`, fmt: "0.00" },
       { t: "In celda (A)", v: (f) => n(f.inCelda, 0), entrada: true },
-      { t: "Resultado", v: (f, rr) => `=IF(AND(I${rr}<=H${rr},O${rr}<=P${rr},Q${rr}<=${dvMax},OR(R${rr}=0,R${rr}>=I${rr})),"Cumple","No cumple")` }
-    ], vacias(e.circuitos));
-    h.resumen(vacias(e.circuitos).map((f, i) => { const rr = t.r0 + i; return { t: String(f.circuito || `Circuito ${i + 1}`), texto: true, f: `"Cable "&B${rr}&" "&C${rr}&" "&D${rr}&": capacidad "&ROUND(H${rr},0)&" A para "&I${rr}&" A; soporta "&ROUND(P${rr},1)&" kA durante "&N${rr}&" s"` }; }));
+      { t: "Resultado", v: (f, rr) => `=IF(AND(I${rr}<=H${rr},O${rr}<=P${rr},Q${rr}<=${dvMax},OR(R${rr}=0,R${rr}>=I${rr})),"Cumple","No cumple")` },
+      { t: "Origen de la ampacidad", v: (f) => f.origen, ancho: 16 }
+    ], filasC);
+    // La ampacidad del fabricante o la interpolada se puede cambiar: celda de entrada.
+    filasC.forEach((f, i) => { if (f.origen === "Tabla") return; const c = h.ws.getCell(`F${t.r0 + i}`); c.fill = relleno(C_AMARILLO); c.font = { size: 9, bold: true, color: { argb: C_AZUL } }; c.protection = { locked: false }; });
+    h.resumen(filasC.map((f, i) => { const rr = t.r0 + i; return { t: String(f.circuito || `Circuito ${i + 1}`), texto: true, f: `"Cable "&B${rr}&" "&C${rr}&" "&D${rr}&": capacidad "&ROUND(H${rr},0)&" A para "&I${rr}&" A; soporta "&ROUND(P${rr},1)&" kA durante "&N${rr}&" s"` }; }));
   },
   apantallamiento(wb, e) {
     const h = new Hoja(wb, "b Apantallamiento", "Apantallamiento por esfera rodante (RETIE literal b; NTC 4552-3; IEEE 998)");
@@ -998,7 +1026,8 @@ const HOJAS = {
   arcoElectrico(wb, e, r, p, ctx) {
     const h = new Hoja(wb, "e Arco eléctrico", "Arco eléctrico: energía incidente y frontera de arco (RETIE literal e; IEEE 1584-2018)");
     const epp = h.dato("Calificación de arco del EPP disponible para el trabajo", n(e.eppDisponible, 8), "cal/cm²");
-    const barras = ctx.cortocircuito?.barras || [];
+    const barras = ctx.cortocircuito?.barras || [], reles = ctx.coordinacion?.reles || [], vRefC = ctx.coordinacion?.tensionRef;
+    const apert = h.dato("Tiempo de apertura del interruptor", n(e.tApertura, 50), "ms", "Se suma al tiempo del relé cuando el tiempo sale de la coordinación");
     const res = [];
     const cx = (et, f, u, expl) => h.fila(et, `=${f}`, u, "", false, expl);
     vacias(e.puntos).forEach((pt, i) => {
@@ -1017,8 +1046,14 @@ const HOJAS = {
       const alto = h.dato("Alto del encerramiento", val("alto", eq.h), "mm", tipico("alto"));
       const ancho = h.dato("Ancho del encerramiento", val("ancho", eq.w), "mm", tipico("ancho"));
       const fondo = h.dato("Fondo del encerramiento", val("fondo", eq.d), "mm", tipico("fondo"));
-      const t = h.dato("Tiempo de despeje con la corriente de arco", val("tiempo", 100), "ms", "De la curva de la protección aguas arriba");
-      const tm = h.dato("Tiempo de despeje con la corriente de arco reducida", val("tiempoMin", val("tiempo", 100)), "ms", "Suele ser mayor: la protección ve menos corriente");
+      // Tiempos: digitados, de la curva de la protección de la coordinación (fórmula viva más abajo) o 100 ms supuestos.
+      const rel = Number.isFinite(n(pt.tiempo, NaN)) ? null : reles.find((x) => pt.proteccion && String(x.nombre || "").trim().toLowerCase() === String(pt.proteccion).trim().toLowerCase());
+      let t = null, tm = null;
+      if (!rel) {
+        const sup = !Number.isFinite(n(pt.tiempo, NaN));
+        t = h.dato("Tiempo de despeje con la corriente de arco", val("tiempo", 100), "ms", sup ? "(S) Supuesto: sin tiempo ni protección de la coordinación" : "De la curva de la protección aguas arriba");
+        tm = h.dato("Tiempo de despeje con la corriente de arco reducida", val("tiempoMin", val("tiempo", 100)), "ms", "Suele ser mayor: la protección ve menos corriente");
+      }
       const abierto = `OR(${ec}="VOA",${ec}="HOA")`, lv = `${V}<=0.6`;
       const fz = (f) => `IF(OR(${V}<0.208,${V}>15),"—",${f})`; // fuera de 0,208 a 15 kV el modelo no aplica
       const tipo = h.calc("Tipo de encerramiento", `IF(${abierto},"Al aire libre",IF(AND(${V}<0.6,${alto}<508,${ancho}<508,${fondo}<=203.2),"Poco profundo (Shallow)","Típico (Typical)"))`, "", "IEEE 1584-2018 §6.2: poco profundo si Voc < 0,6 kV, alto y ancho < 508 mm y fondo ≤ 203,2 mm");
@@ -1045,6 +1080,22 @@ const HOJAS = {
       const varcf = cx("Factor de variación de la corriente de arco VarCf", Array.from({ length: 7 }, (_, j) => `${K(3, j + 1)}${j < 6 ? `*${V}^${6 - j}` : ""}`).join("+"), "", "VarCf = k1·Voc⁶ + k2·Voc⁵ + k3·Voc⁴ + k4·Voc³ + k5·Voc² + k6·Voc + k7, con Voc en kV y los coeficientes de la fila «Tabla 2» — ec. 2");
       const fr = h.calc("Factor de reducción de la corriente de arco", `1-0.5*${varcf}`, "", "Iarc,mín = Iarc × (1 − 0,5 VarCf)");
       const iarcm = h.calc("Corriente de arco reducida Iarc,mín", fz(`${iarc}*${fr}`), "kA");
+      if (rel) {
+        const cv = N.CURVAS_IEC[rel.curva] || N.CURVAS_IEC.SI;
+        h.seccion(`Tiempo de despeje de «${rel.nombre}» (ajustes de la coordinación de protecciones)`);
+        const dt = h.dato("Curva de tiempo definido (1 = sí)", rel.curva === "DT" ? 1 : 0, "", cv.nombre);
+        const kc = h.dato("Constante k de la curva", cv.k, "", "IEC 60255-151"), ac = h.dato("Exponente α de la curva", cv.a, "");
+        const pk = h.dato("Corriente de arranque", n(rel.pickup), "A"), tms = h.dato("TMS (o tiempo, si es de tiempo definido)", n(rel.tms, 0.1), "");
+        const ii = h.dato("Corriente instantánea (0 = sin instantáneo)", n(rel.inst, 0), "A"), ti = h.dato("Tiempo instantáneo", n(rel.tinst, 0.05), "s");
+        const vr = h.dato("Tensión de referencia de la coordinación", Number.isFinite(vRefC) ? vRefC : val("tension", 0.48), "kV", Number.isFinite(vRefC) ? "De la coordinación" : "(S) La coordinación no la indica: se supone la del punto");
+        const iR = h.calc("Corriente de arco referida a la coordinación", fz(`${iarc}*1000*${V}/${vr}`), "A", "Iarc × Voc / Vref");
+        const iRm = h.calc("Corriente de arco reducida referida a la coordinación", fz(`${iarcm}*1000*${V}/${vr}`), "A");
+        const tr = (i) => `IF(${i}>${pk}*1.0001,MIN(IF(${dt}=1,${tms},${tms}*${kc}/((${i}/${pk})^${ac}-1)),IF(AND(${ii}>0,${i}>=${ii}),${ti},1E9)),1E9)`;
+        const ex = "t = mín(2000; t relé × 1000 + apertura), con t relé = TMS × k / ((I/Is)^α − 1), o el tiempo instantáneo si I ≥ I inst.; si la protección no opera se toman 2 s (IEEE 1584-2018 §6.9.1)";
+        t = h.fila("Tiempo de despeje con la corriente de arco", `=IF(ISNUMBER(${iR}),MIN(2000,${tr(iR)}*1000+${apert}),2000)`, "ms", "", false, ex);
+        tm = h.fila("Tiempo de despeje con la corriente de arco reducida", `=IF(ISNUMBER(${iRm}),MIN(2000,${tr(iRm)}*1000+${apert}),2000)`, "ms", "", false, ex);
+        h.seccion("Energía incidente");
+      }
       const A = `IF(${ec}="VCB",4,10)`, B = `IF(${ec}="VCB",20,IF(${ec}="VCBB",24,22))`;
       const eq1112 = (x) => `(660.4+(${x}-660.4)*((${V}+${A})/${B}))/25.4`;
       const w1 = cx("Ancho equivalente del encerramiento", `IF(${ancho}<508,IF(${poco},0.03937*${ancho},20),IF(${ancho}<=660.4,0.03937*${ancho},${eq1112(`MIN(${ancho},1244.6)`)}))`, "pulg.", "Ancho < 508 mm: 20 pulg. (típico) o ancho × 0,03937 (poco profundo); de 508 a 660,4 mm: ancho × 0,03937; mayor: (660,4 + (mín(ancho; 1244,6) − 660,4) × (Voc + A)/B) / 25,4, con A = 4 y B = 20 en VCB, A = 10 y B = 24 en VCBB, A = 10 y B = 22 en HCB — ec. 11 y Tabla 6");
