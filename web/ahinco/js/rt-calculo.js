@@ -1,9 +1,11 @@
 // Página de un módulo de cálculo: formulario generado desde rt-modulos.js,
 // cálculo en vivo (rt-calculos.js) y guardado en rtProyectos/{id}/calculos.
-import { iniciarPagina, leerProyecto, leerCalculos, guardarCalculo, eliminarCalculo, calcularProyecto, moduloDe, nuevaClave, esc, mostrarAlerta, limpiarAlerta, errorAmigable } from "./rt-core.js";
+// Con ?rapido=1&m=módulo es un cálculo rápido: sin proyecto, con borrador en
+// el navegador, salidas de ese solo cálculo y opción de guardarlo en un proyecto.
+import { iniciarPagina, leerProyecto, leerCalculos, guardarCalculo, eliminarCalculo, calcularProyecto, moduloDe, nuevaClave, esc, mostrarAlerta, limpiarAlerta, errorAmigable, listarProyectos, crearProyecto, tituloCalculo } from "./rt-core.js";
 import { MODULOS, AREAS, entradasPorDefecto } from "./rt-modulos.js";
 import { svgTCC } from "./rt-grafico.js";
-import { menuProyecto } from "./rt-shell.js";
+import { menuProyecto, menuInicio } from "./rt-shell.js";
 import { ALCANCE } from "./rt-alcance.js";
 
 const ctx = await iniciarPagina();
@@ -12,8 +14,21 @@ const params = new URLSearchParams(location.search);
 const id = params.get("id"), mid = params.get("k") ? moduloDe(params.get("k")) : params.get("m");
 const mod = MODULOS[mid];
 const alerta = document.getElementById("alerta");
+const rapido = params.get("rapido") === "1";
+// Borrador del cálculo rápido en este navegador (si el almacenamiento no está disponible, no pasa nada).
+const BORRADOR = `ahinco-rapido-${mid}`;
+const leerBorrador = () => { try { return JSON.parse(localStorage.getItem(BORRADOR) || "null"); } catch { return null; } };
+const escribirBorrador = (d) => { try { localStorage.setItem(BORRADOR, JSON.stringify(d)); } catch { /* sin almacenamiento */ } };
+const borrarBorrador = () => { try { localStorage.removeItem(BORRADOR); } catch { /* sin almacenamiento */ } };
 
-if (ctx && (!id || !mod)) {
+if (ctx && rapido) {
+  if (!mod) mostrarAlerta(alerta, "Elija un cálculo en «Cálculo rápido».");
+  else {
+    const b = leerBorrador();
+    const proyecto = { id: null, nombre: "Cálculo rápido", modo: "diseno", altitud: b?.altitud ?? 1000, tempAmbiente: b?.tempAmbiente ?? 30, tipoDiseno: "Cálculo rápido", disenador: ctx.perfil?.nombre || ctx.user.email, matricula: "", literales: {} };
+    iniciar(proyecto, b?.entradas ? { [mid]: { entradas: b.entradas, etiqueta: b.etiqueta || "" } } : {}, true);
+  }
+} else if (ctx && (!id || !mod)) {
   mostrarAlerta(alerta, "Falta el proyecto o el módulo. Vuelve a la lista de proyectos.");
 } else if (ctx) {
   const proyecto = await leerProyecto(id);
@@ -24,11 +39,13 @@ if (ctx && (!id || !mod)) {
   }
 }
 
-function iniciar(proyecto, guardados) {
-  const clave = params.get("k") || (params.get("nuevo") ? nuevaClave(mid, guardados) : mid);
-  document.title = `${mod.titulo} — AHÍNCO`;
-  document.getElementById("migas").innerHTML = `<a href="proyecto.html?id=${encodeURIComponent(proyecto.id)}#resumen">${esc(proyecto.nombre)}</a> › ${esc(AREAS[mod.area].nombre)}`;
-  const pintarMenu = () => menuProyecto(ctx, { proyecto, guardados, resultados: calcularProyecto(proyecto, guardados), activo: clave });
+function iniciar(proyecto, guardados, esRapido = false) {
+  const clave = esRapido ? mid : params.get("k") || (params.get("nuevo") ? nuevaClave(mid, guardados) : mid);
+  document.title = `${mod.titulo}${esRapido ? " (cálculo rápido)" : ""} — AHÍNCO`;
+  document.getElementById("migas").innerHTML = esRapido
+    ? `<a href="rapido.html">Cálculo rápido</a> › ${esc(AREAS[mod.area].nombre)}`
+    : `<a href="proyecto.html?id=${encodeURIComponent(proyecto.id)}#resumen">${esc(proyecto.nombre)}</a> › ${esc(AREAS[mod.area].nombre)}`;
+  const pintarMenu = () => (esRapido ? menuInicio(ctx, { activo: "rapido" }) : menuProyecto(ctx, { proyecto, guardados, resultados: calcularProyecto(proyecto, guardados), activo: clave }));
   pintarMenu();
   document.getElementById("titulo").textContent = `${mod.icono} ${mod.titulo}`;
   document.getElementById("objeto").textContent = mod.objeto;
@@ -46,9 +63,13 @@ function iniciar(proyecto, guardados) {
   btnEliminar.classList.toggle("hidden", !guardados[clave]);
   // Campos nuevos que no existían cuando se guardó: toman el valor por defecto.
   mod.campos.forEach((c) => { if (entradas[c.key] === undefined) entradas[c.key] = entradasPorDefecto(mid)[c.key]; });
-  avisoEj.classList.toggle("hidden", !!origen);
+  avisoEj.classList.toggle("hidden", !!origen || esRapido);
   let sinGuardar = false;
-  const marcar = (v) => { sinGuardar = v; estado.textContent = v ? "● Cambios sin guardar" : guardados[clave] ? "Guardado" : "Sin guardar"; estado.className = `rt-estado-guardado${v ? " pendiente" : ""}`; };
+  const marcar = (v) => {
+    if (esRapido) { if (v) guardarBorrador(); estado.textContent = "Borrador en este navegador"; estado.className = "rt-estado-guardado"; return; }
+    sinGuardar = v; estado.textContent = v ? "● Cambios sin guardar" : guardados[clave] ? "Guardado" : "Sin guardar"; estado.className = `rt-estado-guardado${v ? " pendiente" : ""}`;
+  };
+  const guardarBorrador = () => escribirBorrador({ entradas, etiqueta: etiquetaEl.value.trim(), altitud: proyecto.altitud, tempAmbiente: proyecto.tempAmbiente });
   marcar(false);
   window.addEventListener("beforeunload", (e) => { if (sinGuardar) { e.preventDefault(); e.returnValue = ""; } });
 
@@ -130,6 +151,7 @@ function iniciar(proyecto, guardados) {
       ${(res.notas || []).map((n) => `<p class="rt-nota">ℹ️ ${esc(n)}</p>`).join("")}`;
   }
 
+  if (esRapido) conectarRapido({ proyecto, clave, obtener: () => ({ entradas, etiqueta: etiquetaEl.value.trim() }), recalcular, marcar });
   document.getElementById("guardarBtn").addEventListener("click", async (e) => {
     const btn = e.currentTarget;
     btn.disabled = true;
@@ -159,7 +181,7 @@ function iniciar(proyecto, guardados) {
     } catch (err) { mostrarAlerta(alerta, errorAmigable(err)); }
   });
   document.getElementById("ejemploBtn").addEventListener("click", () => {
-    if (!confirm("¿Reemplazar los datos del formulario por los valores de ejemplo? No se guarda hasta que pulses «Guardar».")) return;
+    if (!confirm(esRapido ? "¿Reemplazar los datos del formulario por los valores de ejemplo?" : "¿Reemplazar los datos del formulario por los valores de ejemplo? No se guarda hasta que pulses «Guardar».")) return;
     entradas = entradasPorDefecto(mid);
     marcar(true);
     pintarCampos();
@@ -168,4 +190,75 @@ function iniciar(proyecto, guardados) {
 
   pintarCampos();
   recalcular();
+}
+
+// ---------------------------------------------------------------- cálculo rápido
+function conectarRapido({ proyecto, clave, obtener, recalcular, marcar }) {
+  ["guardarBtn", "eliminarCalcBtn"].forEach((b) => document.getElementById(b).classList.add("hidden"));
+  document.getElementById("rapidoBarra").classList.remove("hidden");
+  const alt = document.getElementById("rAltitud"), tmp = document.getElementById("rTemp");
+  alt.value = proyecto.altitud; tmp.value = proyecto.tempAmbiente;
+  const sitio = () => { proyecto.altitud = Number(alt.value) || 0; proyecto.tempAmbiente = Number(tmp.value) || 30; marcar(true); recalcular(); };
+  alt.addEventListener("input", sitio); tmp.addEventListener("input", sitio);
+  // Datos para los generadores de documentos: un proyecto con este único cálculo.
+  const datos = () => {
+    const { entradas, etiqueta } = obtener();
+    const guardados = { [clave]: { entradas: structuredClone(entradas), etiqueta } };
+    const resultados = calcularProyecto(proyecto, guardados);
+    const nombre = tituloCalculo(resultados[clave]);
+    return { proyecto: { ...proyecto, nombre }, resultados, guardados, rapido: true };
+  };
+  const generar = async (tipo, btn) => {
+    limpiarAlerta(alerta);
+    btn.disabled = true; btn.classList.add("generando");
+    try {
+      if (tipo === "excel") { const { descargarExcel } = await import("./rt-excel.js"); await descargarExcel(datos()); }
+      else { const { descargarCalculo } = await import("./rt-memoria.js"); await descargarCalculo(datos(), tipo); }
+    } catch (err) { console.error(err); mostrarAlerta(alerta, `No se pudo generar: ${errorAmigable(err)}`); }
+    finally { btn.disabled = false; btn.classList.remove("generando"); }
+  };
+  document.getElementById("rPdf").addEventListener("click", (e) => generar("pdf", e.currentTarget));
+  document.getElementById("rWord").addEventListener("click", (e) => generar("word", e.currentTarget));
+  document.getElementById("rExcel").addEventListener("click", (e) => generar("excel", e.currentTarget));
+  // Guardar en un proyecto existente o en uno nuevo.
+  const dlg = document.getElementById("rDialogo"), sel = document.getElementById("rProyecto");
+  const campoNuevo = document.getElementById("rNuevoNombreCampo"), nuevoNombre = document.getElementById("rNuevoNombre"), dAlerta = document.getElementById("rDialogoAlerta");
+  sel.addEventListener("change", () => campoNuevo.classList.toggle("hidden", sel.value !== "__nuevo"));
+  document.getElementById("rGuardar").addEventListener("click", async () => {
+    limpiarAlerta(dAlerta);
+    sel.innerHTML = '<option value="">Cargando…</option>';
+    dlg.showModal();
+    try {
+      const lista = await listarProyectos();
+      sel.innerHTML = `<option value="__nuevo">＋ Proyecto nuevo</option>${lista.map((p) => `<option value="${esc(p.id)}">${esc(p.nombre)}</option>`).join("")}`;
+      sel.value = lista[0]?.id || "__nuevo";
+      nuevoNombre.value = datos().proyecto.nombre;
+      campoNuevo.classList.toggle("hidden", sel.value !== "__nuevo");
+    } catch (err) { mostrarAlerta(dAlerta, errorAmigable(err)); }
+  });
+  const cerrar = () => dlg.close();
+  document.getElementById("rDialogoCerrar").addEventListener("click", cerrar);
+  document.getElementById("rCancelar").addEventListener("click", cerrar);
+  document.getElementById("rConfirmar").addEventListener("click", async (e) => {
+    const btn = e.currentTarget;
+    limpiarAlerta(dAlerta);
+    btn.disabled = true;
+    try {
+      let pid = sel.value;
+      if (!pid) throw new Error("Elija un proyecto.");
+      if (pid === "__nuevo") {
+        const nombre = nuevoNombre.value.trim();
+        if (!nombre) throw new Error("Escriba el nombre del proyecto nuevo.");
+        pid = await crearProyecto({ nombre, modo: "diseno", cliente: "", ubicacion: "", altitud: proyecto.altitud, tempAmbiente: proyecto.tempAmbiente, tipoDiseno: "Diseño detallado", descripcion: "", disenador: proyecto.disenador, matricula: "", literales: {} }, ctx.user);
+      }
+      const { entradas, etiqueta } = obtener();
+      const nueva = nuevaClave(mid, await leerCalculos(pid));
+      await guardarCalculo(pid, nueva, entradas, ctx.user, etiqueta);
+      borrarBorrador();
+      window.location.href = `calculo.html?id=${encodeURIComponent(pid)}&k=${encodeURIComponent(nueva)}`;
+    } catch (err) {
+      mostrarAlerta(dAlerta, err.message && !err.code ? err.message : errorAmigable(err));
+      btn.disabled = false;
+    }
+  });
 }

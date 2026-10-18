@@ -272,3 +272,14 @@ body.rt-verificacion .rt-solo-verif { display: block; }
 .rt-lista { margin: 0; padding-left: 18px; font-size: 13.5px; }
 .rt-lista li { margin: 6px 0; }
 .rt-w-prioridad { width: 110px; }
+
+/* ---- cálculo rápido */
+.rt-rapido-barra { display: flex; flex-wrap: wrap; justify-content: space-between; align-items: flex-end; gap: 12px 20px; margin-bottom: 14px; border-left: 4px solid var(--rt-naranja, #f5a623); }
+.rt-rapido-sitio { display: flex; flex-wrap: wrap; align-items: flex-end; gap: 8px 16px; }
+.rt-rapido-sitio > strong { width: 100%; }
+.rt-rapido-sitio > .text-muted { width: 100%; font-size: 12.5px; }
+.rt-rapido-sitio label { font-size: 12.5px; display: flex; flex-direction: column; gap: 4px; }
+.rt-rapido-sitio input { width: 130px; }
+#rDialogo label { display: block; margin: 10px 0; }
+#rDialogo select, #rDialogo input { width: 100%; }
+#modulos .rt-selector-area { margin-bottom: 14px; }

@@ -27,6 +27,28 @@
           <button type="button" class="btn" id="guardarBtn">Guardar</button>
         </div>
       </div>
+      <div class="card rt-rapido-barra hidden" id="rapidoBarra">
+        <div class="rt-rapido-sitio">
+          <strong>⚡ Cálculo rápido</strong>
+          <span class="text-muted">No se guarda en un proyecto: el borrador queda en este navegador.</span>
+          <label>Altitud (m s. n. m.)<input id="rAltitud" type="number" step="any"></label>
+          <label>Temperatura ambiente (°C)<input id="rTemp" type="number" step="any"></label>
+        </div>
+        <div class="rt-acciones">
+          <button type="button" class="btn secondary" id="rPdf">📄 PDF</button>
+          <button type="button" class="btn secondary" id="rWord">📝 Word</button>
+          <button type="button" class="btn secondary" id="rExcel">📊 Excel formulado</button>
+          <button type="button" class="btn" id="rGuardar">Guardar en un proyecto</button>
+        </div>
+      </div>
+      <dialog class="rt-dialogo" id="rDialogo">
+        <div class="rt-dialogo-cabeza"><h2>Guardar en un proyecto</h2><button type="button" class="rt-icono-btn" id="rDialogoCerrar" title="Cerrar">✕</button></div>
+        <p class="text-muted">El cálculo se agrega al proyecto como un cálculo más; si el proyecto ya tiene uno igual, se agrega como otro.</p>
+        <label>Proyecto<select id="rProyecto"></select></label>
+        <label class="hidden" id="rNuevoNombreCampo">Nombre del proyecto nuevo<input id="rNuevoNombre" type="text" maxlength="120"></label>
+        <div class="alert" id="rDialogoAlerta"></div>
+        <div class="rt-acciones"><button type="button" class="btn" id="rConfirmar">Guardar</button><button type="button" class="btn secondary" id="rCancelar">Cancelar</button></div>
+      </dialog>
       <div class="alert" id="alerta"></div>
       <div class="rt-calculo">
         <section class="card">
@@ -39,6 +61,9 @@
       </div>
     </main>
   </div>
+  <script src="../js/vendor/jspdf.umd.min.js"></script>
+  <script src="../js/vendor/docx.iife.js"></script>
+  <script src="../js/vendor/exceljs.min.js"></script>
   <script type="module" src="js/rt-calculo.js"></script>
 </body>
 </html>

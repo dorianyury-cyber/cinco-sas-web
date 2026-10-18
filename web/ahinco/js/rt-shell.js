@@ -51,6 +51,7 @@ export function menuInicio(ctx, { filtro = "todos", conteos = {}, activo = "" } 
       ${item("verificacion", "🔎", "Verificación")}
       <div class="rt-nav-titulo">Acciones</div>
       <a href="inicio.html#nuevo" id="rtNuevo"><span class="rt-nav-icono">＋</span>Nuevo proyecto</a>
+      <a href="rapido.html" class="${activo === "rapido" ? "active" : ""}"><span class="rt-nav-icono">⚡</span>Cálculo rápido</a>
       ${activo ? "" : '<a href="#" id="rtImportar"><span class="rt-nav-icono">⬆</span>Importar proyecto</a>'}
       <div class="rt-nav-titulo">Ayuda</div>
       <a href="acerca.html" class="${activo === "acerca" ? "active" : ""}"><span class="rt-nav-icono">ℹ</span>Alcance y validación</a>

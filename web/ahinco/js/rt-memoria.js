@@ -173,3 +173,17 @@ export async function descargarMemoria(datos, tipo) {
     descargarBlob(doc.output("blob"), nombreArchivo(datos.proyecto, "pdf"));
   }
 }
+
+// Documento de un solo cálculo (cálculo rápido, sin proyecto): el desarrollo del
+// cálculo con sus datos, método, verificaciones y conclusión.
+export async function descargarCalculo(datos, tipo) {
+  const { proyecto, resultados, guardados } = datos;
+  const r = Object.values(resultados)[0];
+  const b = await seccionModulo(r, guardados[r.clave]?.entradas || {}, 1);
+  b.splice(1, 0, P(`<i>Cálculo realizado con AHÍNCO sin proyecto asociado (cálculo rápido). Condiciones del sitio: altitud ${esc(String(proyecto.altitud ?? "—"))} m s. n. m. y temperatura ambiente ${esc(String(proyecto.tempAmbiente ?? "—"))} °C.</i>`));
+  b.push({ tipo: "firma", etiqueta: "Elaboró", firmantes: [{ nombre: proyecto.disenador || "", cargo: "Cinco S.A.S.", firmaUrl: null }] });
+  const informe = { ...datosInforme(proyecto, b), titulo: `Cálculo — ${tituloCalculo(r)}`, radicado: "Cálculo rápido", contratoNombre: tituloCalculo(r) };
+  const nombre = `Calculo - ${tituloCalculo(r).replace(/[\/:*?"<>|]/g, "-").slice(0, 90)}`;
+  if (tipo === "word") descargarBlob(await generarInformeDocxBlob(informe), `${nombre}.docx`);
+  else descargarBlob((await generarInformePDF(sanearPDF(informe))).output("blob"), `${nombre}.pdf`);
+}

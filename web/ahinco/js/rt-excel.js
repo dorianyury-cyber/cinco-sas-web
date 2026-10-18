@@ -1407,20 +1407,20 @@ function bandaTitulo(ws, texto, sub, cols) {
   const s = ws.getCell("A2"); s.value = sub; s.font = { italic: true, size: 10, color: { argb: C_GRIS_TXT } }; s.alignment = { indent: 1 };
 }
 
-export async function construirLibro({ proyecto, resultados, guardados }, ExcelJS = window.ExcelJS) {
+export async function construirLibro({ proyecto, resultados, guardados, rapido = false }, ExcelJS = window.ExcelJS) {
   const wb = new ExcelJS.Workbook();
   wb.creator = "AHÍNCO — Cinco S.A.S.";
   wb.calcProperties.fullCalcOnLoad = true;
   hojasCreadas.length = 0;
   const verif = esVerificacion(proyecto);
-  const tituloDoc = verif ? "Verificación de la memoria de cálculo" : "Memoria de cálculo";
+  const tituloDoc = rapido ? "Cálculo" : verif ? "Verificación de la memoria de cálculo" : "Memoria de cálculo";
   proyectoActual = `${proyecto.nombre}${proyecto.cliente ? ` · ${proyecto.cliente}` : ""}`;
 
   // ---- portada (el índice se llena al final, cuando existen todas las hojas)
   const port = wb.addWorksheet("Portada", { properties: { tabColor: { argb: C_NAVY } }, pageSetup: { orientation: "landscape", fitToPage: true, fitToWidth: 1, fitToHeight: 0, paperSize: 9 } });
   port.columns = [{ width: 32 }, { width: 62 }, { width: 50 }];
   bandaTitulo(port, `${tituloDoc} — ${proyecto.nombre}`, "Libro formulado generado con AHÍNCO — Cinco S.A.S.", 3);
-  const datos = [["Tipo de documento", verif ? "Verificación de interventoría" : "Diseño"], ["Cliente", proyecto.cliente], ["Ubicación", proyecto.ubicacion], ["Altitud (m s. n. m.)", proyecto.altitud], ["Temperatura ambiente de diseño (°C)", proyecto.tempAmbiente], ...(verif ? [["Diseño revisado", proyecto.autorDiseno], ["Documentos revisados", proyecto.documentosRevisados]] : []), [verif ? "Interventor que verifica" : "Diseñador", proyecto.disenador], ["Matrícula profesional", proyecto.matricula]];
+  const datos = [["Tipo de documento", rapido ? "Cálculo rápido (sin proyecto)" : verif ? "Verificación de interventoría" : "Diseño"], ["Cliente", proyecto.cliente], ["Ubicación", proyecto.ubicacion], ["Altitud (m s. n. m.)", proyecto.altitud], ["Temperatura ambiente de diseño (°C)", proyecto.tempAmbiente], ...(verif ? [["Diseño revisado", proyecto.autorDiseno], ["Documentos revisados", proyecto.documentosRevisados]] : []), [verif ? "Interventor que verifica" : "Diseñador", proyecto.disenador], ["Matrícula profesional", proyecto.matricula]];
   let pr = 4;
   datos.forEach(([k, v]) => {
     const a = port.getCell(`A${pr}`); a.value = k; a.font = { bold: true, size: 10 }; a.fill = relleno(C_SECCION); a.border = BORDES;
@@ -1450,7 +1450,8 @@ export async function construirLibro({ proyecto, resultados, guardados }, ExcelJ
   pr++;
   const filaIndice = pr;
 
-  // ---- literales
+  // ---- literales (no en un cálculo rápido, que no tiene proyecto)
+  if (!rapido) {
   const lit = wb.addWorksheet("Literales RETIE", { properties: { tabColor: { argb: C_NAVY } }, pageSetup: { orientation: "landscape", fitToPage: true, fitToWidth: 1, fitToHeight: 0, paperSize: 9 } });
   lit.columns = [{ width: 6 }, { width: 62 }, { width: 9 }, { width: 80 }];
   bandaTitulo(lit, "Diseño detallado según el RETIE: literales a) a x)", FUENTE_LITERALES, 4);
@@ -1470,10 +1471,11 @@ export async function construirLibro({ proyecto, resultados, guardados }, ExcelJ
     fila.height = Math.max(16, 13 * Math.max(Math.ceil(l.texto.length / 60), Math.ceil(texto.length / 78)) + 4);
   });
   lit.views = [{ state: "frozen", ySplit: 4, showGridLines: false }];
+  }
 
   // ---- hallazgos (o pendientes) y supuestos, como valores: resumen para el oficio
   const hall = hallazgos(proyecto, resultados), sup = supuestos(proyecto, guardados || {});
-  if (hall.length || sup.length) {
+  if (!rapido && (hall.length || sup.length)) {
     const hs = wb.addWorksheet(verif ? "Hallazgos" : "Pendientes", { properties: { tabColor: { argb: "FFD64545" } }, pageSetup: { orientation: "landscape", fitToPage: true, fitToWidth: 1, fitToHeight: 0, paperSize: 9 } });
     hs.columns = [{ width: 7 }, { width: 30 }, { width: 46 }, { width: 16 }, { width: 22 }, { width: 40 }, { width: 8 }];
     bandaTitulo(hs, verif ? "Hallazgos de la interventoría" : "Pendientes por corregir", verif ? "Criterios que no cumplen en el diseño revisado: el contratista debe aclararlos o corregirlos." : "Criterios que todavía no cumplen: corríjalos antes de entregar la memoria.", 7);
@@ -1533,7 +1535,7 @@ export async function construirLibro({ proyecto, resultados, guardados }, ExcelJ
   ir++;
   ["Hoja", "Cálculo", "Qué contiene"].forEach((t, i) => { const c = port.getCell(ir, i + 1); c.value = t; c.font = { bold: true, size: 9, color: { argb: "FFFFFFFF" } }; c.fill = relleno(C_NAVY); c.border = BORDES; });
   ir++;
-  const fijas = [{ hoja: "Literales RETIE", texto: "Literales a) a x)", desc: "Qué exige el RETIE en cada literal y dónde se desarrolla" }, ...(hall.length || sup.length ? [{ hoja: verif ? "Hallazgos" : "Pendientes", texto: verif ? "Hallazgos" : "Pendientes", desc: "Criterios que no cumplen y supuestos por confirmar" }] : [])];
+  const fijas = rapido ? [] : [{ hoja: "Literales RETIE", texto: "Literales a) a x)", desc: "Qué exige el RETIE en cada literal y dónde se desarrolla" }, ...(hall.length || sup.length ? [{ hoja: verif ? "Hallazgos" : "Pendientes", texto: verif ? "Hallazgos" : "Pendientes", desc: "Criterios que no cumplen y supuestos por confirmar" }] : [])];
   [...fijas, ...indice, { hoja: "Tablas", texto: "Tablas normativas", desc: "Tablas que consultan las fórmulas" }].forEach((x) => {
     const a = port.getCell(`A${ir}`); a.value = { text: x.hoja, hyperlink: `#'${x.hoja}'!A1` }; a.font = { size: 10, color: { argb: C_AZUL }, underline: true };
     port.getCell(`B${ir}`).value = x.texto; port.getCell(`C${ir}`).value = x.desc;
@@ -1565,7 +1567,7 @@ export async function descargarExcel(datos) {
   const blob = new Blob([buf], { type: "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet" });
   const url = URL.createObjectURL(blob);
   const a = document.createElement("a");
-  a.href = url; a.download = `${esVerificacion(proyecto) ? "Verificacion" : "Memoria de calculo"} formulada - ${String(proyecto.nombre || "proyecto").replace(/[\\/:*?"<>|]/g, "-").slice(0, 80)}.xlsx`;
+  a.href = url; a.download = `${datos.rapido ? "Calculo" : esVerificacion(proyecto) ? "Verificacion" : "Memoria de calculo"} formulada - ${String(proyecto.nombre || "proyecto").replace(/[\\/:*?"<>|]/g, "-").slice(0, 80)}.xlsx`;
   document.body.appendChild(a); a.click(); a.remove();
   setTimeout(() => URL.revokeObjectURL(url), 4000);
 }

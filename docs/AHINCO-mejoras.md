@@ -18,7 +18,7 @@ Documento para quien mantenga o amplíe AHÍNCO (`web/ahinco/`). Resume cómo es
 | `js/rt-shell.js` | Menú lateral (lista de proyectos y proyecto). |
 | `js/rt-memoria.js` | Memoria PDF/Word con los generadores compartidos `web/js/control/informes-pdf.js` e `informes-docx.js`. |
 | `js/rt-excel.js` | Excel formulado (ExcelJS): clase `Hoja` (formato, explicación de fórmulas, resumen, protección con clave `cinco`) y una función por módulo en `HOJAS`. |
-| `proyecto.html`, `calculo.html`, `inicio.html`, `acerca.html` | Páginas (CSP estricta: sin `style=""` ni scripts externos). |
+| `proyecto.html`, `calculo.html`, `inicio.html`, `acerca.html`, `rapido.html` | Páginas (CSP estricta: sin `style=""` ni scripts externos). `calculo.html?rapido=1&m=módulo` es el cálculo rápido: sin proyecto, borrador en `localStorage` (`ahinco-rapido-<módulo>`), salidas de un solo cálculo (`descargarCalculo()` en `rt-memoria.js`; `construirLibro({ rapido: true })` sin literales ni hallazgos) y «Guardar en un proyecto». |
 
 Datos en Firestore: `rtProyectos/{id}` y `rtProyectos/{id}/calculos/{clave}` (`clave` = módulo o `módulo-N`). Reglas en `firestore.rules` (se publican a mano).
 
