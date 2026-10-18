@@ -22,6 +22,9 @@
         </div>
         <div class="rt-acciones rt-acciones-calc">
           <span class="rt-estado-guardado" id="estadoGuardado"></span>
+          <button type="button" class="btn secondary" id="plantillaCalcBtn" title="Excel con todos los datos de este cálculo para llenarlo y volverlo a cargar">⬇ Plantilla Excel</button>
+          <button type="button" class="btn secondary" id="importarCalcBtn" title="Cargar los datos de este cálculo desde la plantilla Excel">⬆ Importar Excel</button>
+          <input type="file" id="importarCalcArchivo" accept=".xlsx" class="hidden">
           <button type="button" class="btn secondary" id="ejemploBtn">Restablecer ejemplo</button>
           <button type="button" class="btn danger hidden" id="eliminarCalcBtn">Eliminar</button>
           <button type="button" class="btn" id="guardarBtn">Guardar</button>
@@ -59,6 +62,12 @@
         <div id="impVista"></div>
         <div class="rt-imp-modo"><label><input type="radio" name="impModo" value="agregar" checked> Agregar a las filas actuales</label><label><input type="radio" name="impModo" value="reemplazar"> Reemplazar las filas actuales</label></div>
         <div class="rt-acciones"><button type="button" class="btn" id="impAceptar" disabled>Importar</button><button type="button" class="btn secondary" id="impCancelar">Cancelar</button></div>
+      </dialog>
+      <dialog class="rt-dialogo" id="impCalcDialogo">
+        <div class="rt-dialogo-cabeza"><h2>Importar los datos del cálculo</h2><button type="button" class="rt-icono-btn" id="impCalcCerrar" title="Cerrar">✕</button></div>
+        <p class="text-muted" id="impCalcArchivo"></p>
+        <div id="impCalcResumen"></div>
+        <div class="rt-acciones"><button type="button" class="btn" id="impCalcAceptar">Aplicar los datos</button><button type="button" class="btn secondary" id="impCalcCancelar">Cancelar</button></div>
       </dialog>
       <div class="alert" id="alerta"></div>
       <div class="rt-calculo">

@@ -7,7 +7,7 @@ import { MODULOS, AREAS, entradasPorDefecto, tablasFaltantes } from "./rt-modulo
 import { svgTCC, svgUnifilar } from "./rt-grafico.js";
 import { menuProyecto, menuInicio } from "./rt-shell.js";
 import { ALCANCE } from "./rt-alcance.js";
-import { leerTexto, convertirFilas } from "./rt-importar.js";
+import { leerTexto, convertirFilas, leerCalculoExcel, HOJA_DATOS, marcaTabla, nombreHojaTabla } from "./rt-importar.js";
 
 const ctx = await iniciarPagina();
 const params = new URLSearchParams(location.search);
@@ -253,6 +253,94 @@ function iniciar(proyecto, guardados, esRapido = false) {
     marcar(true); pintarCampos(); recalcular();
     mostrarAlerta(alerta, `Se importaron ${nuevas.length} fila${nuevas.length === 1 ? "" : "s"} en «${c.label.replace(/\s*\(.*\)\s*$/, "")}».`, "success");
   });
+  // ---- el cálculo completo en Excel: plantilla con los campos y las tablas, e importación
+  const textoValor = (c, v) => (c.tipo === "select" ? c.opciones.find((o) => String(o.valor) === String(v ?? ""))?.texto ?? v ?? "" : v ?? "");
+  const listaValidacion = (c) => { const l = c.opciones.map((o) => String(o.texto).replace(/[",]/g, " ")).join(","); return l.length <= 250 ? { type: "list", allowBlank: true, formulae: [`"${l}"`] } : null; };
+  const nombreArchivoCalc = () => `${mod.titulo}${etiquetaEl.value.trim() ? ` - ${etiquetaEl.value.trim()}` : ""}`.replace(/[\\/:*?"<>|]/g, "-");
+  async function plantillaCalculo() {
+    const wb = new window.ExcelJS.Workbook();
+    const enc = (ws, fila) => { ws.getRow(fila).font = { bold: true, color: { argb: "FFFFFFFF" } }; ws.getRow(fila).fill = { type: "pattern", pattern: "solid", fgColor: { argb: "FF1F2732" } }; };
+    const ws = wb.addWorksheet(HOJA_DATOS);
+    ws.columns = [{ width: 18 }, { width: 70 }, { width: 28 }, { width: 12 }];
+    ws.getCell("A1").value = `${mod.titulo} — datos del cálculo (AHÍNCO)`; ws.getCell("A1").font = { bold: true, size: 13 };
+    ws.getRow(2).values = ["Clave", "Parámetro", "Valor", "Unidad"]; enc(ws, 2);
+    let r = 3;
+    mod.campos.filter((c) => c.tipo !== "tabla").forEach((c) => {
+      const cond = c.soloSi ? ` (solo si «${mod.campos.find((x) => x.key === Object.keys(c.soloSi)[0])?.label}» = ${textoValor(mod.campos.find((x) => x.key === Object.keys(c.soloSi)[0]) || {}, Object.values(c.soloSi)[0])})` : "";
+      ws.getRow(r).values = [c.key, `${c.label}${cond}`, textoValor(c, entradas[c.key]), c.unidad || ""];
+      ws.getCell(r, 1).font = { color: { argb: "FF8A94A3" }, size: 9 };
+      ws.getCell(r, 3).fill = { type: "pattern", pattern: "solid", fgColor: { argb: "FFFFF4CC" } }; ws.getCell(r, 3).font = { bold: true, color: { argb: "FF1F4E9A" } };
+      ws.getCell(r, 2).alignment = { wrapText: true, vertical: "top" };
+      if (c.tipo === "select") { const v = listaValidacion(c); if (v) ws.getCell(r, 3).dataValidation = v; }
+      r++;
+    });
+    mod.campos.filter((c) => c.tipo === "tabla").forEach((c) => {
+      let nombre = nombreHojaTabla(c.label), k = 2;
+      while (wb.getWorksheet(nombre)) nombre = `${nombreHojaTabla(c.label).slice(0, 27)} (${k++})`;
+      const wt = wb.addWorksheet(nombre);
+      wt.getCell("A1").value = `${c.label} ${marcaTabla(c.key)}`; wt.getCell("A1").font = { bold: true };
+      wt.getRow(2).values = c.columnas.map((col) => col.label); enc(wt, 2);
+      wt.columns = c.columnas.map((col) => ({ width: Math.max(10, Math.min(40, col.label.length + 4, (col.ancho || 10) * 1.6)) }));
+      (entradas[c.key] || []).forEach((f, i) => { wt.getRow(3 + i).values = c.columnas.map((col) => textoValor(col, f[col.key])); });
+      c.columnas.forEach((col, i) => { if (col.tipo !== "select") return; const v = listaValidacion(col); if (v) for (let rr = 3; rr <= 300; rr++) wt.getCell(rr, i + 1).dataValidation = v; });
+    });
+    const ins = wb.addWorksheet("Instrucciones");
+    ins.getColumn(1).width = 110;
+    ["Cómo usar esta plantilla", "1. En «Datos» cambie solo la columna «Valor» (amarilla); no cambie la columna «Clave».", "2. Cada tabla del cálculo tiene su hoja: llene las filas desde la fila 3, sin cambiar la fila 1 ni los encabezados de la fila 2.", "3. Los números pueden llevar coma o punto decimal; las columnas con lista aceptan solo esas opciones.", "4. En AHÍNCO abra el cálculo y use «⬆ Importar Excel»: verá un resumen de lo que cambia antes de aplicarlo."].forEach((t, i) => { ins.getCell(i + 1, 1).value = t; if (!i) ins.getCell(1, 1).font = { bold: true, size: 13 }; });
+    const buf = await wb.xlsx.writeBuffer();
+    const a = document.createElement("a");
+    a.href = URL.createObjectURL(new Blob([buf], { type: "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet" }));
+    a.download = `Plantilla - ${nombreArchivoCalc()}.xlsx`;
+    document.body.appendChild(a); a.click(); a.remove();
+  }
+  const impC = { dlg: document.getElementById("impCalcDialogo"), resumen: document.getElementById("impCalcResumen"), datos: null };
+  async function leerLibro(archivo) {
+    const wb = new window.ExcelJS.Workbook();
+    await wb.xlsx.load(await archivo.arrayBuffer());
+    const hojas = {};
+    wb.worksheets.forEach((ws) => {
+      const m = [];
+      ws.eachRow({ includeEmpty: true }, (row, n) => {
+        const v = [];
+        for (let i = 1; i <= ws.columnCount; i++) { const x = row.getCell(i).value; v.push(x == null ? "" : typeof x === "object" ? (x.result ?? x.text ?? (x.richText ? x.richText.map((t) => t.text).join("") : "")) : x); }
+        m[n - 1] = v;
+      });
+      hojas[ws.name] = Array.from(m, (f) => f || []).slice(ws.name === HOJA_DATOS ? 2 : 0);
+    });
+    return hojas;
+  }
+  document.getElementById("plantillaCalcBtn").addEventListener("click", () => plantillaCalculo().catch((err) => mostrarAlerta(alerta, errorAmigable(err))));
+  const archivoCalc = document.getElementById("importarCalcArchivo");
+  document.getElementById("importarCalcBtn").addEventListener("click", () => archivoCalc.click());
+  archivoCalc.addEventListener("change", async () => {
+    const f = archivoCalc.files[0];
+    archivoCalc.value = "";
+    if (!f) return;
+    limpiarAlerta(alerta);
+    try {
+      const d = leerCalculoExcel(mod, await leerLibro(f), entradas);
+      impC.datos = d;
+      document.getElementById("impCalcArchivo").textContent = f.name;
+      const nT = Object.keys(d.tablas);
+      impC.resumen.innerHTML = `<p class="rt-imp-resumen"><b>${d.cambios.length}</b> dato${d.cambios.length === 1 ? "" : "s"} cambia${d.cambios.length === 1 ? "" : "n"}${d.cambios.length ? `: ${d.cambios.slice(0, 12).map(esc).join(", ")}${d.cambios.length > 12 ? "…" : ""}` : ""}.</p>
+        ${nT.length ? `<p class="rt-imp-resumen">Tablas que se reemplazan: ${nT.map((k) => `«${esc(mod.campos.find((c) => c.key === k).label.replace(/\s*\(.*\)\s*$/, ""))}» con ${d.tablas[k].length} fila${d.tablas[k].length === 1 ? "" : "s"}`).join("; ")}.</p>` : '<p class="rt-imp-resumen">No se reemplaza ninguna tabla.</p>'}
+        ${d.avisos.length ? `<ul class="rt-imp-avisos">${d.avisos.slice(0, 15).map((a) => `<li>${esc(a)}</li>`).join("")}${d.avisos.length > 15 ? `<li>… y ${d.avisos.length - 15} avisos más</li>` : ""}</ul>` : ""}`;
+      document.getElementById("impCalcAceptar").disabled = !d.cambios.length && !nT.length;
+      impC.dlg.showModal();
+    } catch (err) { console.error(err); mostrarAlerta(alerta, `No se pudo leer el archivo: ${errorAmigable(err)}`); }
+  });
+  const cerrarImpC = () => impC.dlg.close();
+  document.getElementById("impCalcCerrar").addEventListener("click", cerrarImpC);
+  document.getElementById("impCalcCancelar").addEventListener("click", cerrarImpC);
+  document.getElementById("impCalcAceptar").addEventListener("click", () => {
+    const d = impC.datos;
+    Object.assign(entradas, d.campos);
+    Object.entries(d.tablas).forEach(([k, filasT]) => { const c = mod.campos.find((x) => x.key === k); entradas[k] = filasT.map((f) => ({ ...(c.nueva || {}), ...Object.fromEntries(Object.entries(f).filter(([, v]) => v !== "")) })); });
+    impC.dlg.close();
+    marcar(true); pintarCampos(); recalcular();
+    mostrarAlerta(alerta, `Datos importados: ${d.cambios.length} campo(s) y ${Object.keys(d.tablas).length} tabla(s). ${esRapido ? "" : "Revise y pulse «Guardar»."}`, "success");
+  });
+
   // ---- plantilla Excel de una tabla (encabezados, filas actuales y listas)
   async function plantillaExcel(c) {
     const wb = new window.ExcelJS.Workbook();

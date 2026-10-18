@@ -12,6 +12,8 @@ Documento para quien mantenga o amplíe AHÍNCO (`web/ahinco/`). Resume cómo es
 | `js/rt-calculos.js` | Motor de cálculo: una función pura por módulo `f(entradas, proyecto, ctx)` que devuelve `{resumen, salidas, tablas, pasos, verificaciones, notas, conclusion}`. Sin Firebase: se puede probar con Node. |
 | `js/rt-modulos.js` | Formularios de cada módulo (campos, valores de ejemplo, normas, objeto). |
 | `js/rt-literales.js` | Literales a) a x) del RETIE y qué módulos desarrollan cada uno. Un módulo con `literalPrincipal` (en `rt-modulos.js`) se desarrolla en ese literal y los demás remiten a él. |
+| `js/rt-importar.js` | Importar desde Excel: filas de una tabla (pegado, .xlsx o .csv) y el cálculo completo (`leerCalculoExcel`: hoja «Datos» con Clave/Parámetro/Valor y una hoja por tabla marcada con `[clave: …]` en A1). La plantilla la arma `plantillaCalculo()` en `rt-calculo.js`. |
+| `js/rt-visor.js` | Visores de la memoria (PDF en iframe) y del Excel formulado (por pestañas). |
 | `js/rt-alcance.js` | Alcance, validación, limitaciones y mejoras (texto para el usuario). |
 | `js/rt-hallazgos.js` | Hallazgos (criterios que no cumplen) y supuestos «(S)». Tipo de proyecto `modo`: `diseno` o `verificacion`. |
 | `js/rt-core.js` | Firebase (sesión, proyectos, cálculos), cálculo encadenado (`calcularProyecto`), instancias repetibles (`modulo-N`), importar y exportar. |

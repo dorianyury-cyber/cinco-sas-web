@@ -64,3 +64,52 @@ export function convertirFilas(matriz, columnas) {
   if (!enc && matriz[0].length > columnas.length) avisos.push(`Las filas traen ${matriz[0].length} columnas y la tabla tiene ${columnas.length}: se tomaron las primeras.`);
   return { filas, avisos, porEncabezado: !!enc };
 }
+
+// ---------------------------------------------------------------- un cálculo completo desde Excel
+// Plantilla: hoja «Datos» (Clave, Parámetro, Valor, Unidad) con los campos sueltos y una hoja
+// por tabla cuya celda A1 dice «… [clave: <clave>]», con los encabezados en la fila 2.
+export const HOJA_DATOS = "Datos";
+export const marcaTabla = (clave) => `[clave: ${clave}]`;
+export const nombreHojaTabla = (label) => String(label).replace(/\s*\(.*\)\s*$/, "").replace(/[\/?*[\]:]/g, "-").slice(0, 31) || "Tabla";
+
+// Valor de una celda para un campo (número, lista o texto) → { valor } o { aviso }.
+export function convertirValor(campo, v) {
+  const t = String(v ?? "").trim();
+  if (t === "") return { valor: "" };
+  if (campo.tipo === "numero") { const x = aNumero(t); return Number.isNaN(x) ? { aviso: `«${t}» no es un número` } : { valor: x }; }
+  if (campo.tipo === "select") {
+    const op = campo.opciones.find((x) => normal(x.valor) === normal(t)) || campo.opciones.find((x) => normal(x.valor) === conSinonimo(t) || normal(x.texto) === conSinonimo(t)) || campo.opciones.find((x) => normal(x.texto) === normal(t)) || campo.opciones.find((x) => normal(x.texto).startsWith(normal(t)));
+    return op ? { valor: op.valor } : { aviso: `«${t}» no está en la lista (${campo.opciones.slice(0, 6).map((x) => x.texto).join(", ")}${campo.opciones.length > 6 ? "…" : ""})` };
+  }
+  return { valor: t };
+}
+
+// hojas: { nombreDeHoja: matriz de celdas } → { campos: {clave: valor}, tablas: {clave: filas}, avisos, cambios }
+export function leerCalculoExcel(mod, hojas, entradasActuales = {}) {
+  const avisos = [], campos = {}, tablas = {}, cambios = [];
+  const simples = mod.campos.filter((c) => c.tipo !== "tabla");
+  const datos = hojas[HOJA_DATOS] || Object.entries(hojas).find(([n]) => normal(n) === "datos")?.[1];
+  if (datos) {
+    for (const fila of datos) {
+      const [clave, etiqueta, valor] = fila;
+      const c = simples.find((x) => x.key === String(clave ?? "").trim()) || simples.find((x) => sinParentesis(x.label) === sinParentesis(etiqueta));
+      if (!c) continue;
+      const r = convertirValor(c, valor);
+      if (r.aviso) { avisos.push(`«${c.label}»: ${r.aviso}; se conserva el valor actual.`); continue; }
+      if (r.valor === "" && entradasActuales[c.key] !== "" && entradasActuales[c.key] != null && c.def !== "") continue; // vacío: no borra un dato obligatorio
+      if (String(r.valor) !== String(entradasActuales[c.key] ?? "")) cambios.push(c.label.replace(/\s*\(.*\)\s*$/, ""));
+      campos[c.key] = r.valor;
+    }
+  } else avisos.push("El archivo no tiene la hoja «Datos»: solo se leen las tablas.");
+  for (const c of mod.campos.filter((x) => x.tipo === "tabla")) {
+    const hoja = Object.values(hojas).find((m) => String(m?.[0]?.[0] ?? "").includes(marcaTabla(c.key))) || hojas[nombreHojaTabla(c.label)];
+    if (!hoja) continue;
+    const cuerpo = String(hoja[0]?.[0] ?? "").includes("[clave:") ? hoja.slice(1) : hoja;
+    const r = convertirFilas(cuerpo, c.columnas);
+    const titulo = c.label.replace(/\s*\(.*\)\s*$/, "");
+    r.avisos.forEach((a) => avisos.push(`${titulo} — ${a}`));
+    if (!r.filas.length) continue; // hoja sin filas: la tabla actual se conserva
+    tablas[c.key] = r.filas;
+  }
+  return { campos, tablas, avisos, cambios };
+}
