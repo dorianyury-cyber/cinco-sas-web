@@ -11,7 +11,7 @@ export const urlCalculo = (id, clave) => `calculo.html?id=${encodeURIComponent(i
 
 function cabeza() {
   return `<div class="ip-sidebar-cabeza">
-      <a href="inicio.html" class="brand rt-brand"><img src="../interventoria-pro/assets/logo.png" alt="CINCO S.A.S."><span>AHÍNCO<small>Memorias de cálculo RETIE</small></span></a>
+      <a href="inicio.html" class="brand rt-brand"><img class="rt-logo-oscuro" src="../assets/img/logo.png" alt="CINCO S.A.S."><img class="rt-logo-claro" src="../assets/img/logo-texto-oscuro.png" alt="CINCO S.A.S."><span>AHÍNCO<small>Memorias de cálculo RETIE</small></span></a>
       <button type="button" class="ip-menu-movil" id="rtMenuMovil" aria-expanded="false">☰ Menú</button>
     </div>`;
 }

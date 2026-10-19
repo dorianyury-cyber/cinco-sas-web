@@ -115,6 +115,11 @@ body.rt-con-menu .theme-toggle { display: none; }
 .rt-sidebar { width: 270px; position: sticky; top: 20px; align-self: flex-start; max-height: calc(100vh - 40px); overflow-y: auto; }
 .rt-sidebar nav a { padding: 8px 12px; margin-bottom: 2px; gap: 10px; }
 .rt-brand { gap: 10px; }
+/* Logo: el de partes blancas en tema oscuro y el de letras oscuras en tema claro. */
+.sidebar .rt-brand img { height: 38px; width: auto; border-radius: 0; }
+.rt-logo-oscuro { display: none; }
+:root[data-theme="dark"] .rt-logo-oscuro { display: inline-block; }
+:root[data-theme="dark"] .rt-logo-claro { display: none; }
 .rt-brand span { display: flex; flex-direction: column; line-height: 1.15; }
 .rt-brand small { font-weight: 500; font-size: 11px; color: var(--text-muted); letter-spacing: 0; }
 .rt-nav-icono { width: 20px; text-align: center; flex-shrink: 0; }
