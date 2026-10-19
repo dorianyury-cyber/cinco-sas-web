@@ -59,6 +59,8 @@ function iniciar(proyecto, guardados) {
     const kpi = (valor, etiqueta, clase = "") => `<div class="rt-kpi ${clase}"><div class="valor">${valor}</div><div class="etiqueta">${esc(etiqueta)}</div></div>`;
     document.getElementById("kpis").innerHTML = kpi(calcs.length, "Cálculos") + kpi(cumplen, "Cumplen", "ok") + kpi(hall.length, modo.hallazgos, hall.length ? "mal" : "ok") + kpi(`${listos}/${LITERALES.length}`, "Literales desarrollados", listos === LITERALES.length ? "ok" : "");
     document.getElementById("tituloHallResumen").textContent = `${modo.hallazgos} principales`;
+    document.getElementById("accesoHallTitulo").textContent = modo.hallazgos;
+    document.getElementById("accesoHall").textContent = hall.length ? `${hall.length} por resolver` : "Sin incumplimientos";
     document.getElementById("hallResumen").innerHTML = hall.length
       ? `<ul class="rt-hall-lista">${hall.slice(0, 6).map((h) => `<li><span class="rt-hall-cod">${h.codigo}</span><span><strong>${esc(h.criterio)}</strong><small>${esc(h.valor)} frente a ${esc(h.limite)} · ${esc(h.calculo)} · lit. ${esc(h.literales)}</small></span></li>`).join("")}</ul>${hall.length > 6 ? `<p class="rt-nota">y ${hall.length - 6} más.</p>` : ""}`
       : `<p class="rt-vacio">✔ Todos los criterios verificados cumplen.</p>`;
@@ -211,9 +213,10 @@ function iniciar(proyecto, guardados) {
     const lista = document.getElementById("listaVersiones");
     try { versiones = await listarVersiones(proyecto.id); } catch (err) { lista.innerHTML = `<p class="alert error">${esc(errorAmigable(err))}</p>`; return; }
     const modo = modoDe(proyecto);
+    document.getElementById("ultimaVersion").textContent = versiones.length ? nombreV(versiones[0]) : "Sin versiones guardadas";
     lista.innerHTML = versiones.length
       ? tablaHtml(["N.º", "Fecha", "Autor", "Nota", "Cálculos", modo.hallazgos, "Acciones"], versiones.map((v) => [`<b>V${v.numero}</b>`, esc(fechaCorta(v.creadoEn)), esc(v.creadoPor || ""), esc(v.nota || "—"), String(Object.keys(v.calculos || {}).length), String(v.resumen?.hallazgos ?? "—"),
-        `<span class="rt-version-acciones"><button type="button" data-vcomp="${esc(v.id)}">Comparar con la actual</button><button type="button" data-vver="${esc(v.id)}">Ver memoria</button><button type="button" data-vexp="${esc(v.id)}">Exportar</button><button type="button" data-vres="${esc(v.id)}">Restaurar</button></span>`]))
+        `<span class="rt-version-acciones"><button type="button" data-vcomp="${esc(v.id)}">Comparar con la actual</button><button type="button" data-vver="${esc(v.id)}">Ver memoria</button><button type="button" data-vexp="${esc(v.id)}">Exportar</button><button type="button" data-vres="${esc(v.id)}">Restaurar</button></span>`]), "rt-tabla-versiones")
       : '<p class="rt-vacio">Todavía no hay versiones guardadas.</p>';
     const opciones = ['<option value="actual">Estado actual</option>', ...versiones.map((v) => `<option value="${esc(v.id)}">${esc(nombreV(v))}</option>`)].join("");
     const a = document.getElementById("compA"), b = document.getElementById("compB");

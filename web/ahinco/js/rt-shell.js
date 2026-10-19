@@ -101,12 +101,12 @@ export function menuProyecto(ctx, { proyecto, guardados, resultados, activo }) {
       <div class="rt-nav-titulo">Ayuda</div>
       <a href="acerca.html"><span class="rt-nav-icono">ℹ</span>Alcance y validación</a>
     </nav>${caja(ctx)}
-    <dialog class="rt-dialogo" id="rtSelector">
+    <dialog class="rt-dialogo rt-dialogo-ancho" id="rtSelector">
       <div class="rt-dialogo-cabeza"><h2>Agregar cálculo</h2><button type="button" class="rt-icono-btn" id="rtSelectorCerrar" title="Cerrar">✕</button></div>
       <p class="text-muted">Un mismo cálculo puede repetirse en el proyecto, por ejemplo la coordinación de aislamiento a 115 kV y a 34,5 kV.</p>
-      ${Object.entries(AREAS).map(([a, info]) => `<section class="rt-selector-area ${info.clase}"><h3>${esc(info.nombre)}</h3><div class="rt-selector-lista">
+      <div class="rt-selector-areas">${Object.entries(AREAS).map(([a, info]) => `<section class="rt-selector-area ${info.clase}"><h3>${esc(info.nombre)}</h3><div class="rt-selector-lista">
         ${modulosPorArea(a).map((m) => `<a class="rt-selector-item" href="calculo.html?id=${encodeURIComponent(proyecto.id)}&m=${m}&nuevo=1"><span class="rt-modulo-icono">${MODULOS[m].icono}</span><span><strong>${esc(MODULOS[m].titulo)}</strong><small>${esc(MODULOS[m].objeto)}</small>${clavesDe(m, guardados).length ? `<em>${clavesDe(m, guardados).length} en el proyecto</em>` : ""}</span></a>`).join("")}
-      </div></section>`).join("")}
+      </div></section>`).join("")}</div>
     </dialog>`;
   conectar(aside);
   const dlg = aside.querySelector("#rtSelector");

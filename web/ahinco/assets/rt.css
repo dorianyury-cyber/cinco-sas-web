@@ -58,7 +58,7 @@
 .rt-calculo .card { margin: 0; }
 .rt-resultados { position: sticky; top: 16px; }
 .rt-campos { display: grid; grid-template-columns: repeat(auto-fill, minmax(210px, 1fr)); gap: 0 14px; }
-.rt-campo.rt-oculto { display: none; }
+.rt-campo.rt-oculto, .rt-tabla-campo.rt-oculto { display: none; }
 .rt-tabla-campo { grid-column: 1 / -1; margin-top: 14px; }
 .rt-tabla-campo > label { font-size: 12.5px; font-weight: 600; color: var(--text-muted); }
 .rt-tabla-edit { width: 100%; table-layout: fixed; border-collapse: collapse; margin-top: 6px; }
@@ -225,12 +225,16 @@ body.rt-verificacion .rt-solo-verif { display: block; }
 
 /* Hallazgos */
 .rt-tabla-hall td:first-child { white-space: nowrap; color: var(--danger); }
-.rt-tabla-hall th:nth-child(1) { width: 6%; } .rt-tabla-hall th:nth-child(2) { width: 17%; } .rt-tabla-hall th:nth-child(3) { width: 25%; }
-.rt-tabla-hall th:nth-child(4), .rt-tabla-hall th:nth-child(5) { width: 11%; } .rt-tabla-hall th:nth-child(6) { width: 23%; } .rt-tabla-hall th:nth-child(7) { width: 7%; }
-.rt-tabla-sup th:first-child { width: 26%; }
+.rt-tabla-hall, .rt-tabla-sup, .rt-tabla-versiones { table-layout: fixed; width: 100%; }
+.rt-tabla-hall th:nth-child(1) { width: 4.5%; } .rt-tabla-hall th:nth-child(2) { width: 17%; } .rt-tabla-hall th:nth-child(3) { width: 30%; }
+.rt-tabla-hall th:nth-child(4) { width: 10%; } .rt-tabla-hall th:nth-child(5) { width: 12%; } .rt-tabla-hall th:nth-child(6) { width: 22%; } .rt-tabla-hall th:nth-child(7) { width: 4.5%; }
+.rt-tabla-sup th:first-child { width: 19%; }
+.rt-tabla-versiones th:nth-child(1) { width: 5%; } .rt-tabla-versiones th:nth-child(2) { width: 11%; } .rt-tabla-versiones th:nth-child(3) { width: 17%; } .rt-tabla-versiones th:nth-child(4) { width: 26%; }
+.rt-tabla-versiones th:nth-child(5), .rt-tabla-versiones th:nth-child(6) { width: 7%; } .rt-tabla-versiones th:nth-child(7) { width: 27%; }
+@media (max-width: 900px) { .rt-tabla-hall, .rt-tabla-sup, .rt-tabla-versiones { table-layout: auto; min-width: 760px; } }
 
 /* Documentos */
-.rt-docs { display: grid; grid-template-columns: repeat(auto-fill, minmax(230px, 1fr)); gap: 16px; }
+.rt-docs { display: grid; grid-template-columns: repeat(auto-fit, minmax(190px, 1fr)); gap: 14px; }
 .rt-doc { display: flex; flex-direction: column; align-items: flex-start; gap: 6px; text-align: left; background: var(--card-bg); border: 1px solid var(--border); border-radius: var(--radius); box-shadow: var(--shadow); padding: 20px; cursor: pointer; color: var(--text); font: inherit; width: auto; margin: 0; position: relative; transition: border-color .12s ease, transform .12s ease; }
 .rt-doc:hover { border-color: var(--cinco-orange); transform: translateY(-2px); }
 .rt-doc-icono { font-size: 28px; line-height: 1; }
@@ -277,6 +281,10 @@ body.rt-verificacion .rt-solo-verif { display: block; }
 .rt-alcance-area .rt-alcance { margin-top: 8px; background: transparent; border-left-color: var(--rt-color, #8a94a3); }
 .rt-lista { margin: 0; padding-left: 18px; font-size: 13.5px; }
 .rt-lista li { margin: 6px 0; }
+/* Listas largas en columnas para aprovechar el ancho (cada punto no se parte entre columnas). */
+.rt-lista-cols { columns: 2 420px; column-gap: 36px; }
+.rt-lista-cols li { break-inside: avoid; margin: 0 0 8px; }
+.rt-alcance-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(340px, 1fr)); gap: 0 22px; align-items: start; }
 .rt-w-prioridad { width: 110px; }
 
 /* ---- cálculo rápido */
@@ -332,3 +340,29 @@ body.rt-verificacion .rt-solo-verif { display: block; }
 .rt-comp-nuevo { color: var(--danger); }
 .rt-comp-kpis { display: flex; gap: 10px; flex-wrap: wrap; }
 .rt-comp-kpis .rt-kpi { min-width: 150px; }
+
+/* ---- distribución eficiente del espacio ---- */
+/* Resumen: columna derecha con dos tarjetas apiladas (avance por literal y entregables). */
+.rt-pila { display: flex; flex-direction: column; gap: 20px; }
+.rt-pila .card { margin-bottom: 0; }
+.rt-accesos { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 8px; }
+.rt-acceso { display: grid; grid-template-columns: auto 1fr; column-gap: 10px; align-items: center; padding: 9px 12px; border: 1px solid var(--border); border-radius: 10px; color: var(--text); text-decoration: none; }
+.rt-acceso:hover { border-color: var(--cinco-orange); background: var(--sidebar-hover); text-decoration: none; }
+.rt-acceso > span { grid-row: span 2; font-size: 20px; }
+.rt-acceso strong { font-size: 13px; }
+.rt-acceso small { font-size: 11.5px; color: var(--text-muted); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+/* Dos tarjetas del mismo ancho y la misma altura. */
+.rt-dos-igual { grid-template-columns: minmax(0, 1fr) minmax(0, 1fr); align-items: stretch; }
+.rt-si-contenido:empty { display: none; }
+/* Áreas de cálculos (cálculo rápido y «Agregar cálculo») en dos columnas tipo mosaico. */
+.rt-selector-areas { columns: 2 520px; column-gap: 18px; }
+.rt-selector-areas > .rt-selector-area { break-inside: avoid; display: inline-block; width: 100%; }
+.rt-rapido-areas > .rt-selector-area { margin: 0 0 18px; }
+.rt-rapido-areas > .rt-selector-area h3 { margin-top: 0; }
+.rt-selector-areas .rt-selector-lista { grid-template-columns: repeat(auto-fill, minmax(230px, 1fr)); }
+/* Ventanas emergentes con el ancho que pide su contenido. */
+.rt-dialogo-chico { width: min(520px, calc(100vw - 32px)); }
+.rt-dialogo-medio { width: min(680px, calc(100vw - 32px)); }
+.rt-dialogo-ancho { width: min(1180px, calc(100vw - 32px)); }
+/* Tablas de resultados con muchas columnas: ancho mínimo y desplazamiento lateral en paneles angostos. */
+.rt-tabla-res.rt-tabla-ancha { min-width: 780px; }

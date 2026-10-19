@@ -28,10 +28,21 @@
             <div class="rt-card-cabeza"><h2 id="tituloHallResumen">Hallazgos principales</h2><a href="#hallazgos" class="rt-link">Ver todos →</a></div>
             <div id="hallResumen"></div>
           </div>
-          <div class="card">
-            <div class="rt-card-cabeza"><h2>Avance por literal del RETIE</h2><a href="#literales" class="rt-link">Ir a literales →</a></div>
-            <div class="rt-chips" id="chipsLit"></div>
-            <div class="rt-leyenda"><span><i class="rt-chip-ok"></i>Desarrollado</span><span><i class="rt-chip-danger"></i>Con incumplimientos</span><span><i class="rt-chip-warn"></i>Pendiente</span><span><i class="rt-chip-muted"></i>No aplica</span></div>
+          <div class="rt-pila">
+            <div class="card">
+              <div class="rt-card-cabeza"><h2>Avance por literal del RETIE</h2><a href="#literales" class="rt-link">Ir a literales →</a></div>
+              <div class="rt-chips" id="chipsLit"></div>
+              <div class="rt-leyenda"><span><i class="rt-chip-ok"></i>Desarrollado</span><span><i class="rt-chip-danger"></i>Con incumplimientos</span><span><i class="rt-chip-warn"></i>Pendiente</span><span><i class="rt-chip-muted"></i>No aplica</span></div>
+            </div>
+            <div class="card">
+              <div class="rt-card-cabeza"><h2>Entregables</h2><a href="#documentos" class="rt-link">Ir a documentos →</a></div>
+              <div class="rt-accesos">
+                <a href="#documentos" class="rt-acceso"><span>📄</span><strong>Memoria PDF / Word</strong><small>Verla en pantalla y descargarla</small></a>
+                <a href="#documentos" class="rt-acceso"><span>📊</span><strong>Excel formulado</strong><small>Una hoja por cálculo</small></a>
+                <a href="#hallazgos" class="rt-acceso"><span>🔎</span><strong id="accesoHallTitulo">Hallazgos</strong><small id="accesoHall">—</small></a>
+                <a href="#versiones" class="rt-acceso"><span>🕓</span><strong>Versiones</strong><small id="ultimaVersion">—</small></a>
+              </div>
+            </div>
           </div>
         </div>
         <div class="card">
@@ -58,9 +69,9 @@
             <div><label for="dTipo">Tipo de diseño</label><select id="dTipo" data-p="tipoDiseno"><option>Diseño detallado</option><option>Diseño básico (vivienda, pequeño comercio o pequeña industria)</option><option>Diseño básico (ramal aéreo rural ≤ 50 kVA y 13,2 kV)</option></select></div>
             <div><label for="dRadicado">Código o radicado del documento</label><input id="dRadicado" data-p="radicado"></div>
             <div class="rt-solo-verif"><label for="dAutor">Diseño revisado: autor y matrícula</label><input id="dAutor" data-p="autorDiseno" placeholder="Ej. Ing. N. N., M.P. CN205-000000"></div>
-            <div class="rt-solo-verif rt-ancho"><label for="dDocs">Documentos revisados (planos, memorias y versión)</label><input id="dDocs" data-p="documentosRevisados" placeholder="Ej. Unifilar HI-806-ORI rev. 0 del 12/04/2026"></div>
             <div><label for="dDisenador" id="lblFirma">Diseñador (ingeniero responsable)</label><input id="dDisenador" data-p="disenador"></div>
             <div><label for="dMatricula">Matrícula profesional</label><input id="dMatricula" data-p="matricula" placeholder="Ej. CN205-123456"></div>
+            <div class="rt-solo-verif rt-ancho"><label for="dDocs">Documentos revisados (planos, memorias y versión)</label><input id="dDocs" data-p="documentosRevisados" placeholder="Ej. Unifilar HI-806-ORI rev. 0 del 12/04/2026"></div>
             <div class="rt-ancho"><label for="dDescripcion">Descripción de la instalación y alcance</label><textarea id="dDescripcion" data-p="descripcion" rows="3"></textarea></div>
           </form>
           <div class="rt-acciones"><button type="button" class="btn" id="guardarDatosBtn">Guardar datos</button><button type="button" class="btn danger" id="eliminarBtn">Eliminar proyecto</button></div>
@@ -94,29 +105,31 @@
 
       <!-- Versiones -->
       <section class="rt-seccion" data-seccion="versiones">
-        <div class="card">
-          <h2>Guardar una versión</h2>
-          <p class="text-muted">Una versión es una copia del proyecto completo (datos, literales y cálculos) que no se modifica. Guárdela al radicar una memoria o al recibir cada revisión del contratista, para poder compararlas, ver su memoria o restaurarla.</p>
-          <div class="rt-version-nueva"><input id="notaVersion" type="text" maxlength="300" placeholder="Nota, por ejemplo «Rev. 1 — respuesta a hallazgos» o «Radicada al operador de red»"><button type="button" class="btn" id="guardarVersionBtn">Guardar versión</button></div>
+        <div class="rt-dos rt-dos-igual">
+          <div class="card">
+            <h2>Guardar una versión</h2>
+            <p class="text-muted">Una versión es una copia del proyecto completo (datos, literales y cálculos) que no se modifica. Guárdela al radicar una memoria o al recibir cada revisión del contratista, para poder compararlas, ver su memoria o restaurarla.</p>
+            <div class="rt-version-nueva"><input id="notaVersion" type="text" maxlength="300" placeholder="Nota, por ejemplo «Rev. 1 — respuesta a hallazgos» o «Radicada al operador de red»"><button type="button" class="btn" id="guardarVersionBtn">Guardar versión</button></div>
+          </div>
+          <div class="card">
+            <h2>Comparar</h2>
+            <p class="text-muted">Elija dos versiones (o una versión y el estado actual) para ver los hallazgos cerrados y nuevos y los datos que cambiaron.</p>
+            <div class="rt-version-comparar"><label>Desde<select id="compA"></select></label><label>Hasta<select id="compB"></select></label><button type="button" class="btn secondary" id="compararBtn">Comparar</button></div>
+          </div>
         </div>
         <div class="card">
           <h2>Versiones guardadas</h2>
           <div id="listaVersiones"><p class="text-muted">Cargando…</p></div>
         </div>
-        <div class="card">
-          <h2>Comparar</h2>
-          <div class="rt-version-comparar"><label>Desde<select id="compA"></select></label><label>Hasta<select id="compB"></select></label><button type="button" class="btn secondary" id="compararBtn">Comparar</button></div>
-          <div id="resultadoComparacion"></div>
-        </div>
+        <div id="resultadoComparacion" class="card rt-si-contenido"></div>
       </section>
 
       <!-- Documentos -->
       <section class="rt-seccion" data-seccion="documentos">
-        <div class="rt-docs rt-docs-ver">
+        <div class="rt-docs">
           <button type="button" class="rt-doc rt-doc-ver" id="verMemoriaBtn"><span class="rt-doc-icono">👁</span><strong>Ver memoria</strong><small>Revise la memoria en pantalla antes de descargarla (PDF o Word).</small></button>
           <button type="button" class="rt-doc rt-doc-ver" id="verExcelBtn"><span class="rt-doc-icono">👁</span><strong>Ver Excel formulado</strong><small>Hojas, datos de entrada y fórmulas del libro antes de descargarlo.</small></button>
-        </div>
-        <div class="rt-docs">
+        
           <button type="button" class="rt-doc" id="pdfBtn"><span class="rt-doc-icono">📄</span><strong>PDF</strong><small id="descPdf">Memoria completa lista para radicar, organizada por los literales a) a x).</small></button>
           <button type="button" class="rt-doc" id="wordBtn"><span class="rt-doc-icono">📝</span><strong>Word</strong><small>El mismo documento en formato editable.</small></button>
           <button type="button" class="rt-doc" id="excelBtn"><span class="rt-doc-icono">📊</span><strong>Excel formulado</strong><small>Un solo libro con una hoja por cálculo y fórmulas vivas: cambie un dato y Excel recalcula.</small></button>

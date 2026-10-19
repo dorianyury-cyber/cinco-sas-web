@@ -19,6 +19,31 @@ export { auth, db };
 export const NOMBRE_APP = "AHÍNCO";
 const CLAVE_TEMA = "ip-theme";
 
+// Anchos de columna proporcionales al contenido real (encabezado y celdas), como
+// calcularAnchosColumna() de los informes: las columnas cortas (Resultado, Valor) no
+// ocupan lo mismo que las de texto largo (Criterio, Norma). Devuelve el <colgroup> con
+// data-ancho (%); aplicarAnchos() lo pasa a estilo después de insertar el HTML (CSP).
+export function colgroupProporcional(encabezados, filas, { min = 6, max = 45 } = {}) {
+  const largo = (v) => String(v ?? "").replace(/<[^>]*>/g, "").length;
+  const palabra = (v) => Math.max(0, ...String(v ?? "").replace(/<[^>]*>/g, "").split(/[\s/]+/).map((x) => x.length));
+  // Lineal hasta 14 caracteres (columnas cortas: Valor, Resultado) y comprimido en textos largos.
+  const peso = (n) => (n <= 14 ? n : 14 + Math.sqrt(n - 14) * 3);
+  const pesos = encabezados.map((h, j) => {
+    const celdas = filas.map((f) => largo(f[j])).sort((a, b) => a - b);
+    const p80 = celdas.length ? celdas[Math.min(celdas.length - 1, Math.floor(celdas.length * 0.8))] : 0;
+    const minPalabra = Math.max(palabra(h) * 1.2, ...filas.map((f) => palabra(f[j]))); // la palabra más larga no se parte
+    return Math.max(minPalabra + 2, peso(p80) + 2, 4);
+  });
+  const total = pesos.reduce((s, x) => s + x, 0) || 1;
+  let pct = pesos.map((x) => Math.min(max, Math.max(min, (x / total) * 100)));
+  const suma = pct.reduce((s, x) => s + x, 0);
+  pct = pct.map((x) => (x / suma) * 100);
+  return `<colgroup>${pct.map((x) => `<col data-ancho="${x.toFixed(1)}">`).join("")}</colgroup>`;
+}
+export function aplicarAnchos(raiz) {
+  raiz.querySelectorAll("col[data-ancho]").forEach((col) => { col.style.width = `${col.dataset.ancho}%`; });
+}
+
 export function esc(texto) {
   return String(texto ?? "").replace(/[&<>"']/g, (c) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" }[c]));
 }

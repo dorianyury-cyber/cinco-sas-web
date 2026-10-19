@@ -46,7 +46,7 @@
           <button type="button" class="btn" id="rGuardar">Guardar en un proyecto</button>
         </div>
       </div>
-      <dialog class="rt-dialogo" id="rDialogo">
+      <dialog class="rt-dialogo rt-dialogo-chico" id="rDialogo">
         <div class="rt-dialogo-cabeza"><h2>Guardar en un proyecto</h2><button type="button" class="rt-icono-btn" id="rDialogoCerrar" title="Cerrar">✕</button></div>
         <p class="text-muted">El cálculo se agrega al proyecto como un cálculo más; si el proyecto ya tiene uno igual, se agrega como otro.</p>
         <label>Proyecto<select id="rProyecto"></select></label>
@@ -54,7 +54,7 @@
         <div class="alert" id="rDialogoAlerta"></div>
         <div class="rt-acciones"><button type="button" class="btn" id="rConfirmar">Guardar</button><button type="button" class="btn secondary" id="rCancelar">Cancelar</button></div>
       </dialog>
-      <dialog class="rt-dialogo" id="impDialogo">
+      <dialog class="rt-dialogo rt-dialogo-ancho" id="impDialogo">
         <div class="rt-dialogo-cabeza"><h2 id="impTitulo">Importar filas</h2><button type="button" class="rt-icono-btn" id="impCerrar" title="Cerrar">✕</button></div>
         <p class="text-muted">Copie las celdas en Excel (con o sin la fila de encabezados) y péguelas aquí, o cargue un archivo .xlsx o .csv. Si la primera fila trae los nombres de las columnas, se ubican por nombre; si no, por orden. Revise la vista previa antes de importar.</p>
         <textarea id="impTexto" rows="6" placeholder="Pegue aquí las celdas copiadas de Excel (Ctrl + V)"></textarea>
@@ -63,7 +63,7 @@
         <div class="rt-imp-modo"><label><input type="radio" name="impModo" value="agregar" checked> Agregar a las filas actuales</label><label><input type="radio" name="impModo" value="reemplazar"> Reemplazar las filas actuales</label></div>
         <div class="rt-acciones"><button type="button" class="btn" id="impAceptar" disabled>Importar</button><button type="button" class="btn secondary" id="impCancelar">Cancelar</button></div>
       </dialog>
-      <dialog class="rt-dialogo" id="impCalcDialogo">
+      <dialog class="rt-dialogo rt-dialogo-medio" id="impCalcDialogo">
         <div class="rt-dialogo-cabeza"><h2>Importar los datos del cálculo</h2><button type="button" class="rt-icono-btn" id="impCalcCerrar" title="Cerrar">✕</button></div>
         <p class="text-muted" id="impCalcArchivo"></p>
         <div id="impCalcResumen"></div>

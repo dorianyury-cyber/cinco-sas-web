@@ -2,7 +2,7 @@
 // cálculo en vivo (rt-calculos.js) y guardado en rtProyectos/{id}/calculos.
 // Con ?rapido=1&m=módulo es un cálculo rápido: sin proyecto, con borrador en
 // el navegador, salidas de ese solo cálculo y opción de guardarlo en un proyecto.
-import { iniciarPagina, leerProyecto, leerCalculos, guardarCalculo, eliminarCalculo, calcularProyecto, moduloDe, nuevaClave, esc, mostrarAlerta, limpiarAlerta, errorAmigable, listarProyectos, crearProyecto, tituloCalculo } from "./rt-core.js";
+import { iniciarPagina, leerProyecto, leerCalculos, guardarCalculo, eliminarCalculo, calcularProyecto, moduloDe, nuevaClave, esc, mostrarAlerta, limpiarAlerta, errorAmigable, listarProyectos, crearProyecto, tituloCalculo, colgroupProporcional, aplicarAnchos } from "./rt-core.js";
 import { MODULOS, AREAS, entradasPorDefecto, tablasFaltantes } from "./rt-modulos.js";
 import { svgTCC, svgUnifilar } from "./rt-grafico.js";
 import { menuProyecto, menuInicio } from "./rt-shell.js";
@@ -107,7 +107,7 @@ function iniciar(proyecto, guardados, esRapido = false) {
   function visibilidad() {
     mod.campos.filter((c) => c.soloSi).forEach((c) => {
       const [k, v] = Object.entries(c.soloSi)[0];
-      contCampos.querySelector(`[data-campo="${c.key}"]`)?.classList.toggle("rt-oculto", String(entradas[k]) !== String(v));
+      contCampos.querySelector(`[data-campo="${c.key}"]`)?.classList.toggle("rt-oculto", String(entradas[k] ?? mod.campos.find((x) => x.key === k)?.def ?? "") !== String(v));
     });
   }
   const leer = (el) => (el.type === "number" ? (el.value === "" ? "" : Number(el.value)) : el.value);
@@ -140,7 +140,7 @@ function iniciar(proyecto, guardados, esRapido = false) {
   });
 
   function tablaHtml(t) {
-    return `<h3>${esc(t.titulo)}</h3><div class="tabla-scroll"><table class="rt-tabla-res"><thead><tr>${t.encabezados.map((h) => `<th>${esc(h)}</th>`).join("")}</tr></thead><tbody>${t.filas.map((f) => `<tr>${f.map((v) => `<td>${esc(v)}</td>`).join("")}</tr>`).join("")}</tbody></table></div>`;
+    return `<h3>${esc(t.titulo)}</h3><div class="tabla-scroll"><table class="rt-tabla-res${t.encabezados.length >= 8 ? " rt-tabla-ancha" : ""}">${t.anchos ? `<colgroup>${t.anchos.map((x) => `<col data-ancho="${x}">`).join("")}</colgroup>` : colgroupProporcional(t.encabezados, t.filas)}<thead><tr>${t.encabezados.map((h) => `<th>${esc(h)}</th>`).join("")}</tr></thead><tbody>${t.filas.map((f) => `<tr>${f.map((v) => `<td>${esc(v)}</td>`).join("")}</tr>`).join("")}</tbody></table></div>`;
   }
   function recalcular() {
     const faltan = tablasFaltantes(mid, entradas);
@@ -154,12 +154,13 @@ function iniciar(proyecto, guardados, esRapido = false) {
       <div class="rt-resumen">${(res.resumen || []).map((r) => `<div class="rt-resumen-item"><div class="valor">${esc(r.valor)} <span class="rt-unidad">${esc(r.unidad)}</span></div><div class="etiqueta">${esc(r.etiqueta)}</div></div>`).join("")}</div>
       <div class="rt-conclusion ${fallan || res.error ? "mal" : "ok"}">${esc(res.conclusion || "")}</div>
       ${ALCANCE[mid] ? `<details class="rt-alcance"><summary>⚠ Alcance y limitaciones de este cálculo (léalas antes de usar el resultado)</summary><p>${esc(ALCANCE[mid].metodo)}</p><ul>${ALCANCE[mid].limitaciones.map((l) => `<li>${esc(l)}</li>`).join("")}</ul><p class="rt-nota"><a href="acerca.html">Ver el alcance y la validación de AHÍNCO →</a></p></details>` : ""}
-      ${(res.verificaciones || []).length ? tablaHtml({ titulo: "Verificaciones", encabezados: ["Criterio", "Norma", "Valor", "Límite", "Resultado"], filas: res.verificaciones.map((v) => [v.criterio, v.norma, v.valor, v.limite, v.cumple ? "✔ Cumple" : "✖ No cumple"]) }) : ""}
+      ${(res.verificaciones || []).length ? tablaHtml({ titulo: "Verificaciones", anchos: [30, 25, 13, 19, 13], encabezados: ["Criterio", "Norma", "Valor", "Límite", "Resultado"], filas: res.verificaciones.map((v) => [v.criterio, v.norma, v.valor, v.limite, v.cumple ? "✔ Cumple" : "✖ No cumple"]) }) : ""}
       ${res.grafico?.tipo === "tcc" ? `<h3>Curvas tiempo-corriente</h3><div class="rt-grafico">${svgTCC(res.grafico)}</div>` : ""}
       ${res.grafico?.tipo === "unifilar" ? `<h3>Diagrama unifilar</h3><div class="rt-grafico rt-unifilar">${svgUnifilar(res.grafico)}</div>` : ""}
       ${(res.tablas || []).map(tablaHtml).join("")}
       <h3>Cálculos</h3>${(res.pasos || []).map((p) => `<div class="rt-paso"><strong>${esc(p.titulo)}</strong><span class="rt-formula">${esc(p.formula)}</span><span class="text-muted">${esc(p.sustitucion)}</span><span>${esc(p.resultado)}</span></div>`).join("")}
       ${(res.notas || []).map((n) => `<p class="rt-nota">ℹ️ ${esc(n)}</p>`).join("")}`;
+    aplicarAnchos(resultados);
   }
 
   if (esRapido) conectarRapido({ proyecto, clave, obtener: () => ({ entradas, etiqueta: etiquetaEl.value.trim() }), recalcular, marcar });
