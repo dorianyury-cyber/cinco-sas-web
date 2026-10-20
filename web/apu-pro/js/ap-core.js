@@ -181,6 +181,66 @@ export async function registrarPrecio(insumo, precio, user) {
 }
 export async function eliminarInsumo(codigo) { await deleteDoc(doc(db, "apInsumos", codigo)); }
 
+// ---------------------------------------------------------------- APU (biblioteca)
+// apApus/{codigo} = { codigo, nombre, unidad, rendimiento, categoria, notas, lineas, version,
+//                     origen, fechaOrigen, valorOrigen, observacionesOrigen, codigosAnteriores }
+// apApus/{codigo}/versiones/{auto} = copia inmutable de cada versión guardada.
+const CAMPOS_APU = ["codigo", "nombre", "unidad", "rendimiento", "categoria", "notas", "lineas", "version", "origen", "fechaOrigen", "valorOrigen", "observacionesOrigen", "codigosAnteriores", "factorMaterialesOrigen", "redondeoOrigen"];
+const limpiarApu = (o) => Object.fromEntries(Object.entries(o).filter(([k, v]) => CAMPOS_APU.includes(k) && v !== undefined));
+export async function listarApus() {
+  const snap = await getDocs(collection(db, "apApus"));
+  return snap.docs.map((d) => ({ id: d.id, ...d.data() }));
+}
+export async function leerApu(codigo) {
+  const snap = await getDoc(doc(db, "apApus", codigo));
+  return snap.exists() ? { id: snap.id, ...snap.data() } : null;
+}
+// Guarda el APU como nueva versión: el documento queda con la versión vigente y la
+// subcolección «versiones» conserva la copia de cada versión con su nota.
+export async function guardarApu(apu, user, { nuevo = false, nota = "" } = {}) {
+  const ref = doc(db, "apApus", apu.codigo);
+  const actual = await getDoc(ref);
+  if (nuevo && actual.exists()) throw new Error(`Ya existe un APU con el código ${apu.codigo}.`);
+  const version = (actual.exists() ? Number(actual.data().version) || 1 : 0) + 1;
+  const datos = { ...limpiarApu(apu), version };
+  await setDoc(ref, { ...datos, ...(actual.exists() ? { creadoPor: actual.data().creadoPor || user.email, creadoEn: actual.data().creadoEn || serverTimestamp() } : { creadoPor: user.email, creadoEn: serverTimestamp() }), actualizadoPor: user.email, actualizadoEn: serverTimestamp() });
+  await setDoc(doc(collection(db, "apApus", apu.codigo, "versiones")), { ...datos, nota: String(nota || "").slice(0, 300), creadoPor: user.email, creadoEn: serverTimestamp() });
+  return version;
+}
+export async function listarVersionesApu(codigo) {
+  const snap = await getDocs(collection(db, "apApus", codigo, "versiones"));
+  return snap.docs.map((d) => ({ id: d.id, ...d.data() })).sort((a, b) => (b.version || 0) - (a.version || 0));
+}
+export async function eliminarApu(codigo) {
+  const vers = await getDocs(collection(db, "apApus", codigo, "versiones"));
+  for (const d of vers.docs) await deleteDoc(d.ref);
+  await deleteDoc(doc(db, "apApus", codigo));
+}
+// Carga «APU PRO - biblioteca inicial de APU.json» (formato apupro-biblioteca). Cada APU
+// entra como versión 1 con su copia en «versiones»; los que ya existan no se tocan.
+export function validarBiblioteca(json) {
+  if (!json || json.formato !== "apupro-biblioteca") throw new Error("El archivo no es una biblioteca de APU de APU PRO.");
+  if (!Array.isArray(json.apus) || !json.apus.length) throw new Error("El archivo no trae APU.");
+  for (const a of json.apus) if (!a.codigo || !a.nombre || !a.lineas) throw new Error(`APU incompleto en el archivo: ${JSON.stringify(a).slice(0, 80)}`);
+  return json;
+}
+export async function importarBiblioteca(json, user, { existentes = new Set(), progreso = () => {} } = {}) {
+  validarBiblioteca(json);
+  const nuevos = json.apus.filter((a) => !existentes.has(a.codigo));
+  for (let i = 0; i < nuevos.length; i += 200) {
+    const lote = writeBatch(db);
+    for (const a of nuevos.slice(i, i + 200)) {
+      const datos = { ...limpiarApu(a), version: 1 };
+      lote.set(doc(db, "apApus", a.codigo), { ...datos, creadoPor: user.email, creadoEn: serverTimestamp(), actualizadoPor: user.email, actualizadoEn: serverTimestamp() });
+      lote.set(doc(collection(db, "apApus", a.codigo, "versiones")), { ...datos, nota: `Importado de ${a.origen || "la biblioteca inicial"}`, creadoPor: user.email, creadoEn: serverTimestamp() });
+    }
+    await lote.commit();
+    progreso(Math.min(i + 200, nuevos.length), nuevos.length);
+  }
+  if (json.validacion) await guardarSerie("validacionApu", { resumen: json.validacion.map(({ detalle, ...v }) => v), generado: json.generado }, user);
+  return { apus: nuevos.length, omitidos: json.apus.length - nuevos.length };
+}
+
 // ---------------------------------------------------------------- base inicial
 // Carga el archivo «APU PRO - base inicial de insumos.json» (formato apupro-semilla):
 // parámetros por año, IPP, monedas e insumos. Los insumos que ya existan no se

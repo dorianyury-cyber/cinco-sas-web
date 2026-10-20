@@ -1,0 +1,49 @@
+<!doctype html>
+<html lang="es" class="ap-preparando">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<meta name="robots" content="noindex, nofollow">
+<title>Biblioteca de APU — APU PRO</title>
+<link rel="icon" type="image/png" sizes="32x32" href="../assets/img/favicon-32.png">
+<link rel="stylesheet" href="../interventoria-pro/assets/ip.css">
+<link rel="stylesheet" href="../ahinco/assets/rt.css">
+<link rel="stylesheet" href="assets/ap.css">
+</head>
+<body>
+  <div class="app-shell">
+    <aside class="sidebar rt-sidebar" id="sidebar"></aside>
+    <main class="main rt-main">
+      <div class="rt-encabezado">
+        <h1>📚 Biblioteca de APU</h1>
+        <p class="text-muted">Análisis de precios unitarios con sus cinco capítulos. El costo directo se recalcula con los precios vigentes de la base y los parámetros del año elegido; el AIU y el factor de proyección se aplican en cada proyecto.</p>
+      </div>
+
+      <div class="card hidden" id="cargaCard">
+        <h2>Cargar la biblioteca inicial</h2>
+        <p class="text-muted">La biblioteca está vacía. Carga el archivo <strong>«APU PRO - biblioteca inicial de APU.json»</strong> (en el escritorio): 507 APU tomados de PR-36 (83), PR-38 (82) y CSS 226 (342), validados contra sus Excel. Carga antes la base de insumos desde el Tablero.</p>
+        <input type="file" id="bibliotecaArchivo" accept=".json,application/json" class="hidden">
+        <div class="rt-acciones"><button type="button" class="btn" id="bibliotecaBtn">Elegir archivo y cargar</button></div>
+        <p class="text-muted ap-progreso" id="bibliotecaProgreso"></p>
+      </div>
+
+      <div class="toolbar ap-toolbar">
+        <input type="search" id="buscar" placeholder="Buscar por código, nombre, categoría o código anterior…">
+        <select id="filtroCategoria"><option value="">Todas las categorías</option></select>
+        <select id="filtroOrigen"><option value="">Todos los orígenes</option></select>
+        <label class="ap-anio">Parámetros de <select id="anioParametros"></select></label>
+        <span class="text-muted ap-cuenta" id="cuenta"></span>
+        <a class="btn ap-btn" href="apu.html">＋ Nuevo APU</a>
+      </div>
+      <div class="alert" id="alerta"></div>
+
+      <section class="card ap-vp" id="vistaPrevia"><p class="text-muted">Cargando…</p></section>
+
+      <div class="card ap-lista">
+        <div class="tabla-scroll"><table class="ap-tabla ap-tabla-sel" id="tabla"></table></div>
+      </div>
+    </main>
+  </div>
+  <script type="module" src="js/ap-apus.js"></script>
+</body>
+</html>

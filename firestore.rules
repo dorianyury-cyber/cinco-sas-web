@@ -419,5 +419,15 @@ service cloud.firestore {
       allow read, create, update: if puedeApuPro();
       allow delete: if esAdmin();
     }
+    // Biblioteca de APU: cada guardado deja una copia inmutable en «versiones».
+    match /apApus/{codigo} {
+      allow read, create, update: if puedeApuPro();
+      allow delete: if esAdmin();
+      match /versiones/{versionId} {
+        allow read, create: if puedeApuPro();
+        allow update: if false;
+        allow delete: if esAdmin();
+      }
+    }
   }
 }

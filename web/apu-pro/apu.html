@@ -1,0 +1,57 @@
+<!doctype html>
+<html lang="es" class="ap-preparando">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<meta name="robots" content="noindex, nofollow">
+<title>APU — APU PRO</title>
+<link rel="icon" type="image/png" sizes="32x32" href="../assets/img/favicon-32.png">
+<link rel="stylesheet" href="../interventoria-pro/assets/ip.css">
+<link rel="stylesheet" href="../ahinco/assets/rt.css">
+<link rel="stylesheet" href="assets/ap.css">
+</head>
+<body>
+  <div class="app-shell">
+    <aside class="sidebar rt-sidebar" id="sidebar"></aside>
+    <main class="main rt-main">
+      <div class="rt-encabezado">
+        <a class="ap-volver" href="apus.html" id="volver">← Biblioteca de APU</a>
+        <h1 id="titulo">Nuevo APU</h1>
+      </div>
+      <div class="alert" id="alerta"></div>
+
+      <section class="card">
+        <form id="apuForm" class="rt-form-grid ap-form-apu">
+          <div><label for="aCodigo">Código</label><input id="aCodigo" required></div>
+          <div class="ap-ancho2"><label for="aNombre">Nombre</label><input id="aNombre" required placeholder="Suministro e instalación de…"></div>
+          <div><label for="aUnidad">Unidad</label><input id="aUnidad" required placeholder="U, m, km, m²…"></div>
+          <div><label for="aRend">Rendimiento (unidades por día)</label><input id="aRend" inputmode="decimal" required></div>
+          <div><label for="aCategoria">Categoría</label><input id="aCategoria" list="dlCategorias" placeholder="Ej. Redes de baja tensión"></div>
+          <div class="ap-ancho2"><label for="aNotas">Notas</label><input id="aNotas" placeholder="Alcance, especificación, supuestos…"></div>
+          <div><label for="aAnio">Parámetros para el cálculo</label><select id="aAnio"></select></div>
+        </form>
+        <datalist id="dlCategorias"></datalist>
+      </section>
+
+      <section class="card ap-resumen-apu" id="resumen"></section>
+      <div id="capitulos"></div>
+
+      <section class="card">
+        <div class="ap-guardar">
+          <label for="aNota">Nota de esta versión</label>
+          <input id="aNota" placeholder="Qué cambió (opcional): rendimiento ajustado, nuevo material…">
+          <div class="rt-acciones"><button type="button" class="btn" id="guardar">Guardar APU</button><a class="btn secondary" href="apus.html" id="cancelar">Cancelar</a></div>
+        </div>
+      </section>
+
+      <section class="card hidden" id="versionesCard">
+        <h2>Versiones</h2>
+        <p class="text-muted ap-nota">Cada vez que se guarda queda una copia. «Cargar» pone esa versión en el formulario; al guardar se crea una versión nueva.</p>
+        <div id="versiones"></div>
+      </section>
+    </main>
+  </div>
+  <div id="datalists"></div>
+  <script type="module" src="js/ap-apu-editor.js"></script>
+</body>
+</html>

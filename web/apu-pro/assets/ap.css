@@ -87,3 +87,41 @@
 .ap-fila-form { display: flex; gap: 10px; align-items: flex-end; flex-wrap: wrap; margin-top: 8px; }
 .ap-fila-form label { display: flex; flex-direction: column; gap: 4px; font-size: 12.5px; font-weight: 600; color: var(--text-muted); }
 .ap-fila-form input { padding: 7px 10px; border: 1px solid var(--border); border-radius: 8px; background: var(--input-bg); color: var(--text); font-size: 13px; }
+
+/* Biblioteca y hoja de un APU */
+.ap-pares-apu { grid-template-columns: repeat(auto-fill, minmax(220px, 1fr)); margin-bottom: 8px; }
+.ap-origen { font-size: 12.5px; margin: 4px 0 8px; }
+.ap-obs { font-size: 12.5px; margin: 6px 0; }
+.ap-hoja { display: flex; flex-direction: column; gap: 10px; margin-top: 6px; }
+.ap-tabla-apu { font-size: 12px; }
+.ap-tabla-apu td, .ap-tabla-apu th { padding: 3px 6px; }
+.ap-tabla-apu .ap-cap-titulo th { font-size: 11.5px; color: var(--text); background: var(--sidebar-hover); text-transform: uppercase; letter-spacing: .4px; padding: 5px 6px; }
+.ap-tabla-apu small { font-size: 10px; }
+.ap-cap-vacio { display: flex; gap: 12px; align-items: center; font-size: 12px; padding: 5px 6px; background: var(--sidebar-hover); border-radius: 6px; }
+.ap-cap-vacio span:first-child { font-weight: 700; text-transform: uppercase; letter-spacing: .4px; font-size: 11.5px; }
+.ap-cap-vacio strong { margin-left: auto; }
+.ap-cd { display: flex; justify-content: space-between; align-items: center; padding: 8px 10px; border-top: 2px solid var(--cinco-orange); font-size: 14px; }
+.ap-cd strong { font-size: 17px; }
+
+/* Editor */
+.ap-volver { font-size: 12.5px; color: var(--text-muted); }
+.ap-form-apu { grid-template-columns: repeat(4, minmax(0, 1fr)); }
+.ap-form-apu .ap-ancho2 { grid-column: span 2; }
+@media (max-width: 900px) { .ap-form-apu { grid-template-columns: 1fr 1fr; } }
+.ap-resumen-apu { position: sticky; top: 8px; z-index: 3; padding: 10px 16px; }
+.ap-resumen-apu .ap-pares-apu { margin: 0; }
+.ap-grande { font-size: 17px; color: var(--cinco-orange-dark); }
+.ap-cap-edit { padding: 12px 16px; margin-bottom: 10px; }
+.ap-cap-edit-cabeza { display: flex; justify-content: space-between; align-items: center; gap: 10px; flex-wrap: wrap; }
+.ap-cap-edit-cabeza h2 { margin: 0; font-size: 15px; }
+.ap-subtotal { font-weight: 600; color: var(--text-muted); margin-left: 8px; font-size: 13.5px; }
+.ap-tabla-lineas { margin-top: 6px; font-size: 12.5px; }
+.ap-tabla-lineas td { padding: 2px 4px; overflow: visible; }
+.ap-tabla-lineas input, .ap-tabla-lineas select { width: 100%; padding: 5px 7px; border: 1px solid var(--border); border-radius: 6px; background: var(--input-bg); color: var(--text); font-size: 12.5px; }
+.ap-tabla-lineas input:disabled { opacity: .6; }
+.ap-tabla-lineas .rt-icono-btn { width: 28px; height: 28px; font-size: 12px; }
+.ap-fila-falta .ap-in-insumo { border-color: var(--danger); }
+.ap-guardar { display: grid; grid-template-columns: auto 1fr auto; gap: 10px; align-items: center; }
+.ap-guardar label { font-size: 12.5px; font-weight: 600; color: var(--text-muted); }
+.ap-guardar input { padding: 8px 10px; border: 1px solid var(--border); border-radius: 8px; background: var(--input-bg); color: var(--text); font-size: 13px; }
+@media (max-width: 800px) { .ap-guardar { grid-template-columns: 1fr; } }
