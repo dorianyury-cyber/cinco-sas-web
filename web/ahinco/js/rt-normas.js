@@ -163,6 +163,49 @@ export const MATERIALES_SPT = {
 export const DIAMETRO_COBRE_DESNUDO = { "2": 7.42, "1/0": 9.35, "2/0": 10.52, "3/0": 11.79, "4/0": 13.26, "250": 14.6, "300": 16.0, "350": 17.3, "500": 20.6 };
 
 // RETIE: valores de referencia de resistencia de puesta a tierra (Ω).
+// ---------------------------------------------------------------- iluminación interior (RETILAP)
+// RETILAP 2024 (Res. 40150 de 2024, modificada por la Res. 40286 de 2026), Libro 3, Tabla 3.2.2.6.a: Em (lx), Uo, Ra, UGRL y Em,z (lx)
+// por tipo de área, y categoría de la Tabla 3.2.5.a (límite de VEEI en W/m² por 100 lx).
+export const RETILAP_VEEI = {
+  admin: { nombre: "Administrativa en general", limite: 3.0 },
+  comun: { nombre: "Zonas comunes (pasillos, escaleras, baños públicos)", limite: 4.0 },
+  archivo: { nombre: "Almacenes, archivos, salas técnicas y cocinas", limite: 4.0 },
+  otro: { nombre: "Recintos interiores no descritos", limite: 4.0 },
+  reunion: { nombre: "Salas de reuniones y conferencias", limite: 8.0 }
+};
+export const RETILAP_AREAS = {
+  oficina: { nombre: "Oficinas: escritura, lectura, procesamiento de datos", ref: "26.2", em: 500, uo: 0.6, ra: 80, ugr: 19, ez: 150, veei: "admin", oficina: true },
+  copiado: { nombre: "Oficinas: área de copiado e impresión", ref: "26.1", em: 300, uo: 0.4, ra: 80, ugr: 19, ez: 100, veei: "admin", oficina: true },
+  cad: { nombre: "Oficinas: estaciones de trabajo CAD", ref: "26.4", em: 500, uo: 0.6, ra: 80, ugr: 19, ez: 150, veei: "admin", oficina: true },
+  dibujo: { nombre: "Oficinas: dibujo técnico", ref: "26.3", em: 750, uo: 0.7, ra: 80, ugr: 16, ez: 150, veei: "admin", oficina: true },
+  reuniones: { nombre: "Salas de conferencias y reuniones", ref: "26.5.1", em: 500, uo: 0.6, ra: 80, ugr: 19, ez: 150, veei: "reunion", oficina: true, antipanico: true },
+  recepcion: { nombre: "Recepción", ref: "26.6", em: 300, uo: 0.6, ra: 80, ugr: 22, ez: 100, veei: "admin" },
+  archivo: { nombre: "Área de archivo", ref: "26.7", em: 200, uo: 0.4, ra: 80, ugr: 25, ez: 75, veei: "archivo" },
+  corredor: { nombre: "Corredores y zonas de circulación", ref: "1.1", em: 100, uo: 0.4, ra: 40, ugr: 28, ez: 50, veei: "comun", corredor: true },
+  escalera: { nombre: "Escaleras", ref: "1.2", em: 100, uo: 0.4, ra: 40, ugr: 25, ez: 50, veei: "comun", corredor: true },
+  rampa: { nombre: "Rampas", ref: "1.5", em: 150, uo: 0.4, ra: 40, ugr: 25, ez: 50, veei: "comun" },
+  banos: { nombre: "Baños, vestidores, lavabos e inodoros", ref: "2.4", em: 200, uo: 0.4, ra: 80, ugr: 25, ez: 75, veei: "comun", emergencia: true },
+  comedor: { nombre: "Comedores y zonas de descanso", ref: "2.1", em: 200, uo: 0.4, ra: 80, ugr: 22, ez: 75, veei: "otro", antipanico: true },
+  descanso: { nombre: "Salas de descanso", ref: "2.2", em: 100, uo: 0.4, ra: 80, ugr: 22, ez: 50, veei: "otro", antipanico: true },
+  cocina: { nombre: "Cocina", ref: "29.2", em: 500, uo: 0.6, ra: 80, ugr: 22, ez: 100, veei: "archivo" },
+  tecnica: { nombre: "Salas de planta y de operación de maquinaria", ref: "3.1", em: 200, uo: 0.4, ra: 80, ugr: 25, ez: 50, veei: "archivo" }
+};
+// RETILAP 3.2.4.4, Tabla 3.2.4.5.a y 3.2.4.7: iluminancia mínima de emergencia (lx) y
+// relación Emax/Emin máxima (1:40).
+export const RETILAP_EMERGENCIA = {
+  ruta: { nombre: "Ruta de evacuación (eje central)", eh: 1, ref: "3.2.4.4" },
+  rampa: { nombre: "Rampa en la ruta de evacuación (énfasis)", eh: 5, ref: "Tabla 3.2.4.5.a" },
+  escalera: { nombre: "Escalera en la ruta de evacuación (énfasis)", eh: 5, ref: "Tabla 3.2.4.5.a" },
+  puerta: { nombre: "Puerta de salida (énfasis)", eh: 5, ref: "Tabla 3.2.4.5.a" },
+  cambio: { nombre: "Cambio de dirección, intersección o cambio de nivel (énfasis)", eh: 5, ref: "Tabla 3.2.4.5.a" },
+  cuarto: { nombre: "Cuarto eléctrico (énfasis)", eh: 5, ev: 15, ref: "Tabla 3.2.4.5.a" },
+  equipo: { nombre: "Equipo de seguridad: extintor, gabinete, primeros auxilios (vertical)", ev: 5, ref: "Tabla 3.2.4.5.a" },
+  antipanico: { nombre: "Área antipánico (piso, sin borde de 0,5 m)", eh: 0.5, ref: "3.2.4.7" },
+  altoRiesgo: { nombre: "Área de trabajo de alto riesgo", eh: 15, ref: "3.2.4.8" }
+};
+// RETILAP 3.2.1.1: reflectancias de referencia cuando no se conocen las reales.
+export const RETILAP_REFLECTANCIA = { techo: [70, 90], paredes: [50, 80], piso: [20, 60] };
+
 // RETIE 2024 (mod. Res. 40284 de 2026), Libro 3, art. 3.12.1 literal g, Tabla 3.12.1.a:
 // máxima tensión de contacto (V rms) sin capa superficial, según el tiempo de despeje (s).
 // [tiempo, público en general (IEC 60479-1), ocupacional (IEEE 80, 50 kg)]; la última fila

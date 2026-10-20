@@ -15,10 +15,53 @@ export const AREAS = {
   mt: { nombre: "Media tensión", desc: "Transformadores, cortocircuito y coordinación de protecciones", clase: "rt-area-mt" },
   spt: { nombre: "Puesta a tierra y rayos", desc: "Malla de puesta a tierra y análisis de riesgo por rayos", clase: "rt-area-spt" },
   at: { nombre: "Alta tensión", desc: "Coordinación de aislamiento, distancias de seguridad y cálculo mecánico", clase: "rt-area-at" },
+  ilum: { nombre: "Iluminación (RETILAP)", desc: "Niveles por recinto, deslumbramiento, eficiencia energética (VEEI) e iluminación de emergencia", clase: "rt-area-ilum" },
   fv: { nombre: "Generación solar fotovoltaica (AGPE / GD)", desc: "Arreglo e inversor, producción y balance energético, conductores DC/AC y conexión a la red según la CREG 174 de 2021", clase: "rt-area-fv" }
 };
 
 export const MODULOS = {
+  iluminacion: {
+    area: "ilum", icono: "💡", titulo: "Iluminación interior (RETILAP)", literalPrincipal: "w",
+    objeto: "Verificar el diseño de iluminación interior frente al RETILAP: iluminancia, uniformidad, deslumbramiento e iluminancia cilíndrica por recinto, reflectancias del modelo, eficiencia energética (VEEI), iluminación de emergencia, factor de mantenimiento, control del alumbrado y documentos del diseño.",
+    normas: ["RETILAP 2024 — Resolución 40150 de 2024, modificada por la Resolución 40286 del 23 de junio de 2026 (texto compilado), Libro 3: arts. 3.1.4 (diseño básico y detallado), 3.2.1 a 3.2.6, Tablas 3.2.2.6.a, 3.2.4.5.a y 3.2.5.a", "EN 12464-1 (requisitos de iluminación de lugares de trabajo interiores)", "CIE 117 (UGR); ISO/CIE TS 22012 (factor de mantenimiento); NTC 6556 (iluminación de emergencia)"],
+    campos: [
+      { key: "fm", label: "Factor de mantenimiento usado en el cálculo", tipo: "numero", def: 0.8 },
+      { key: "fmCalculado", label: "¿El factor de mantenimiento se calculó por equipo (ISO/CIE TS 22012)?", tipo: "select", opciones: [{ valor: "Sí", texto: "Sí" }, { valor: "No", texto: "No" }], def: "Sí" },
+      { key: "reflectanciasDocumentadas", label: "¿Las reflectancias del modelo corresponden a acabados reales documentados?", tipo: "select", opciones: [{ valor: "Sí", texto: "Sí" }, { valor: "No", texto: "No" }], def: "No" },
+      { key: "areaConstruida", label: "Área construida de la edificación (vacío = suma de los recintos)", tipo: "numero", unidad: "m²", def: "" },
+      { key: "altaConcentracion", label: "¿Puede reunir 50 personas o más?", tipo: "select", opciones: [{ valor: "Sí", texto: "Sí" }, { valor: "No", texto: "No" }], def: "No" },
+      { key: "control", label: "¿Se especifica un sistema de control automático del alumbrado?", tipo: "select", opciones: [{ valor: "Sí", texto: "Sí" }, { valor: "No", texto: "No" }], def: "Sí" },
+      { key: "sensoresCorredores", label: "¿Sensores de presencia a prueba de fallo en corredores?", tipo: "select", opciones: [{ valor: "Sí", texto: "Sí" }, { valor: "No", texto: "No" }], def: "Sí" },
+      { key: "autonomia", label: "Autonomía de la iluminación de emergencia", tipo: "numero", unidad: "min", def: 60 },
+      { key: "raEmergencia", label: "Ra de las luminarias de emergencia", tipo: "numero", def: 70 },
+      { key: "planos", label: "¿Plano de distribución de luminarias y mallas?", tipo: "select", opciones: [{ valor: "Sí", texto: "Sí" }, { valor: "No", texto: "No" }], def: "Sí" },
+      { key: "fichas", label: "¿Fichas técnicas de las luminarias?", tipo: "select", opciones: [{ valor: "Sí", texto: "Sí" }, { valor: "No", texto: "No" }], def: "Sí" },
+      { key: "declaracion", label: "¿Declaración de cumplimiento del diseñador?", tipo: "select", opciones: [{ valor: "Sí", texto: "Sí" }, { valor: "No", texto: "No" }], def: "Sí" },
+      { key: "mantenimiento", label: "¿Programa de mantenimiento?", tipo: "select", opciones: [{ valor: "Sí", texto: "Sí" }, { valor: "No", texto: "No" }], def: "Sí" },
+      { key: "analisis", label: "¿Documento de análisis del proyecto (diseño detallado)?", tipo: "select", opciones: [{ valor: "Sí", texto: "Sí" }, { valor: "No", texto: "No" }], def: "Sí" },
+      { key: "recintos", label: "Recintos (resultados del software: iluminancia mantenida Em, uniformidad Uo, UGR máximo e iluminancia cilíndrica Ez)", tipo: "tabla", columnas: [
+        { key: "recinto", label: "Recinto", tipo: "texto", ancho: 14 }, { key: "tipo", label: "Tipo (Tabla 3.2.2.6.a)", tipo: "select", opciones: [...op(N.RETILAP_AREAS), { valor: "personalizado", texto: "Personalizado (digitar exigidos)" }], ancho: 20 },
+        { key: "area", label: "S (m²)", tipo: "numero", ancho: 7 }, { key: "potencia", label: "P (W)", tipo: "numero", ancho: 7 }, { key: "em", label: "Em (lx)", tipo: "numero", ancho: 7 }, { key: "uo", label: "Uo", tipo: "numero", ancho: 6 },
+        { key: "ugr", label: "UGR", tipo: "numero", ancho: 6 }, { key: "ez", label: "Ez (lx)", tipo: "numero", ancho: 7 }, { key: "rhoPiso", label: "Piso (%)", tipo: "numero", ancho: 7 },
+        { key: "flujo", label: "Flujo (lm, opc.)", tipo: "numero", ancho: 8 },
+        { key: "ugrGiro", label: "Observadores UGR", tipo: "select", opciones: [{ valor: "completo", texto: "Giro 0-360°" }, { valor: "justificado", texto: "Limitado (justificado)" }, { valor: "parcial", texto: "Parcial sin justificar" }], ancho: 12 },
+        { key: "emergencia", label: "Emergencia calculada", tipo: "select", opciones: [{ valor: "Sí", texto: "Sí" }, { valor: "No", texto: "No" }], ancho: 8 },
+        { key: "emReq", label: "Em exigido (pers.)", tipo: "numero", ancho: 7 }, { key: "uoReq", label: "Uo exigido (pers.)", tipo: "numero", ancho: 7 }, { key: "ugrReq", label: "UGR máx. (pers.)", tipo: "numero", ancho: 7 }
+      ], nueva: { tipo: "oficina", ugrGiro: "completo", emergencia: "No" }, def: [
+        { recinto: "Oficina general", tipo: "oficina", area: 60, potencia: 480, em: 540, uo: 0.65, ugr: 18.2, ez: 190, rhoPiso: 30, ugrGiro: "completo", emergencia: "No" },
+        { recinto: "Pasillo", tipo: "corredor", area: 25, potencia: 72, em: 160, uo: 0.55, ugr: 21, ez: 80, rhoPiso: 30, ugrGiro: "completo", emergencia: "Sí" },
+        { recinto: "Baño", tipo: "banos", area: 6, potencia: 36, em: 230, uo: 0.7, ez: 95, rhoPiso: 30, ugrGiro: "completo", emergencia: "Sí" }
+      ] },
+      { key: "emergencia", label: "Iluminación de emergencia (resultados del software)", tipo: "tabla", columnas: [
+        { key: "zona", label: "Zona", tipo: "texto", ancho: 18 }, { key: "tipo", label: "Tipo de zona", tipo: "select", opciones: op(N.RETILAP_EMERGENCIA), ancho: 28 },
+        { key: "ehmin", label: "Eh mín. (lx)", tipo: "numero", ancho: 9 }, { key: "evmin", label: "Ev mín. (lx)", tipo: "numero", ancho: 9 }, { key: "relacion", label: "Emax/Emin (n de 1:n)", tipo: "numero", ancho: 10 },
+        { key: "impar", label: "Malla con puntos impares", tipo: "select", opciones: [{ valor: "Sí", texto: "Sí" }, { valor: "No", texto: "No" }], ancho: 10 }
+      ], nueva: { tipo: "ruta", impar: "Sí" }, def: [
+        { zona: "Pasillo principal", tipo: "ruta", ehmin: 2.4, relacion: 8.5, impar: "Sí" },
+        { zona: "Puerta de salida", tipo: "puerta", ehmin: 6.1, relacion: 3.2, impar: "Sí" }
+      ] }
+    ]
+  },
   riesgoElectrico: {
     area: "gen", icono: "⚠️", titulo: "Análisis de riesgos eléctricos", literalPrincipal: "a",
     objeto: "Identificar los factores de riesgo de origen eléctrico de la instalación, valorarlos con la matriz del RETIE (probabilidad frente a consecuencias en personas, económicas, ambientales y de imagen) y definir las medidas para mitigarlos hasta un riesgo residual aceptable.",
@@ -656,7 +699,7 @@ export const MODULOS = {
 
 // Tablas sin las cuales el cálculo no tiene sentido (las demás son opcionales):
 // si están vacías no se calcula, para no dar conclusiones sin datos.
-export const TABLAS_REQUERIDAS = { riesgoElectrico: ["riesgos"], nivelTension: ["candidatos"], cargas: ["circuitos"], conductores: ["circuitos"], regulacion: ["tramos"], canalizaciones: ["conductores"], coordinacion: ["protecciones", "fallas"], distancias: ["puntos"], mecanico: ["hipotesis"], cableMT: ["circuitos"], armonicos: ["grupos"], conductorEconomico: ["candidatos"], camposEM: ["conductores"], arcoElectrico: ["puntos"], apantallamiento: ["elementos"], fvConductores: ["circuitos"] };
+export const TABLAS_REQUERIDAS = { iluminacion: ["recintos"], riesgoElectrico: ["riesgos"], nivelTension: ["candidatos"], cargas: ["circuitos"], conductores: ["circuitos"], regulacion: ["tramos"], canalizaciones: ["conductores"], coordinacion: ["protecciones", "fallas"], distancias: ["puntos"], mecanico: ["hipotesis"], cableMT: ["circuitos"], armonicos: ["grupos"], conductorEconomico: ["candidatos"], camposEM: ["conductores"], arcoElectrico: ["puntos"], apantallamiento: ["elementos"], fvConductores: ["circuitos"] };
 const conDatos = (filas) => (filas || []).some((f) => f && Object.values(f).some((v) => v !== "" && v != null));
 // Nombres de las tablas requeridas que están vacías.
 export const tablasFaltantes = (id, entradas) => (TABLAS_REQUERIDAS[id] || []).filter((k) => !conDatos(entradas?.[k])).map((k) => MODULOS[id].campos.find((c) => c.key === k).label.replace(/\s*\(.*\)\s*$/, ""));
@@ -672,6 +715,7 @@ export function entradasPorDefecto(id) {
 // Normas generales que encabezan toda memoria.
 export const NORMAS_GENERALES = [
   ["RETIE 2024", "Reglamento Técnico de Instalaciones Eléctricas: Resolución 40117 de 2024 del Ministerio de Minas y Energía, modificada por la Resolución 40284 del 23 de junio de 2026"],
+  ["RETILAP 2024", "Reglamento Técnico de Iluminación y Alumbrado Público: Resolución 40150 de 2024, modificada por la Resolución 40286 del 23 de junio de 2026 (aplica cuando el proyecto incluye el cálculo de iluminación)"],
   ["NTC 2050 (Segunda Actualización)", "Código Eléctrico Colombiano (adopción de la NFPA 70 / NEC 2017), exigido por el RETIE 2024 para instalaciones de uso final"],
   ["IEEE 80-2013", "Guide for Safety in AC Substation Grounding"],
   ["IEC 60909-0", "Short-circuit currents in three-phase a.c. systems"],

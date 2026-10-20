@@ -51,6 +51,7 @@ Datos en Firestore: `rtProyectos/{id}` y `rtProyectos/{id}/calculos/{clave}` (`c
   - Armónicos (literal c): con THDi ≥ 15 %, factor de la IEC 60364-5-52 Anexo E (3.3.3.6). DPS (literal d): 3.3.3.1 y capacidad de cortocircuito del art. 3.17.14 f. Arco (literal e): aviso del art. 3.10.5 d con E ≥ 1,2 cal/cm². FV: caída AC ≤ 3 % (art. 3.17.21 d). Mecánico: tensión de tendido ≤ 25 % (art. 3.19.6 b y 3.20.6.1 a). Regulación: Título 26 f (3 % acometida; 5 % alimentadores y ramales). Nivel de tensión: clase del Título 9. Transformador de potencia: art. 3.17.28 (i, l, d).
   - Sin cambios: Tabla 3.11.1.a (campos), Tabla 1.5.1.4.1.a (riesgos), Tabla 3.12.3.a (valores).
   - Referencias de la NTC 2050 pasadas a la Segunda Actualización (NEC 2017): Tabla 310.15(B)(16), 250.122, 240.4, 690.8, etc. Los valores de las tablas no cambian.
+- Iluminación interior (RETILAP, Res. 40286 de 2026): módulo `iluminacion` (literal w). Con el diseño del Archivo Central de UTRAHUILCA (INFRARED v1) reproduce las no conformidades de la revisión manual RD: piso 88 %, VEEI de baños y del archivo móvil, emergencia de la rampa (< 5 lx) y de los baños, UGR sin giro completo, FM sin calcular, control, mallas pares y documentos. La pantalla y el Excel dan los mismos resultados.
 - **Pendiente:** validación independiente de cortocircuito y coordinación contra un estudio en ETAP o DIgSILENT, y revisión de una memoria completa por un organismo de inspección acreditado.
 
 ## 3. Limitaciones conocidas por cálculo

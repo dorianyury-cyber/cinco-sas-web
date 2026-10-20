@@ -216,7 +216,7 @@ export const tituloCalculo = (r) => `${MODULOS[r.modulo].titulo}${r.etiqueta ? `
 // ---------------------------------------------------------------- cálculo encadenado
 // Orden con dependencias: el transformador usa la demanda del cuadro de
 // cargas y el cortocircuito usa los datos del transformador.
-export const ORDEN_MODULOS = ["riesgoElectrico", "cargas", "nivelTension", "conductores", "conductorEconomico", "regulacion", "canalizaciones", "transformador", "trafoPotencia", "cortocircuito", "armonicos", "cableMT", "coordinacion", "arcoElectrico", "malla", "rayos", "apantallamiento", "aislamiento", "distancias", "camposEM", "mecanico", "fvArreglo", "fvProduccion", "fvConductores", "fvConexion", "unifilar"];
+export const ORDEN_MODULOS = ["riesgoElectrico", "cargas", "nivelTension", "conductores", "conductorEconomico", "regulacion", "canalizaciones", "transformador", "trafoPotencia", "cortocircuito", "armonicos", "cableMT", "coordinacion", "arcoElectrico", "malla", "rayos", "apantallamiento", "aislamiento", "distancias", "camposEM", "mecanico", "fvArreglo", "fvProduccion", "fvConductores", "fvConexion", "unifilar", "iluminacion"];
 
 export function calcularModulo(id, entradas, proyecto, ctx = {}) {
   const faltan = tablasFaltantes(id, entradas);

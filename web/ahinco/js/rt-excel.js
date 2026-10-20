@@ -141,6 +141,7 @@ function formatoUnidad(u = "") {
 // Constantes y factores fijos que usan las fórmulas de cada hoja: se explican
 // en el encabezado para que nadie tenga que adivinar de dónde sale un número.
 const CONSTANTES = {
+  iluminacion: [["Tabla 3.2.2.6.a", "lx", "Em, Uo, UGRL y Em,z exigidos por tipo de recinto", "RETILAP 2024 (Res. 40150 de 2024, mod. Res. 40286 de 2026), Libro 3"], ["P × 100 / (S × Em)", "W/m² por 100 lx", "Valor de eficiencia energética VEEI; límites de la Tabla 3.2.5.a (2,5 si Em > 600 lx)", "RETILAP art. 3.2.5"], ["20 % a 60 %", "", "Reflectancia de piso de referencia si no se documenta el acabado", "RETILAP 3.2.1.1"], ["1 / 5 / 0,5 lx; 1:40", "", "Emergencia: ruta (eje), zonas de énfasis, antipánico; relación Emax/Emin", "RETILAP 3.2.4.4, Tabla 3.2.4.5.a, 3.2.4.7"]],
   cargas: [["0,25", "", "Se suma el 25 % de la corriente del motor más grande a la corriente del alimentador", "NTC 2050 430.24"], ["0,90", "", "Factor de potencia mínimo de referencia (por debajo se cobra energía reactiva)", "Res. CREG 015 de 2018"], ["1000", "W/kW", "Conversión de vatios a kilovatios", ""]],
   conductores: [["1,25", "", "Las cargas continuas (3 h o más) se dimensionan al 125 %", "NTC 2050 210.19 y 215.2"], ["60 / 75 / 90", "°C", "Columnas de temperatura de la tabla de capacidad de corriente", "NTC 2050 Tabla 310.15(B)(16)"], ["Factores Ft y Fa", "", "Corrección por temperatura ambiente y por más de 3 conductores portadores en la misma canalización", "NTC 2050 Tabla 310.15(B)(16) y 310.15(b)(2)"]],
   regulacion: [["√3 / 2", "", "Factor del sistema en la caída de tensión: √3 trifásico, 2 monofásico (ida y vuelta)", ""], ["3 / 2", "", "Número de conductores con pérdidas: 3 trifásico, 2 monofásico", ""]],
@@ -1229,6 +1230,59 @@ const HOJAS = {
     }
     h.resumen([{ t: "Demanda proyectada", f: S, u: "kVA" }, { t: "Menor nivel de tensión viable", texto: true, f: rec }]);
   },
+  iluminacion(wb, e, r) {
+    const h = new Hoja(wb, "w Iluminación", "Iluminación interior frente al RETILAP 2024 (Res. 40150 de 2024, modificada por la Res. 40286 de 2026), Libro 3");
+    h.nota("Em, Uo, UGR y Ez son los resultados del software de cálculo (celdas amarillas). Los valores exigidos vienen de la Tabla 3.2.2.6.a según el tipo de recinto.");
+    const A = N.RETILAP_AREAS, V = N.RETILAP_VEEI;
+    const rs = vacias(e.recintos).map((x) => {
+      const t = x.tipo === "personalizado" ? { nombre: "Personalizado", ref: "—", em: n(x.emReq, 0), uo: n(x.uoReq, 0), ugr: n(x.ugrReq, NaN), ez: NaN, veei: "otro" } : A[x.tipo] || A.oficina;
+      return { ...x, t, lim: (V[t.veei] || V.otro).limite };
+    });
+    const opc = (v) => (v === "" || v == null ? "" : n(v));
+    const t = h.tabla([
+      { t: "Recinto", v: (x) => String(x.recinto || x.t.nombre), ancho: 22 }, { t: "Ref.", v: (x) => x.t.ref },
+      { t: "S (m²)", v: (x) => n(x.area), entrada: true, fmt: "0.00" }, { t: "P (W)", v: (x) => n(x.potencia), entrada: true, fmt: "0.0" },
+      { t: "Em (lx)", v: (x) => n(x.em), entrada: true, fmt: "0" }, { t: "Uo", v: (x) => opc(x.uo), entrada: true, fmt: "0.00" },
+      { t: "UGR", v: (x) => opc(x.ugr), entrada: true, fmt: "0.0" }, { t: "Ez (lx)", v: (x) => opc(x.ez), entrada: true, fmt: "0" },
+      { t: "Piso (%)", v: (x) => opc(x.rhoPiso), entrada: true, fmt: "0" },
+      { t: "Em exigido", v: (x) => x.t.em, fmt: "0" }, { t: "Uo exigido", v: (x) => x.t.uo, fmt: "0.00" },
+      { t: "UGR máx.", v: (x) => (Number.isFinite(x.t.ugr) ? x.t.ugr : ""), fmt: "0" }, { t: "Ez exigido", v: (x) => (Number.isFinite(x.t.ez) ? x.t.ez : ""), fmt: "0" },
+      { t: "VEEI", v: (x, rr) => `=IF(AND(C${rr}>0,E${rr}>0),D${rr}*100/(C${rr}*E${rr}),"")`, fmt: "0.00" },
+      { t: "VEEI límite", v: (x, rr) => `=IF(E${rr}>600,MIN(${x.lim},2.5),${x.lim})`, fmt: "0.0" },
+      { t: "Resultado", ancho: 12, v: (x, rr) => `=IF(AND(E${rr}>=J${rr},IF(F${rr}="",TRUE,F${rr}>=K${rr}-1E-9),IF(OR(G${rr}="",L${rr}=""),TRUE,G${rr}<=L${rr}+1E-9),IF(OR(H${rr}="",M${rr}=""),TRUE,H${rr}>=M${rr}),IF(N${rr}="",TRUE,N${rr}<=O${rr}+1E-9)),"Cumple","No cumple")` },
+      { t: "Piso 20-60 %", ancho: 11, v: (x, rr) => `=IF(I${rr}="","—",IF(AND(I${rr}>=20,I${rr}<=60),"Cumple","Fuera de rango"))` }
+    ], rs);
+    const R = (c) => `${c}${t.r0}:${c}${t.r1}`;
+    const E = N.RETILAP_EMERGENCIA, zs = vacias(e.emergencia).map((z) => ({ ...z, tz: E[z.tipo] || E.ruta }));
+    let te = null;
+    if (zs.length) {
+      h.seccion("Iluminación de emergencia (RETILAP art. 3.2.4)");
+      te = h.tabla([
+        { t: "Zona", v: (z) => String(z.zona || ""), ancho: 22 }, { t: "Tipo", v: (z) => z.tz.nombre, ancho: 34 },
+        { t: "Eh mín. (lx)", v: (z) => opc(z.ehmin), entrada: true, fmt: "0.00" }, { t: "Ev mín. (lx)", v: (z) => opc(z.evmin), entrada: true, fmt: "0.00" },
+        { t: "Emax/Emin", v: (z) => opc(z.relacion), entrada: true, fmt: "0.00" },
+        { t: "Eh exigido", v: (z) => (Number.isFinite(z.tz.eh) ? z.tz.eh : ""), fmt: "0.0" }, { t: "Ev exigido", v: (z) => (Number.isFinite(z.tz.ev) ? z.tz.ev : ""), fmt: "0" },
+        { t: "Malla impar", v: (z) => (z.impar === "No" ? "No" : "Sí"), entrada: true, lista: ["Sí", "No"] },
+        { t: "Resultado", v: (z, rr) => `=IF(AND(IF(F${rr}="",TRUE,IF(C${rr}="",FALSE,C${rr}>=F${rr}-1E-9)),IF(G${rr}="",TRUE,IF(D${rr}="",FALSE,D${rr}>=G${rr}-1E-9)),IF(E${rr}="",TRUE,E${rr}<=40)),"Cumple","No cumple")` }
+      ], zs);
+    }
+    h.seccion("Verificaciones generales");
+    const sT = h.calc("Superficie iluminada", `SUM(${R("C")})`, "m²"), pT = h.calc("Potencia de iluminación", `SUM(${R("D")})`, "W");
+    const sE = h.dato("Área construida (0 = la suma de los recintos)", n(e.areaConstruida, 0), "m²");
+    h.verif("Todos los recintos cumplen niveles, UGR y VEEI", `COUNTIF(${R("P")},"No cumple")=0`, "RETILAP Tablas 3.2.2.6.a y 3.2.5.a");
+    h.verif("Reflectancia del piso entre 20 % y 60 % (o acabados documentados)", `OR(COUNTIF(${R("Q")},"Fuera de rango")=0,${e.reflectanciasDocumentadas === "Sí" ? "TRUE" : "FALSE"})`, "RETILAP 3.2.1.1");
+    if (te) h.verif("Zonas de emergencia y mallas impares", `AND(COUNTIF(I${te.r0}:I${te.r1},"No cumple")=0,COUNTIF(H${te.r0}:H${te.r1},"No")=0)`, "RETILAP art. 3.2.4");
+    const aut = h.dato("Autonomía de emergencia", n(e.autonomia, 60), "min"), raE = h.dato("Ra de emergencia", n(e.raEmergencia, 70), "");
+    h.verif("Autonomía >= 60 min y Ra >= 70", `AND(${aut}>=60,${raE}>=70)`, "RETILAP 3.2.4.2");
+    const sn = (k) => (e[k] === "Sí" ? "Sí" : "No");
+    const fmc = h.dato("Factor de mantenimiento calculado por equipo (ISO/CIE TS 22012)", sn("fmCalculado"), "");
+    h.verif("Factor de mantenimiento calculado", `${fmc}="Sí"`, "RETILAP 3.2.1.10.1");
+    const ctl = h.dato("Control automático del alumbrado", sn("control"), "");
+    h.verif("Control del alumbrado si la edificación supera 500 m²", `OR(IF(${sE}>0,${sE},${sT})<=500,${ctl}="Sí")`, "RETILAP art. 3.2.6");
+    const docs = [["planos", "Plano de distribución"], ["fichas", "Fichas técnicas"], ["declaracion", "Declaración de cumplimiento"], ["mantenimiento", "Programa de mantenimiento"]].map(([k, txt]) => h.dato(txt, sn(k), ""));
+    h.verif("Documentos del diseño entregados", `AND(${docs.map((d) => `${d}="Sí"`).join(",")})`, "RETILAP 3.1.4.2 num. 3");
+    h.resumen([{ t: "Recintos verificados", f: String(rs.length), u: "" }, { t: "Superficie iluminada", f: sT, u: "m²" }, { t: "Potencia de iluminación", f: pT, u: "W" }, { t: "Recintos que no cumplen", f: `COUNTIF(${R("P")},"No cumple")`, u: "" }]);
+  },
   unifilar(wb, e, r) {
     const h = new Hoja(wb, "r Unifilar", "Diagrama unifilar — elementos (RETIE 2024 literal r)");
     h.nota("El dibujo del diagrama unifilar está en la memoria PDF y Word. Esta hoja lista sus elementos con los datos de los cálculos del proyecto.");
@@ -1494,6 +1548,7 @@ const DESCRIPCION_HOJA = {
   mecanico: "Tensiones y flechas del conductor por cambio de estado",
   riesgoElectrico: "Matriz de riesgos del RETIE: nivel sin medidas, medidas de mitigación y riesgo residual",
   nivelTension: "Comparación de niveles de tensión para la demanda proyectada",
+  iluminacion: "Niveles, deslumbramiento, VEEI y emergencia por recinto frente al RETILAP",
   unifilar: "Elementos del diagrama unifilar (el dibujo está en la memoria)",
   armonicos: "Distorsión armónica de corriente y tensión, factor K y neutro (IEEE 519 / C57.110)",
   conductorEconomico: "Costo total por calibre en la vida útil y rango económico de corriente (IEC 60287-3-2)",
@@ -1619,7 +1674,7 @@ export async function construirLibro({ proyecto, resultados, guardados, rapido =
   // ---- hojas de cálculo en el orden de los literales
   const ctx = {};
   Object.entries(resultados).forEach(([k, r]) => { const m = r.modulo ?? k; if (r.salidas && !ctx[m]) ctx[m] = r.salidas; });
-  const orden = ["riesgoElectrico", "rayos", "apantallamiento", "cargas", "armonicos", "nivelTension", "aislamiento", "cortocircuito", "arcoElectrico", "transformador", "trafoPotencia", "malla", "conductores", "conductorEconomico", "cableMT", "mecanico", "coordinacion", "canalizaciones", "regulacion", "distancias", "camposEM", "fvArreglo", "fvProduccion", "fvConductores", "fvConexion", "unifilar"];
+  const orden = ["riesgoElectrico", "rayos", "apantallamiento", "cargas", "armonicos", "nivelTension", "aislamiento", "cortocircuito", "arcoElectrico", "transformador", "trafoPotencia", "malla", "conductores", "conductorEconomico", "cableMT", "mecanico", "coordinacion", "canalizaciones", "regulacion", "distancias", "camposEM", "fvArreglo", "fvProduccion", "fvConductores", "fvConexion", "unifilar", "iluminacion"];
   const indice = [];
   for (const m of orden) {
     for (const [clave, r] of Object.entries(resultados)) {

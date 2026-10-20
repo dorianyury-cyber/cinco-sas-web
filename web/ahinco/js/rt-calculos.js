@@ -1715,4 +1715,93 @@ export function unifilar(e, proyecto = {}, ctx = {}) {
   };
 }
 
-export const CALCULOS = { cargas, conductores, regulacion, canalizaciones, transformador, cortocircuito, coordinacion, malla, rayos, aislamiento, distancias, mecanico, trafoPotencia, cableMT, apantallamiento, fvArreglo, fvProduccion, fvConductores, fvConexion, arcoElectrico, camposEM, conductorEconomico, armonicos, riesgoElectrico, nivelTension, unifilar };
+// ================================================================ 27. ILUMINACIÓN INTERIOR (RETILAP)
+// Verificación de un diseño de iluminación interior frente al RETILAP 2024 (Res. 40150 de 2024, modificada por la Res. 40286 de 2026,
+// Libro 3): niveles por recinto (Tabla 3.2.2.6.a), reflectancias, método del UGR, VEEI
+// (Tabla 3.2.5.a), emergencia (art. 3.2.4), factor de mantenimiento, control y documentos.
+// Los resultados fotométricos (Em, Uo, UGR, Ez) son los del software de cálculo.
+const siNo = (v) => String(v || "").toLowerCase().startsWith("s");
+export function iluminacion(e) {
+  const A = N.RETILAP_AREAS, verificaciones = [], notas = [];
+  const recintos = filas(e.recintos).map((r) => {
+    const t = r.tipo === "personalizado" ? { nombre: "Personalizado", ref: "—", em: num(r.emReq, 0), uo: num(r.uoReq, 0), ugr: num(r.ugrReq, NaN), ez: NaN, veei: "otro" } : A[r.tipo] || A.oficina;
+    const S = num(r.area, 0), P = num(r.potencia, 0), Em = num(r.em, 0), Uo = num(r.uo, NaN), ugr = num(r.ugr, NaN), Ez = num(r.ez, NaN), rho = num(r.rhoPiso, NaN), flujo = num(r.flujo, NaN);
+    const veei = S > 0 && Em > 0 ? (P * 100) / (S * Em) : NaN;
+    let lim = (N.RETILAP_VEEI[t.veei] || N.RETILAP_VEEI.otro).limite;
+    if (Em > 600) lim = Math.min(lim, 2.5);
+    const cu = flujo > 0 && S > 0 ? (Em * S) / (flujo * num(e.fm, 0.8)) : NaN;
+    return { nombre: r.recinto || t.nombre, t, S, P, Em, Uo, ugr, Ez, rho, veei, lim, cu, giro: r.ugrGiro || "completo", emerg: r.emergencia || "No" };
+  });
+  recintos.forEach((r) => {
+    const req = `${r.t.ref !== "—" ? `ref. ${r.t.ref}: ` : ""}Em >= ${r.t.em} lx; Uo >= ${fmt(r.t.uo, 2)}${Number.isFinite(r.t.ez) ? `; Ez >= ${r.t.ez} lx` : ""}`;
+    const okEm = r.Em >= r.t.em, okUo = !Number.isFinite(r.Uo) || r.Uo >= r.t.uo - 1e-9, okEz = !Number.isFinite(r.Ez) || !Number.isFinite(r.t.ez) || r.Ez >= r.t.ez;
+    verificaciones.push({ criterio: `${r.nombre}: iluminancia, uniformidad e iluminancia cilíndrica`, norma: "RETILAP 2024 Libro 3, Tabla 3.2.2.6.a; 3.2.1.3 y 3.2.1.5", valor: `${fmt(r.Em, 0)} lx; Uo ${Number.isFinite(r.Uo) ? fmt(r.Uo, 2) : "—"}${Number.isFinite(r.Ez) ? `; Ez ${fmt(r.Ez, 0)} lx` : ""}`, limite: req, cumple: okEm && okUo && okEz });
+    if (Number.isFinite(r.ugr) && Number.isFinite(r.t.ugr)) verificaciones.push({ criterio: `${r.nombre}: deslumbramiento UGR`, norma: "RETILAP 2024 3.2.1.4 (CIE 117); Tabla 3.2.2.6.a", valor: fmt(r.ugr, 1), limite: `<= ${r.t.ugr}`, cumple: r.ugr <= r.t.ugr + 1e-9 });
+    if (r.t.oficina && r.giro === "parcial") verificaciones.push({ criterio: `${r.nombre}: evaluación del UGR con observadores girando de 0° a 360° cada 15°`, norma: "RETILAP 2024 3.2.1.4 (obligatorio en oficinas y zonas de trabajo)", valor: "Barrido parcial sin justificación", limite: "Giro completo o campo visual limitado y justificado", cumple: false });
+    if (Number.isFinite(r.veei)) verificaciones.push({ criterio: `${r.nombre}: valor de eficiencia energética VEEI`, norma: `RETILAP 2024 art. 3.2.5, Tabla 3.2.5.a (${r.Em > 600 ? "locales de más de 600 lx" : (N.RETILAP_VEEI[r.t.veei] || N.RETILAP_VEEI.otro).nombre.toLowerCase()})`, valor: `${fmt(r.veei, 2)} W/m² por 100 lx`, limite: `<= ${fmt(r.lim, 1)}`, cumple: r.veei <= r.lim + 1e-9 });
+    if (Number.isFinite(r.cu) && r.cu > 1) verificaciones.push({ criterio: `${r.nombre}: coherencia del flujo con la iluminancia (método de los lúmenes)`, norma: "Control cruzado: Em <= Φ × FM / S", valor: `factor de utilización implícito ${fmt(r.cu, 2)}`, limite: "<= 1", cumple: false });
+  });
+  // Reflectancias del piso (RETILAP 3.2.1.1: 0,2 a 0,6 si no se conocen los acabados).
+  const [pMin, pMax] = N.RETILAP_REFLECTANCIA.piso;
+  const conRho = recintos.filter((r) => Number.isFinite(r.rho));
+  if (conRho.length) {
+    const fuera = conRho.filter((r) => r.rho < pMin || r.rho > pMax);
+    const documentado = siNo(e.reflectanciasDocumentadas);
+    verificaciones.push({ criterio: "Reflectancia del piso en el modelo de cálculo", norma: "RETILAP 2024 3.2.1.1 (piso 0,2 a 0,6 si no se documenta el acabado real)", valor: fuera.length ? `${fuera.length} recinto(s) fuera del rango: ${fuera.map((r) => `${r.nombre} ${fmt(r.rho, 0)} %`).join("; ")}` : "Todas dentro del rango", limite: documentado ? "Acabados reales documentados" : `${pMin} % a ${pMax} %`, cumple: !fuera.length || documentado });
+  }
+  // Emergencia de los baños y espacios antipánico.
+  const sinEm = recintos.filter((r) => (r.t.emergencia || r.t.antipanico) && !siNo(r.emerg));
+  if (recintos.some((r) => r.t.emergencia || r.t.antipanico)) verificaciones.push({ criterio: "Iluminación de emergencia calculada en baños y espacios antipánico", norma: "RETILAP 2024 3.2.4.1 num. 2 y 7; 3.2.4.7 (>= 0,5 lx; 1:40)", valor: sinEm.length ? `Sin cálculo: ${sinEm.map((r) => r.nombre).join("; ")}` : "Calculada en todos", limite: "Calculada", cumple: !sinEm.length });
+  // Zonas de emergencia.
+  const E = N.RETILAP_EMERGENCIA;
+  const zonas = filas(e.emergencia).map((z) => ({ nombre: z.zona || "", t: E[z.tipo] || E.ruta, eh: num(z.ehmin, NaN), ev: num(z.evmin, NaN), rel: num(z.relacion, NaN), impar: z.impar || "Sí" }));
+  zonas.forEach((z) => {
+    const okEh = !Number.isFinite(z.t.eh) || (Number.isFinite(z.eh) && z.eh >= z.t.eh - 1e-9), okEv = !Number.isFinite(z.t.ev) || (Number.isFinite(z.ev) && z.ev >= z.t.ev - 1e-9), okRel = !Number.isFinite(z.rel) || z.rel <= 40 + 1e-9;
+    const lim = [Number.isFinite(z.t.eh) ? `Eh min >= ${fmt(z.t.eh, 1)} lx` : "", Number.isFinite(z.t.ev) ? `Ev min >= ${z.t.ev} lx` : "", "Emax/Emin <= 40"].filter(Boolean).join("; ");
+    verificaciones.push({ criterio: `Emergencia — ${z.nombre || z.t.nombre} (${z.t.nombre.toLowerCase()})`, norma: `RETILAP 2024 ${z.t.ref}`, valor: [Number.isFinite(z.eh) ? `Eh min ${fmt(z.eh, 2)} lx` : "", Number.isFinite(z.ev) ? `Ev min ${fmt(z.ev, 2)} lx` : "", Number.isFinite(z.rel) ? `1:${fmt(z.rel, 2)}` : ""].filter(Boolean).join("; "), limite: lim, cumple: okEh && okEv && okRel });
+  });
+  const pares = zonas.filter((z) => z.impar === "No");
+  if (zonas.length) verificaciones.push({ criterio: "Mallas de cálculo de emergencia con número impar de puntos y separación <= 0,5 m", norma: "RETILAP 2024 art. 3.2.4", valor: pares.length ? `Con número par: ${pares.map((z) => z.nombre).join("; ")}` : "Todas impares", limite: "Número impar en ambas direcciones", cumple: !pares.length });
+  const autonomia = num(e.autonomia, 60), raE = num(e.raEmergencia, 70);
+  verificaciones.push({ criterio: "Autonomía de la iluminación de emergencia", norma: "RETILAP 2024 3.2.4.2 num. 4", valor: `${fmt(autonomia, 0)} min`, limite: ">= 60 min", cumple: autonomia >= 60 });
+  verificaciones.push({ criterio: "Índice de reproducción cromática de las luminarias de emergencia", norma: "RETILAP 2024 3.2.4.2 num. 5", valor: `Ra ${fmt(raE, 0)}`, limite: ">= 70", cumple: raE >= 70 });
+  // Factor de mantenimiento, control y documentos.
+  const fm = num(e.fm, 0.8);
+  verificaciones.push({ criterio: `Factor de mantenimiento (${fmt(fm, 2)}) calculado por equipo, entorno y programa de mantenimiento`, norma: "RETILAP 2024 3.2.1.10.1; ISO/CIE TS 22012", valor: siNo(e.fmCalculado) ? "Calculado y documentado" : "Adoptado como hipótesis", limite: "Calculado (fLF × fS × fLM × fSM)", cumple: siNo(e.fmCalculado) });
+  const sTotal = recintos.reduce((s, r) => s + r.S, 0), sEdif = num(e.areaConstruida, NaN) > 0 ? num(e.areaConstruida) : sTotal;
+  if (sEdif > 500) {
+    verificaciones.push({ criterio: "Sistema de control del alumbrado (edificación de más de 500 m²)", norma: "RETILAP 2024 art. 3.2.6", valor: siNo(e.control) ? "Especificado" : "No especificado", limite: "Al menos una forma de control automático", cumple: siNo(e.control) });
+    if (recintos.some((r) => r.t.corredor)) verificaciones.push({ criterio: "Sensores de presencia a prueba de fallo en corredores de circulación (apagado <= 20 min)", norma: "RETILAP 2024 art. 3.2.6", valor: siNo(e.sensoresCorredores) ? "Especificados" : "No especificados", limite: "Especificados", cumple: siNo(e.sensoresCorredores) });
+  }
+  const detallado = sTotal >= 100 || siNo(e.altaConcentracion);
+  [["planos", "Plano con distribución de luminarias, mallas, alturas de montaje y cuadro de cantidades", "3.1.4.2 num. 3 a"], ["fichas", "Fichas técnicas e instrucciones de instalación de las luminarias", "3.1.4.2 num. 3 b; 3.1.3.1"], ["declaracion", "Declaración de cumplimiento del RETILAP firmada por el diseñador", "3.1.4.2 num. 3 c"], ["mantenimiento", "Programa de mantenimiento", "3.1.4.2 num. 3 d; 3.2.1.10"], ...(detallado ? [["analisis", "Documento de análisis del proyecto (orientación, condiciones ambientales, visita al sitio)", "3.1.4.1"]] : [])].forEach(([k, txt, ref]) => {
+    verificaciones.push({ criterio: txt, norma: `RETILAP 2024 ${ref}`, valor: siNo(e[k]) ? "Entregado" : "No entregado", limite: "Entregado", cumple: siNo(e[k]) });
+  });
+  const pTotal = recintos.reduce((s, r) => s + r.P, 0);
+  const malos = recintos.filter((r) => r.Em < r.t.em || (Number.isFinite(r.Uo) && r.Uo < r.t.uo - 1e-9));
+  notas.push("Los valores Em, Uo, UGR y Ez son los resultados del software de cálculo (iluminancia mantenida, con el factor de mantenimiento ya aplicado); AHÍNCO los verifica frente al RETILAP y calcula el VEEI. La iluminancia cilíndrica, la de paredes y la de techos se exigen en el diseño, no en la inspección (Tabla 3.2.2.6.a, columnas 7 a 9).");
+  notas.push("VEEI = P × 100 / (S × Em) con P la potencia de las luminarias y sus auxiliares; incluye el alumbrado general y el direccional (solo se exceptúan vitrinas y zonas de exposición). Para locales con más de 600 lx el límite es 2,5.");
+  if (conRho.some((r) => r.rho > pMax)) notas.push("Un piso con reflectancia alta aumenta las interreflexiones: sobrestima la iluminancia y la uniformidad, y eleva la luminancia de fondo, lo que reduce el UGR calculado. Recalcule con la reflectancia del acabado real.");
+  return {
+    resumen: [
+      { etiqueta: "Recintos verificados", valor: String(recintos.length), unidad: "" },
+      { etiqueta: "Superficie iluminada", valor: fmt(sTotal, 1), unidad: "m²" },
+      { etiqueta: "Potencia de iluminación", valor: fmt(pTotal, 0), unidad: "W" },
+      { etiqueta: "Tipo de diseño exigido", valor: detallado ? "Detallado" : "Básico", unidad: "" }
+    ],
+    salidas: { area: sTotal, potencia: pTotal },
+    tablas: [
+      { titulo: "Niveles de iluminación y eficiencia por recinto (RETILAP Tabla 3.2.2.6.a y 3.2.5.a)", encabezados: ["Recinto", "Ref.", "S (m²)", "P (W)", "Em / exigido (lx)", "Uo / exigido", "UGR / máx.", "Ez / exigido (lx)", "Piso (%)", "VEEI / límite"], filas: recintos.map((r) => [r.nombre, r.t.ref, fmt(r.S, 2), fmt(r.P, 1), `${fmt(r.Em, 0)} / ${r.t.em}`, `${Number.isFinite(r.Uo) ? fmt(r.Uo, 2) : "—"} / ${fmt(r.t.uo, 2)}`, `${Number.isFinite(r.ugr) ? fmt(r.ugr, 1) : "—"} / ${Number.isFinite(r.t.ugr) ? r.t.ugr : "—"}`, `${Number.isFinite(r.Ez) ? fmt(r.Ez, 0) : "—"} / ${Number.isFinite(r.t.ez) ? r.t.ez : "—"}`, Number.isFinite(r.rho) ? fmt(r.rho, 0) : "—", Number.isFinite(r.veei) ? `${fmt(r.veei, 2)} / ${fmt(r.lim, 1)}` : "—"]) },
+      ...(zonas.length ? [{ titulo: "Iluminación de emergencia (RETILAP art. 3.2.4)", encabezados: ["Zona", "Tipo", "Eh min (lx)", "Ev min (lx)", "Emax/Emin", "Exigido", "Malla impar"], filas: zonas.map((z) => [z.nombre, z.t.nombre, Number.isFinite(z.eh) ? fmt(z.eh, 2) : "—", Number.isFinite(z.ev) ? fmt(z.ev, 2) : "—", Number.isFinite(z.rel) ? `1:${fmt(z.rel, 2)}` : "—", [Number.isFinite(z.t.eh) ? `Eh >= ${fmt(z.t.eh, 1)}` : "", Number.isFinite(z.t.ev) ? `Ev >= ${z.t.ev}` : ""].filter(Boolean).join("; "), z.impar]) }] : [])
+    ],
+    pasos: [
+      { titulo: "Requisitos por recinto", formula: "Em >= Em(tabla); Uo = Emin / Em >= Uo(tabla); UGR <= UGRL; Em,z >= Em,z(tabla)", sustitucion: "RETILAP Tabla 3.2.2.6.a según el tipo de tarea o actividad de cada recinto", resultado: malos.length ? `${malos.length} recinto(s) bajo el nivel exigido` : "Todos los recintos alcanzan Em y Uo" },
+      { titulo: "Valor de eficiencia energética", formula: "VEEI = P × 100 / (S × Em)", sustitucion: `P total = ${fmt(pTotal, 0)} W; S total = ${fmt(sTotal, 1)} m²`, resultado: "Por recinto, frente a la Tabla 3.2.5.a" },
+      { titulo: "Control cruzado por el método de los lúmenes", formula: "CU = Em × S / (Φ × FM) <= 1", sustitucion: `FM = ${fmt(fm, 2)}; Φ = flujo total de las luminarias del recinto (opcional)`, resultado: recintos.some((r) => Number.isFinite(r.cu)) ? recintos.filter((r) => Number.isFinite(r.cu)).map((r) => `${r.nombre}: CU ${fmt(r.cu, 2)}`).join("; ") : "Sin flujos digitados" }
+    ],
+    verificaciones, notas,
+    conclusion: veredicto(verificaciones, "El diseño de iluminación cumple los requisitos verificados del RETILAP.", "El diseño de iluminación no cumple todos los requisitos verificados del RETILAP.")
+  };
+}
+
+export const CALCULOS = { iluminacion, cargas, conductores, regulacion, canalizaciones, transformador, cortocircuito, coordinacion, malla, rayos, aislamiento, distancias, mecanico, trafoPotencia, cableMT, apantallamiento, fvArreglo, fvProduccion, fvConductores, fvConexion, arcoElectrico, camposEM, conductorEconomico, armonicos, riesgoElectrico, nivelTension, unifilar };
