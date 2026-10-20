@@ -164,7 +164,7 @@ export const DIAMETRO_COBRE_DESNUDO = { "2": 7.42, "1/0": 9.35, "2/0": 10.52, "3
 
 // RETIE: valores de referencia de resistencia de puesta a tierra (Ω).
 // ---------------------------------------------------------------- iluminación interior (RETILAP)
-// RETILAP 2024 (Res. 40150 de 2024, modificada por la Res. 40286 de 2026), Libro 3, Tabla 3.2.2.6.a: Em (lx), Uo, Ra, UGRL y Em,z (lx)
+// RETILAP 2024 (Anexo General de la Res. 40150 de 2024, con las modificaciones de las Res. 40318 de 2025 y 40286 de 2026), Libro 3, Tabla 3.2.2.6.a: Em (lx), Uo, Ra, UGRL y Em,z (lx)
 // por tipo de área, y categoría de la Tabla 3.2.5.a (límite de VEEI en W/m² por 100 lx).
 export const RETILAP_VEEI = {
   admin: { nombre: "Administrativa en general", limite: 3.0 },

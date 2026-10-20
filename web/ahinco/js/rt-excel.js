@@ -141,7 +141,7 @@ function formatoUnidad(u = "") {
 // Constantes y factores fijos que usan las fórmulas de cada hoja: se explican
 // en el encabezado para que nadie tenga que adivinar de dónde sale un número.
 const CONSTANTES = {
-  iluminacion: [["Tabla 3.2.2.6.a", "lx", "Em, Uo, UGRL y Em,z exigidos por tipo de recinto", "RETILAP 2024 (Res. 40150 de 2024, mod. Res. 40286 de 2026), Libro 3"], ["P × 100 / (S × Em)", "W/m² por 100 lx", "Valor de eficiencia energética VEEI; límites de la Tabla 3.2.5.a (2,5 si Em > 600 lx)", "RETILAP art. 3.2.5"], ["20 % a 60 %", "", "Reflectancia de piso de referencia si no se documenta el acabado", "RETILAP 3.2.1.1"], ["1 / 5 / 0,5 lx; 1:40", "", "Emergencia: ruta (eje), zonas de énfasis, antipánico; relación Emax/Emin", "RETILAP 3.2.4.4, Tabla 3.2.4.5.a, 3.2.4.7"]],
+  iluminacion: [["Tabla 3.2.2.6.a", "lx", "Em, Uo, UGRL y Em,z exigidos por tipo de recinto", "RETILAP 2024 (Anexo General Res. 40150 de 2024; mod. Res. 40318 de 2025 y 40286 de 2026), Libro 3"], ["P × 100 / (S × Em)", "W/m² por 100 lx", "Valor de eficiencia energética VEEI; límites de la Tabla 3.2.5.a (2,5 si Em > 600 lx)", "RETILAP art. 3.2.5"], ["20 % a 60 %", "", "Reflectancia de piso de referencia si no se documenta el acabado", "RETILAP 3.2.1.1"], ["1 / 5 / 0,5 lx; 1:40", "", "Emergencia: ruta (eje), zonas de énfasis, antipánico; relación Emax/Emin", "RETILAP 3.2.4.4, Tabla 3.2.4.5.a, 3.2.4.7"]],
   cargas: [["0,25", "", "Se suma el 25 % de la corriente del motor más grande a la corriente del alimentador", "NTC 2050 430.24"], ["0,90", "", "Factor de potencia mínimo de referencia (por debajo se cobra energía reactiva)", "Res. CREG 015 de 2018"], ["1000", "W/kW", "Conversión de vatios a kilovatios", ""]],
   conductores: [["1,25", "", "Las cargas continuas (3 h o más) se dimensionan al 125 %", "NTC 2050 210.19 y 215.2"], ["60 / 75 / 90", "°C", "Columnas de temperatura de la tabla de capacidad de corriente", "NTC 2050 Tabla 310.15(B)(16)"], ["Factores Ft y Fa", "", "Corrección por temperatura ambiente y por más de 3 conductores portadores en la misma canalización", "NTC 2050 Tabla 310.15(B)(16) y 310.15(b)(2)"]],
   regulacion: [["√3 / 2", "", "Factor del sistema en la caída de tensión: √3 trifásico, 2 monofásico (ida y vuelta)", ""], ["3 / 2", "", "Número de conductores con pérdidas: 3 trifásico, 2 monofásico", ""]],
@@ -1231,7 +1231,7 @@ const HOJAS = {
     h.resumen([{ t: "Demanda proyectada", f: S, u: "kVA" }, { t: "Menor nivel de tensión viable", texto: true, f: rec }]);
   },
   iluminacion(wb, e, r) {
-    const h = new Hoja(wb, "w Iluminación", "Iluminación interior frente al RETILAP 2024 (Res. 40150 de 2024, modificada por la Res. 40286 de 2026), Libro 3");
+    const h = new Hoja(wb, "w Iluminación", "Iluminación interior frente al RETILAP 2024 (Anexo General de la Res. 40150 de 2024, con las modificaciones de las Res. 40318 de 2025 y 40286 de 2026), Libro 3");
     h.nota("Em, Uo, UGR y Ez son los resultados del software de cálculo (celdas amarillas). Los valores exigidos vienen de la Tabla 3.2.2.6.a según el tipo de recinto.");
     const A = N.RETILAP_AREAS, V = N.RETILAP_VEEI;
     const rs = vacias(e.recintos).map((x) => {

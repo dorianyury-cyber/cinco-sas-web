@@ -23,7 +23,7 @@ export const MODULOS = {
   iluminacion: {
     area: "ilum", icono: "💡", titulo: "Iluminación interior (RETILAP)", literalPrincipal: "w",
     objeto: "Verificar el diseño de iluminación interior frente al RETILAP: iluminancia, uniformidad, deslumbramiento e iluminancia cilíndrica por recinto, reflectancias del modelo, eficiencia energética (VEEI), iluminación de emergencia, factor de mantenimiento, control del alumbrado y documentos del diseño.",
-    normas: ["RETILAP 2024 — Resolución 40150 de 2024, modificada por la Resolución 40286 del 23 de junio de 2026 (texto compilado), Libro 3: arts. 3.1.4 (diseño básico y detallado), 3.2.1 a 3.2.6, Tablas 3.2.2.6.a, 3.2.4.5.a y 3.2.5.a", "EN 12464-1 (requisitos de iluminación de lugares de trabajo interiores)", "CIE 117 (UGR); ISO/CIE TS 22012 (factor de mantenimiento); NTC 6556 (iluminación de emergencia)"],
+    normas: ["RETILAP 2024 — Anexo General de la Resolución 40150 de 2024, con las modificaciones de la Resolución 40318 de 2025 (transición) y la Resolución 40286 del 23 de junio de 2026 (texto compilado), Libro 3: arts. 3.1.4 (diseño básico y detallado), 3.2.1 a 3.2.6, Tablas 3.2.2.6.a, 3.2.4.5.a y 3.2.5.a", "EN 12464-1 (requisitos de iluminación de lugares de trabajo interiores)", "CIE 117 (UGR); ISO/CIE TS 22012 (factor de mantenimiento); NTC 6556 (iluminación de emergencia)"],
     campos: [
       { key: "fm", label: "Factor de mantenimiento usado en el cálculo", tipo: "numero", def: 0.8 },
       { key: "fmCalculado", label: "¿El factor de mantenimiento se calculó por equipo (ISO/CIE TS 22012)?", tipo: "select", opciones: [{ valor: "Sí", texto: "Sí" }, { valor: "No", texto: "No" }], def: "Sí" },
@@ -715,7 +715,7 @@ export function entradasPorDefecto(id) {
 // Normas generales que encabezan toda memoria.
 export const NORMAS_GENERALES = [
   ["RETIE 2024", "Reglamento Técnico de Instalaciones Eléctricas: Resolución 40117 de 2024 del Ministerio de Minas y Energía, modificada por la Resolución 40284 del 23 de junio de 2026"],
-  ["RETILAP 2024", "Reglamento Técnico de Iluminación y Alumbrado Público: Resolución 40150 de 2024, modificada por la Resolución 40286 del 23 de junio de 2026 (aplica cuando el proyecto incluye el cálculo de iluminación)"],
+  ["RETILAP 2024", "Reglamento Técnico de Iluminación y Alumbrado Público: Anexo General de la Resolución 40150 de 2024, modificado por las Resoluciones 40318 de 2025 y 40286 del 23 de junio de 2026 (aplica cuando el proyecto incluye el cálculo de iluminación)"],
   ["NTC 2050 (Segunda Actualización)", "Código Eléctrico Colombiano (adopción de la NFPA 70 / NEC 2017), exigido por el RETIE 2024 para instalaciones de uso final"],
   ["IEEE 80-2013", "Guide for Safety in AC Substation Grounding"],
   ["IEC 60909-0", "Short-circuit currents in three-phase a.c. systems"],
