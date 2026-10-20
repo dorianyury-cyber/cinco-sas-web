@@ -1275,177 +1275,251 @@ function cargarEnFormulario(informe, paraEditar) {
   document.getElementById("nuevoInformeDetails").scrollIntoView({ behavior: "smooth" });
 }
 
+// Listado con panel de vista previa arriba (mismo patrón de Ofertas): la fila solo sirve
+// para escanear y seleccionar; los datos completos y las acciones van en el panel. Se
+// selecciona sola la fila 1 al cargar y cuando la seleccionada deja de existir.
+const vistaPreviaInformeEl = document.getElementById("informeVistaPrevia");
+let informesListaActual = [];
+let informeSeleccionadoId = null;
+let esGestorInformesActual = false;
+
+function escapeHtmlInf(texto) {
+  return String(texto ?? "").replace(/[&<>"']/g, (c) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" }[c]));
+}
+
 function renderTabla(informes, esGestor) {
+  informesListaActual = informes;
+  esGestorInformesActual = esGestor;
   tbody.innerHTML = "";
   sinInformes.classList.toggle("oculto", informes.length > 0);
-
+  if (!informeSeleccionadoId || !informes.some((x) => x.id === informeSeleccionadoId)) {
+    informeSeleccionadoId = informes[0]?.id || null;
+  }
   informes.forEach((inf) => {
     const fila = document.createElement("tr");
+    fila.dataset.id = inf.id;
     fila.appendChild(celda(inf.radicado));
-    const tdTitulo = document.createElement("td");
-    tdTitulo.textContent = inf.titulo;
-    if (inf.archivoFinalUrl) {
-      const badge = document.createElement("div");
-      badge.className = "control-badge-final";
-      badge.textContent = "✓ Versión final subida";
-      tdTitulo.appendChild(badge);
-    }
+    const tdTitulo = celda(`${inf.archivoFinalUrl ? "⭐ " : ""}${inf.titulo || ""}`);
+    tdTitulo.title = inf.titulo || "";
     fila.appendChild(tdTitulo);
-    fila.appendChild(celda(inf.contratoCodigo ? `${inf.contratoCodigo} — ${inf.contratoNombre || ""}` : "—"));
+    const contrato = inf.contratoCodigo ? `${inf.contratoCodigo} — ${inf.contratoNombre || ""}` : "—";
+    const tdContrato = celda(contrato);
+    tdContrato.title = contrato;
+    fila.appendChild(tdContrato);
     fila.appendChild(celda(inf.creadoEn ? inf.creadoEn.toDate().toLocaleDateString("es-CO") : ""));
-
-    const tdAccion = document.createElement("td");
-    tdAccion.className = "control-tabla-acciones";
-
-    const tieneFinal = !!inf.archivoFinalUrl;
-
-    if (tieneFinal) {
-      const btnFinal = document.createElement("a");
-      btnFinal.href = inf.archivoFinalUrl;
-      btnFinal.target = "_blank";
-      btnFinal.rel = "noopener";
-      btnFinal.className = "btn-outline";
-      btnFinal.textContent = "⭐ Descargar versión final";
-      tdAccion.appendChild(btnFinal);
-    }
-
-    const btnPdf = document.createElement("button");
-    btnPdf.type = "button";
-    btnPdf.className = "control-btn-mini";
-    btnPdf.textContent = tieneFinal ? "PDF (automático)" : "PDF";
-    btnPdf.title = tieneFinal ? "Genera el PDF a partir del contenido por bloques, sin las correcciones manuales de la versión final" : "";
-    btnPdf.addEventListener("click", async () => {
-      btnPdf.disabled = true;
-      try {
-        const pdf = await generarInformePDF(inf);
-        pdf.save(`${inf.radicado}.pdf`);
-      } finally {
-        btnPdf.disabled = false;
-      }
+    fila.addEventListener("click", () => {
+      informeSeleccionadoId = inf.id;
+      actualizarResaltadoInforme();
+      pintarVistaPreviaInforme();
     });
-
-    const btnWord = document.createElement("button");
-    btnWord.type = "button";
-    btnWord.className = "control-btn-mini";
-    btnWord.textContent = tieneFinal ? "Word (automático)" : "Word";
-    btnWord.title = tieneFinal ? "Genera el Word a partir del contenido por bloques, sin las correcciones manuales de la versión final" : "";
-    btnWord.addEventListener("click", async () => {
-      btnWord.disabled = true;
-      try {
-        await descargarInformeDocx(inf);
-      } finally {
-        btnWord.disabled = false;
-      }
-    });
-
-    tdAccion.append(btnPdf, btnWord);
-
-    if (esGestor) {
-      const inputFinal = document.createElement("input");
-      inputFinal.type = "file";
-      inputFinal.accept = ".doc,.docx,.pdf";
-      inputFinal.hidden = true;
-      inputFinal.addEventListener("change", async () => {
-        const archivo = inputFinal.files[0];
-        inputFinal.value = "";
-        if (!archivo) return;
-        btnSubirFinal.disabled = true;
-        btnSubirFinal.textContent = "Subiendo...";
-        try {
-          await subirArchivoFinal(inf, archivo);
-        } catch (err) {
-          mostrarAlerta(err.message || "No se pudo subir el archivo.", "error");
-        } finally {
-          btnSubirFinal.disabled = false;
-          btnSubirFinal.textContent = tieneFinal ? "Reemplazar versión final" : "Subir versión final (Word/PDF)";
-        }
-      });
-
-      const btnSubirFinal = document.createElement("button");
-      btnSubirFinal.type = "button";
-      btnSubirFinal.className = "control-btn-mini";
-      btnSubirFinal.textContent = tieneFinal ? "Reemplazar versión final" : "Subir versión final (Word/PDF)";
-      btnSubirFinal.title = "Sube el Word (o PDF) ya corregido a mano — mientras esté subido, reemplaza al PDF/Word automáticos como lo que se entrega.";
-      btnSubirFinal.addEventListener("click", () => inputFinal.click());
-
-      tdAccion.append(btnSubirFinal, inputFinal);
-
-      if (tieneFinal) {
-        const btnQuitarFinal = document.createElement("button");
-        btnQuitarFinal.type = "button";
-        btnQuitarFinal.className = "control-btn-mini";
-        btnQuitarFinal.textContent = "Quitar versión final";
-        btnQuitarFinal.addEventListener("click", async () => {
-          const confirmado = window.confirm(`¿Quitar la versión final de "${inf.titulo}"? Vuelve a quedar el PDF/Word generado automáticamente.`);
-          if (!confirmado) return;
-          btnQuitarFinal.disabled = true;
-          try {
-            await quitarArchivoFinal(inf);
-          } catch (err) {
-            mostrarAlerta(err.message || "No se pudo quitar el archivo.", "error");
-            btnQuitarFinal.disabled = false;
-          }
-        });
-        tdAccion.appendChild(btnQuitarFinal);
-      }
-
-      const btnEditar = document.createElement("button");
-      btnEditar.type = "button";
-      btnEditar.className = "control-btn-mini";
-      btnEditar.textContent = "Editar";
-      btnEditar.addEventListener("click", () => cargarEnFormulario(inf, true));
-
-      const btnDuplicar = document.createElement("button");
-      btnDuplicar.type = "button";
-      btnDuplicar.className = "control-btn-mini";
-      btnDuplicar.textContent = "Duplicar";
-      btnDuplicar.title = "Partir de este informe para uno nuevo (otro mes u otro contrato), con radicado propio";
-      btnDuplicar.addEventListener("click", () => cargarEnFormulario(inf, false));
-
-      const btnPortada = document.createElement("button");
-      btnPortada.type = "button";
-      btnPortada.className = "control-btn-mini";
-      const esClara = inf.portada === "clara";
-      btnPortada.textContent = esClara ? "Portada oscura" : "Portada clara";
-      btnPortada.title = "Cambia el estilo de portada de este informe y descarga el PDF con el nuevo estilo";
-      btnPortada.addEventListener("click", async () => {
-        btnPortada.disabled = true;
-        try {
-          const nuevaPortada = esClara ? "oscura" : "clara";
-          await updateDoc(doc(db, "informes", inf.id), { portada: nuevaPortada });
-          const pdf = await generarInformePDF({ ...inf, portada: nuevaPortada });
-          pdf.save(`${inf.radicado}.pdf`);
-        } catch (err) {
-          mostrarAlerta(err.message || "No se pudo cambiar la portada.", "error");
-        } finally {
-          btnPortada.disabled = false;
-        }
-      });
-
-      const btnBorrar = document.createElement("button");
-      btnBorrar.type = "button";
-      btnBorrar.className = "control-btn-danger";
-      btnBorrar.textContent = "Borrar";
-      btnBorrar.addEventListener("click", async () => {
-        const confirmado = window.confirm(
-          `¿Seguro que quieres borrar el informe ${inf.radicado} (${inf.titulo})?\n\nEsta acción no se puede deshacer. El radicado no se vuelve a usar para otro informe.`
-        );
-        if (!confirmado) return;
-        btnBorrar.disabled = true;
-        try {
-          await deleteDoc(doc(db, "informes", inf.id));
-        } catch (err) {
-          mostrarAlerta(err.message || "No se pudo borrar el informe.", "error");
-          btnBorrar.disabled = false;
-        }
-      });
-
-      tdAccion.append(btnEditar, btnDuplicar, btnPortada, btnBorrar);
-    }
-
-    fila.appendChild(tdAccion);
     tbody.appendChild(fila);
   });
+  actualizarResaltadoInforme();
+  pintarVistaPreviaInforme();
+}
+
+function actualizarResaltadoInforme() {
+  tbody.querySelectorAll("tr[data-id]").forEach((tr) => {
+    tr.classList.toggle("control-fila-fijada", tr.dataset.id === informeSeleccionadoId);
+  });
+}
+
+function pintarVistaPreviaInforme() {
+  const inf = informesListaActual.find((x) => x.id === informeSeleccionadoId);
+  if (!inf) {
+    vistaPreviaInformeEl.innerHTML = '<p class="text-muted" style="margin:0;">Todavía no hay informes registrados.</p>';
+    return;
+  }
+  const esGestor = esGestorInformesActual;
+  const campo = (etiqueta, valor) => `
+    <div class="control-vp-campo">
+      <span class="control-vp-etiqueta">${etiqueta}</span>
+      <span class="control-vp-valor">${escapeHtmlInf(valor || "-")}</span>
+    </div>`;
+  const grupo = (titulo, camposHtml) => `
+    <div class="control-vp-grupo">
+      <div class="control-vp-grupo-titulo">${titulo}</div>
+      <div class="control-vp-grupo-campos">${camposHtml}</div>
+    </div>`;
+  const bloques = inf.bloques || [];
+  const titulos = bloques.filter((x) => x.tipo === "titulo1").length;
+  const tablas = bloques.filter((x) => x.tipo === "tabla").length;
+  vistaPreviaInformeEl.innerHTML = `
+    <div class="control-vp-encabezado">
+      <span class="control-vp-titulo">${escapeHtmlInf(inf.radicado)} — ${escapeHtmlInf(inf.titulo)}</span>
+      <div class="control-vp-acciones" id="informeVpAcciones"></div>
+    </div>
+    <div class="control-vp-grupos">
+      ${grupo("Informe", `
+        ${campo("Tipo", TIPO_LABEL[inf.tipoInforme] || inf.tipoInforme)}
+        ${campo("Fecha", inf.creadoEn ? inf.creadoEn.toDate().toLocaleDateString("es-CO") : "")}
+        ${campo("Mes", inf.mes)}
+        ${campo("Portada", inf.portada === "clara" ? "Clara" : "Oscura")}
+      `)}
+      ${grupo("Contrato", `
+        ${campo("Contrato", inf.contratoCodigo)}
+        ${campo("Objeto", inf.contratoNombre)}
+        ${campo("Cliente", inf.contratoCliente || inf.cliente)}
+      `)}
+      ${grupo("Contenido", `
+        ${campo("Capítulos", String(titulos))}
+        ${campo("Tablas", String(tablas))}
+        ${campo("Bloques", String(bloques.length))}
+        ${campo("Versión final", inf.archivoFinalUrl ? "Subida (reemplaza al PDF/Word automáticos)" : "No")}
+      `)}
+      ${grupo("Firma", `
+        ${campo("Elabora", inf.firmaNombre)}
+        ${campo("Cargo", inf.firmaCargo)}
+      `)}
+    </div>`;
+  const tdAccion = document.getElementById("informeVpAcciones");
+
+  const tieneFinal = !!inf.archivoFinalUrl;
+
+  if (tieneFinal) {
+    const btnFinal = document.createElement("a");
+    btnFinal.href = inf.archivoFinalUrl;
+    btnFinal.target = "_blank";
+    btnFinal.rel = "noopener";
+    btnFinal.className = "btn-outline";
+    btnFinal.textContent = "⭐ Descargar versión final";
+    tdAccion.appendChild(btnFinal);
+  }
+
+  const btnPdf = document.createElement("button");
+  btnPdf.type = "button";
+  btnPdf.className = "control-btn-mini";
+  btnPdf.textContent = tieneFinal ? "PDF (automático)" : "PDF";
+  btnPdf.title = tieneFinal ? "Genera el PDF a partir del contenido por bloques, sin las correcciones manuales de la versión final" : "";
+  btnPdf.addEventListener("click", async () => {
+    btnPdf.disabled = true;
+    try {
+      const pdf = await generarInformePDF(inf);
+      pdf.save(`${inf.radicado}.pdf`);
+    } finally {
+      btnPdf.disabled = false;
+    }
+  });
+
+  const btnWord = document.createElement("button");
+  btnWord.type = "button";
+  btnWord.className = "control-btn-mini";
+  btnWord.textContent = tieneFinal ? "Word (automático)" : "Word";
+  btnWord.title = tieneFinal ? "Genera el Word a partir del contenido por bloques, sin las correcciones manuales de la versión final" : "";
+  btnWord.addEventListener("click", async () => {
+    btnWord.disabled = true;
+    try {
+      await descargarInformeDocx(inf);
+    } finally {
+      btnWord.disabled = false;
+    }
+  });
+
+  tdAccion.append(btnPdf, btnWord);
+
+  if (esGestor) {
+    const inputFinal = document.createElement("input");
+    inputFinal.type = "file";
+    inputFinal.accept = ".doc,.docx,.pdf";
+    inputFinal.hidden = true;
+    inputFinal.addEventListener("change", async () => {
+      const archivo = inputFinal.files[0];
+      inputFinal.value = "";
+      if (!archivo) return;
+      btnSubirFinal.disabled = true;
+      btnSubirFinal.textContent = "Subiendo...";
+      try {
+        await subirArchivoFinal(inf, archivo);
+      } catch (err) {
+        mostrarAlerta(err.message || "No se pudo subir el archivo.", "error");
+      } finally {
+        btnSubirFinal.disabled = false;
+        btnSubirFinal.textContent = tieneFinal ? "Reemplazar versión final" : "Subir versión final (Word/PDF)";
+      }
+    });
+
+    const btnSubirFinal = document.createElement("button");
+    btnSubirFinal.type = "button";
+    btnSubirFinal.className = "control-btn-mini";
+    btnSubirFinal.textContent = tieneFinal ? "Reemplazar versión final" : "Subir versión final (Word/PDF)";
+    btnSubirFinal.title = "Sube el Word (o PDF) ya corregido a mano — mientras esté subido, reemplaza al PDF/Word automáticos como lo que se entrega.";
+    btnSubirFinal.addEventListener("click", () => inputFinal.click());
+
+    tdAccion.append(btnSubirFinal, inputFinal);
+
+    if (tieneFinal) {
+      const btnQuitarFinal = document.createElement("button");
+      btnQuitarFinal.type = "button";
+      btnQuitarFinal.className = "control-btn-mini";
+      btnQuitarFinal.textContent = "Quitar versión final";
+      btnQuitarFinal.addEventListener("click", async () => {
+        const confirmado = window.confirm(`¿Quitar la versión final de "${inf.titulo}"? Vuelve a quedar el PDF/Word generado automáticamente.`);
+        if (!confirmado) return;
+        btnQuitarFinal.disabled = true;
+        try {
+          await quitarArchivoFinal(inf);
+        } catch (err) {
+          mostrarAlerta(err.message || "No se pudo quitar el archivo.", "error");
+          btnQuitarFinal.disabled = false;
+        }
+      });
+      tdAccion.appendChild(btnQuitarFinal);
+    }
+
+    const btnEditar = document.createElement("button");
+    btnEditar.type = "button";
+    btnEditar.className = "control-btn-mini";
+    btnEditar.textContent = "Editar";
+    btnEditar.addEventListener("click", () => cargarEnFormulario(inf, true));
+
+    const btnDuplicar = document.createElement("button");
+    btnDuplicar.type = "button";
+    btnDuplicar.className = "control-btn-mini";
+    btnDuplicar.textContent = "Duplicar";
+    btnDuplicar.title = "Partir de este informe para uno nuevo (otro mes u otro contrato), con radicado propio";
+    btnDuplicar.addEventListener("click", () => cargarEnFormulario(inf, false));
+
+    const btnPortada = document.createElement("button");
+    btnPortada.type = "button";
+    btnPortada.className = "control-btn-mini";
+    const esClara = inf.portada === "clara";
+    btnPortada.textContent = esClara ? "Portada oscura" : "Portada clara";
+    btnPortada.title = "Cambia el estilo de portada de este informe y descarga el PDF con el nuevo estilo";
+    btnPortada.addEventListener("click", async () => {
+      btnPortada.disabled = true;
+      try {
+        const nuevaPortada = esClara ? "oscura" : "clara";
+        await updateDoc(doc(db, "informes", inf.id), { portada: nuevaPortada });
+        const pdf = await generarInformePDF({ ...inf, portada: nuevaPortada });
+        pdf.save(`${inf.radicado}.pdf`);
+      } catch (err) {
+        mostrarAlerta(err.message || "No se pudo cambiar la portada.", "error");
+      } finally {
+        btnPortada.disabled = false;
+      }
+    });
+
+    const btnBorrar = document.createElement("button");
+    btnBorrar.type = "button";
+    btnBorrar.className = "control-btn-danger";
+    btnBorrar.textContent = "Borrar";
+    btnBorrar.addEventListener("click", async () => {
+      const confirmado = window.confirm(
+        `¿Seguro que quieres borrar el informe ${inf.radicado} (${inf.titulo})?\n\nEsta acción no se puede deshacer. El radicado no se vuelve a usar para otro informe.`
+      );
+      if (!confirmado) return;
+      btnBorrar.disabled = true;
+      try {
+        await deleteDoc(doc(db, "informes", inf.id));
+      } catch (err) {
+        mostrarAlerta(err.message || "No se pudo borrar el informe.", "error");
+        btnBorrar.disabled = false;
+      }
+    });
+
+    tdAccion.append(btnEditar, btnDuplicar, btnPortada, btnBorrar);
+  }
+
 }
 
 requireAuth(async (user) => {

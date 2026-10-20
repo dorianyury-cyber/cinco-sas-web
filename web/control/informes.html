@@ -134,14 +134,17 @@
         </form>
       </details>
 
+      <div class="control-vista-previa" id="informeVistaPrevia">
+        <p class="text-muted" style="margin:0;">Cargando...</p>
+      </div>
+
       <div class="control-tabla-wrap">
-        <table class="control-tabla-documentos">
+        <table class="control-tabla-documentos control-tabla-seleccionable">
           <colgroup>
             <col class="w-130">
             <col>
-            <col class="w-180">
-            <col class="w-110">
             <col class="w-260">
+            <col class="w-110">
           </colgroup>
           <thead>
             <tr>
@@ -149,7 +152,6 @@
               <th>Título</th>
               <th>Contrato</th>
               <th>Fecha</th>
-              <th></th>
             </tr>
           </thead>
           <tbody id="listaInformes"></tbody>
