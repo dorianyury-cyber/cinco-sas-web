@@ -385,7 +385,8 @@ function pintarVistaPreviaEmpleado() {
     campoEditable("Aprobación de contratos", controlCheckboxSimple(e, esAdminActual, "aprobadorContratos", "Requerido")),
     campoEditable("Órdenes de Trabajo", controlCheckboxSimple(e, esAdminActual, "autorizadoOrdenesTrabajo", "Autorizado")),
     campoEditable("Interventoría PRO", controlCheckboxSimple(e, esAdminActual, "gestionaInterventoriaPro", "Gestor")),
-    campoEditable("AHÍNCO", controlCheckboxSimple(e, esAdminActual, "autorizadoAhinco", "Autorizado"))
+    campoEditable("AHÍNCO", controlCheckboxSimple(e, esAdminActual, "autorizadoAhinco", "Autorizado")),
+    campoEditable("APU PRO", controlCheckboxSimple(e, esAdminActual, "autorizadoApuPro", "Autorizado"))
   ]));
 
   vistaPreviaEl.appendChild(grupos);
@@ -428,6 +429,7 @@ requireAuth(async (user) => {
     const autorizadoOrdenesTrabajo = document.getElementById("autorizadoOrdenesTrabajo").checked;
     const gestionaInterventoriaPro = document.getElementById("gestionaInterventoriaPro").checked;
     const autorizadoAhinco = document.getElementById("autorizadoAhinco").checked;
+    const autorizadoApuPro = document.getElementById("autorizadoApuPro").checked;
     const rol = selectRolNuevo.value;
     const campo = campoDeRol(rol);
     const seleccionadas = [...camposLista.querySelectorAll(".campo-permiso-check:checked")].map((c) => c.value);
@@ -440,7 +442,7 @@ requireAuth(async (user) => {
       }
       await setDoc(empleadoRef, {
         nombre, email, cargo, cedula, telefono, rol, estado: "activo",
-        autorizadoOfertas, gestionaDocumentos, aprobadorContratos, autorizadoOrdenesTrabajo, gestionaInterventoriaPro, autorizadoAhinco,
+        autorizadoOfertas, gestionaDocumentos, aprobadorContratos, autorizadoOrdenesTrabajo, gestionaInterventoriaPro, autorizadoAhinco, autorizadoApuPro,
         ...(campo ? { [campo]: seleccionadas } : {}),
         creadoPor: user.email, creadoEn: serverTimestamp(),
         actualizadoEn: serverTimestamp()

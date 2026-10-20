@@ -1,0 +1,66 @@
+<!doctype html>
+<html lang="es" class="ap-preparando">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<meta name="robots" content="noindex, nofollow">
+<title>Parámetros — APU PRO</title>
+<link rel="icon" type="image/png" sizes="32x32" href="../assets/img/favicon-32.png">
+<link rel="stylesheet" href="../interventoria-pro/assets/ip.css">
+<link rel="stylesheet" href="../ahinco/assets/rt.css">
+<link rel="stylesheet" href="assets/ap.css">
+</head>
+<body>
+  <div class="app-shell">
+    <aside class="sidebar rt-sidebar" id="sidebar"></aside>
+    <main class="main rt-main">
+      <div class="rt-encabezado">
+        <h1>⚙ Parámetros e IPP</h1>
+        <p class="text-muted">Valores con los que se calcula la mano de obra y se proyectan los precios. Cada proyecto toma los parámetros del año que se elija.</p>
+      </div>
+      <div class="alert" id="alerta"></div>
+
+      <section class="card">
+        <div class="ap-vp-cabeza"><h2>Parámetros por año</h2><div class="rt-acciones"><button type="button" class="btn" id="nuevoAnio">＋ Agregar año</button></div></div>
+        <p class="text-muted ap-nota">Jornal = factor salarial × (salario mínimo + auxilio de transporte si el factor es 2 o menos) ÷ días hábiles; prestaciones = % prestacional × jornal.</p>
+        <div id="tablaParametros"><p class="text-muted">Cargando…</p></div>
+      </section>
+
+      <div class="ap-dos">
+        <section class="card">
+          <h2>Índice de Precios del Productor (IPP)</h2>
+          <p class="text-muted ap-nota">Sirve para actualizar precios antiguos y para sugerir el factor de proyección de materiales de un proyecto que se construirá más adelante.</p>
+          <div id="ippResumen"></div>
+          <form id="ippForm" class="ap-fila-form">
+            <label>Mes<input type="month" id="ippMes" required></label>
+            <label>Índice<input id="ippValor" inputmode="decimal" required placeholder="Ej. 182,35"></label>
+            <button type="submit" class="btn ap-btn">Agregar o corregir</button>
+          </form>
+          <div class="tabla-scroll ap-scroll-corto" id="ippTabla"></div>
+        </section>
+        <section class="card">
+          <h2>Tasas de cambio</h2>
+          <p class="text-muted ap-nota">Para insumos cotizados en otra moneda (equipos importados, software).</p>
+          <div id="monedas"></div>
+          <div class="rt-acciones"><button type="button" class="btn secondary" id="agregarMoneda">＋ Moneda</button><button type="button" class="btn" id="guardarMonedas">Guardar tasas</button></div>
+        </section>
+      </div>
+    </main>
+  </div>
+
+  <dialog class="rt-dialogo rt-dialogo-chico" id="anioDlg">
+    <div class="rt-dialogo-cabeza"><h2 id="anioDlgTitulo">Parámetros del año</h2><button type="button" class="rt-icono-btn" data-cerrar title="Cerrar">✕</button></div>
+    <form id="anioForm" class="rt-form-grid">
+      <div><label for="aAnio">Año</label><input id="aAnio" type="number" min="2015" max="2100" required></div>
+      <div><label for="aSmmlv">Salario mínimo mensual ($)</label><input id="aSmmlv" inputmode="decimal" required></div>
+      <div><label for="aAux">Auxilio de transporte ($)</label><input id="aAux" inputmode="decimal" required></div>
+      <div><label for="aPrest">Prestaciones (%)</label><input id="aPrest" inputmode="decimal" required placeholder="60"></div>
+      <div><label for="aDias">Días hábiles por mes</label><input id="aDias" type="number" min="1" max="31" required></div>
+      <div class="rt-ancho"><label for="aFuente">Fuente</label><input id="aFuente" placeholder="Decreto del salario mínimo, política interna…"></div>
+    </form>
+    <div class="alert" id="anioDlgAlerta"></div>
+    <div class="rt-acciones"><button type="button" class="btn" id="anioGuardar">Guardar</button><button type="button" class="btn secondary" data-cerrar>Cancelar</button></div>
+  </dialog>
+  <script type="module" src="js/ap-parametros.js"></script>
+</body>
+</html>

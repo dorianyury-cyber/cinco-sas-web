@@ -1,0 +1,82 @@
+<!doctype html>
+<html lang="es" class="ap-preparando">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<meta name="robots" content="noindex, nofollow">
+<title>Insumos — APU PRO</title>
+<link rel="icon" type="image/png" sizes="32x32" href="../assets/img/favicon-32.png">
+<link rel="stylesheet" href="../interventoria-pro/assets/ip.css">
+<link rel="stylesheet" href="../ahinco/assets/rt.css">
+<link rel="stylesheet" href="assets/ap.css">
+</head>
+<body>
+  <div class="app-shell">
+    <aside class="sidebar rt-sidebar" id="sidebar"></aside>
+    <main class="main rt-main">
+      <div class="rt-encabezado">
+        <h1 id="titulo">Insumos</h1>
+        <p class="text-muted" id="subtitulo">Base de precios de Cinco S.A.S.</p>
+      </div>
+      <div class="ap-pestanas" id="pestanas"></div>
+
+      <div class="toolbar ap-toolbar">
+        <input type="search" id="buscar" placeholder="Buscar por código, descripción o código anterior…">
+        <select id="filtroEstado" title="Antigüedad del precio">
+          <option value="">Todos los precios</option>
+          <option value="ok">Vigentes (≤ 6 meses)</option>
+          <option value="warn">Por revisar (6 a 12 meses)</option>
+          <option value="danger">Desactualizados (&gt; 12 meses)</option>
+          <option value="muted">Sin fecha o sin precio</option>
+        </select>
+        <label class="ap-anio hidden" id="anioCaja">Parámetros de <select id="anioParametros"></select></label>
+        <span class="text-muted ap-cuenta" id="cuenta"></span>
+        <button type="button" class="btn ap-btn" id="nuevoBtn">＋ Nuevo</button>
+      </div>
+      <div class="alert" id="alerta"></div>
+
+      <section class="card ap-vp" id="vistaPrevia"><p class="text-muted">Cargando…</p></section>
+
+      <div class="card ap-lista">
+        <div class="tabla-scroll"><table class="ap-tabla ap-tabla-sel" id="tabla"></table></div>
+      </div>
+    </main>
+  </div>
+
+  <dialog class="rt-dialogo rt-dialogo-medio" id="insumoDlg">
+    <div class="rt-dialogo-cabeza"><h2 id="insumoDlgTitulo">Insumo</h2><button type="button" class="rt-icono-btn" data-cerrar title="Cerrar">✕</button></div>
+    <form id="insumoForm" class="rt-form-grid">
+      <div><label for="fCodigo">Código</label><input id="fCodigo" required></div>
+      <div><label for="fUnidad">Unidad</label><input id="fUnidad" required placeholder="U, m, kg, Día…"></div>
+      <div class="rt-ancho"><label for="fDescripcion">Descripción</label><input id="fDescripcion" required></div>
+      <div class="ap-solo ap-solo-MO"><label for="fFactor">Factor salarial (veces el salario mínimo)</label><input id="fFactor" inputmode="decimal"></div>
+      <div class="ap-solo ap-solo-EH ap-solo-ED ap-solo-TV"><label for="fBase">Cómo se expresa el valor</label><select id="fBase"><option value="mensual">Valor mensual</option><option value="vidaUtil">Valor de compra con vida útil</option><option value="unidad">Valor por unidad (ton·km, m³…)</option></select></div>
+      <div class="ap-solo ap-solo-EH ap-solo-ED"><label for="fVida">Vida útil (años)</label><input id="fVida" inputmode="decimal"></div>
+      <div class="ap-solo ap-solo-MA ap-solo-EH ap-solo-ED ap-solo-TV"><label for="fIva">Precio con IVA</label><select id="fIva"><option value="si">Sí, incluye IVA</option><option value="no">No, antes de IVA</option></select></div>
+      <div class="rt-ancho"><label for="fNotas">Notas</label><input id="fNotas" placeholder="Especificación, marca de referencia, observaciones…"></div>
+      <div class="ap-solo ap-solo-MA ap-solo-EH ap-solo-ED ap-solo-TV ap-solo-nuevo rt-ancho ap-subtitulo">Precio inicial</div>
+      <div class="ap-solo ap-solo-MA ap-solo-EH ap-solo-ED ap-solo-TV ap-solo-nuevo"><label for="fPrecio">Valor ($)</label><input id="fPrecio" inputmode="decimal"></div>
+      <div class="ap-solo ap-solo-MA ap-solo-EH ap-solo-ED ap-solo-TV ap-solo-nuevo"><label for="fFecha">Fecha del precio</label><input id="fFecha" type="date"></div>
+      <div class="ap-solo ap-solo-MA ap-solo-EH ap-solo-ED ap-solo-TV ap-solo-nuevo"><label for="fFuente">Fuente</label><input id="fFuente" placeholder="Proveedor, cotización, tienda…"></div>
+      <div class="ap-solo ap-solo-MA ap-solo-EH ap-solo-ED ap-solo-TV ap-solo-nuevo"><label for="fUrl">Enlace</label><input id="fUrl" type="url" placeholder="https://…"></div>
+    </form>
+    <div class="alert" id="insumoDlgAlerta"></div>
+    <div class="rt-acciones"><button type="button" class="btn" id="insumoGuardar">Guardar</button><button type="button" class="btn secondary" data-cerrar>Cancelar</button></div>
+  </dialog>
+
+  <dialog class="rt-dialogo rt-dialogo-chico" id="precioDlg">
+    <div class="rt-dialogo-cabeza"><h2>Registrar precio</h2><button type="button" class="rt-icono-btn" data-cerrar title="Cerrar">✕</button></div>
+    <p class="text-muted" id="precioDlgInsumo"></p>
+    <form id="precioForm" class="rt-form-grid">
+      <div><label for="pValor" id="pValorEtiqueta">Valor ($)</label><input id="pValor" inputmode="decimal" required></div>
+      <div><label for="pFecha">Fecha</label><input id="pFecha" type="date" required></div>
+      <div class="rt-ancho"><label for="pFuente">Fuente</label><input id="pFuente" required placeholder="Proveedor, cotización, tienda…"></div>
+      <div class="rt-ancho"><label for="pUrl">Enlace (opcional)</label><input id="pUrl" type="url" placeholder="https://…"></div>
+      <div><label for="pIva">Precio con IVA</label><select id="pIva"><option value="si">Sí, incluye IVA</option><option value="no">No, antes de IVA</option></select></div>
+    </form>
+    <div class="alert" id="precioDlgAlerta"></div>
+    <div class="rt-acciones"><button type="button" class="btn" id="precioGuardar">Registrar</button><button type="button" class="btn secondary" data-cerrar>Cancelar</button></div>
+  </dialog>
+  <script type="module" src="js/ap-insumos.js"></script>
+</body>
+</html>

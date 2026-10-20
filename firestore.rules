@@ -399,5 +399,25 @@ service cloud.firestore {
         allow delete: if puedeAhinco() && duenoRt(proyectoId);
       }
     }
+
+    // ---- APU PRO: presupuestos y análisis de precios unitarios (web/apu-pro).
+    // Entran el administrador y los empleados activos con el permiso
+    // autorizadoApuPro (Empleados). Parámetros, series (IPP, monedas) e insumos
+    // los ven y editan los autorizados; borrarlos es solo del administrador.
+    function puedeApuPro() {
+      return esAdmin() || (esEmpleadoActivo() && empleadoDoc().get('autorizadoApuPro', false) == true);
+    }
+    match /apParametros/{anio} {
+      allow read, create, update: if puedeApuPro();
+      allow delete: if esAdmin();
+    }
+    match /apSeries/{serieId} {
+      allow read, create, update: if puedeApuPro();
+      allow delete: if esAdmin();
+    }
+    match /apInsumos/{codigo} {
+      allow read, create, update: if puedeApuPro();
+      allow delete: if esAdmin();
+    }
   }
 }

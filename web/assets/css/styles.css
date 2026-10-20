@@ -774,13 +774,20 @@ ul.clean-list li::before {
 }
 .app-card p { font-size: 13.5px; color: var(--text-muted); margin-bottom: 18px; }
 .app-card-link { margin: 12px 0 0; }
-/* Aplicativos: 4 tarjetas en una sola fila en pantallas anchas, un poco
-   más compactas; el botón queda alineado abajo aunque el texto varíe. */
-.grid-apps { gap: 18px; }
-.grid-apps .app-card { padding: 22px 18px; display: flex; flex-direction: column; align-items: center; }
-.grid-apps .app-card h3 { font-size: 17px; }
-.grid-apps .app-card > p:not(.app-card-link) { font-size: 13px; flex: 1; }
-.grid-apps .app-card .icon { width: 58px; height: 58px; }
+/* Aplicativos: las 5 tarjetas en una sola fila en pantallas anchas, más
+   compactas; el botón queda alineado abajo aunque el texto varíe. En
+   pantallas medianas pasan a 3 y luego a 2 o 1 columna. */
+.grid-apps { gap: 14px; grid-template-columns: repeat(auto-fit, minmax(200px, 1fr)); }
+@media (min-width: 1040px) {
+  .grid-apps { grid-template-columns: repeat(5, 1fr); }
+}
+.grid-apps .app-card { padding: 20px 14px; display: flex; flex-direction: column; align-items: center; }
+.grid-apps .app-card h3 { font-size: 16px; }
+.grid-apps .app-card > p:not(.app-card-link) { font-size: 12.5px; line-height: 1.5; flex: 1; margin-bottom: 14px; }
+.grid-apps .app-card .icon { width: 54px; height: 54px; margin-bottom: 12px; }
+.grid-apps .app-card .btn { padding: 9px 20px; font-size: 13px; }
+.grid-apps .app-card-link { margin-top: 10px; font-size: 12.5px; }
+.grid-apps .app-card-pronto { color: var(--text-muted); font-weight: 600; }
 .app-card .note {
   font-size: 11.5px;
   color: var(--text-muted);

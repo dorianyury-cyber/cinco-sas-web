@@ -1,0 +1,58 @@
+<!doctype html>
+<html lang="es" class="ap-preparando">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<meta name="robots" content="noindex, nofollow">
+<title>Tablero — APU PRO</title>
+<link rel="icon" type="image/png" sizes="32x32" href="../assets/img/favicon-32.png">
+<link rel="stylesheet" href="../interventoria-pro/assets/ip.css">
+<link rel="stylesheet" href="../ahinco/assets/rt.css">
+<link rel="stylesheet" href="assets/ap.css">
+</head>
+<body>
+  <div class="app-shell">
+    <aside class="sidebar rt-sidebar" id="sidebar"></aside>
+    <main class="main rt-main">
+      <div class="rt-encabezado">
+        <h1>Tablero</h1>
+        <p class="text-muted">Estado de la base de precios de Cinco S.A.S.: insumos por tipo, antigüedad de los precios y parámetros vigentes para la mano de obra.</p>
+      </div>
+      <div class="alert" id="tableroAlerta"></div>
+
+      <div class="card hidden" id="cargaCard">
+        <h2>Cargar la base inicial</h2>
+        <p class="text-muted">La base de precios está vacía. Carga el archivo <strong>«APU PRO - base inicial de insumos.json»</strong> (en el escritorio): trae los materiales de CSS 226 y los de los presupuestos PR-36 y PR-38, la mano de obra, los equipos, el EPP, el transporte, los parámetros de 2024 y 2025, el IPP y las monedas.</p>
+        <input type="file" id="semillaArchivo" accept=".json,application/json" class="hidden">
+        <div class="rt-acciones"><button type="button" class="btn" id="semillaBtn">Elegir archivo y cargar</button></div>
+        <p class="text-muted ap-progreso" id="semillaProgreso"></p>
+      </div>
+
+      <div class="ap-kpis" id="kpis"></div>
+
+      <div class="ap-dos">
+        <section class="card">
+          <h2>Antigüedad de los precios</h2>
+          <p class="text-muted ap-nota">Vigente: 6 meses o menos · Revisar: hasta 12 meses · Desactualizado: más de 12 meses. Aplica a materiales, equipos, EPP y transporte.</p>
+          <div id="antiguedad"><p class="text-muted">Cargando…</p></div>
+        </section>
+        <section class="card">
+          <h2>Parámetros vigentes</h2>
+          <div id="parametros"><p class="text-muted">Cargando…</p></div>
+        </section>
+      </div>
+
+      <section class="card">
+        <h2>Lo que viene</h2>
+        <ul class="rt-lista rt-lista-cols">
+          <li><strong>Biblioteca de APU</strong>: análisis con sus cinco capítulos (materiales, mano de obra, equipos y herramientas, EPP y dotación, transporte), rendimiento y versiones.</li>
+          <li><strong>Proyectos</strong>: presupuesto por capítulos y sitios, memoria de cantidades, AIU, régimen de IVA y factor de proyección de materiales.</li>
+          <li><strong>Reportes</strong>: Excel formulado con el formato de la página anterior de Cinco y PDF del presupuesto y los APU.</li>
+          <li><strong>Revisión</strong>: análisis de presupuestos de terceros, como el de INFRARED.</li>
+        </ul>
+      </section>
+    </main>
+  </div>
+  <script type="module" src="js/ap-inicio.js"></script>
+</body>
+</html>
