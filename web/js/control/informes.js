@@ -8,6 +8,7 @@ import { auth, db, storage, requireAuth, obtenerPerfil } from "./firebase-contro
 import { generarInformePDF } from "./informes-pdf.js";
 import { descargarInformeDocx } from "./informes-docx.js";
 import { registrarDocumentoSGC } from "./documentos-sgc.js";
+import { escucharOfertas, botonOfertas } from "./visor-ofertas.js";
 import { truncar } from "./texto.js";
 import { crearCampoTextoRico } from "./texto-rico.js";
 import {
@@ -1373,6 +1374,7 @@ function pintarVistaPreviaInforme() {
       `)}
     </div>`;
   const tdAccion = document.getElementById("informeVpAcciones");
+  tdAccion.appendChild(botonOfertas({ contratoId: inf.contratoId, cliente: inf.contratoCliente || inf.cliente, referencia: inf.radicado, contratoCodigo: inf.contratoCodigo }));
 
   const tieneFinal = !!inf.archivoFinalUrl;
 
@@ -1538,6 +1540,8 @@ requireAuth(async (user) => {
   // general) — puede ser responsable/personal asignado de una orden
   // puntual sin ser "autorizado" al módulo completo, ver contratos.js.
   document.getElementById("navOrdenesTrabajo")?.classList.toggle("oculto", perfil?.estado !== "activo");
+
+  escucharOfertas(pintarVistaPreviaInforme);
 
   const q = query(collection(db, "informes"), orderBy("creadoEn", "desc"));
   onSnapshot(q, (snapshot) => {

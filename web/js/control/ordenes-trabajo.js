@@ -6,6 +6,7 @@ import {
 import { auth, db, requireAuth, obtenerPerfil } from "./firebase-control.js";
 import { generarOrdenTrabajoPDF } from "./ordenes-trabajo-pdf.js";
 import { RIESGOS, PREOPERACIONALES } from "./ordenes-trabajo-datos.js";
+import { escucharOfertas, botonOfertas } from "./visor-ofertas.js";
 
 const contenidoOrdenes = document.getElementById("contenidoOrdenes");
 const contenidoParticipante = document.getElementById("contenidoParticipante");
@@ -721,6 +722,7 @@ function pintarVistaPreviaOrden() {
   `;
 
   const accionesEl = document.getElementById("otVpAcciones");
+  accionesEl.appendChild(botonOfertas({ contratoId: o.contratoId, cliente: o.contratoCliente || o.cliente, referencia: o.numero || o.codigo, contratoCodigo: o.contratoCodigo }));
 
   const btnPdf = document.createElement("button");
   btnPdf.type = "button";
@@ -781,6 +783,7 @@ function pintarVistaPreviaOrden() {
 }
 
 requireAuth(async (user) => {
+  escucharOfertas(() => pintarVistaPreviaOrden());
   usuarioActual = user;
   document.getElementById("userEmail").textContent = user.email;
 

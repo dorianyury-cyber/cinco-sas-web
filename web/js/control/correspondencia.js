@@ -9,6 +9,7 @@ import { descargarCartaDocx } from "./correspondencia-docx.js";
 import { truncar } from "./texto.js";
 import { registrarDocumentoSGC } from "./documentos-sgc.js";
 import { crearCampoTextoRico } from "./texto-rico.js";
+import { escucharOfertas, botonOfertas } from "./visor-ofertas.js";
 
 // Área/tipo fijos para que una carta quede en el Listado Maestro de
 // Documentos (SGC) sin pedir un campo más en el formulario — mismo
@@ -389,6 +390,8 @@ function pintarVistaPreviaCarta() {
   `;
 
   const accionesEl = document.getElementById("cartaVpAcciones");
+  const contratoCarta = c.contratoId ? contratosPorId[c.contratoId] : null;
+  accionesEl.appendChild(botonOfertas({ contratoId: c.contratoId, cliente: contratoCarta?.cliente || c.destinatario, referencia: c.radicado, contratoCodigo: contratoCarta?.codigo }));
 
   const btnPdf = document.createElement("button");
   btnPdf.type = "button";
@@ -480,6 +483,7 @@ inputWordFinal.addEventListener("change", async () => {
 });
 
 requireAuth(async (user) => {
+  escucharOfertas(() => pintarVistaPreviaCarta());
   usuarioActual = user;
   document.getElementById("userEmail").textContent = user.email;
 

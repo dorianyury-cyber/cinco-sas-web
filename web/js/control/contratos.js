@@ -8,6 +8,7 @@ import { auth, db, storage, requireAuth, obtenerPerfil } from "./firebase-contro
 import { itemsIniciales } from "./plantillas.js";
 import { LINEAS_SERVICIO } from "./lineas-servicio.js";
 import { capitalizarOracion, capitalizarNombrePropio } from "./texto.js";
+import { escucharOfertas, botonOfertas } from "./visor-ofertas.js";
 
 const TIPO_LABEL = { obra: "Obra", servicio: "Servicio" };
 
@@ -201,6 +202,7 @@ function pintarVistaPreviaContrato() {
   `;
 
   const accionesEl = document.getElementById("contratoVpAcciones");
+  accionesEl.appendChild(botonOfertas({ contratoId: c.id, cliente: c.cliente, referencia: c.codigo, contratoCodigo: c.codigo }));
   const btnAbrir = document.createElement("a");
   btnAbrir.className = "control-btn-mini";
   btnAbrir.href = `contrato.html?id=${c.id}`;
@@ -209,6 +211,7 @@ function pintarVistaPreviaContrato() {
 }
 
 requireAuth(async (user) => {
+  escucharOfertas(() => pintarVistaPreviaContrato());
   document.getElementById("userEmail").textContent = user.email;
 
   // Solo admin/coadmin crean contratos (las reglas de Firestore también lo
