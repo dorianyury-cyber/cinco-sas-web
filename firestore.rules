@@ -372,27 +372,31 @@ service cloud.firestore {
       }
     }
 
-    // ---- AHÍNCO: memorias de cálculo eléctricas (web/ahinco). Cualquier
-    // empleado activo ve y edita los proyectos; solo quien lo creó (o el
+    // ---- AHÍNCO: memorias de cálculo eléctricas (web/ahinco). Entran el
+    // administrador y los empleados activos con el permiso autorizadoAhinco
+    // (Empleados); ven y editan los proyectos y solo quien lo creó (o el
     // administrador) lo elimina, junto con sus cálculos.
+    function puedeAhinco() {
+      return esAdmin() || (esEmpleadoActivo() && empleadoDoc().get('autorizadoAhinco', false) == true);
+    }
     function duenoRt(proyectoId) {
       return esAdmin() || get(/databases/$(database)/documents/rtProyectos/$(proyectoId)).data.creadoPor == request.auth.token.email;
     }
     match /rtProyectos/{proyectoId} {
-      allow read: if esEmpleadoActivo();
-      allow create: if esEmpleadoActivo() && request.resource.data.creadoPor == request.auth.token.email;
-      allow update: if esEmpleadoActivo() && request.resource.data.creadoPor == resource.data.creadoPor;
-      allow delete: if esEmpleadoActivo() && duenoRt(proyectoId);
+      allow read: if puedeAhinco();
+      allow create: if puedeAhinco() && request.resource.data.creadoPor == request.auth.token.email;
+      allow update: if puedeAhinco() && request.resource.data.creadoPor == resource.data.creadoPor;
+      allow delete: if puedeAhinco() && duenoRt(proyectoId);
       match /calculos/{moduloId} {
-        allow read, create, update: if esEmpleadoActivo();
-        allow delete: if esEmpleadoActivo() && duenoRt(proyectoId);
+        allow read, create, update: if puedeAhinco();
+        allow delete: if puedeAhinco() && duenoRt(proyectoId);
       }
       // Versiones: copias inmutables (no se modifican); las borra el dueño del proyecto o un administrador.
       match /versiones/{versionId} {
-        allow read: if esEmpleadoActivo();
-        allow create: if esEmpleadoActivo() && request.resource.data.creadoPor == request.auth.token.email;
+        allow read: if puedeAhinco();
+        allow create: if puedeAhinco() && request.resource.data.creadoPor == request.auth.token.email;
         allow update: if false;
-        allow delete: if esEmpleadoActivo() && duenoRt(proyectoId);
+        allow delete: if puedeAhinco() && duenoRt(proyectoId);
       }
     }
   }

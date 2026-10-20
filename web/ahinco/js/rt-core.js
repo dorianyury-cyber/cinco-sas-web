@@ -97,9 +97,15 @@ export async function iniciarPagina() {
   const user = await esperarUsuario();
   if (!user) { window.location.href = "index.html"; return null; }
   const perfil = await obtenerPerfil(user.email);
-  if (!perfil || perfil.estado !== "activo") {
+  // Entran el administrador y los empleados activos con el permiso «AHÍNCO» marcado en
+  // Empleados (las reglas de Firestore exigen lo mismo).
+  const autorizado = perfil?.estado === "activo" && (perfil.rol === "admin" || perfil.autorizadoAhinco === true);
+  if (!autorizado) {
     document.documentElement.classList.remove("rt-preparando");
-    document.body.innerHTML = `<div class="auth-page"><div class="auth-card"><h1>${NOMBRE_APP}</h1><p class="text-muted">Tu cuenta no tiene un perfil activo en Cinco S.A.S. Pídele a un administrador que te registre en Empleados.</p><button type="button" class="btn" id="salirSinAcceso">Cerrar sesión</button></div></div>`;
+    const motivo = !perfil || perfil.estado !== "activo"
+      ? "Tu cuenta no tiene un perfil activo en Cinco S.A.S. Pídele a un administrador que te registre en Empleados."
+      : "Tu cuenta no tiene autorización para ingresar a AHÍNCO. Pídele a un administrador que marque el permiso «AHÍNCO» en Empleados.";
+    document.body.innerHTML = `<div class="auth-page"><div class="auth-card"><h1>${NOMBRE_APP}</h1><p class="text-muted">${motivo}</p><button type="button" class="btn" id="salirSinAcceso">Cerrar sesión</button></div></div>`;
     document.getElementById("salirSinAcceso").addEventListener("click", cerrarSesion);
     return null;
   }
