@@ -4,7 +4,20 @@ on:
     branches:
       - main
 jobs:
+  # Pruebas (APU PRO: cálculo, revisión de ofertas y lectura de PDF). Si alguna falla, no se
+  # publica el sitio. Las de validación con casos reales se omiten aquí (no están en el repo).
+  pruebas:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+      - name: Correr las pruebas
+        run: npm test
+
   build_and_deploy:
+    needs: pruebas
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4

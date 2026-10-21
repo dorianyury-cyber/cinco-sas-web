@@ -536,14 +536,14 @@ function revisarApus(rev, apus, { F, items, valor, valorFinal, agregar, precioIn
     if (principal.v < totalMa * 0.6) continue;
     const k = claveInsumo(principal);
     const otros = [...(usoPorClave.get(k) || [])].filter((b) => b !== a && claveInsumo(mat(b).reduce((m, x) => (x.v > m.v ? x : m), { v: -1 })) !== k);
-    if (otros.length >= 5) { const e = dobles.get(k) || { d: principal.d, separados: [], otros: new Set() }; e.separados.push(a); otros.forEach((b) => e.otros.add(b)); dobles.set(k, e); }
+    if (otros.length >= 5) { const e = dobles.get(k) || { d: principal.d, u: principal.u, separados: [], otros: new Set() }; e.separados.push(a); otros.forEach((b) => e.otros.add(b)); dobles.set(k, e); }
   }
   if (dobles.size) {
     const grupos = [...dobles.values()].map((e) => { const its = itemsDeApus(e.separados); return { ...e, its, unidades: its.reduce((s, it) => s + (Number(it.cant) || 0), 0), v: vtDe(e.separados) }; }).sort((p, q) => q.v - p.v);
     const v = grupos.reduce((s, g) => s + g.v, 0);
     agregar({ clave: "accesoriosDobles", titulo: "Accesorios cobrados dentro de los APU y aparte", estado: "hallazgo", sev: v > valorFinal * 0.01 ? "Mayor" : "Menor", tema: "Cantidades",
       texto: `Hay accesorios que ya van dentro de muchos APU (una o dos unidades por salida) y además se cobran como ítems separados; pueden ser cantidades cobradas dos veces: ${grupos.map((g) => `«${g.d}»: incluida en ${g.otros.size} APU y ${numTxt(g.unidades)} unidades aparte (${lista(g.its, 8)}), hasta ${pesosTxt(g.v)}`).join("; ")}.`,
-      itemsRef: grupos.flatMap((g) => g.its), impacto: null, impactoTexto: `Hasta ${pesosTxt(v)}`, accion: "Pedir la justificación de cada unidad cobrada aparte (derivación, paso, soporte adicional) con su ubicación en planos; retirar las que dupliquen las incluidas en cada salida." });
+      itemsRef: grupos.flatMap((g) => g.its), insumosRef: grupos.map((g) => `MA|${claveInsumo({ d: g.d, u: g.u })}`), fuente: "ambos", impacto: null, impactoTexto: `Hasta ${pesosTxt(v)}`, accion: "Pedir la justificación de cada unidad cobrada aparte (derivación, paso, soporte adicional) con su ubicación en planos; retirar las que dupliquen las incluidas en cada salida." });
   }
 
   // Consumibles con peso atípico: filtros, discos, brocas o lijas que pesan más del 15 % del APU.
@@ -555,7 +555,7 @@ function revisarApus(rev, apus, { F, items, valor, valorFinal, agregar, precioIn
     const its = itemsDeApus(consumos.map((c) => c.a));
     agregar({ clave: "consumibles", titulo: "Consumibles con peso atípico en los APU", estado: "hallazgo", sev: v > valorFinal * 0.01 ? "Mayor" : "Menor", tema: "Insumos",
       texto: `En ${consumos.length} APU un consumible pesa más del 15 % del costo directo: ${consumos.slice(0, 6).map(({ a, x }) => `${a.item}: ${numTxt(x.c)} ${x.u || "und"} de «${x.d}» a ${pesosTxt(x.p)} = ${pesosTxt(x.v)} (${Math.round((x.v / a.cd) * 100)} % del APU)`).join("; ")}${consumos.length > 6 ? ", entre otros" : ""}. En toda la obra suman ${pesosTxt(v)}.`,
-      itemsRef: its, impacto: v, accion: "Pedir la justificación del consumo y ajustarlo a un valor razonable (los consumibles suelen ser una fracción menor del costo)." });
+      itemsRef: its, insumosRef: consumos.map(({ x }) => `MA|${claveInsumo(x)}`), fuente: "insumos", impacto: v, accion: "Pedir la justificación del consumo y ajustarlo a un valor razonable (los consumibles suelen ser una fracción menor del costo)." });
   }
 
   // Obra civil (cielo raso, drywall, regatas, pintura…) ejecutada por la cuadrilla eléctrica.
@@ -605,7 +605,7 @@ function revisarApus(rev, apus, { F, items, valor, valorFinal, agregar, precioIn
   for (const e of varios) { const min = e.preciosLista[0]; for (const [p, q] of e.precios) vVarios += (p - min) * q * F.final; }
   if (varios.length) agregar({ clave: "insumoPrecios", titulo: "Mismo insumo con precios distintos", estado: "hallazgo", sev: vVarios > valorFinal * 0.005 ? "Mayor" : "Menor", tema: "Precios",
     texto: `${varios.length} materiales tienen precios distintos según el APU: ${varios.slice(0, 5).map((e) => `${e.d} (${pesosTxt(e.preciosLista[0])} a ${pesosTxt(e.preciosLista[e.preciosLista.length - 1])})`).join("; ")}${varios.length > 5 ? ", entre otros" : ""}. Llevados al menor precio, el valor bajaría en ${pesosTxt(vVarios)}.`,
-    itemsRef: items.filter((it) => varios.some((e) => e.apus.some((c) => codNorm(c) === codNorm(it.item)))), impacto: vVarios, accion: "Pedir la justificación o unificar cada insumo en su menor precio." });
+    itemsRef: items.filter((it) => varios.some((e) => e.apus.some((c) => codNorm(c) === codNorm(it.item)))), insumosRef: varios.map((e) => e.clave), fuente: "insumos", impacto: vVarios, accion: "Pedir la justificación o unificar cada insumo en su menor precio." });
 
   // Jornales: un mismo cargo con jornal distinto; personal de dirección en el costo directo.
   const cargos = listaIns.filter((e) => e.sec === "MO");
@@ -636,7 +636,7 @@ function revisarApus(rev, apus, { F, items, valor, valorFinal, agregar, precioIn
   const vIns = encimaIns.reduce((s, c) => s + c.exceso, 0);
   if (encimaIns.length) agregar({ clave: "insumosBase", titulo: "Insumos por encima de la base de APU PRO", estado: "hallazgo", sev: vIns > valorFinal * 0.01 ? "Mayor" : "Menor", tema: "Precios",
     texto: `De ${comparadosIns.length} insumos comparados con la base de precios de Cinco S.A.S., ${encimaIns.length} superan en más del 20 % el precio de referencia (${encimaIns.slice(0, 6).map((c) => `${c.d} +${Math.round(c.dif * 100)} %`).join("; ")}${encimaIns.length > 6 ? ", entre otros" : ""}). El exceso sobre la referencia más un 20 % es de ${pesosTxt(vIns)} en el valor final.`,
-    itemsRef: items.filter((it) => encimaIns.some((c) => (insumos.get(c.clave)?.apus || new Set()).has(it.item))), impacto: vIns, accion: "Pedir cotizaciones de soporte de estos insumos y ajustar los APU." });
+    itemsRef: items.filter((it) => encimaIns.some((c) => (insumos.get(c.clave)?.apus || new Set()).has(it.item))), insumosRef: encimaIns.map((c) => c.clave), fuente: "insumos", impacto: vIns, accion: "Pedir cotizaciones de soporte de estos insumos y ajustar los APU." });
 
   // Días-cuadrilla: cantidad del ítem ÷ rendimiento de la cuadrilla (el de mano de obra o el del APU).
   let dias = 0;
@@ -654,14 +654,44 @@ export function hallazgosRevision(rev, res) {
   const auto = res.verificaciones.filter((v) => v.estado === "hallazgo").map((v) => {
     const a = aj[v.clave] || {};
     return { clave: v.clave, origen: "auto", incluir: a.incluir !== false, sev: a.sev || v.sev, tema: v.tema, hallazgo: a.comentario ? `${v.texto} ${a.comentario}` : v.texto,
-      items: v.itemsRef?.length ? lista(v.itemsRef, 20) : "Todos", impacto: v.impacto, impactoTexto: v.impactoTexto || "", accion: a.accion || v.accion, titulo: v.titulo };
+      items: v.itemsRef?.length ? lista(v.itemsRef, 20) : "Todos", impacto: v.impacto, impactoTexto: v.impactoTexto || "", accion: a.accion || v.accion, titulo: v.titulo,
+      codigos: v.fuente === "insumos" ? new Set() : new Set((v.itemsRef || []).map((it) => codNorm(it.item))), insumos: new Set(v.insumosRef || []) };
   });
-  const manuales = (rev.hallazgos || []).map((h) => ({ ...h, clave: h.id, origen: "manual", incluir: h.incluir !== false, impacto: h.impacto == null || h.impacto === "" ? null : Number(h.impacto), impactoTexto: h.impactoTexto || "" }));
+  // Los ítems de un hallazgo del revisor salen de lo que escribió («8-1, 8-2»).
+  const manuales = (rev.hallazgos || []).map((h) => ({ ...h, clave: h.id, origen: "manual", incluir: h.incluir !== false, impacto: h.impacto == null || h.impacto === "" ? null : Number(h.impacto), impactoTexto: h.impactoTexto || "",
+    codigos: new Set(String(h.items || "").split(/[,;]+|\s+y\s+/).map((c) => codNorm(c)).filter((c) => c && RE_CODIGO_ITEM.test(c))), insumos: new Set() }));
   const orden = { Mayor: 0, Menor: 1, "Observación": 2 };
   const todos = [...auto, ...manuales].sort((x, y) => (orden[x.sev] ?? 3) - (orden[y.sev] ?? 3) || (Math.abs(y.impacto || 0) - Math.abs(x.impacto || 0)));
   let h = 0, ob = 0;
   for (const x of todos) if (x.incluir) x.numero = x.sev === "Observación" ? `OB-${String(++ob).padStart(2, "0")}` : `H-${String(++h).padStart(2, "0")}`;
+  // Superposición: dos hallazgos que cuentan el mismo dinero. Los de insumos (precio, consumo)
+  // se superponen si comparten un insumo (la caja cara y la caja cobrada dos veces); los de
+  // ítems, si comparten buena parte de sus ítems (30 % o más del menor).
+  const inc = todos.filter((x) => x.incluir);
+  for (const x of inc) x.superpone = [];
+  for (let i = 0; i < inc.length; i++) for (let j = i + 1; j < inc.length; j++) {
+    const A = inc[i].codigos, B = inc[j].codigos;
+    let comunes = 0;
+    for (const c of A) if (B.has(c)) comunes++;
+    const porItems = A.size && B.size && comunes / Math.min(A.size, B.size) >= 0.3;
+    const porInsumos = [...inc[i].insumos].some((k) => inc[j].insumos.has(k));
+    if (porItems || porInsumos) { inc[i].superpone.push(inc[j].numero); inc[j].superpone.push(inc[i].numero); }
+  }
   return todos;
+}
+const RE_CODIGO_ITEM = /^[a-z]{0,5}[-.]?\d+([.\-_]\d+)*[a-z]?$/;
+
+// Total estimado de los impactos sin contar dos veces el mismo dinero: de mayor a menor se
+// suman los impactos en pesos y se deja por fuera cada hallazgo que se superpone con uno ya
+// sumado. Los «hasta $…» y «por justificar» no entran: no son ahorros seguros.
+export function totalSinDuplicar(hallazgos) {
+  const conValor = hallazgos.filter((h) => h.incluir && h.impacto != null && Number.isFinite(h.impacto) && h.impacto > 0).sort((a, b) => b.impacto - a.impacto);
+  const sumados = [], omitidos = [];
+  for (const h of conValor) {
+    if (sumados.some((s) => (h.superpone || []).includes(s.numero))) omitidos.push(h);
+    else sumados.push(h);
+  }
+  return { total: sumados.reduce((s, h) => s + h.impacto, 0), sumados, omitidos };
 }
 export const impactoTexto = (h) => (h.impacto != null && Number.isFinite(h.impacto) && h.impacto !== 0 ? pesosTxt(h.impacto) : h.impactoTexto || "-");
 
@@ -688,6 +718,7 @@ export function informeRD(rev, res, hallazgos, { firmaNombre = "", firmaCargo = 
   const fechaOf = rev.fechaOferta ? ` (versión del ${fechaLarga(rev.fechaOferta)})` : "";
   const conformes = res.verificaciones.filter((v) => v.estado === "ok");
   const conImpacto = inc.filter((h) => h.impacto && Number.isFinite(h.impacto) && h.impacto > 0 || h.impactoTexto);
+  const sinDup = totalSinDuplicar(inc);
   const bloques = [
     H1("Objeto y alcance de la revisión"),
     P(rev.objeto ? escH(rev.objeto) : `El presente informe consigna la revisión objetiva del presupuesto de la <b>${oferta}</b>${fechaOf}, por un valor total de ${pesosTxt(res.valorFinal)}${F.reg === "ninguno" ? "" : " IVA incluido"}.`),
@@ -729,10 +760,11 @@ export function informeRD(rev, res, hallazgos, { firmaNombre = "", firmaCargo = 
     ]),
     H2("Resultados"),
     P(`Se verificaron ${items.length} ítems en ${res.capitulos.length} capítulos. Resultado: ${inc.filter((h) => h.sev === "Mayor").length} hallazgos mayores, ${inc.filter((h) => h.sev === "Menor").length} menores y ${inc.filter((h) => h.sev === "Observación").length} observaciones. ${res.pareto.n80} ítems (${pctTxt(res.pareto.pct)}) concentran el 80 % del valor.`),
-    ...(conImpacto.length ? [T("Impactos estimados sobre el valor final", [["Hallazgo", "Concepto", "Tema", "Valor estimado"], ...conImpacto.map((h) => [h.numero, h.titulo || h.tema, h.tema, impactoTexto(h)])], "Los impactos pueden superponerse entre sí y no deben sumarse sin revisarlos; los alcances por justificar no son ahorros seguros: dependen de la respuesta del oferente.")] : []),
+    ...(conImpacto.length ? [T("Impactos estimados sobre el valor final", [["Hallazgo", "Concepto", "Valor estimado", "Se superpone con"], ...conImpacto.map((h) => [h.numero, h.titulo || h.tema, impactoTexto(h), (h.superpone || []).join(", ") || "-"]), ["", "Total estimado sin duplicar", pesosTxt(sinDup.total), ""]],
+      `El total suma los impactos en pesos de mayor a menor y deja por fuera los que se superponen con uno ya sumado${sinDup.omitidos.length ? ` (${sinDup.omitidos.map((h) => h.numero).join(", ")})` : ""}. Los valores «hasta» y los alcances por justificar no se suman: no son ahorros seguros, dependen de la respuesta del oferente.`)] : []),
     H1("Resultados de la revisión"),
     ...(conformes.length ? [H2("Aspectos verificados conformes"), P(conformes.map((v) => `• ${escH(v.texto)}`).join("<br>"))] : []),
-    ...inc.flatMap((h) => [H2(`${h.numero}. ${h.titulo || h.tema}`), P(`${escH(h.hallazgo)}<br><b>Acción requerida:</b> ${escH(h.accion || "-")}`)]),
+    ...inc.flatMap((h) => [H2(`${h.numero}. ${h.titulo || h.tema}`), P(`${escH(h.hallazgo)}<br><b>Acción requerida:</b> ${escH(h.accion || "-")}${h.superpone?.length ? `<br><b>Superposición:</b> comparte ítems con ${h.superpone.join(", ")}; sus impactos no deben sumarse completos.` : ""}`)]),
     ...(res.comparados.length ? [T("Ítems comparados con los APU de Cinco S.A.S.", [
       ["Ítem", "Descripción", "Und", "Cantidad", "Precio oferta", "Referencia APU PRO", "Diferencia", "Estado"],
       ...res.comparados.map((c) => [c.item, c.desc.length > 90 ? c.desc.slice(0, 87) + "..." : c.desc, c.und || "", numTxt(c.cant), pesosTxt(c.vu), `${pesosTxt(c.ref)} (${c.codigo})`, `${c.dif >= 0 ? "+" : ""}${Math.round(c.dif * 100)} %`, c.estado])
@@ -933,18 +965,26 @@ export function libroRevision(ExcelJS, rev, res, hallazgos, { logo = null } = {}
     wsR.__fila = f + 2;
   }
   tituloSeccion(wsR, "Resumen de hallazgos", aR.length);
-  const tH = tabla(wsR, [{ h: "No.", w: 8, al: "center", bold: true }, { h: "Hallazgo", w: 60, wrap: true }, { h: "", w: 12 }, { h: "", w: 18 }, { h: "Severidad", w: 18, al: "center" }, { h: "Impacto", w: 12, n: MONEDA, wrap: true }],
-    inc.map((x) => [x.numero, x.titulo || x.tema, null, null, x.sev, valorImpacto(x)]),
-    { zebra: false, colorFila: (f) => SEV_COLOR[f[4]] });
-  for (let f = tH.primera - 1; f <= tH.ultima; f++) wsR.mergeCells(f, 2, f, 4);
+  const sinDup = totalSinDuplicar(inc);
+  const tH = tabla(wsR, [{ h: "No.", w: 8, al: "center", bold: true }, { h: "Hallazgo", w: 42, wrap: true }, { h: "", w: 12 }, { h: "Se superpone con", w: 18, al: "center", wrap: true }, { h: "Severidad", w: 18, al: "center" }, { h: "Impacto", w: 12, n: MONEDA, wrap: true }],
+    inc.map((x) => [x.numero, x.titulo || x.tema, null, (x.superpone || []).join(", "), x.sev, valorImpacto(x)]),
+    { zebra: false, colorFila: (f) => SEV_COLOR[f[4]], total: ["", "Total estimado sin duplicar", null, "", "", Math.round(sinDup.total)] });
+  for (let f = tH.primera - 1; f <= tH.filaTotal; f++) wsR.mergeCells(f, 2, f, 3);
+  {
+    const f = wsR.__fila - 1;
+    wsR.mergeCells(f, 1, f, 6);
+    Object.assign(wsR.getCell(f, 1), { value: `Suma de los impactos en pesos sin contar dos veces el mismo dinero${sinDup.omitidos.length ? ` (se dejan por fuera ${sinDup.omitidos.map((h) => h.numero).join(", ")}, que se superponen con otros)` : ""}. Los valores «hasta» y los alcances por justificar no se suman.`, font: fx({ size: 8, italic: true, color: { argb: GRIS_TXT } }), alignment: { wrapText: true, vertical: "top" } });
+    wsR.getRow(f).height = 26;
+    wsR.__fila = f + 1;
+  }
   wsR.getColumn(6).width = 16;
   wsR.pageSetup.printArea = `A1:F${wsR.__fila}`;
 
   // ---------- Hallazgos
-  const aH = [8, 12, 13, 58, 22, 16, 44];
+  const aH = [8, 12, 13, 58, 22, 16, 12, 44];
   const wsH = hojaCinco(wb, "Hallazgos", { logo: idLogo, rev, titulo: "Hallazgos y acciones requeridas", anchos: aH });
-  tabla(wsH, [{ h: "No.", w: 8, al: "center", bold: true }, { h: "Severidad", w: 12, al: "center" }, { h: "Tema", w: 13 }, { h: "Hallazgo", w: 58, wrap: true }, { h: "Ítems", w: 22, wrap: true }, { h: "Impacto estimado", w: 16, n: MONEDA, wrap: true }, { h: "Acción requerida", w: 44, wrap: true }],
-    inc.map((x) => [x.numero, x.sev, x.tema, x.titulo ? `${x.titulo}. ${x.hallazgo}` : x.hallazgo, x.items, valorImpacto(x), x.accion || "-"]),
+  tabla(wsH, [{ h: "No.", w: 8, al: "center", bold: true }, { h: "Severidad", w: 12, al: "center" }, { h: "Tema", w: 13 }, { h: "Hallazgo", w: 58, wrap: true }, { h: "Ítems", w: 22, wrap: true }, { h: "Impacto estimado", w: 16, n: MONEDA, wrap: true }, { h: "Se superpone con", w: 12, al: "center", wrap: true }, { h: "Acción requerida", w: 44, wrap: true }],
+    inc.map((x) => [x.numero, x.sev, x.tema, x.titulo ? `${x.titulo}. ${x.hallazgo}` : x.hallazgo, x.items, valorImpacto(x), (x.superpone || []).join(", "), x.accion || "-"]),
     { zebra: false, repetir: true, colorFila: (f) => SEV_COLOR[f[1]] });
   wsH.eachRow((r, i) => { if (i > 7) { const c = r.getCell(2); if (SEV_TXT[c.value]) c.font = fx({ bold: true, color: { argb: SEV_TXT[c.value] } }); } });
 

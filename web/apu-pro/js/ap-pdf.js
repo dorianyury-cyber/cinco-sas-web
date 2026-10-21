@@ -22,7 +22,16 @@ export function lineasDeTexto(items, alto) {
   // El ancho se limita con el tamaño de la letra: algunos PDF informan anchos exagerados y el
   // texto invadiría la columna vecina.
   const ancho = (i) => Math.min(i.width || 0, String(i.str).trim().length * (Math.hypot(i.transform[0], i.transform[1]) || 10) * 0.7);
-  const trozos = items.filter((i) => String(i.str || "").trim()).map((i) => ({ s: i.str.replace(/\s+/g, " ").trim(), x0: i.transform[4], x1: i.transform[4] + ancho(i), y: alto - i.transform[5], fs: Math.hypot(i.transform[0], i.transform[1]) || 8 }));
+  const trozos = items.filter((i) => String(i.str || "").trim()).flatMap((i) => {
+    const t = { s: i.str.replace(/\s+/g, " ").trim(), x0: i.transform[4], x1: i.transform[4] + ancho(i), y: alto - i.transform[5], fs: Math.hypot(i.transform[0], i.transform[1]) || 8 };
+    // pdf.js a veces junta en un trozo dos celdas vecinas hechas solo de códigos o números
+    // («1 1-9»: capítulo y código del ítem): se separan con la posición proporcional al texto.
+    const partes = t.s.split(" ");
+    if (partes.length < 2 || !partes.every((p) => RE_CODIGO.test(p.replace(/\.$/, "")) || esNumero(p))) return [t];
+    const porLetra = (t.x1 - t.x0) / t.s.length;
+    let x = t.x0;
+    return partes.map((p) => { const c = { ...t, s: p, x0: x, x1: x + p.length * porLetra }; x += (p.length + 1) * porLetra; return c; });
+  });
   trozos.sort((a, b) => a.y - b.y || a.x0 - b.x0);
   const lineas = [];
   for (const t of trozos) {
@@ -325,7 +334,9 @@ function leerApu(lineas) {
       const grupos = [];
       for (const c of celdas) {
         const g = grupos[grupos.length - 1];
-        if (g && c.x0 <= g.x1 + 2) { g.partes.push(c); g.x1 = Math.max(g.x1, c.x1); } else grupos.push({ x0: c.x0, x1: c.x1, partes: [c] });
+        // Solo se apilan títulos de líneas distintas: dos de la misma línea que casi se tocan
+        // («CANTIDAD BASE» y «DESPERDICIO») son columnas distintas.
+        if (g && c.x0 <= g.x1 + 2 && !g.partes.some((p) => p.y === c.y)) { g.partes.push(c); g.x1 = Math.max(g.x1, c.x1); } else grupos.push({ x0: c.x0, x1: c.x1, partes: [c] });
       }
       cols = columnasDe(grupos.map((g) => ({ x0: g.x0, x1: g.x1, s: g.partes.sort((p, q) => p.y - q.y).map((p) => p.s).join(" ") })));
       pap = papeles(cols);

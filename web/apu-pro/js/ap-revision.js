@@ -399,7 +399,7 @@ function pintarHallazgos() {
     return `<div class="ap-verif ap-verif-h ${h.incluir ? "" : "ap-excluido"}" data-clave="${esc(v.clave)}">
       <span class="badge ${BADGE_SEV[h.sev]}">${h.incluir ? esc(h.numero) : "Excluido"}</span>
       <div>
-        <strong>${esc(v.titulo)}</strong> <small class="text-muted">${esc(v.tema)} · impacto ${esc(RV.impactoTexto(h))}</small>
+        <strong>${esc(v.titulo)}</strong> <small class="text-muted">${esc(v.tema)} · impacto ${esc(RV.impactoTexto(h))}${h.superpone?.length ? ` · se superpone con ${esc(h.superpone.join(", "))}` : ""}</small>
         <p>${esc(v.texto)}</p>
         <div class="ap-fila-form">
           <label class="ap-check"><input type="checkbox" data-a="incluir" ${h.incluir ? "checked" : ""}> Incluir en el informe</label>
@@ -468,7 +468,8 @@ function pintarInforme() {
   const inc = hallazgos.filter((h) => h.incluir);
   const enc = ["No.", "Severidad", "Tema", "Hallazgo", "Impacto estimado"];
   const filas = inc.map((h) => [h.numero, h.sev, h.tema, h.titulo || h.hallazgo, RV.impactoTexto(h)]);
-  $("consolidado").innerHTML = `<p class="ap-nota"><b>Concepto:</b> ${esc(RV.CONCEPTOS[rev.concepto] || `${RV.conceptoSugerido(inc)} (sugerido; se fija en «Datos, AIU e IVA»)`)}</p>` + (inc.length
+    const sinDup = RV.totalSinDuplicar(inc);
+  $("consolidado").innerHTML = `<p class="ap-nota"><b>Concepto:</b> ${esc(RV.CONCEPTOS[rev.concepto] || `${RV.conceptoSugerido(inc)} (sugerido; se fija en «Datos, AIU e IVA»)`)}</p><p class="ap-nota"><b>Total estimado sin duplicar:</b> ${pesos(sinDup.total)}${sinDup.omitidos.length ? ` <span class="text-muted">(no se suman ${esc(sinDup.omitidos.map((h) => h.numero).join(", "))}, que se superponen con otros; los valores «hasta» y por justificar tampoco)</span>` : ""}</p>` + (inc.length
     ? `<div class="tabla-scroll"><table class="ap-tabla" id="tablaConsolidado">${colgroupProporcional(enc, filas)}<thead><tr>${enc.map((x, j) => `<th class="${j === 4 ? "ap-num" : ""}">${x}</th>`).join("")}</tr></thead>
       <tbody>${filas.map((f) => `<tr>${f.map((v, j) => `<td class="${j === 4 ? "ap-num" : ""}" title="${esc(v)}">${j === 1 ? `<span class="badge ${BADGE_SEV[v]}">${esc(v)}</span>` : esc(v)}</td>`).join("")}</tr>`).join("")}</tbody></table></div>`
     : `<p class="text-muted">Sin hallazgos incluidos.</p>`);

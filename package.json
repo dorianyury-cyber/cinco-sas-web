@@ -1,0 +1,8 @@
+{
+  "name": "cinco-sas",
+  "private": true,
+  "description": "Sitio y aplicativos de Cinco S.A.S. (Firebase). Este package.json solo sirve para correr las pruebas: npm test",
+  "scripts": {
+    "test": "node --test \"tests/**/*.test.mjs\""
+  }
+}
