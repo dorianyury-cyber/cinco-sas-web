@@ -474,7 +474,8 @@ function pintarInforme() {
     : `<p class="text-muted">Sin hallazgos incluidos.</p>`);
   aplicarAnchos($("consolidado"));
 }
-const nombreArchivo = (s) => s.replace(/[\\/:*?"<>|]/g, "").slice(0, 90);
+// Nombre de archivo sin caracteres prohibidos; se recorta el nombre, nunca la extensión.
+const nombreArchivo = (s, ext) => `${s.replace(/[\\/:*?"<>|]/g, "").replace(/\s+/g, " ").trim().slice(0, 90).trim()}${ext}`;
 function descargar(blob, nombre) {
   const url = URL.createObjectURL(blob);
   const a = Object.assign(document.createElement("a"), { href: url, download: nombre });
@@ -484,7 +485,7 @@ function descargar(blob, nombre) {
 function descargarRD() {
   if (!rev.items.length) return mostrarAlerta(alerta, "Importa primero los ítems de la oferta.");
   const inf = RV.informeRD(rev, res, hallazgos, { firmaNombre: ctx.perfil?.nombre || "", firmaCargo: ctx.perfil?.cargo || "" });
-  descargar(new Blob([JSON.stringify(inf, null, 2)], { type: "application/json" }), nombreArchivo(`RD ${rev.codigo} ${rev.nombre} - importar en Informes.json`));
+  descargar(new Blob([JSON.stringify(inf, null, 2)], { type: "application/json" }), nombreArchivo(`RD ${rev.codigo} ${rev.nombre} - importar en Informes`, ".json"));
 }
 async function descargarExcel() {
   if (!rev.items.length) return mostrarAlerta(alerta, "Importa primero los ítems de la oferta.");
@@ -493,7 +494,7 @@ async function descargarExcel() {
   try {
     const wb = RV.libroRevision(window.ExcelJS, rev, res, hallazgos, { logo: await logoBase64() });
     const buf = await wb.xlsx.writeBuffer();
-    descargar(new Blob([buf], { type: "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet" }), nombreArchivo(`${rev.codigo} Revisión ${rev.nombre}.xlsx`));
+    descargar(new Blob([buf], { type: "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet" }), nombreArchivo(`${rev.codigo} Revisión ${rev.nombre}`, ".xlsx"));
   } catch (err) { mostrarAlerta(alerta, errorAmigable(err)); } finally { btn.disabled = false; }
 }
 
