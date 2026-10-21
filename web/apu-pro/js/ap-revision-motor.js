@@ -400,7 +400,7 @@ export function revisar(rev, { precioApu = () => null, apus = [], precioInsumo =
   const encima = comparados.filter((c) => c.estado === "Por encima"), debajo = comparados.filter((c) => c.estado === "Por debajo");
   const vExceso = encima.reduce((s, c) => s + c.exceso, 0);
   if (encima.length) agregar({ clave: "precios", titulo: "Precios por encima de APU PRO", estado: "hallazgo", sev: vExceso > valorFinal * 0.01 ? "Mayor" : "Menor", tema: "Precios",
-    texto: `De ${comparados.length} ítems comparados con los APU de Cinco S.A.S., ${encima.length} superan en más del 20 % el precio de referencia (${encima.slice(0, 8).map((c) => `${c.item} +${Math.round(c.dif * 100)} %`).join("; ")}${encima.length > 8 ? "; …" : ""}). El exceso sobre el precio de referencia más un 20 % es de ${pesosTxt(vExceso)} en el valor final.`,
+    texto: `De ${comparados.length} ítems comparados con los APU de Cinco S.A.S., ${encima.length} superan en más del 20 % el precio de referencia (${encima.slice(0, 8).map((c) => `${c.item} +${Math.round(c.dif * 100)} %`).join("; ")}${encima.length > 8 ? ", entre otros" : ""}). El exceso sobre el precio de referencia más un 20 % es de ${pesosTxt(vExceso)} en el valor final.`,
     itemsRef: items.filter((it) => encima.some((c) => c.id === it.id)), impacto: vExceso, accion: "Pedir al oferente los APU y las cotizaciones de soporte de estos ítems y ajustar los precios." });
   if (debajo.length) agregar({ clave: "preciosBajos", titulo: "Precios por debajo de APU PRO", estado: "hallazgo", sev: "Observación", tema: "Precios",
     texto: `${debajo.length} ítem(s) están más de un 20 % por debajo del precio de referencia (${debajo.slice(0, 8).map((c) => `${c.item} ${Math.round(c.dif * 100)} %`).join("; ")}): puede tratarse de una especificación menor o de un riesgo de reclamaciones posteriores.`,
@@ -485,7 +485,7 @@ function revisarApus(rev, apus, { F, items, valor, valorFinal, agregar, precioIn
     texto: `${sinApu.length} ítem(s) del presupuesto no tienen análisis de precio unitario en la oferta (${lista(sinApu)}), por lo que su precio no se puede verificar.`,
     itemsRef: sinApu, impacto: null, impactoTexto: `${pesosTxt(sinApu.reduce((s, it) => s + valor(it), 0) * F.aFinal)} sin APU`, accion: "Pedir los APU faltantes." });
   if (huerfanos.length) agregar({ clave: "apuSinItem", titulo: "APU que no están en el presupuesto", estado: "hallazgo", sev: "Observación", tema: "Consistencia",
-    texto: `${huerfanos.length} APU no corresponden a ningún ítem del presupuesto (${huerfanos.slice(0, 12).map((a) => a.item || "sin código").join(", ")}${huerfanos.length > 12 ? "…" : ""}).`, itemsRef: [], impacto: null, accion: "Aclarar con el oferente si sobran o si falta el ítem en el presupuesto." });
+    texto: `${huerfanos.length} APU no corresponden a ningún ítem del presupuesto (${huerfanos.slice(0, 12).map((a) => a.item || "sin código").join(", ")}${huerfanos.length > 12 ? ", entre otros" : ""}).`, itemsRef: [], impacto: null, accion: "Aclarar con el oferente si sobran o si falta el ítem en el presupuesto." });
 
   // Aritmética interna de cada APU: secciones contra su subtotal, subtotales contra el costo
   // directo y AIU contra sus porcentajes.
@@ -502,7 +502,7 @@ function revisarApus(rev, apus, { F, items, valor, valorFinal, agregar, precioIn
     if (prob.length) malos.push({ a, prob });
   }
   if (malos.length) agregar({ clave: "apuAritmetica", titulo: "Aritmética de los APU", estado: "hallazgo", sev: "Menor", tema: "Aritmética",
-    texto: `${malos.length} APU tienen operaciones que no cuadran: ${malos.slice(0, 6).map((m) => `${m.a.item} (${m.prob[0]})`).join("; ")}${malos.length > 6 ? "; …" : ""}.`,
+    texto: `${malos.length} APU tienen operaciones que no cuadran: ${malos.slice(0, 6).map((m) => `${m.a.item} (${m.prob[0]})`).join("; ")}${malos.length > 6 ? ", entre otros" : ""}.`,
     itemsRef: items.filter((it) => malos.some((m) => codNorm(m.a.item) === codNorm(it.item))), impacto: null, accion: "Pedir al oferente que corrija los APU." });
   else agregar({ clave: "apuAritmetica", titulo: "Aritmética de los APU", estado: "ok", texto: `Las sumas de los ${apus.length} APU (secciones, costo directo y AIU) son correctas.` });
 
@@ -554,7 +554,7 @@ function revisarApus(rev, apus, { F, items, valor, valorFinal, agregar, precioIn
     const v = consumos.reduce((s, { a, x }) => s + x.v * qty(a), 0) * F.final;
     const its = itemsDeApus(consumos.map((c) => c.a));
     agregar({ clave: "consumibles", titulo: "Consumibles con peso atípico en los APU", estado: "hallazgo", sev: v > valorFinal * 0.01 ? "Mayor" : "Menor", tema: "Insumos",
-      texto: `En ${consumos.length} APU un consumible pesa más del 15 % del costo directo: ${consumos.slice(0, 6).map(({ a, x }) => `${a.item}: ${numTxt(x.c)} ${x.u || "und"} de «${x.d}» a ${pesosTxt(x.p)} = ${pesosTxt(x.v)} (${Math.round((x.v / a.cd) * 100)} % del APU)`).join("; ")}${consumos.length > 6 ? "; …" : ""}. En toda la obra suman ${pesosTxt(v)}.`,
+      texto: `En ${consumos.length} APU un consumible pesa más del 15 % del costo directo: ${consumos.slice(0, 6).map(({ a, x }) => `${a.item}: ${numTxt(x.c)} ${x.u || "und"} de «${x.d}» a ${pesosTxt(x.p)} = ${pesosTxt(x.v)} (${Math.round((x.v / a.cd) * 100)} % del APU)`).join("; ")}${consumos.length > 6 ? ", entre otros" : ""}. En toda la obra suman ${pesosTxt(v)}.`,
       itemsRef: its, impacto: v, accion: "Pedir la justificación del consumo y ajustarlo a un valor razonable (los consumibles suelen ser una fracción menor del costo)." });
   }
 
@@ -565,7 +565,7 @@ function revisarApus(rev, apus, { F, items, valor, valorFinal, agregar, precioIn
   if (civiles.length) {
     const v = vtDe(civiles);
     agregar({ clave: "obraCivil", titulo: "Obra civil ejecutada por la cuadrilla eléctrica", estado: "hallazgo", sev: v > valorFinal * 0.05 ? "Mayor" : "Observación", tema: "Alcance",
-      texto: `${civiles.length} actividades de obra civil (${civiles.slice(0, 6).map((a) => `${a.item} ${a.desc.toLowerCase()}`).join("; ")}${civiles.length > 6 ? "; …" : ""}) suman ${pesosTxt(v)} (${pctTxt(valorFinal ? v / valorFinal : 0)} de la oferta) y sus APU las asignan a electricistas, sin oficiales de obra civil. Debe verificarse que el alcance sea necesario para la instalación eléctrica (aperturas y reposiciones) y no un reemplazo completo.`,
+      texto: `${civiles.length} actividades de obra civil (${civiles.slice(0, 6).map((a) => `${a.item} ${a.desc.toLowerCase()}`).join("; ")}${civiles.length > 6 ? ", entre otros" : ""}) suman ${pesosTxt(v)} (${pctTxt(valorFinal ? v / valorFinal : 0)} de la oferta) y sus APU las asignan a electricistas, sin oficiales de obra civil. Debe verificarse que el alcance sea necesario para la instalación eléctrica (aperturas y reposiciones) y no un reemplazo completo.`,
       itemsRef: itemsDeApus(civiles), impacto: null, impactoTexto: `${pesosTxt(v)} por justificar`, accion: "Pedir el soporte del alcance de obra civil (planos o estado existente) y los APU con la cuadrilla y los rendimientos de esos oficios." });
   }
 
@@ -575,7 +575,7 @@ function revisarApus(rev, apus, { F, items, valor, valorFinal, agregar, precioIn
   if (redondas.length) {
     const apusR = [...new Set(redondas.map((r) => r.a))];
     agregar({ clave: "globalesApu", titulo: "Partidas globales en cifras redondas dentro de los APU", estado: "hallazgo", sev: "Menor", tema: "Precios",
-      texto: `${apusR.length} APU usan partidas globales en cifras redondas, sin desglose ni cotización: ${redondas.slice(0, 6).map(({ a, x }) => `${a.item}: «${x.d}» ${pesosTxt(x.p)}`).join("; ")}${redondas.length > 6 ? "; …" : ""}.`,
+      texto: `${apusR.length} APU usan partidas globales en cifras redondas, sin desglose ni cotización: ${redondas.slice(0, 6).map(({ a, x }) => `${a.item}: «${x.d}» ${pesosTxt(x.p)}`).join("; ")}${redondas.length > 6 ? ", entre otros" : ""}.`,
       itemsRef: itemsDeApus(apusR), impacto: null, impactoTexto: `${pesosTxt(vtDe(apusR))} sin desglose`, accion: "Pedir el desglose de cada partida (materiales, cantidades y cotización)." });
   }
 
@@ -604,7 +604,7 @@ function revisarApus(rev, apus, { F, items, valor, valorFinal, agregar, precioIn
   let vVarios = 0;
   for (const e of varios) { const min = e.preciosLista[0]; for (const [p, q] of e.precios) vVarios += (p - min) * q * F.final; }
   if (varios.length) agregar({ clave: "insumoPrecios", titulo: "Mismo insumo con precios distintos", estado: "hallazgo", sev: vVarios > valorFinal * 0.005 ? "Mayor" : "Menor", tema: "Precios",
-    texto: `${varios.length} materiales tienen precios distintos según el APU: ${varios.slice(0, 5).map((e) => `${e.d} (${pesosTxt(e.preciosLista[0])} a ${pesosTxt(e.preciosLista[e.preciosLista.length - 1])})`).join("; ")}${varios.length > 5 ? "; …" : ""}. Llevados al menor precio, el valor bajaría en ${pesosTxt(vVarios)}.`,
+    texto: `${varios.length} materiales tienen precios distintos según el APU: ${varios.slice(0, 5).map((e) => `${e.d} (${pesosTxt(e.preciosLista[0])} a ${pesosTxt(e.preciosLista[e.preciosLista.length - 1])})`).join("; ")}${varios.length > 5 ? ", entre otros" : ""}. Llevados al menor precio, el valor bajaría en ${pesosTxt(vVarios)}.`,
     itemsRef: items.filter((it) => varios.some((e) => e.apus.some((c) => codNorm(c) === codNorm(it.item)))), impacto: vVarios, accion: "Pedir la justificación o unificar cada insumo en su menor precio." });
 
   // Jornales: un mismo cargo con jornal distinto; personal de dirección en el costo directo.
@@ -635,7 +635,7 @@ function revisarApus(rev, apus, { F, items, valor, valorFinal, agregar, precioIn
   const encimaIns = comparadosIns.filter((c) => c.estado === "Por encima");
   const vIns = encimaIns.reduce((s, c) => s + c.exceso, 0);
   if (encimaIns.length) agregar({ clave: "insumosBase", titulo: "Insumos por encima de la base de APU PRO", estado: "hallazgo", sev: vIns > valorFinal * 0.01 ? "Mayor" : "Menor", tema: "Precios",
-    texto: `De ${comparadosIns.length} insumos comparados con la base de precios de Cinco S.A.S., ${encimaIns.length} superan en más del 20 % el precio de referencia (${encimaIns.slice(0, 6).map((c) => `${c.d} +${Math.round(c.dif * 100)} %`).join("; ")}${encimaIns.length > 6 ? "; …" : ""}). El exceso sobre la referencia más un 20 % es de ${pesosTxt(vIns)} en el valor final.`,
+    texto: `De ${comparadosIns.length} insumos comparados con la base de precios de Cinco S.A.S., ${encimaIns.length} superan en más del 20 % el precio de referencia (${encimaIns.slice(0, 6).map((c) => `${c.d} +${Math.round(c.dif * 100)} %`).join("; ")}${encimaIns.length > 6 ? ", entre otros" : ""}). El exceso sobre la referencia más un 20 % es de ${pesosTxt(vIns)} en el valor final.`,
     itemsRef: items.filter((it) => encimaIns.some((c) => (insumos.get(c.clave)?.apus || new Set()).has(it.item))), impacto: vIns, accion: "Pedir cotizaciones de soporte de estos insumos y ajustar los APU." });
 
   // Días-cuadrilla: cantidad del ítem ÷ rendimiento de la cuadrilla (el de mano de obra o el del APU).
@@ -692,25 +692,26 @@ export function informeRD(rev, res, hallazgos, { firmaNombre = "", firmaCargo = 
     H1("Objeto y alcance de la revisión"),
     P(rev.objeto ? escH(rev.objeto) : `El presente informe consigna la revisión objetiva del presupuesto de la <b>${oferta}</b>${fechaOf}, por un valor total de ${pesosTxt(res.valorFinal)}${F.reg === "ninguno" ? "" : " IVA incluido"}.`),
     P("La revisión verifica la aritmética del presupuesto, la coherencia entre ítems, la estructura del AIU y del IVA, la concentración del valor y la razonabilidad de los precios unitarios frente a los análisis de precios unitarios (APU) de Cinco S.A.S. elaborados en APU PRO."),
-    H1("Documento revisado"),
+    H2("Documento revisado"),
     T("Datos de la oferta", [
       ["Dato", "Valor"],
       ["Oferta", rev.nombre || "-"], ["Oferente", rev.oferente || "-"], ["Contratante", rev.cliente || "-"],
       ["Fecha de la oferta", rev.fechaOferta ? fechaLarga(rev.fechaOferta) : "-"], ["Documento", rev.documento || "-"],
-      ["Capítulos / ítems", `${res.capitulos.length} / ${items.length}`],
+      ["Capítulos / ítems / APU", `${res.capitulos.length} / ${items.length}${res.apus ? ` / ${res.apus.vinculos.length + res.apus.huerfanos.length}` : ""}`],
       ["Los valores de los ítems son", BASES[rev.base || "cd"]],
       ["AIU", `A ${pctTxt(F.aiu.a || 0)} - I ${pctTxt(F.aiu.i || 0)} - U ${pctTxt(F.aiu.u || 0)}`],
       ["IVA", F.iva ? `${pctTxt(F.iva, 0)} ${minuscula(REGIMENES[F.reg])}` : "No se liquida"]
     ]),
-    H1("Metodología"),
-    P("Se importó la tabla del presupuesto y se recalcularon el valor de cada ítem (cantidad por valor unitario), los subtotales por capítulo, el costo directo, el AIU, el IVA y el total. Se buscaron ítems incompletos, repetidos o con precios distintos, partidas globales e ítems de alto peso, y se compararon los precios unitarios de los ítems con un APU equivalente en la biblioteca de Cinco S.A.S. Los hallazgos se califican así:"),
+    H2("Metodología"),
+    P(`Se importó la tabla del presupuesto${res.apus ? " y los análisis de precios unitarios (APU) del oferente" : ""} y se recalcularon el valor de cada ítem (cantidad por valor unitario), los subtotales por capítulo, el costo directo, el AIU, el IVA y el total. Se buscaron ítems incompletos, repetidos o con precios distintos, partidas globales e ítems de alto peso${res.apus ? "; en los APU se verificaron su aritmética, su coherencia con el presupuesto, los insumos con precios distintos, los consumibles y accesorios atípicos, la obra civil asignada a la cuadrilla eléctrica, los jornales y el personal de dirección, y se calcularon las cantidades de cada insumo en toda la obra" : ""}. Los precios se compararon con los APU y la base de precios de Cinco S.A.S. en APU PRO. Los hallazgos se califican así:`),
     T("Criterios de calificación", [
       ["Severidad", "Significado"],
       ["Mayor", "Afecta de forma importante el valor o el alcance; debe resolverse antes de contratar."],
       ["Menor", "Debe corregirse o aclararse; impacto económico acotado."],
       ["Observación", "Aspecto a tener en cuenta en la contratación o la ejecución."]
     ]),
-    H1("Resumen económico de la oferta"),
+    H1("Resumen de la oferta y de la revisión"),
+    H2("Valor de la oferta"),
     T("Valor por capítulo", [
       ["Cap.", "Descripción", "Ítems", "Valor final", "% del total"],
       ...res.capitulos.map((c) => [String(c.num), c.nombre, String(c.n), pesosTxt(c.final), pctTxt(c.pct)]),
@@ -723,10 +724,10 @@ export function informeRD(rev, res, hallazgos, { firmaNombre = "", firmaCargo = 
       [`Imprevistos ${pctTxt(F.aiu.i || 0)}`, pesosTxt(res.comp.i), pctTxt(F.aiu.i || 0)],
       [`Utilidad ${pctTxt(F.aiu.u || 0)}`, pesosTxt(res.comp.u), pctTxt(F.aiu.u || 0)],
       [`IVA ${F.iva ? pctTxt(F.iva, 0) + " " + minuscula(REGIMENES[F.reg]) : ""}`, pesosTxt(res.comp.iva), pctTxt(res.comp.cd ? res.comp.iva / res.comp.cd : 0)],
-      ["Total recalculado", pesosTxt(res.total), pctTxt(res.comp.cd ? res.total / res.comp.cd : 0)],
+      ["Total recalculado", pesosTxt(res.total), ""],
       ...(res.declarado ? [["Total declarado en la oferta", pesosTxt(res.declarado), ""]] : [])
     ]),
-    H1("Resumen de resultados"),
+    H2("Resultados"),
     P(`Se verificaron ${items.length} ítems en ${res.capitulos.length} capítulos. Resultado: ${inc.filter((h) => h.sev === "Mayor").length} hallazgos mayores, ${inc.filter((h) => h.sev === "Menor").length} menores y ${inc.filter((h) => h.sev === "Observación").length} observaciones. ${res.pareto.n80} ítems (${pctTxt(res.pareto.pct)}) concentran el 80 % del valor.`),
     ...(conImpacto.length ? [T("Impactos estimados sobre el valor final", [["Hallazgo", "Concepto", "Tema", "Valor estimado"], ...conImpacto.map((h) => [h.numero, h.titulo || h.tema, h.tema, impactoTexto(h)])], "Los impactos pueden superponerse entre sí y no deben sumarse sin revisarlos; los alcances por justificar no son ahorros seguros: dependen de la respuesta del oferente.")] : []),
     H1("Resultados de la revisión"),
@@ -755,13 +756,14 @@ export function informeRD(rev, res, hallazgos, { firmaNombre = "", firmaCargo = 
     H1("Consolidado de hallazgos"),
     T("Hallazgos y acciones requeridas", [
       ["No.", "Hallazgo", "Ítems", "Severidad", "Impacto estimado", "Acción requerida"],
-      ...inc.map((h) => [h.numero, h.hallazgo, String(h.items || "-").length > 60 ? String(h.items).slice(0, 57) + "..." : String(h.items || "-"), h.sev, impactoTexto(h), h.accion || "-"])
-    ], "Impacto estimado sobre el valor final (con AIU e IVA). El detalle ítem por ítem está en el archivo Excel anexo."),
+      // Cuadro resumen: el título del hallazgo (el texto completo está en «Resultados de la revisión»).
+      ...inc.map((h) => [h.numero, h.titulo || (h.hallazgo.length > 140 ? h.hallazgo.slice(0, 137) + "..." : h.hallazgo), String(h.items || "-").length > 40 ? String(h.items).slice(0, 37) + "..." : String(h.items || "-"), h.sev, impactoTexto(h), h.accion || "-"])
+    ], "Impacto estimado sobre el valor final (con AIU e IVA). El texto completo de cada hallazgo está en la sección «Resultados de la revisión» y el detalle ítem por ítem en el archivo Excel anexo."),
     H1("Concepto de la revisión"),
     P(`<b>Concepto: ${escH((CONCEPTOS[rev.concepto] || conceptoSugerido(inc)).toUpperCase())}.</b>`),
     ...(rev.conceptoTexto ? [P(escH(rev.conceptoTexto))] : []),
     ...(rev.recomendaciones ? [P(escH(rev.recomendaciones))] : []),
-    H1("Limitaciones"),
+    H2("Limitaciones"),
     P(escH(rev.limitaciones || LIMITACIONES))
   ];
   return {
@@ -782,109 +784,209 @@ const minuscula = (s) => String(s).replace(/^./, (c) => c.toLowerCase());
 const numTxt = (v) => (v == null ? "-" : Number(v).toLocaleString("es-CO", { maximumFractionDigits: 2 }));
 
 // ---------------------------------------------------------------- Excel de detalle
-const AZUL = "FF1F2732", AMBAR = "FFFEB209", GRIS = "FFF3F4F6";
-const SEV_COLOR = { Mayor: "FFF8CBAD", Menor: "FFFFE699", "Observación": "FFDDEBF7" };
+// Formato Cinco (el mismo del presupuesto de APU PRO): logo, título, ficha de la oferta, línea
+// ámbar, encabezados de tabla en ámbar, filas alternas, alturas según el texto y preparado
+// para imprimir (horizontal, ajustado al ancho, encabezado repetido y «Página X de Y»).
+const AZUL = "FF1F2732", AMBAR = "FFFEB209", AMBAR_SUAVE = "FFFFF3D1", GRIS = "FFF5F6F8", GRIS_TXT = "FF5A6270", BORDE_C = "FFD0D5DD";
+const SEV_COLOR = { Mayor: "FFF8D0C4", Menor: "FFFFEBB0", "Observación": "FFDCE9F5" };
+const SEV_TXT = { Mayor: "FF9B2C10", Menor: "FF7A5600", "Observación": "FF1F4E79" };
 const MONEDA = '"$"#,##0';
-const BORDE = { style: "thin", color: { argb: "FFD0D5DD" } };
-// Ancho proporcional al contenido real (encabezado y percentil 80 de las celdas).
-function anchos(enc, filas, { min = 6, max = 70 } = {}) {
-  return enc.map((h, j) => {
-    const l = filas.map((f) => String(f[j] ?? "").length).sort((a, b) => a - b);
-    const p80 = l.length ? l[Math.min(l.length - 1, Math.floor(l.length * 0.8))] : 0;
-    return Math.max(min, Math.min(max, Math.max(String(h).split(" ").reduce((m, w) => Math.max(m, w.length), 0) + 2, p80 + 2)));
+const B = { style: "thin", color: { argb: BORDE_C } };
+const BORDES = { top: B, left: B, bottom: B, right: B };
+const fx = (extra = {}) => ({ name: "Calibri", size: 10, color: { argb: "FF1F2732" }, ...extra });
+const relleno = (argb) => ({ type: "pattern", pattern: "solid", fgColor: { argb } });
+const letra = (n) => { let s = ""; while (n > 0) { const m = (n - 1) % 26; s = String.fromCharCode(65 + m) + s; n = Math.floor((n - 1) / 26); } return s; };
+// Alto de fila para que el texto ajustado se vea completo (Excel no lo calcula al abrir).
+const altoPara = (textos) => Math.max(16, ...textos.map(([t, ancho]) => Math.ceil(String(t ?? "").length / Math.max(4, ancho * 1.15)) * 12.8 + 3));
+
+function hojaCinco(wb, nombre, { logo, rev, titulo, anchos, horizontal = true }) {
+  const ws = wb.addWorksheet(nombre, {
+    pageSetup: { paperSize: 1, orientation: horizontal ? "landscape" : "portrait", fitToPage: true, fitToWidth: 1, fitToHeight: 0, horizontalCentered: true, margins: { left: 0.4, right: 0.4, top: 0.5, bottom: 0.6, header: 0.2, footer: 0.25 } },
+    headerFooter: { oddFooter: `&L&8Cinco S.A.S. · APU PRO · ${(rev.codigo || "").replace(/&/g, "&&")}&C&8${titulo.replace(/&/g, "&&")}&R&8Página &P de &N` },
+    views: [{ showGridLines: false }]
   });
-}
-function hoja(wb, nombre, titulo, cols, filas, { colorFila, anchoMax } = {}) {
-  const ws = wb.addWorksheet(nombre, { views: [{ state: "frozen", ySplit: 3 }] });
-  const t = ws.getCell(1, 1);
-  t.value = titulo; t.font = { bold: true, size: 13, color: { argb: AZUL } };
-  const w = anchos(cols.map((c) => c.h), filas.map((f) => f.map((v, j) => (cols[j].n === MONEDA && typeof v === "number" ? pesosTxt(v) : typeof v === "object" && v ? "" : v))), { max: anchoMax || 70 });
-  cols.forEach((c, j) => { ws.getColumn(j + 1).width = c.w || w[j]; });
-  const hr = ws.getRow(3);
-  cols.forEach((c, j) => {
-    const cel = hr.getCell(j + 1);
-    cel.value = c.h; cel.font = { bold: true, color: { argb: "FFFFFFFF" } };
-    cel.fill = { type: "pattern", pattern: "solid", fgColor: { argb: AZUL } };
-    cel.alignment = { vertical: "middle", horizontal: "center", wrapText: true };
-    cel.border = { top: BORDE, left: BORDE, bottom: { style: "medium", color: { argb: AMBAR } }, right: BORDE };
-  });
-  hr.height = 30;
-  filas.forEach((f, k) => {
-    const row = ws.addRow(f);
-    row.eachCell({ includeEmpty: true }, (cel, j) => {
-      const c = cols[j - 1];
-      if (!c) return;
-      cel.border = { top: BORDE, left: BORDE, bottom: BORDE, right: BORDE };
-      cel.alignment = { vertical: "top", wrapText: !!c.wrap, horizontal: c.al || (c.n ? "right" : "left") };
-      if (c.n) cel.numFmt = c.n;
-    });
-    const col = colorFila?.(f, k);
-    if (col) row.eachCell({ includeEmpty: true }, (cel) => { cel.fill = { type: "pattern", pattern: "solid", fgColor: { argb: col } }; });
-  });
+  ws.columns = anchos.map((w) => ({ width: w }));
+  const n = anchos.length;
+  // El título empieza donde termina el logo (unos 165 px).
+  let c0 = 1, px = 0;
+  while (c0 < n && px < 165) { px += anchos[c0 - 1] * 7.2; c0++; }
+  if (logo != null) ws.addImage(logo, { tl: { col: 0.15, row: 0.2 }, ext: { width: 150, height: 72 } });
+  const anchoTitulo = anchos.slice(c0 - 1).reduce((t, w) => t + w, 0);
+  ws.getRow(1).height = 24; ws.getRow(2).height = 24;
+  ws.getRow(3).height = Math.max(20, altoPara([[`${rev.codigo || ""} · ${rev.nombre || ""}`, anchoTitulo * 0.9]]) + 2);
+  ws.mergeCells(1, c0, 2, n);
+  Object.assign(ws.getCell(1, c0), { value: titulo.toUpperCase(), font: fx({ size: 15, bold: true }), alignment: { vertical: "middle", horizontal: "left" } });
+  ws.mergeCells(3, c0, 3, n);
+  Object.assign(ws.getCell(3, c0), { value: `${rev.codigo ? rev.codigo + " · " : ""}${rev.nombre || ""}`, font: fx({ size: 11, bold: true, color: { argb: GRIS_TXT } }), alignment: { vertical: "middle", wrapText: true } });
+  for (let c = 1; c <= n; c++) ws.getCell(4, c).border = { bottom: { style: "medium", color: { argb: AMBAR } } };
+  ws.mergeCells(5, 1, 5, n);
+  const datos = [rev.oferente && `Oferente: ${rev.oferente}`, rev.cliente && `Contratante: ${rev.cliente}`, rev.fechaOferta && `Oferta del ${fechaLarga(rev.fechaOferta)}`, `Revisión: ${fechaLarga(rev.fechaRevision || new Date().toISOString().slice(0, 10))}`].filter(Boolean).join("   ·   ");
+  Object.assign(ws.getCell(5, 1), { value: datos, font: fx({ size: 9, color: { argb: GRIS_TXT } }), alignment: { vertical: "middle" } });
+  ws.getRow(5).height = 18;
+  ws.__fila = 7;
   return ws;
 }
+function tituloSeccion(ws, texto, n) {
+  const f = ws.__fila;
+  ws.mergeCells(f, 1, f, n);
+  Object.assign(ws.getCell(f, 1), { value: texto.toUpperCase(), font: fx({ size: 10, bold: true, color: { argb: AZUL } }), border: { bottom: { style: "thin", color: { argb: AMBAR } } } });
+  ws.getRow(f).height = 18;
+  ws.__fila = f + 1;
+}
+// Tabla con encabezado ámbar. cols: [{ h, w (ancho de la columna, para calcular alturas), n (formato), al, wrap }]
+function tabla(ws, cols, filas, { zebra = true, colorFila, repetir = false, total = null } = {}) {
+  const h = ws.__fila;
+  cols.forEach((c, j) => Object.assign(ws.getCell(h, j + 1), { value: c.h, font: fx({ size: 9, bold: true }), fill: relleno(AMBAR), border: BORDES, alignment: { horizontal: "center", vertical: "middle", wrapText: true } }));
+  ws.getRow(h).height = altoPara(cols.map((c) => [c.h, c.w || 10]));
+  if (repetir) { ws.pageSetup.printTitlesRow = `${h}:${h}`; ws.views = [{ showGridLines: false, state: "frozen", ySplit: h }]; }
+  let f = h + 1;
+  filas.forEach((fila, k) => {
+    const r = ws.getRow(f);
+    const color = colorFila?.(fila, k) || (zebra && k % 2 ? GRIS : null);
+    cols.forEach((c, j) => {
+      const cel = r.getCell(j + 1);
+      cel.value = fila[j] ?? null;
+      cel.border = BORDES;
+      cel.font = fx(c.bold ? { bold: true } : {});
+      cel.alignment = { vertical: "top", horizontal: c.al || (c.n ? "right" : "left"), wrapText: !!c.wrap };
+      if (c.n) cel.numFmt = c.n;
+      if (color) cel.fill = relleno(color);
+    });
+    r.height = altoPara(cols.map((c, j) => [c.wrap ? fila[j] : "", c.w || 10]));
+    f++;
+  });
+  if (total) {
+    const r = ws.getRow(f);
+    cols.forEach((c, j) => {
+      const cel = r.getCell(j + 1);
+      cel.value = total[j] ?? null;
+      cel.border = BORDES;
+      cel.font = fx({ bold: true });
+      cel.fill = relleno(AMBAR_SUAVE);
+      cel.alignment = { vertical: "middle", horizontal: c.al || (c.n ? "right" : "left") };
+      if (c.n) cel.numFmt = c.n;
+    });
+    r.height = 18;
+    f++;
+  }
+  ws.__fila = f + 1;
+  return { primera: h + 1, ultima: f - 1 - (total ? 1 : 0), filaTotal: total ? f - 1 : null };
+}
+const valorImpacto = (h) => (h.impacto != null && Number.isFinite(h.impacto) && h.impacto !== 0 ? Math.round(h.impacto) : h.impactoTexto || "-");
 
 export function libroRevision(ExcelJS, rev, res, hallazgos, { logo = null } = {}) {
   const wb = new ExcelJS.Workbook();
-  wb.creator = "CINCO S.A.S. - APU PRO";
+  wb.creator = "Cinco S.A.S. - APU PRO";
+  const idLogo = logo ? wb.addImage({ base64: logo, extension: "png" }) : null;
   const F = res.F, inc = hallazgos.filter((h) => h.incluir), items = rev.items || [];
-  const titulo = `Revisión de presupuesto - ${rev.nombre || rev.codigo}${rev.oferente ? ` (${rev.oferente})` : ""}`;
+  const concepto = CONCEPTOS[rev.concepto] || conceptoSugerido(inc);
 
-  const wsR = hoja(wb, "Resumen", titulo,
-    [{ h: "Cap." , al: "center" }, { h: "Descripción", wrap: true }, { h: "Ítems", al: "center" }, { h: "Valor de los ítems", n: MONEDA }, { h: "Valor final", n: MONEDA }, { h: "% del total", n: "0.0%" }],
-    [...res.capitulos.map((c) => [c.num, c.nombre, c.n, Math.round(c.valor), Math.round(c.final), c.pct]),
-      ["", "Total", items.length, Math.round(res.sumaItems), Math.round(res.total), 1]],
-    { colorFila: (f) => (f[1] === "Total" ? GRIS : null), anchoMax: 60 });
-  wsR.getRow(wsR.rowCount).font = { bold: true };
-  const r0 = wsR.rowCount + 2;
-  const filasComp = [["Costo directo", res.comp.cd], [`Administración ${pctTxt(F.aiu.a || 0)}`, res.comp.a], [`Imprevistos ${pctTxt(F.aiu.i || 0)}`, res.comp.i], [`Utilidad ${pctTxt(F.aiu.u || 0)}`, res.comp.u], [`IVA ${F.iva ? pctTxt(F.iva, 0) + " " + minuscula(REGIMENES[F.reg]) : ""}`, res.comp.iva], ["Total recalculado", res.total], ...(res.declarado ? [["Total declarado", res.declarado], ["Diferencia", res.declarado - res.total]] : [])];
-  filasComp.forEach(([k, v], j) => {
-    const row = wsR.getRow(r0 + j);
-    row.getCell(2).value = k; row.getCell(5).value = Math.round(v); row.getCell(5).numFmt = MONEDA;
-    if (/^Total/.test(k)) row.font = { bold: true };
-  });
-  if (logo) {
-    const id = wb.addImage({ base64: logo, extension: "png" });
-    wsR.addImage(id, { tl: { col: 6.2, row: 0.1 }, ext: { width: 150, height: 42 } });
+  // ---------- Resumen
+  const aR = [8, 30, 12, 18, 18, 12];
+  const wsR = hojaCinco(wb, "Resumen", { logo: idLogo, rev, titulo: "Revisión de presupuesto", anchos: aR, horizontal: false });
+  tituloSeccion(wsR, "Datos de la oferta", aR.length);
+  const ficha = [
+    ["Oferta", rev.nombre || "-"], ["Oferente", rev.oferente || "-"], ["Contratante", rev.cliente || "-"],
+    ["Fecha de la oferta", rev.fechaOferta ? fechaLarga(rev.fechaOferta) : "-"], ["Documento revisado", rev.documento || "-"],
+    ["Capítulos / ítems / APU", `${res.capitulos.length} / ${items.length}${res.apus ? ` / ${res.apus.vinculos.length + res.apus.huerfanos.length}` : ""}`],
+    ["Valores de los ítems", BASES[rev.base || "cd"]],
+    ["AIU", `Administración ${pctTxt(F.aiu.a || 0)} · Imprevistos ${pctTxt(F.aiu.i || 0)} · Utilidad ${pctTxt(F.aiu.u || 0)}`],
+    ["IVA", F.iva ? `${pctTxt(F.iva, 0)} ${minuscula(REGIMENES[F.reg])}` : "No se liquida"]
+  ];
+  for (const [et, v] of ficha) {
+    const f = wsR.__fila;
+    wsR.mergeCells(f, 1, f, 2); wsR.mergeCells(f, 3, f, aR.length);
+    Object.assign(wsR.getCell(f, 1), { value: et, font: fx({ size: 9, bold: true, color: { argb: GRIS_TXT } }), fill: relleno(GRIS), border: BORDES, alignment: { vertical: "top" } });
+    Object.assign(wsR.getCell(f, 3), { value: v, font: fx(), border: BORDES, alignment: { vertical: "top", wrapText: true } });
+    wsR.getRow(f).height = altoPara([[v, 58]]);
+    wsR.__fila = f + 1;
   }
+  wsR.__fila++;
+  // Concepto destacado.
+  {
+    const f = wsR.__fila;
+    wsR.mergeCells(f, 1, f, 2); wsR.mergeCells(f, 3, f, aR.length);
+    Object.assign(wsR.getCell(f, 1), { value: "CONCEPTO", font: fx({ bold: true, color: { argb: AMBAR } }), fill: relleno(AZUL), alignment: { vertical: "middle", horizontal: "center" } });
+    Object.assign(wsR.getCell(f, 3), { value: concepto.toUpperCase(), font: fx({ bold: true, size: 11, color: { argb: "FFFFFFFF" } }), fill: relleno(AZUL), alignment: { vertical: "middle" } });
+    wsR.getRow(f).height = 22;
+    wsR.__fila = f + 1;
+    if (rev.conceptoTexto) { const g = wsR.__fila; wsR.mergeCells(g, 1, g, aR.length); Object.assign(wsR.getCell(g, 1), { value: rev.conceptoTexto, font: fx(), alignment: { wrapText: true, vertical: "top" } }); wsR.getRow(g).height = altoPara([[rev.conceptoTexto, 95]]); wsR.__fila = g + 1; }
+    wsR.__fila++;
+  }
+  tituloSeccion(wsR, "Valor por capítulo", aR.length);
+  const tCap = tabla(wsR, [{ h: "Cap.", w: 8, al: "center" }, { h: "Capítulo", w: 30, wrap: true }, { h: "Ítems", w: 12, al: "center" }, { h: "", w: 18 }, { h: "Valor final", w: 18, n: MONEDA }, { h: "% del total", w: 12, n: "0.0%" }],
+    res.capitulos.map((c) => [String(c.num), c.nombre, c.n, null, Math.round(c.final), c.pct]),
+    { total: ["", "Total", items.length, null, Math.round(res.total), 1] });
+  for (let f = tCap.primera - 1; f <= tCap.filaTotal; f++) wsR.mergeCells(f, 2, f, 4);
+  tituloSeccion(wsR, "Composición del valor", aR.length);
+  const comp = [["Costo directo", res.comp.cd, 1], [`Administración ${pctTxt(F.aiu.a || 0)}`, res.comp.a, F.aiu.a || 0], [`Imprevistos ${pctTxt(F.aiu.i || 0)}`, res.comp.i, F.aiu.i || 0], [`Utilidad ${pctTxt(F.aiu.u || 0)}`, res.comp.u, F.aiu.u || 0], [`IVA ${F.iva ? pctTxt(F.iva, 0) + " " + minuscula(REGIMENES[F.reg]) : ""}`, res.comp.iva, res.comp.cd ? res.comp.iva / res.comp.cd : 0]];
+  const tComp = tabla(wsR, [{ h: "Componente", w: 50, wrap: true }, { h: "", w: 12 }, { h: "", w: 18 }, { h: "", w: 18 }, { h: "Valor", w: 18, n: MONEDA }, { h: "% del costo directo", w: 12, n: "0.0%" }],
+    comp.map(([k, v, p]) => [k, null, null, null, Math.round(v), p]),
+    { zebra: false, total: ["Total recalculado", null, null, null, Math.round(res.total), null] });
+  for (let f = tComp.primera - 1; f <= tComp.filaTotal; f++) wsR.mergeCells(f, 1, f, 4);
+  if (res.declarado) {
+    const f = wsR.__fila - 1;
+    wsR.mergeCells(f, 1, f, 4);
+    const dif = res.declarado - res.total;
+    Object.assign(wsR.getCell(f, 1), { value: `Total declarado en la oferta${Math.abs(dif) < 1000 ? " (coincide)" : ` (diferencia ${pesosTxt(dif)})`}`, font: fx({ size: 9, color: { argb: GRIS_TXT } }), alignment: { horizontal: "right" } });
+    Object.assign(wsR.getCell(f, 5), { value: Math.round(res.declarado), numFmt: MONEDA, font: fx({ size: 9, color: { argb: GRIS_TXT } }) });
+    wsR.__fila = f + 2;
+  }
+  tituloSeccion(wsR, "Resumen de hallazgos", aR.length);
+  const tH = tabla(wsR, [{ h: "No.", w: 8, al: "center", bold: true }, { h: "Hallazgo", w: 60, wrap: true }, { h: "", w: 12 }, { h: "", w: 18 }, { h: "Severidad", w: 18, al: "center" }, { h: "Impacto", w: 12, n: MONEDA, wrap: true }],
+    inc.map((x) => [x.numero, x.titulo || x.tema, null, null, x.sev, valorImpacto(x)]),
+    { zebra: false, colorFila: (f) => SEV_COLOR[f[4]] });
+  for (let f = tH.primera - 1; f <= tH.ultima; f++) wsR.mergeCells(f, 2, f, 4);
+  wsR.getColumn(6).width = 16;
+  wsR.pageSetup.printArea = `A1:F${wsR.__fila}`;
 
-  hoja(wb, "Hallazgos", "Hallazgos y acciones requeridas",
-    [{ h: "No.", al: "center" }, { h: "Severidad", al: "center" }, { h: "Tema" }, { h: "Hallazgo", wrap: true }, { h: "Ítems", wrap: true, w: 28 }, { h: "Impacto estimado", n: MONEDA, w: 22 }, { h: "Acción requerida", wrap: true }],
-    inc.map((h) => [h.numero, h.sev, h.tema, h.hallazgo, h.items, h.impacto != null && Number.isFinite(h.impacto) && h.impacto !== 0 ? Math.round(h.impacto) : h.impactoTexto || "-", h.accion || "-"]),
-    { colorFila: (f) => SEV_COLOR[f[1]], anchoMax: 60 });
+  // ---------- Hallazgos
+  const aH = [8, 12, 13, 58, 22, 16, 44];
+  const wsH = hojaCinco(wb, "Hallazgos", { logo: idLogo, rev, titulo: "Hallazgos y acciones requeridas", anchos: aH });
+  tabla(wsH, [{ h: "No.", w: 8, al: "center", bold: true }, { h: "Severidad", w: 12, al: "center" }, { h: "Tema", w: 13 }, { h: "Hallazgo", w: 58, wrap: true }, { h: "Ítems", w: 22, wrap: true }, { h: "Impacto estimado", w: 16, n: MONEDA, wrap: true }, { h: "Acción requerida", w: 44, wrap: true }],
+    inc.map((x) => [x.numero, x.sev, x.tema, x.titulo ? `${x.titulo}. ${x.hallazgo}` : x.hallazgo, x.items, valorImpacto(x), x.accion || "-"]),
+    { zebra: false, repetir: true, colorFila: (f) => SEV_COLOR[f[1]] });
+  wsH.eachRow((r, i) => { if (i > 7) { const c = r.getCell(2); if (SEV_TXT[c.value]) c.font = fx({ bold: true, color: { argb: SEV_TXT[c.value] } }); } });
 
+  // ---------- Ítems (con fórmulas: el revisor cambia un dato y ve el recálculo)
   const numeros = Object.fromEntries(inc.map((h) => [h.clave, h.numero]));
-  const comp = Object.fromEntries(res.comparados.map((c) => [c.id, c]));
-  const wsI = hoja(wb, "Ítems", "Presupuesto de la oferta, ítem por ítem",
-    [{ h: "Cap.", al: "center" }, { h: "Ítem", al: "center" }, { h: "Descripción", wrap: true }, { h: "Und", al: "center" }, { h: "Cantidad", n: "#,##0.00##" }, { h: "Valor unitario", n: MONEDA }, { h: "Valor total oferta", n: MONEDA }, { h: "Cantidad x valor unitario", n: MONEDA, w: 16 }, { h: "Diferencia", n: MONEDA, w: 13 }, { h: "Valor final", n: MONEDA, w: 16 }, { h: "APU PRO", al: "center", w: 11 }, { h: "Precio referencia", n: MONEDA }, { h: "Dif. frente a referencia", n: "0%" }, { h: "Hallazgos", wrap: true }],
-    items.map((it) => {
-      const c = comp[it.id];
-      return [it.cap, it.item, it.desc, it.und, it.cant, it.vu, it.vt, null, null, null, c?.codigo || it.ref?.codigo || "", c ? Math.round(c.ref) : null, c ? c.dif : null, (res.porItem[it.id] || []).map((k) => numeros[k]).filter(Boolean).join(", ")];
-    }),
-    { colorFila: (f) => (f[13] ? "FFFFF4D6" : null), anchoMax: 55 });
-  // Fórmulas: el revisor puede cambiar un dato y ver el recálculo.
-  for (let r = 4; r <= wsI.rowCount; r++) {
+  const comp2 = Object.fromEntries(res.comparados.map((c) => [c.id, c]));
+  // Las columnas de APU PRO solo van si algún ítem tiene APU de referencia.
+  const conRef = res.comparados.length > 0;
+  const colsRef = conRef ? [{ h: "APU PRO", w: 11, al: "center" }, { h: "Precio referencia", w: 14, n: MONEDA }, { h: "Dif. frente a referencia", w: 10, n: "0%" }] : [];
+  const colsI = [{ h: "Cap.", w: 6, al: "center" }, { h: "Ítem", w: 8, al: "center" }, { h: "Descripción", w: conRef ? 48 : 60, wrap: true }, { h: "Und", w: 6, al: "center" }, { h: "Cantidad", w: 10, n: "#,##0.00##" }, { h: "Valor unitario", w: 14, n: MONEDA }, { h: "Valor total oferta", w: 15, n: MONEDA }, { h: "Cantidad × valor unitario", w: 15, n: MONEDA }, { h: "Diferencia", w: 12, n: MONEDA }, { h: "Valor final", w: 15, n: MONEDA }, ...colsRef, { h: "Hallazgos", w: 14, wrap: true }];
+  const aI = colsI.map((c) => c.w);
+  const wsI = hojaCinco(wb, "Ítems", { logo: idLogo, rev, titulo: "Presupuesto de la oferta, ítem por ítem", anchos: aI });
+  const ordenNum = (x) => (x.startsWith("OB") ? 1000 : 0) + Number(x.replace(/\D/g, ""));
+  const tI = tabla(wsI, colsI,
+    items.map((it) => { const c = comp2[it.id]; const marcas = [...new Set((res.porItem[it.id] || []).map((k) => numeros[k]).filter(Boolean))].sort((p, q) => ordenNum(p) - ordenNum(q)).join(", "); return [it.cap, it.item, it.desc, it.und, it.cant, it.vu, it.vt, null, null, null, ...(conRef ? [c?.codigo || it.ref?.codigo || "", c ? Math.round(c.ref) : null, c ? c.dif : null] : []), marcas]; }),
+    { repetir: true, colorFila: (f, k) => (f[f.length - 1] ? "FFFFF6DC" : k % 2 ? GRIS : null) });
+  for (let r = tI.primera; r <= tI.ultima; r++) {
     wsI.getCell(r, 8).value = { formula: `IFERROR(ROUND(E${r}*F${r},0),0)` };
     wsI.getCell(r, 9).value = { formula: `IFERROR(G${r}-H${r},0)` };
     wsI.getCell(r, 10).value = { formula: `IFERROR(ROUND(G${r}*${F.aFinal.toFixed(8)},0),0)` };
   }
-  const tot = wsI.addRow(["", "", "Total", "", null, null, { formula: `SUM(G4:G${wsI.rowCount})` }, { formula: `SUM(H4:H${wsI.rowCount})` }, { formula: `SUM(I4:I${wsI.rowCount})` }, { formula: `SUM(J4:J${wsI.rowCount})` }]);
-  tot.font = { bold: true };
-  [7, 8, 9, 10].forEach((j) => { tot.getCell(j).numFmt = MONEDA; });
+  const tot = wsI.getRow(tI.ultima + 1);
+  [["C", "Total"], ["G", { formula: `SUM(G${tI.primera}:G${tI.ultima})` }], ["H", { formula: `SUM(H${tI.primera}:H${tI.ultima})` }], ["I", { formula: `SUM(I${tI.primera}:I${tI.ultima})` }], ["J", { formula: `SUM(J${tI.primera}:J${tI.ultima})` }]].forEach(([c, v]) => { tot.getCell(c).value = v; });
+  for (let j = 1; j <= aI.length; j++) Object.assign(tot.getCell(j), { border: BORDES, font: fx({ bold: true }), fill: relleno(AMBAR_SUAVE), ...(j >= 7 && j <= 10 ? { numFmt: MONEDA } : {}) });
+  tot.height = 18;
 
   if (res.apus) {
     const A = res.apus;
     const malos = new Map(A.malos.map((m) => [m.a, m.prob.join("; ")]));
     const filasApu = [...A.vinculos.map((v) => ({ a: v.apu, it: items.find((x) => x.id === v.id), ref: v.ref, dif: v.dif })), ...A.huerfanos.map((a) => ({ a, it: null, ref: a.pu, dif: null }))];
-    hoja(wb, "APU oferente", "APU del oferente frente al presupuesto",
-      [{ h: "Ítem", al: "center" }, { h: "Descripción", wrap: true }, { h: "Und", al: "center" }, ...Object.keys(SECCIONES_APU).map((k) => ({ h: SECCIONES_APU[k], n: MONEDA, w: 14 })), { h: "Costo directo", n: MONEDA, w: 15 }, { h: "Precio APU", n: MONEDA, w: 15 }, { h: "Valor unitario presupuesto", n: MONEDA, w: 15 }, { h: "Diferencia", n: MONEDA, w: 13 }, { h: "Observación", wrap: true }],
-      filasApu.map(({ a, it, ref, dif }) => [a.item, a.desc, a.und, ...Object.keys(SECCIONES_APU).map((k) => (a.sub?.[k] ?? (a.secciones[k] ? a.secciones[k].reduce((s, x) => s + (Number(x.v) || 0), 0) : null))), a.cd, ref, it?.vu ?? null, dif, [it ? "" : "No está en el presupuesto", malos.get(a) || ""].filter(Boolean).join(". ")]),
-      { colorFila: (f) => (f[f.length - 1] || (f[f.length - 2] && Math.abs(f[f.length - 2]) > 1) ? "FFFFF4D6" : null), anchoMax: 55 });
-    const comp = new Map(A.comparadosIns.map((c) => [c.clave, c]));
-    hoja(wb, "Insumos", "Insumos de los APU en toda la obra (cantidad del APU × cantidad del ítem)",
-      [{ h: "Sección" }, { h: "Insumo", wrap: true }, { h: "Und", al: "center" }, { h: "Cantidad en la obra", n: "#,##0.00" }, { h: "Precio mínimo", n: MONEDA, w: 14 }, { h: "Precio máximo", n: MONEDA, w: 14 }, { h: "Valor (costo directo)", n: MONEDA, w: 16 }, { h: "Valor final", n: MONEDA, w: 16 }, { h: "N.º de APU", al: "center" }, { h: "APU PRO", al: "center" }, { h: "Precio referencia", n: MONEDA, w: 14 }, { h: "Dif.", n: "0%" }],
-      A.insumos.map((e) => { const c = comp.get(e.clave); return [SECCIONES_APU[e.sec] || e.sec, e.d, e.u, Math.round(e.q * 100) / 100, e.preciosLista[0] ?? null, e.preciosLista[e.preciosLista.length - 1] ?? null, Math.round(e.valor), Math.round(e.valorFinal), e.apus.length, c?.codigo || "", c ? Math.round(c.base) : null, c ? c.dif : null]; }),
-      { colorFila: (f) => (f[4] != null && f[5] != null && f[5] / f[4] > 1.01 ? "FFFFF4D6" : null), anchoMax: 60 });
+    const secs = Object.keys(SECCIONES_APU);
+    const aA = [8, 44, 6, ...secs.map(() => 13), 14, 14, 14, 12, 30];
+    const wsA = hojaCinco(wb, "APU oferente", { logo: idLogo, rev, titulo: "APU del oferente frente al presupuesto", anchos: aA });
+    tabla(wsA, [{ h: "Ítem", w: 8, al: "center" }, { h: "Descripción", w: 44, wrap: true }, { h: "Und", w: 6, al: "center" }, ...secs.map((k) => ({ h: SECCIONES_APU[k], w: 13, n: MONEDA })), { h: "Costo directo", w: 14, n: MONEDA }, { h: "Precio APU", w: 14, n: MONEDA }, { h: "Valor unitario presupuesto", w: 14, n: MONEDA }, { h: "Diferencia", w: 12, n: MONEDA }, { h: "Observación", w: 30, wrap: true }],
+      filasApu.map(({ a, it, ref, dif }) => [a.item, a.desc, a.und, ...secs.map((k) => (a.sub?.[k] ?? (a.secciones[k] ? a.secciones[k].reduce((s, x) => s + (Number(x.v) || 0), 0) : null))), a.cd, ref, it?.vu ?? null, dif, [it ? "" : "No está en el presupuesto", malos.get(a) || ""].filter(Boolean).join(". ")]),
+      { repetir: true, colorFila: (f, k) => (f[f.length - 1] || (f[f.length - 2] && Math.abs(f[f.length - 2]) > 1) ? "FFFFF6DC" : k % 2 ? GRIS : null) });
+    const compI = new Map(A.comparadosIns.map((c) => [c.clave, c]));
+    const aN = [20, 50, 7, 13, 13, 13, 15, 15, 8, 11, 13, 9];
+    const wsN = hojaCinco(wb, "Insumos", { logo: idLogo, rev, titulo: "Insumos de los APU en toda la obra", anchos: aN });
+    tabla(wsN, [{ h: "Sección", w: 20 }, { h: "Insumo", w: 50, wrap: true }, { h: "Und", w: 7, al: "center" }, { h: "Cantidad en la obra", w: 13, n: "#,##0.00" }, { h: "Precio mínimo", w: 13, n: MONEDA }, { h: "Precio máximo", w: 13, n: MONEDA }, { h: "Valor (costo directo)", w: 15, n: MONEDA }, { h: "Valor final", w: 15, n: MONEDA }, { h: "N.º de APU", w: 8, al: "center" }, { h: "APU PRO", w: 11, al: "center" }, { h: "Precio referencia", w: 13, n: MONEDA }, { h: "Dif.", w: 9, n: "0%" }],
+      A.insumos.map((e) => { const c = compI.get(e.clave); return [SECCIONES_APU[e.sec] || e.sec, e.d, e.u, Math.round(e.q * 100) / 100, e.preciosLista[0] ?? null, e.preciosLista[e.preciosLista.length - 1] ?? null, Math.round(e.valor), Math.round(e.valorFinal), e.apus.length, c?.codigo || "", c ? Math.round(c.base) : null, c ? c.dif : null]; }),
+      { repetir: true, colorFila: (f, k) => (f[4] != null && f[5] != null && f[5] / f[4] > 1.01 ? "FFFFF6DC" : (f[11] ?? 0) > 0.2 ? "FFF8D0C4" : k % 2 ? GRIS : null) });
   }
   return wb;
 }

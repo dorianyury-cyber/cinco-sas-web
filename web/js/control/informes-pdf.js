@@ -119,12 +119,16 @@ function repartirConMinimos(mins, deseos, total) {
     restante -= usado;
   }
   // Si todas las columnas ya llegaron a lo que pidieron y aún sobra espacio
-  // (tabla con pocas columnas cortas en una página ancha), se reparte lo
-  // que queda proporcional a lo ya asignado para que la tabla llene el
-  // ancho completo en vez de quedar angosta con un vacío a la derecha.
+  // (tabla con pocas columnas cortas en una página ancha), lo que queda va a
+  // la columna de texto más largo (y a las que estén casi empatadas con ella)
+  // para que la tabla llene el ancho completo. Repartirlo entre todas
+  // agrandaba columnas cortas como «Cap.», «Und» o «%» tanto como la
+  // descripción.
   if (restante > 0.5) {
-    const usado = anchos.reduce((a, b) => a + b, 0);
-    for (let i = 0; i < n; i++) anchos[i] += restante * (anchos[i] / usado);
+    const mayor = Math.max(...deseos);
+    const anchas = deseos.map((d) => d >= mayor * 0.9);
+    const base = deseos.reduce((s, d, i) => s + (anchas[i] ? d : 0), 0) || 1;
+    for (let i = 0; i < n; i++) if (anchas[i]) anchos[i] += restante * (deseos[i] / base);
   }
   return anchos;
 }
@@ -1230,6 +1234,9 @@ export async function generarInformePDF(informe) {
     doc.setTextColor(...TEXT_MUTED);
     const anchoDisponibleTitulo = anchoPagina - margenDer - (margenIzq + anchoLogo + 4);
     let tamanoTitulo = 8;
+    // Se mide con el tamaño real: medir con la letra que quedó de la página
+    // anterior daba una sola línea que, a 8 pt, se montaba sobre el logo.
+    doc.setFontSize(tamanoTitulo);
     let lineasTitulo = doc.splitTextToSize(informe.titulo || "", anchoDisponibleTitulo);
     while (lineasTitulo.length > 2 && tamanoTitulo > 6) {
       tamanoTitulo -= 0.5;
