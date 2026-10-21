@@ -22,6 +22,9 @@
         </div>
         <div class="rt-acciones">
           <span class="badge warn hidden" id="sucio">Cambios sin guardar</span>
+          <button type="button" class="btn secondary" id="cargarAjustesBtn" title="Carga desde un archivo las referencias de insumos, los ajustes de los hallazgos automáticos, los hallazgos del revisor, el concepto y los datos de la oferta">⬆ Cargar ajustes</button>
+          <button type="button" class="btn secondary" id="exportarAjustesBtn" title="Descarga en un archivo lo que el revisor ha decidido en esta revisión, para reutilizarlo o compartirlo">⬇ Exportar ajustes</button>
+          <input type="file" id="ajustesArchivo" accept=".json,application/json" class="hidden">
           <button type="button" class="btn" id="guardarBtn">💾 Guardar</button>
         </div>
       </div>

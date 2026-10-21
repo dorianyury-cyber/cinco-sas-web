@@ -638,6 +638,68 @@ function confirmarSugIns() {
   mostrarAlerta(alerta, `Se confirmaron ${n} referencias de insumos. Revísalas: el parecido es por la descripción.`, "success");
 }
 
+// ---------------------------------------------------------------- ajustes del revisor en un archivo
+// Lo que el revisor decide (referencias de insumos y de APU, ajustes de los hallazgos automáticos,
+// hallazgos propios, concepto y datos de la oferta) se exporta y se carga como archivo
+// «apupro-ajustes-revision». Al cargar se mezcla con lo que ya tiene la revisión y queda sin
+// guardar, para revisarlo antes de pulsar «Guardar».
+const CAMPOS_DATOS = ["nombre", "oferente", "cliente", "fechaOferta", "documento", "base", "aiu", "iva", "regimenIva", "totalDeclarado"];
+const CAMPOS_TEXTO = ["concepto", "conceptoTexto", "recomendaciones", "objeto", "limitaciones"];
+function exportarAjustes() {
+  const refsItems = Object.fromEntries(rev.items.filter((it) => it.ref?.codigo).map((it) => [it.item, it.ref.codigo]));
+  const json = {
+    formato: "apupro-ajustes-revision", version: 1, revision: rev.codigo, generado: new Date().toISOString(),
+    datos: Object.fromEntries(CAMPOS_DATOS.map((k) => [k, rev[k] ?? null])),
+    ...Object.fromEntries(CAMPOS_TEXTO.map((k) => [k, rev[k] || ""])),
+    refInsumos: rev.refInsumos || {}, refItems: refsItems, ajustes: rev.ajustes || {}, hallazgos: rev.hallazgos || []
+  };
+  descargar(new Blob([JSON.stringify(json, null, 2)], { type: "application/json" }), nombreArchivo(`${rev.codigo} ajustes de la revisión`, ".json"));
+}
+async function cargarAjustes() {
+  const f = $("ajustesArchivo").files[0];
+  $("ajustesArchivo").value = "";
+  if (!f) return;
+  try {
+    const j = JSON.parse(await f.text());
+    if (j?.formato !== "apupro-ajustes-revision") throw new Error("El archivo no es de ajustes de una revisión de APU PRO.");
+    const resumen = [];
+    if (j.datos) {
+      const cambios = CAMPOS_DATOS.filter((k) => j.datos[k] != null && JSON.stringify(j.datos[k]) !== JSON.stringify(rev[k]));
+      for (const k of cambios) rev[k] = j.datos[k];
+      if (cambios.length) resumen.push(`datos de la oferta (${cambios.length})`);
+    }
+    const textos = CAMPOS_TEXTO.filter((k) => j[k]);
+    for (const k of textos) rev[k] = j[k];
+    if (textos.length) resumen.push("concepto y textos del informe");
+    // Referencias de insumos: las del archivo reemplazan; null en el archivo quita la referencia.
+    if (j.refInsumos) {
+      const r = { ...(rev.refInsumos || {}) };
+      let n = 0;
+      for (const [k, v] of Object.entries(j.refInsumos)) { if (v) { if (insumos.has(v)) { r[k] = v; n++; } } else if (k in r) { delete r[k]; n++; } }
+      rev.refInsumos = r;
+      if (n) resumen.push(`${n} referencias de insumos`);
+    }
+    if (j.refItems) {
+      let n = 0;
+      for (const it of rev.items) { const c = j.refItems[it.item]; if (c && apus.has(c)) { it.ref = { codigo: c, confirmada: true }; n++; } }
+      if (n) resumen.push(`${n} APU de referencia de ítems`);
+    }
+    if (j.ajustes) { rev.ajustes = { ...(rev.ajustes || {}), ...j.ajustes }; resumen.push("ajustes de hallazgos automáticos"); }
+    if (Array.isArray(j.hallazgos)) {
+      const titulo = (h) => normalizar(h.titulo || h.hallazgo).slice(0, 80);
+      const nuevos = j.hallazgos.filter((h) => !(rev.hallazgos || []).some((x) => titulo(x) === titulo(h)));
+      rev.hallazgos = [...(rev.hallazgos || []), ...nuevos.map((h) => ({ incluir: true, ...h, id: h.id && !(rev.hallazgos || []).some((x) => x.id === h.id) ? h.id : `m${Date.now().toString(36)}${Math.random().toString(36).slice(2, 5)}` }))];
+      if (nuevos.length) resumen.push(`${nuevos.length} hallazgos del revisor`);
+    }
+    pintarDatos();
+    calcularSugerencias();
+    cambio();
+    calcularSugIns();
+    mostrarSeccion();
+    mostrarAlerta(alerta, resumen.length ? `Se cargaron: ${resumen.join(", ")}. Revisa y pulsa «Guardar».` : "El archivo no trae cambios para esta revisión.", resumen.length ? "success" : "info");
+  } catch (err) { mostrarAlerta(alerta, errorAmigable(err)); }
+}
+
 // ---------------------------------------------------------------- guardar
 async function guardar() {
   const btn = $("guardarBtn");
@@ -657,6 +719,9 @@ function conectar() {
   window.addEventListener("hashchange", mostrarSeccion);
   window.addEventListener("beforeunload", (e) => { if (sucio) { e.preventDefault(); e.returnValue = ""; } });
   $("guardarBtn").addEventListener("click", guardar);
+  $("exportarAjustesBtn").addEventListener("click", exportarAjustes);
+  $("cargarAjustesBtn").addEventListener("click", () => $("ajustesArchivo").click());
+  $("ajustesArchivo").addEventListener("change", cargarAjustes);
   $("archivo").addEventListener("change", leerArchivo);
   $("leerPegado").addEventListener("click", leerPegado);
   $("usarItems").addEventListener("click", usarItems);

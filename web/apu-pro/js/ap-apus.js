@@ -142,11 +142,15 @@ function conectar() {
     try {
       const json = validarBiblioteca(JSON.parse(await f.text()));
       if (!insumos.size && !confirm("La base de insumos está vacía: los APU quedarán sin precios hasta que la cargues desde el Tablero. ¿Continuar?")) return;
-      if (!confirm(`Se cargarán ${json.apus.length} APU. ¿Continuar?`)) return;
+      const existe = (a) => apus.some((x) => x.codigo === a.codigo);
+      const aActualizar = json.actualizar === true ? json.apus.filter(existe) : [];
+      if (!confirm(aActualizar.length
+        ? `Se actualizarán ${aActualizar.length} APU existentes (${aActualizar.map((a) => a.codigo).slice(0, 6).join(", ")}${aActualizar.length > 6 ? "…" : ""})${json.campos?.length ? `, solo en: ${json.campos.join(", ")}` : ""}. La versión anterior queda en el historial. ¿Continuar?`
+        : `Se cargarán ${json.apus.length} APU. ¿Continuar?`)) return;
       btn.disabled = true;
       const r = await importarBiblioteca(json, ctx.user, { existentes: new Set(apus.map((a) => a.codigo)), progreso: (h, n) => { progreso.textContent = `Guardando APU: ${h} de ${n}…`; } });
       progreso.textContent = "";
-      mostrarAlerta(alerta, `Biblioteca cargada: ${r.apus} APU${r.omitidos ? ` (${r.omitidos} ya existían)` : ""}.`, "success");
+      mostrarAlerta(alerta, r.actualizados ? `Se actualizaron ${r.actualizados} APU${r.apus ? ` y se cargaron ${r.apus} nuevos` : ""}.` : `Biblioteca cargada: ${r.apus} APU${r.omitidos ? ` (${r.omitidos} ya existían)` : ""}.`, "success");
       await cargar();
     } catch (err) { mostrarAlerta(alerta, errorAmigable(err)); } finally { btn.disabled = false; }
   });

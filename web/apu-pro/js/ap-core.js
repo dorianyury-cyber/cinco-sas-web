@@ -221,12 +221,27 @@ export async function eliminarApu(codigo) {
 export function validarBiblioteca(json) {
   if (!json || json.formato !== "apupro-biblioteca") throw new Error("El archivo no es una biblioteca de APU de APU PRO.");
   if (!Array.isArray(json.apus) || !json.apus.length) throw new Error("El archivo no trae APU.");
-  for (const a of json.apus) if (!a.codigo || !a.nombre || !a.lineas) throw new Error(`APU incompleto en el archivo: ${JSON.stringify(a).slice(0, 80)}`);
+  // Archivo de corrección («actualizar» con «campos»): solo trae el código y los campos que cambian.
+  const parcial = json.actualizar === true && Array.isArray(json.campos) && json.campos.length;
+  for (const a of json.apus) if (!a.codigo || (!parcial && (!a.nombre || !a.lineas))) throw new Error(`APU incompleto en el archivo: ${JSON.stringify(a).slice(0, 80)}`);
   return json;
 }
+// Carga APU nuevos; los que ya existen se omiten, salvo que el archivo diga «actualizar»: entonces
+// se actualizan (solo los «campos» indicados, si los trae) y queda la versión anterior en el historial.
 export async function importarBiblioteca(json, user, { existentes = new Set(), progreso = () => {} } = {}) {
   validarBiblioteca(json);
-  const nuevos = json.apus.filter((a) => !existentes.has(a.codigo));
+  let actualizados = 0;
+  if (json.actualizar === true) {
+    for (const a of json.apus.filter((x) => existentes.has(x.codigo))) {
+      const actual = await leerApu(a.codigo);
+      if (!actual) continue;
+      const cambios = Array.isArray(json.campos) && json.campos.length ? Object.fromEntries(json.campos.filter((c) => c in a).map((c) => [c, a[c]])) : a;
+      const { id: _, creadoEn, actualizadoEn, ...base } = actual;
+      await guardarApu({ ...base, ...cambios }, user, { nota: json.nota || "Actualizado desde archivo" });
+      actualizados++;
+    }
+  }
+  const nuevos = json.apus.filter((a) => !existentes.has(a.codigo) && a.lineas);
   for (let i = 0; i < nuevos.length; i += 200) {
     const lote = writeBatch(db);
     for (const a of nuevos.slice(i, i + 200)) {
@@ -238,7 +253,7 @@ export async function importarBiblioteca(json, user, { existentes = new Set(), p
     progreso(Math.min(i + 200, nuevos.length), nuevos.length);
   }
   if (json.validacion) await guardarSerie("validacionApu", { resumen: json.validacion.map(({ detalle, ...v }) => v), generado: json.generado }, user);
-  return { apus: nuevos.length, omitidos: json.apus.length - nuevos.length };
+  return { apus: nuevos.length, actualizados, omitidos: json.apus.length - nuevos.length - actualizados };
 }
 
 // ---------------------------------------------------------------- proyectos (presupuestos)
