@@ -410,7 +410,7 @@ export function revisar(rev, { precioApu = () => null, apus = [], precioInsumo =
 
   const resApus = apus.length ? revisarApus(rev, apus, { F, items, valor, valorFinal, agregar, precioInsumo }) : null;
 
-  return { F, sumaItems, comp, total, declarado, valorFinal, capitulos, verificaciones: V, porItem, pareto, comparados, vExceso, apus: resApus, baseSugerida };
+  return { F, sumaItems, comp, total, declarado, valorFinal, capitulos, verificaciones: V, porItem, pareto, comparados, vExceso, apus: resApus, baseSugerida: baseSugerida || resApus?.baseSugerida || null };
 }
 
 // Lo que dicen los APU del oferente sobre la oferta: qué incluyen los valores del presupuesto
@@ -471,7 +471,13 @@ function revisarApus(rev, apus, { F, items, valor, valorFinal, agregar, precioIn
   const huerfanos = apus.filter((a) => !usados.has(a));
   const qty = (a) => cantDe.get(a) || 0;
 
-  if (difieren.length) agregar({ clave: "apuPrecio", titulo: "Precio del presupuesto distinto al de su APU", estado: "hallazgo", sev: Math.abs(vDif) > valorFinal * 0.005 ? "Mayor" : "Menor", tema: "Consistencia",
+  // Si la mayoría de los precios coincide con otra columna de los APU (por ejemplo, el precio
+  // final cuando se registró «costo directo»), el error es del registro, no de la oferta.
+  const deducida = datosDesdeApus(items, apus).base;
+  const baseSugerida = deducida && deducida !== (rev.base || "cd") && difieren.length > vinculos.length * 0.5 ? deducida : null;
+  if (baseSugerida) agregar({ clave: "apuPrecio", titulo: "Revisa qué incluyen los valores de los ítems", estado: "info",
+    texto: `Los valores unitarios del presupuesto coinciden con el «${BASES[baseSugerida].split(" (")[0]}» de sus APU, no con el «${BASES[rev.base || "cd"].split(" (")[0]}» registrado. Corrígelo en «Datos, AIU e IVA» para comparar bien.` });
+  else if (difieren.length) agregar({ clave: "apuPrecio", titulo: "Precio del presupuesto distinto al de su APU", estado: "hallazgo", sev: Math.abs(vDif) > valorFinal * 0.005 ? "Mayor" : "Menor", tema: "Consistencia",
     texto: `En ${difieren.length} ítem(s) el valor unitario del presupuesto no coincide con el precio de su APU (${lista(difieren)}). La diferencia neta es de ${pesosTxt(vDif)} en el valor final (positiva: el presupuesto cobra más que el APU).`,
     itemsRef: difieren, impacto: vDif, accion: "Pedir al oferente que concilie el presupuesto con los APU; prevalece el menor valor." });
   else if (vinculos.length) agregar({ clave: "apuPrecio", titulo: "Presupuesto y APU", estado: "ok", texto: `Los ${vinculos.length} ítems con APU tienen el mismo precio en el presupuesto y en su análisis.` });
@@ -574,7 +580,7 @@ function revisarApus(rev, apus, { F, items, valor, valorFinal, agregar, precioIn
   for (const v of vinculos) { const r = (v.apu.secciones.MO || []).find((x) => Number(x.r) > 0)?.r || v.apu.rend; const it = items.find((x) => x.id === v.id); if (r > 0 && it?.cant) dias += it.cant / r; }
   if (dias > 0) agregar({ clave: "diasCuadrilla", titulo: "Plazo según los rendimientos", estado: "info", texto: `Los rendimientos de los APU suman unos ${Math.round(dias)} días-cuadrilla: con el plazo de la obra se puede estimar cuántas cuadrillas simultáneas exige.` });
 
-  return { vinculos, sinApu, huerfanos, malos, insumos: listaIns, comparadosIns, dias };
+  return { vinculos, sinApu, huerfanos, malos, insumos: listaIns, comparadosIns, dias, baseSugerida };
 }
 
 // ---------------------------------------------------------------- hallazgos consolidados
