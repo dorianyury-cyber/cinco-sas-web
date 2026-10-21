@@ -2172,3 +2172,9 @@ body.app-control details.control-nuevo { scroll-margin-top: calc(var(--alto-cabe
    la sección — antes los h3 quedaban blanco sobre blanco. */
 .section-dark .card h3 { color: var(--text); }
 .section-dark .card p { color: var(--text-muted); }
+
+/* Ofertas: casillas de «Traer de APU PRO» */
+form.modal-form-grid label.apu-check { display: flex; align-items: center; gap: 8px; font-size: 12.5px; }
+
+/* Ofertas: resumen de «Traer de APU PRO» */
+#apuResumen { margin-top: 12px; }

@@ -12,7 +12,7 @@ import { MODULOS, nombreCapitulo, textoOpcion } from "./ip-modulos.js";
 import { GUIAS } from "./ip-guias.js";
 import { anotarEnLote, diferencias, identificar, refHistorial, fechaHora, ACCIONES } from "./ip-historial.js";
 import { configurarImportacion } from "./ip-importar.js";
-import { configurarPropuesta } from "./ip-presupuesto.js";
+import { configurarPropuesta, configurarApuPro } from "./ip-presupuesto.js";
 import { htmlCampo, leerFormulario, frentesContrato, controlFotos, controlDocumentos } from "./ip-formulario.js";
 const controlFotosVacio = () => ({ archivo: () => null, fotos: () => ({ conservadas: [], nuevas: [] }), camposFotos: () => [] });
 import { mostrarLibro, mostrarTabla } from "./ip-visor.js";
@@ -431,6 +431,7 @@ function iniciarModulo({ user, perfil, contrato, puede }) {
   // Importación desde Excel (plantilla, vista previa y guardado con historial).
   configurarImportacion({ mod, contrato, ctx, user, perfil, coleccionRef, cap, frentesContrato: frentesDelContrato, titulo: tituloModulo });
   if (mod.id === "items" && puede.registrar) configurarPropuesta({ mod, contrato, ctx, user, perfil, coleccionRef, frentes: frentesDelContrato, titulo: tituloModulo });
+  if (mod.id === "items" && puede.registrar) configurarApuPro({ mod, contrato, ctx, user, perfil, coleccionRef, frentes: frentesDelContrato, titulo: tituloModulo });
 
   // ---------------------------------------------------------- plantilla
   // Módulos con lista base (ej. requisitos del acta de inicio): agrega de

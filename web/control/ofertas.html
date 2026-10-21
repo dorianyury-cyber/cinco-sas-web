@@ -94,6 +94,7 @@
           <div id="itemsEditor" class="control-items-editor"></div>
           <div class="control-tabla-botones">
             <button type="button" class="control-btn-mini" id="agregarItemBtn">+ Ítem</button>
+            <button type="button" class="control-btn-mini" id="traerApuBtn" title="Carga los ítems y el AIU de un presupuesto elaborado en APU PRO">📐 Traer de APU PRO</button>
           </div>
 
           <div id="aiuBox" class="control-aiu-box oculto">
@@ -199,6 +200,31 @@
           </div>
           <div class="visor-ofertas-pdf" id="visorOfertasPdf"></div>
         </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- Traer un presupuesto de APU PRO a la cotización de la oferta. -->
+  <div class="modal-backdrop" id="apuBackdrop">
+    <div class="modal modal-ancho">
+      <h2>Traer presupuesto de APU PRO</h2>
+      <form class="modal-form-grid" id="apuForm">
+        <div class="campo-ancho"><label for="apuProyecto">Presupuesto</label><select id="apuProyecto"></select></div>
+        <div class="campo-ancho"><label for="apuModo">Cómo pasarlo a la cotización</label>
+          <select id="apuModo">
+            <option value="items">Ítem por ítem (cantidad y costo directo unitario de cada APU)</option>
+            <option value="capitulos">Un ítem por capítulo (global)</option>
+            <option value="global">Un solo ítem con el costo directo total (global)</option>
+          </select></div>
+        <div class="campo-ancho oculto" id="apuSitioCampo"><label for="apuSitio">Sitio</label><select id="apuSitio"></select></div>
+        <div class="campo-ancho"><label class="apu-check"><input type="checkbox" id="apuAiu" checked> Usar el AIU y el IVA del presupuesto (oferta tipo obra)</label></div>
+        <div class="campo-ancho"><label class="apu-check"><input type="checkbox" id="apuReemplazar" checked> Reemplazar los ítems que ya tiene la cotización</label></div>
+      </form>
+      <p class="text-muted control-informes-ayuda" id="apuResumen"></p>
+      <div class="form-alert" id="apuAlerta"></div>
+      <div class="control-tabla-botones">
+        <button type="button" class="btn" id="apuTraerBtn" disabled>Traer a la cotización</button>
+        <button type="button" class="control-btn-mini" id="apuCerrarBtn">Cancelar</button>
       </div>
     </div>
   </div>

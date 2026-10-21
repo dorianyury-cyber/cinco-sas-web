@@ -7,7 +7,7 @@
 // frente «SE Seboruco»); las demás no se importan.
 
 import { doc, writeBatch, serverTimestamp } from "https://www.gstatic.com/firebasejs/10.7.1/firebase-firestore.js";
-import { db, moneda, errorAmigable } from "./ip-core.js";
+import { db, moneda, esc, errorAmigable } from "./ip-core.js";
 import { anotarEnLote, diferencias, identificar } from "./ip-historial.js";
 import { mostrarTabla } from "./ip-visor.js";
 
@@ -138,44 +138,139 @@ export function configurarPropuesta({ mod, contrato, ctx, user, perfil, coleccio
         columnas: ["Hoja", "Frente del contrato", "Ítems", "Valor (costo directo)", "Ítems donde cantidad × precio ≠ total"],
         filas: hojas.map((h) => [h.nombre, h.frente || "No se importa (no coincide con un frente)", String(h.items.length), moneda(h.valor), h.inconsistencias.length ? h.inconsistencias.map((x) => `${x.codigo} (${moneda(x.diferencia)})`).join(", ") : "—"]),
         marcar: (f) => (f[1].startsWith("No se importa") ? "ip-visor-existente" : ""),
-        accion: validos.length ? { texto: `Importar ${validos.length} ítem(s)`, fn: () => guardar(validos, existentes) } : null
+        accion: validos.length ? { texto: `Importar ${validos.length} ítem(s)`, fn: () => guardarItems({ items: validos, existentes, origen: "Propuesta del contratista", btn, mod, contrato, user, perfil, coleccionRef, titulo }) } : null
       });
     } catch (err) {
       alert(errorAmigable(err));
     }
   });
+}
 
-  async function guardar(items, existentes) {
-    btn.disabled = true;
-    const textoBtn = btn.textContent;
+// Presupuesto contractual desde APU PRO: cada sitio del presupuesto se asigna a un frente del
+// contrato y sus ítems (costo directo unitario y cantidad del sitio) se cargan o actualizan
+// con la misma clave proyecto|código que la propuesta del contratista.
+const BLOQUES = ["Suministro de equipos", "Montaje y obra eléctrica", "Obra civil", "Otro"];
+function bloqueDeCapitulo(nombre) {
+  const n = norm(nombre);
+  if (/obra civil|civil|excavaci|concreto|cimentaci|adecuaci/.test(n)) return "Obra civil";
+  if (/^suministro|equipos?\b|transformador|celda|tablero/.test(n) && !/montaje|instalaci/.test(n)) return "Suministro de equipos";
+  return "Montaje y obra eléctrica";
+}
+export function configurarApuPro({ mod, contrato, ctx, user, perfil, coleccionRef, frentes, titulo }) {
+  const ref = document.getElementById("ipImportarBtn");
+  if (!ref) return;
+  const btn = document.createElement("button");
+  btn.type = "button";
+  btn.className = "btn secondary ip-btn-excel";
+  btn.textContent = "📐 Traer de APU PRO";
+  btn.title = "Carga como presupuesto contratado un presupuesto elaborado en APU PRO (costo directo por ítem y cantidades por sitio)";
+  ref.after(btn);
+  let apu = null;
+  btn.addEventListener("click", async () => {
     try {
-      for (let i = 0; i < items.length; i += 200) {
-        btn.textContent = `Importando ${Math.min(i + 200, items.length)} de ${items.length}…`;
-        const lote = writeBatch(db);
-        const base = { user, perfil, modulo: mod.id, moduloLabel: titulo };
-        items.slice(i, i + 200).forEach((it) => {
-          const previo = existentes.get(`${norm(it.proyecto)}|${it.codigo}`);
-          const datos = { ...it, actualizadoPor: perfil.nombre || user.email, actualizadoEn: serverTimestamp() };
-          if (previo) {
-            const cambios = diferencias(mod.campos, previo, datos);
-            if (!cambios.length) return;
-            lote.update(doc(coleccionRef, previo.id), datos);
-            anotarEnLote(lote, contrato.id, { ...base, registroId: previo.id, accion: "editar", resumen: `(Propuesta del contratista) ${identificar(mod, { ...previo, ...datos })}`, cambios });
-          } else {
-            const nuevo = doc(coleccionRef);
-            lote.set(nuevo, { ...datos, creadoPor: perfil.nombre || user.email, creadoEn: serverTimestamp() });
-            anotarEnLote(lote, contrato.id, { ...base, registroId: nuevo.id, accion: "crear", resumen: `(Propuesta del contratista) ${identificar(mod, datos)}`, cambios: [] });
-          }
-        });
-        await lote.commit();
-      }
-      alert(`Listo: ${items.length} ítem(s) importados o actualizados. Ahora agrúpalos en actividades de la curva S con «🔗 Agrupar ítems en actividades» (arriba de la tabla).`);
+      apu ||= await import("../../apu-pro/js/ap-exportar.js");
+      const lista = await apu.listarPresupuestosApu(db);
+      if (!lista.length) { alert("No hay presupuestos en APU PRO."); return; }
+      abrir(lista);
     } catch (err) {
-      alert(errorAmigable(err));
-    } finally {
-      btn.disabled = false;
-      btn.textContent = textoBtn;
+      alert(apu ? apu.mensajePermiso(err) : errorAmigable(err));
     }
+  });
+
+  function abrir(lista) {
+    const fondo = document.createElement("div");
+    fondo.className = "modal-backdrop open ip-visor-fondo";
+    fondo.innerHTML = `<div class="modal ip-modal-ancho" role="dialog" aria-label="Traer presupuesto de APU PRO">
+      <h2>Traer presupuesto de APU PRO</h2>
+      <div class="ip-form-grid">
+        <div class="ip-campo ip-campo-ancho"><label for="ipApuProyecto">Presupuesto</label><select id="ipApuProyecto">${lista.map((p) => `<option value="${esc(p.id)}">${esc(`${p.codigo} — ${p.nombre}`)}</option>`).join("")}</select></div>
+        <div class="ip-campo ip-campo-ancho" id="ipApuSitios"></div>
+      </div>
+      <p class="text-muted ip-visor-nota" id="ipApuResumen">Calculando el presupuesto…</p>
+      <div class="ip-form-acciones"><button type="button" class="btn" id="ipApuImportar" disabled>Importar</button><button type="button" class="btn secondary" id="ipApuCancelar">Cancelar</button></div>
+    </div>`;
+    document.body.appendChild(fondo);
+    const $m = (id) => fondo.querySelector(`#${id}`);
+    const cerrar = () => fondo.remove();
+    fondo.addEventListener("click", (e) => { if (e.target === fondo) cerrar(); });
+    $m("ipApuCancelar").addEventListener("click", cerrar);
+    let datos = null;
+    const opcionesFrente = (sel) => `<option value="">— No importar —</option>${frentes().map((f) => `<option ${f === sel ? "selected" : ""}>${esc(f)}</option>`).join("")}`;
+    const items = () => {
+      if (!datos) return [];
+      const asign = [...fondo.querySelectorAll("[data-sitio]")].map((s) => ({ sitio: s.dataset.sitio, frente: s.value })).filter((x) => x.frente);
+      return asign.flatMap(({ sitio, frente }) => datos.filas.filter((f) => (f.cantidades[sitio] || 0) > 0).map((f) => ({
+        proyecto: frente, codigo: f.codigo, bloque: bloqueDeCapitulo(f.capitulo), capitulo: f.capitulo.slice(0, 160), descripcion: f.descripcion.slice(0, 1500),
+        unidad: f.unidad, cantidad: Math.round(f.cantidades[sitio] * 10000) / 10000, valorUnitario: Math.round(f.valorUnitario * 100) / 100
+      })));
+    };
+    const resumen = () => {
+      const its = items();
+      const existentes = new Set(ctx.registros.map((r) => `${norm(r.proyecto)}|${r.codigo}`));
+      const nuevos = its.filter((it) => !existentes.has(`${norm(it.proyecto)}|${it.codigo}`)).length;
+      $m("ipApuResumen").textContent = `${its.length} ítem(s) por importar (${nuevos} nuevos, ${its.length - nuevos} actualizan cantidad, valor y descripción, sin tocar lo ejecutado ni la actividad asignada) · costo directo ${moneda(its.reduce((s, it) => s + it.cantidad * it.valorUnitario, 0))}. Valores = costo directo (sin AIU ni IVA), con los precios del presupuesto${datos.proyecto.fechaPrecios ? " congelados" : " vigentes en la base de APU PRO"}.${datos.avisos.length ? ` Atención: el presupuesto tiene ${datos.avisos.length} aviso(s) en APU PRO.` : ""}`;
+      $m("ipApuImportar").disabled = !its.length;
+      $m("ipApuImportar").textContent = `Importar ${its.length} ítem(s)`;
+    };
+    const cargar = async () => {
+      datos = null;
+      $m("ipApuImportar").disabled = true;
+      $m("ipApuResumen").textContent = "Calculando el presupuesto…";
+      try {
+        datos = await apu.presupuestoApu(db, $m("ipApuProyecto").value);
+        const fs = frentes();
+        const unico = datos.sitios.length === 1;
+        // Frente sugerido: el que coincide con el nombre del sitio (o el único frente del contrato).
+        const sugerido = (s) => fs.find((f) => norm(f).includes(norm(s.nombre)) || norm(s.nombre).includes(norm(f).replace(/^(se|s\/e)\s+/, ""))) || (unico && fs.length === 1 ? fs[0] : "");
+        $m("ipApuSitios").innerHTML = `<label>Frente del contrato para cada sitio del presupuesto</label>` + datos.sitios.map((s) => `<div class="ip-apu-sitio"><span>${esc(s.nombre)}</span><select data-sitio="${esc(s.id)}">${opcionesFrente(sugerido(s))}</select></div>`).join("");
+        $m("ipApuSitios").querySelectorAll("select").forEach((s) => s.addEventListener("change", resumen));
+        resumen();
+      } catch (err) {
+        $m("ipApuResumen").textContent = apu.mensajePermiso(err);
+      }
+    };
+    $m("ipApuProyecto").addEventListener("change", cargar);
+    $m("ipApuImportar").addEventListener("click", async () => {
+      const its = items();
+      if (!its.length) return;
+      const existentes = new Map(ctx.registros.map((r) => [`${norm(r.proyecto)}|${r.codigo}`, r]));
+      cerrar();
+      await guardarItems({ items: its, existentes, origen: `APU PRO ${datos.proyecto.codigo}`, btn, mod, contrato, user, perfil, coleccionRef, titulo });
+    });
+    cargar();
   }
 }
 
+// Guarda o actualiza los ítems (clave proyecto|código) en lotes, con su registro en el historial.
+async function guardarItems({ items, existentes, origen, btn, mod, contrato, user, perfil, coleccionRef, titulo }) {
+  btn.disabled = true;
+  const textoBtn = btn.textContent;
+  try {
+    for (let i = 0; i < items.length; i += 200) {
+      btn.textContent = `Importando ${Math.min(i + 200, items.length)} de ${items.length}…`;
+      const lote = writeBatch(db);
+      const base = { user, perfil, modulo: mod.id, moduloLabel: titulo };
+      items.slice(i, i + 200).forEach((it) => {
+        const previo = existentes.get(`${norm(it.proyecto)}|${it.codigo}`);
+        const datos = { ...it, actualizadoPor: perfil.nombre || user.email, actualizadoEn: serverTimestamp() };
+        if (previo) {
+          const cambios = diferencias(mod.campos, previo, datos);
+          if (!cambios.length) return;
+          lote.update(doc(coleccionRef, previo.id), datos);
+          anotarEnLote(lote, contrato.id, { ...base, registroId: previo.id, accion: "editar", resumen: `(${origen}) ${identificar(mod, { ...previo, ...datos })}`, cambios });
+        } else {
+          const nuevo = doc(coleccionRef);
+          lote.set(nuevo, { ...datos, creadoPor: perfil.nombre || user.email, creadoEn: serverTimestamp() });
+          anotarEnLote(lote, contrato.id, { ...base, registroId: nuevo.id, accion: "crear", resumen: `(${origen}) ${identificar(mod, datos)}`, cambios: [] });
+        }
+      });
+      await lote.commit();
+    }
+    alert(`Listo: ${items.length} ítem(s) importados o actualizados. Ahora agrúpalos en actividades de la curva S con «🔗 Agrupar ítems en actividades» (arriba de la tabla).`);
+  } catch (err) {
+    alert(errorAmigable(err));
+  } finally {
+    btn.disabled = false;
+    btn.textContent = textoBtn;
+  }
+}

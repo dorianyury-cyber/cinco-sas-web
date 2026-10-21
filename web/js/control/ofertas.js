@@ -807,6 +807,88 @@ function renderItemsEditor() {
 
 document.getElementById("agregarItemBtn").addEventListener("click", () => { items.push(nuevoItem()); renderItemsEditor(); actualizarResumen(); });
 selectTipo.addEventListener("change", actualizarResumen);
+
+// ---- traer un presupuesto de APU PRO a la cotización ----
+// Los valores unitarios son costo directo; el AIU y el IVA (sobre la utilidad, regla de las
+// ofertas de obra) se copian del presupuesto si se marca la casilla.
+let apuMod = null, apuDatos = null;
+const apuEl = (id) => document.getElementById(id);
+function cerrarApu() { apuEl("apuBackdrop").classList.remove("open"); }
+function alertaApu(texto, tipo = "error") { const a = apuEl("apuAlerta"); a.textContent = texto; a.className = `form-alert ${texto ? tipo : ""}`; }
+function itemsDesdeApu() {
+  const { proyecto, calc, filas, sitios } = apuDatos;
+  const modo = apuEl("apuModo").value, sitio = apuEl("apuSitio").value;
+  const cant = (f) => (sitio ? f.cantidades[sitio] || 0 : f.cantidadTotal);
+  if (modo === "items") return filas.filter((f) => cant(f) > 0).map((f) => ({ descripcion: f.descripcion.slice(0, 300), unidad: f.unidad, cantidad: Math.round(cant(f) * 10000) / 10000, valorUnitario: Math.round(f.valorUnitario) }));
+  const cd = sitio ? calc.porSitio[sitio].costoDirecto : calc.costoDirecto;
+  const nombreSitio = sitio ? ` — ${sitios.find((s) => s.id === sitio)?.nombre}` : "";
+  if (modo === "global") return [{ descripcion: `${proyecto.nombre}${nombreSitio} (según presupuesto ${proyecto.codigo})`.slice(0, 300), unidad: "Gl", cantidad: 1, valorUnitario: Math.round(cd) }];
+  return calc.capitulos.map((c) => ({ descripcion: `${c.nombre}${nombreSitio}`.slice(0, 300), unidad: "Gl", cantidad: 1, valorUnitario: Math.round(sitio ? c.subtotales[sitio] : c.subtotal) })).filter((it) => it.valorUnitario > 0);
+}
+function resumenApu() {
+  if (!apuDatos) return;
+  const its = itemsDesdeApu();
+  const cd = its.reduce((s, it) => s + it.cantidad * it.valorUnitario, 0);
+  const p = apuDatos.proyecto, pct = (v) => Math.round((Number(v) || 0) * 10000) / 100;
+  const avisoIva = p.regimenIva === "total" ? " El presupuesto liquida el IVA sobre el subtotal; en la oferta de obra se liquida sobre la utilidad, por eso el total puede cambiar." : "";
+  const avisos = apuDatos.avisos.length ? ` Atención: el presupuesto tiene ${apuDatos.avisos.length} aviso(s) (insumos sin precio o cantidades no válidas); revísalo en APU PRO.` : "";
+  apuEl("apuResumen").textContent = `${its.length} ítem(s) · costo directo ${formatoMoneda.format(cd)} · AIU ${pct(p.aiu?.a)} / ${pct(p.aiu?.i)} / ${pct(p.aiu?.u)} % · valor total en APU PRO ${formatoMoneda.format(apuDatos.calc.total)}.${avisoIva}${avisos}`;
+}
+async function cargarPresupuestoApu() {
+  apuDatos = null;
+  apuEl("apuTraerBtn").disabled = true;
+  apuEl("apuResumen").textContent = "Calculando el presupuesto…";
+  alertaApu("");
+  try {
+    apuDatos = await apuMod.presupuestoApu(db, apuEl("apuProyecto").value);
+    const sitios = apuDatos.sitios;
+    apuEl("apuSitioCampo").classList.toggle("oculto", sitios.length < 2);
+    apuEl("apuSitio").innerHTML = `<option value="">Todos los sitios (cantidades sumadas)</option>` + sitios.map((s) => `<option value="${escapeHtml(s.id)}">${escapeHtml(s.nombre)}</option>`).join("");
+    apuEl("apuTraerBtn").disabled = false;
+    resumenApu();
+  } catch (err) {
+    apuEl("apuResumen").textContent = "";
+    alertaApu(apuMod.mensajePermiso(err));
+  }
+}
+document.getElementById("traerApuBtn").addEventListener("click", async () => {
+  apuEl("apuBackdrop").classList.add("open");
+  alertaApu("");
+  apuEl("apuResumen").textContent = "Cargando presupuestos…";
+  apuEl("apuTraerBtn").disabled = true;
+  try {
+    apuMod ||= await import("../../apu-pro/js/ap-exportar.js");
+    const lista = await apuMod.listarPresupuestosApu(db);
+    if (!lista.length) { apuEl("apuResumen").textContent = ""; alertaApu("No hay presupuestos en APU PRO."); return; }
+    apuEl("apuProyecto").innerHTML = lista.map((p) => `<option value="${escapeHtml(p.id)}">${escapeHtml(`${p.codigo} — ${p.nombre}${p.cliente ? ` (${p.cliente})` : ""}`)}</option>`).join("");
+    await cargarPresupuestoApu();
+  } catch (err) {
+    apuEl("apuResumen").textContent = "";
+    alertaApu(apuMod ? apuMod.mensajePermiso(err) : String(err?.message || err));
+  }
+});
+apuEl("apuProyecto").addEventListener("change", cargarPresupuestoApu);
+["apuModo", "apuSitio"].forEach((id) => apuEl(id).addEventListener("change", resumenApu));
+apuEl("apuCerrarBtn").addEventListener("click", cerrarApu);
+apuEl("apuBackdrop").addEventListener("click", (e) => { if (e.target === apuEl("apuBackdrop")) cerrarApu(); });
+apuEl("apuTraerBtn").addEventListener("click", () => {
+  const nuevos = itemsDesdeApu();
+  if (!nuevos.length) { alertaApu("El presupuesto no tiene ítems con cantidad."); return; }
+  if (apuEl("apuReemplazar").checked) items = nuevos;
+  else items.push(...nuevos);
+  if (apuEl("apuAiu").checked) {
+    const p = apuDatos.proyecto, pct = (v) => Math.round((Number(v) || 0) * 10000) / 100;
+    selectTipo.value = "obra";
+    administracionInput.value = pct(p.aiu?.a);
+    imprevistosInput.value = pct(p.aiu?.i);
+    utilidadInput.value = pct(p.aiu?.u);
+    ivaInput.value = pct(p.iva ?? 0.19);
+  }
+  renderItemsEditor();
+  actualizarResumen();
+  cerrarApu();
+});
+
 [administracionInput, imprevistosInput, utilidadInput, ivaInput].forEach((el) => el.addEventListener("input", actualizarResumen));
 aplicaPolizaCheck.addEventListener("change", () => {
   detallePolizaTextarea.classList.toggle("oculto", !aplicaPolizaCheck.checked);
