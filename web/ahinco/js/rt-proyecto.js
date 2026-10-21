@@ -1,7 +1,7 @@
 // Página del proyecto, organizada en secciones del menú lateral: Resumen,
 // Datos del proyecto, Literales a) a x), Hallazgos (o pendientes) y
 // Documentos. La sección visible sale del #hash de la dirección.
-import { iniciarPagina, leerProyecto, leerCalculos, actualizarProyecto, eliminarProyecto, calcularProyecto, estadoModulo, clavesDe, tituloCalculo, exportarProyecto, ORDEN_MODULOS, esc, mostrarAlerta, limpiarAlerta, errorAmigable, listarVersiones, guardarVersion, restaurarVersion, fechaCorta } from "./rt-core.js";
+import { iniciarPagina, leerProyecto, leerCalculos, actualizarProyecto, eliminarProyecto, calcularProyecto, estadoModulo, clavesDe, tituloCalculo, exportarProyecto, validarImportacion, ORDEN_MODULOS, esc, mostrarAlerta, limpiarAlerta, errorAmigable, listarVersiones, guardarVersion, restaurarVersion, fechaCorta } from "./rt-core.js";
 import { compararVersiones } from "./rt-versiones.js";
 import { MODULOS, AREAS } from "./rt-modulos.js";
 import { LITERALES, FUENTE_LITERALES, estadoLiteral, normalizarTipoDiseno } from "./rt-literales.js";
@@ -252,6 +252,21 @@ function iniciar(proyecto, guardados) {
       mostrarAlerta(alerta, `Versión V${n} guardada.`, "success");
       await pintarVersiones();
     } catch (err) { mostrarAlerta(alerta, errorAmigable(err)); } finally { btn.disabled = false; }
+  });
+  document.getElementById("actualizarBtn").addEventListener("click", () => document.getElementById("actualizarArchivo").click());
+  document.getElementById("actualizarArchivo").addEventListener("change", async (e) => {
+    const f = e.target.files[0];
+    e.target.value = "";
+    if (!f) return;
+    limpiarAlerta(alerta);
+    try {
+      const json = JSON.parse(await f.text());
+      const nuevos = validarImportacion(json);
+      if (!confirm(`Se reemplazarán los datos y los ${Object.keys(guardados).length} cálculos actuales por los del archivo («${json.proyecto.nombre}», ${Object.keys(nuevos).length} cálculos). Antes se guarda una copia del estado actual como versión nueva. ¿Continuar?`)) return;
+      await guardarVersion(proyecto.id, { ...proyecto, literales }, guardados, ctx.user, "Copia automática antes de actualizar desde archivo", { calculos: Object.keys(guardados).length, hallazgos: hallazgos(proyecto, resultados).length });
+      await restaurarVersion(proyecto.id, { proyecto: json.proyecto, calculos: nuevos }, guardados, ctx.user);
+      location.reload();
+    } catch (err) { mostrarAlerta(alerta, errorAmigable(err)); }
   });
   document.getElementById("compararBtn").addEventListener("click", () => pintarComparacion(document.getElementById("compA").value, document.getElementById("compB").value));
   document.getElementById("listaVersiones").addEventListener("click", async (e) => {

@@ -112,6 +112,12 @@
             <div class="rt-version-nueva"><input id="notaVersion" type="text" maxlength="300" placeholder="Nota, por ejemplo «Rev. 1 — respuesta a hallazgos» o «Radicada al operador de red»"><button type="button" class="btn" id="guardarVersionBtn">Guardar versión</button></div>
           </div>
           <div class="card">
+            <h2>Actualizar con un archivo</h2>
+            <p class="text-muted">Para una nueva ronda: cargue un archivo de proyecto de AHÍNCO (.ahinco.json) con los datos y cálculos corregidos. Los datos y cálculos actuales se reemplazan y antes se guarda una copia como versión nueva, para poder compararlas.</p>
+            <input type="file" id="actualizarArchivo" accept=".json,application/json" class="hidden">
+            <button type="button" class="btn secondary" id="actualizarBtn">⬆ Actualizar desde archivo</button>
+          </div>
+          <div class="card">
             <h2>Comparar</h2>
             <p class="text-muted">Elija dos versiones (o una versión y el estado actual) para ver los hallazgos cerrados y nuevos y los datos que cambiaron.</p>
             <div class="rt-version-comparar"><label>Desde<select id="compA"></select></label><label>Hasta<select id="compB"></select></label><button type="button" class="btn secondary" id="compararBtn">Comparar</button></div>
