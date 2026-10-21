@@ -135,6 +135,7 @@ function conectar() {
   });
   const btn = $("bibliotecaBtn"), archivo = $("bibliotecaArchivo"), progreso = $("bibliotecaProgreso");
   btn.addEventListener("click", () => archivo.click());
+  $("importarBtn").addEventListener("click", () => archivo.click());
   archivo.addEventListener("change", async () => {
     const f = archivo.files[0];
     archivo.value = "";
