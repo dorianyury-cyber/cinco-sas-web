@@ -5,7 +5,7 @@ import { TIPOS, ORDEN_TIPOS } from "./ap-calculos.js";
 
 // activo: "tablero" | "parametros" | "insumos-MA" | "insumos-MO" | ...
 // conteos: { MA: n, MO: n, ... } para mostrar junto a cada tipo de insumo.
-export function pintarMenu(ctx, { activo = "", conteos = {}, apus } = {}) {
+export function pintarMenu(ctx, { activo = "", conteos = {}, apus, proyectos } = {}) {
   const aside = document.getElementById("sidebar");
   const item = (href, clave, icono, texto, extra = "") => `<a href="${href}" class="${activo === clave ? "active" : ""}"><span class="rt-nav-icono">${icono}</span>${esc(texto)}${extra}</a>`;
   const pronto = (icono, texto) => `<span class="ap-nav-pronto" title="Disponible en la siguiente fase"><span class="rt-nav-icono">${icono}</span>${esc(texto)}<small>Pronto</small></span>`;
@@ -16,7 +16,7 @@ export function pintarMenu(ctx, { activo = "", conteos = {}, apus } = {}) {
     <nav>
       ${item("inicio.html", "tablero", "◎", "Tablero")}
       <div class="rt-nav-titulo">Presupuestos</div>
-      ${pronto("📁", "Proyectos")}
+      ${item("proyectos.html", "proyectos", "📁", "Proyectos", proyectos !== undefined ? `<span class="rt-nav-cuenta">${proyectos}</span>` : "")}
       ${item("apus.html", "apus", "📚", "Biblioteca de APU", apus !== undefined ? `<span class="rt-nav-cuenta">${apus}</span>` : "")}
       <div class="rt-nav-titulo">Base de precios</div>
       ${ORDEN_TIPOS.map((t) => item(`insumos.html#${t}`, `insumos-${t}`, TIPOS[t].icono, TIPOS[t].nombre, conteos[t] !== undefined ? `<span class="rt-nav-cuenta">${conteos[t]}</span>` : "")).join("")}
@@ -47,7 +47,7 @@ export function pintarMenu(ctx, { activo = "", conteos = {}, apus } = {}) {
 export function marcarActivo(clave) {
   document.querySelectorAll("#sidebar nav a").forEach((a) => {
     const href = a.getAttribute("href") || "";
-    const k = href.startsWith("insumos.html#") ? `insumos-${href.split("#")[1]}` : href === "inicio.html" ? "tablero" : href === "parametros.html" ? "parametros" : href === "apus.html" ? "apus" : "";
+    const k = href.startsWith("insumos.html#") ? `insumos-${href.split("#")[1]}` : href === "inicio.html" ? "tablero" : href === "parametros.html" ? "parametros" : href === "apus.html" ? "apus" : href === "proyectos.html" ? "proyectos" : "";
     a.classList.toggle("active", k === clave);
   });
 }

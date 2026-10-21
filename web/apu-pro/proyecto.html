@@ -1,0 +1,110 @@
+<!doctype html>
+<html lang="es" class="ap-preparando">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<meta name="robots" content="noindex, nofollow">
+<title>Presupuesto — APU PRO</title>
+<link rel="icon" type="image/png" sizes="32x32" href="../assets/img/favicon-32.png">
+<link rel="stylesheet" href="../interventoria-pro/assets/ip.css">
+<link rel="stylesheet" href="../ahinco/assets/rt.css">
+<link rel="stylesheet" href="assets/ap.css">
+</head>
+<body>
+  <div class="app-shell">
+    <aside class="sidebar rt-sidebar" id="sidebar"></aside>
+    <main class="main rt-main">
+      <div class="rt-encabezado ap-proy-cabeza">
+        <div>
+          <a class="ap-volver" href="proyectos.html" id="volver">← Proyectos</a>
+          <h1 id="titulo">Presupuesto</h1>
+          <p class="text-muted" id="subtitulo"></p>
+        </div>
+        <div class="rt-acciones">
+          <span class="badge warn hidden" id="sucio">Cambios sin guardar</span>
+          <button type="button" class="btn" id="guardarBtn">💾 Guardar</button>
+          <a class="btn secondary" id="formatoBtn" href="#">🖨 Formato Cinco y Excel</a>
+          <button type="button" class="btn secondary" id="exportarBtn" title="Descargar el proyecto completo para pasarlo a otra persona o guardarlo">⬇ Exportar</button>
+        </div>
+      </div>
+      <div class="alert" id="alerta"></div>
+      <section class="card ap-resumen-apu" id="resumen"></section>
+      <nav class="ap-pestanas" id="pestanas">
+        <a href="#presupuesto" data-sec="presupuesto" class="ap-pestana">📋 Presupuesto</a>
+        <a href="#parametros" data-sec="parametros" class="ap-pestana">⚙ Datos, AIU y factor</a>
+        <a href="#precios" data-sec="precios" class="ap-pestana">💲 Precios</a>
+        <a href="#versiones" data-sec="versiones" class="ap-pestana">🕓 Versiones</a>
+      </nav>
+
+      <section data-panel="presupuesto">
+        <div id="capitulos"></div>
+        <div class="rt-acciones ap-agregar-cap"><button type="button" class="btn secondary ap-btn" id="agregarCap">＋ Agregar capítulo</button></div>
+        <div class="alert error hidden" id="avisos"></div>
+      </section>
+
+      <section data-panel="parametros" class="hidden">
+        <div class="card">
+          <h2>Datos del proyecto</h2>
+          <form class="rt-form-grid ap-form-apu" id="datosForm">
+            <div><label for="pCodigo">Código</label><input id="pCodigo"></div>
+            <div class="ap-ancho2"><label for="pNombre">Nombre</label><input id="pNombre"></div>
+            <div><label for="pTipo">Tipo</label><select id="pTipo"><option value="obra">Presupuesto de obra</option><option value="consultoria">Consultoría</option><option value="interventoria">Interventoría</option></select></div>
+            <div><label for="pCliente">Cliente</label><input id="pCliente"></div>
+            <div><label for="pUbicacion">Ubicación</label><input id="pUbicacion"></div>
+            <div class="ap-ancho2"><label for="pDescripcion">Descripción / alcance</label><input id="pDescripcion"></div>
+          </form>
+        </div>
+        <div class="ap-dos">
+          <div class="card">
+            <h2>AIU, IVA y cálculo</h2>
+            <form class="rt-form-grid" id="aiuForm">
+              <div><label for="pA">Administración (%)</label><input id="pA" inputmode="decimal"></div>
+              <div><label for="pI">Imprevistos (%)</label><input id="pI" inputmode="decimal"></div>
+              <div><label for="pU">Utilidad (%)</label><input id="pU" inputmode="decimal"></div>
+              <div><label for="pIva">IVA (%)</label><input id="pIva" inputmode="decimal"></div>
+              <div><label for="pRegimen">IVA se liquida</label><select id="pRegimen"><option value="utilidad">Sobre la utilidad (contrato con AIU)</option><option value="total">Sobre el subtotal (costo directo + AIU)</option></select></div>
+              <div><label for="pAnio">Parámetros del año</label><select id="pAnio"></select></div>
+              <div class="rt-ancho"><label for="pRedondeo">Redondeo de cada línea del APU</label><select id="pRedondeo"><option value="arriba">Hacia arriba al peso (como CSS 226)</option><option value="normal">Al peso más cercano (como la página anterior)</option></select></div>
+            </form>
+          </div>
+          <div class="card">
+            <h2>Factor de proyección de materiales</h2>
+            <p class="text-muted ap-nota">Se escoge para cada proyecto: multiplica el precio de los materiales para proyectar su valor cuando el proyecto se construirá más adelante (antes llamado «rentabilidad»). Debe quedar justificado; aparece en el presupuesto.</p>
+            <form class="rt-form-grid" id="factorForm">
+              <div><label for="pFactor">Factor</label><input id="pFactor" inputmode="decimal"></div>
+              <div class="rt-ancho"><label for="pJustif">Justificación</label><input id="pJustif" placeholder="Ej. Construcción prevista en 2028: IPP promedio de 3 años"></div>
+            </form>
+            <div class="ap-sugerencia" id="sugerencia"></div>
+          </div>
+        </div>
+        <div class="card">
+          <h2>Sitios</h2>
+          <p class="text-muted ap-nota">Cada sitio tiene su propia columna de cantidades y su total (por ejemplo una subestación por municipio).</p>
+          <div id="sitios"></div>
+          <div class="rt-acciones"><button type="button" class="btn secondary ap-btn" id="agregarSitio">＋ Agregar sitio</button></div>
+        </div>
+      </section>
+
+      <section data-panel="precios" class="hidden">
+        <div class="card">
+          <h2>Precios del proyecto</h2>
+          <div id="estadoPrecios"></div>
+          <div class="rt-acciones"><button type="button" class="btn ap-btn" id="congelar">🔒 Congelar precios ahora</button><button type="button" class="btn secondary ap-btn" id="liberar">🔓 Volver a precios vigentes de la base</button></div>
+          <div id="comparacion"></div>
+        </div>
+      </section>
+
+      <section data-panel="versiones" class="hidden">
+        <div class="card">
+          <h2>Versiones entregadas</h2>
+          <p class="text-muted ap-nota">Guarda una copia del presupuesto tal como se entrega (por ejemplo, a un cliente o en una oferta). Las versiones no se modifican.</p>
+          <div class="ap-guardar"><label for="vNota">Nota</label><input id="vNota" placeholder="Ej. Entregado al cliente con la oferta OF-2026-031"><div class="rt-acciones"><button type="button" class="btn ap-btn" id="guardarVersion">Guardar versión</button></div></div>
+          <div id="versiones"></div>
+        </div>
+      </section>
+    </main>
+  </div>
+  <datalist id="dlApus"></datalist>
+  <script type="module" src="js/ap-proyecto.js"></script>
+</body>
+</html>

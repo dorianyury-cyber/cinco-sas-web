@@ -74,7 +74,7 @@ function pintar() {
   $("titulo").textContent = `${T.icono} ${T.nombre}`;
   $("subtitulo").textContent = {
     MA: "Precios comerciales con IVA, con fecha, fuente y enlace. Al registrar un precio nuevo, el anterior queda en el historial.",
-    MO: "Cargos con su factor salarial. El jornal se calcula con los parámetros del año: factor × (salario mínimo + auxilio de transporte si el factor es 2 o menos) ÷ días hábiles, más el % prestacional.",
+    MO: "Cargos con su factor salarial. El jornal se calcula con los parámetros del año: (factor × salario mínimo + auxilio de transporte si el factor es 2 o menos) ÷ días hábiles, más el % prestacional.",
     EH: "Equipos y herramientas con valor mensual o valor de compra y vida útil; en el APU se prorratean por días hábiles y rendimiento.",
     ED: "Elementos de protección personal y dotación con su valor y vida útil; en el APU se reparten según el número de trabajadores.",
     TV: "Vehículos y maquinaria con valor mensual (o por unidad, como ton·km o m³) y viáticos."

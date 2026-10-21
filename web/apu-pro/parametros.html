@@ -22,7 +22,7 @@
 
       <section class="card">
         <div class="ap-vp-cabeza"><h2>Parámetros por año</h2><div class="rt-acciones"><button type="button" class="btn" id="nuevoAnio">＋ Agregar año</button></div></div>
-        <p class="text-muted ap-nota">Jornal = factor salarial × (salario mínimo + auxilio de transporte si el factor es 2 o menos) ÷ días hábiles; prestaciones = % prestacional × jornal.</p>
+        <p class="text-muted ap-nota">Jornal = (factor salarial × salario mínimo + auxilio de transporte si el factor es 2 o menos) ÷ días hábiles; prestaciones = % prestacional × jornal. El auxilio se suma una vez por trabajador, como lo establece la ley y como lo hacía la página anterior de Cinco; CSS 226 lo multiplicaba por el factor (se puede escoger por año).</p>
         <div id="tablaParametros"><p class="text-muted">Cargando…</p></div>
       </section>
 
@@ -56,6 +56,7 @@
       <div><label for="aAux">Auxilio de transporte ($)</label><input id="aAux" inputmode="decimal" required></div>
       <div><label for="aPrest">Prestaciones (%)</label><input id="aPrest" inputmode="decimal" required placeholder="60"></div>
       <div><label for="aDias">Días hábiles por mes</label><input id="aDias" type="number" min="1" max="31" required></div>
+      <div class="rt-ancho"><label for="aAuxModo">Auxilio de transporte en el jornal</label><select id="aAuxModo"><option value="fijo">Una vez por trabajador que gana hasta 2 salarios mínimos (ley)</option><option value="porFactor">Multiplicado por el factor salarial (como CSS 226)</option></select></div>
       <div class="rt-ancho"><label for="aFuente">Fuente</label><input id="aFuente" placeholder="Decreto del salario mínimo, política interna…"></div>
     </form>
     <div class="alert" id="anioDlgAlerta"></div>

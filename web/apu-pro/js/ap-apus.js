@@ -85,7 +85,8 @@ function pintarDetalle() {
     <div class="ap-vp-cabeza">
       <h2>${esc(a.codigo)} — ${esc(a.nombre)}</h2>
       <div class="rt-acciones">
-        <a class="btn" href="apu.html?c=${encodeURIComponent(a.codigo)}">✎ Editar</a>
+        <a class="btn" href="apu-formato.html?c=${encodeURIComponent(a.codigo)}">🖨 Formato Cinco</a>
+        <a class="btn secondary" href="apu.html?c=${encodeURIComponent(a.codigo)}">✎ Editar</a>
         <a class="btn secondary" href="apu.html?copiar=${encodeURIComponent(a.codigo)}">⧉ Duplicar</a>
         ${ctx.esAdmin ? '<button type="button" class="btn secondary ap-peligro" id="vpEliminar">Eliminar</button>' : ""}
       </div>

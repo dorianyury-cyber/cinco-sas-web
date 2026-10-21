@@ -1,0 +1,32 @@
+<!doctype html>
+<html lang="es" class="ap-preparando">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<meta name="robots" content="noindex, nofollow">
+<title>APU en formato Cinco — APU PRO</title>
+<link rel="icon" type="image/png" sizes="32x32" href="../assets/img/favicon-32.png">
+<link rel="stylesheet" href="../interventoria-pro/assets/ip.css">
+<link rel="stylesheet" href="../ahinco/assets/rt.css">
+<link rel="stylesheet" href="assets/ap.css">
+<link rel="stylesheet" href="assets/ap-formato.css">
+</head>
+<body class="cf-pagina">
+  <div class="cf-barra" id="barra">
+    <a class="ap-volver" href="apus.html" id="volver">← Biblioteca de APU</a>
+    <label>Parámetros <select id="fAnio"></select></label>
+    <label>Adm. % <input id="fA" inputmode="decimal" value="15"></label>
+    <label>Impr. % <input id="fI" inputmode="decimal" value="5"></label>
+    <label>Util. % <input id="fU" inputmode="decimal" value="5"></label>
+    <label>IVA <select id="fRegimen"><option value="utilidad">sobre la utilidad (AIU)</option><option value="total">sobre el subtotal</option></select></label>
+    <label>% <input id="fIva" inputmode="decimal" value="19"></label>
+    <span class="cf-espacio"></span>
+    <button type="button" class="btn secondary ap-btn" id="imprimir">🖨 Imprimir o guardar PDF</button>
+    <button type="button" class="btn ap-btn" id="excel">⬇ Descargar Excel</button>
+  </div>
+  <div class="alert" id="alerta"></div>
+  <main class="cf-contenedor" id="hoja"><p class="text-muted">Cargando…</p></main>
+  <script src="../js/vendor/exceljs.min.js"></script>
+  <script type="module" src="js/ap-formato-pagina.js"></script>
+</body>
+</html>

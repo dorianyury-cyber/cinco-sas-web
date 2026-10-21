@@ -28,9 +28,9 @@ function pintarParametros() {
   const aviso = parametros.some((p) => p.anio === anio) ? "" : `<p class="alert error">Falta registrar los parámetros de ${anio} (salario mínimo y auxilio de transporte del año).</p>`;
   if (!parametros.length) { el.innerHTML = `${aviso}<p class="text-muted">Sin parámetros registrados.</p>`; return; }
   el.innerHTML = `${aviso}<table class="ap-tabla">
-    <thead><tr><th>Año</th><th class="ap-num">Salario mínimo</th><th class="ap-num">Aux. transporte</th><th class="ap-num">Prestaciones</th><th class="ap-num">Días hábiles</th><th class="ap-num">Jornal factor 1</th><th class="ap-num">Jornal factor 2</th><th class="ap-num">Jornal factor 4</th><th>Fuente</th><th></th></tr></thead>
+    <thead><tr><th>Año</th><th class="ap-num">Salario mínimo</th><th class="ap-num">Aux. transporte</th><th class="ap-num">Prestaciones</th><th class="ap-num">Días hábiles</th><th>Auxilio</th><th class="ap-num">Jornal factor 1</th><th class="ap-num">Jornal factor 2</th><th class="ap-num">Jornal factor 4</th><th>Fuente</th><th></th></tr></thead>
     <tbody>${parametros.map((p) => `<tr>
-      <td><strong>${p.anio}</strong></td><td class="ap-num">${pesos(p.smmlv)}</td><td class="ap-num">${pesos(p.auxTransporte)}</td><td class="ap-num">${numero(p.prestacional * 100, 1)} %</td><td class="ap-num">${p.diasHabiles}</td>
+      <td><strong>${p.anio}</strong></td><td class="ap-num">${pesos(p.smmlv)}</td><td class="ap-num">${pesos(p.auxTransporte)}</td><td class="ap-num">${numero(p.prestacional * 100, 1)} %</td><td class="ap-num">${p.diasHabiles}</td><td>${p.auxModo === "porFactor" ? "× factor" : "Una vez"}</td>
       ${[1, 2, 4].map((f) => `<td class="ap-num">${pesos(jornalMO(f, p)?.total)}</td>`).join("")}
       <td class="ap-celda-corta" title="${esc(p.fuente || "")}">${esc(p.fuente || "—")}</td>
       <td class="ap-celda-acciones"><button type="button" class="rt-icono-btn" data-editar="${p.anio}" title="Editar">✎</button>${ctx.esAdmin ? `<button type="button" class="rt-icono-btn" data-borrar="${p.anio}" title="Eliminar">🗑</button>` : ""}</td>
@@ -48,11 +48,12 @@ function abrirAnio(p = null) {
   $("aPrest").value = numero((base.prestacional ?? 0.6) * 100, 2);
   $("aDias").value = base.diasHabiles ?? 21;
   $("aFuente").value = p?.fuente || "";
+  $("aAuxModo").value = p?.auxModo || "fijo";
   $("anioDlg").showModal();
 }
 async function guardarAnio() {
   const al = $("anioDlgAlerta");
-  const datos = { anio: Number($("aAnio").value), smmlv: leerNumero($("aSmmlv").value), auxTransporte: leerNumero($("aAux").value), prestacional: (leerNumero($("aPrest").value) ?? 0) / 100, diasHabiles: Number($("aDias").value), fuente: $("aFuente").value.trim() };
+  const datos = { anio: Number($("aAnio").value), smmlv: leerNumero($("aSmmlv").value), auxTransporte: leerNumero($("aAux").value), prestacional: (leerNumero($("aPrest").value) ?? 0) / 100, diasHabiles: Number($("aDias").value), fuente: $("aFuente").value.trim(), auxModo: $("aAuxModo").value };
   if (!(datos.anio >= 2015) || !(datos.smmlv > 0) || !(datos.auxTransporte >= 0) || !(datos.prestacional > 0) || !(datos.diasHabiles > 0)) return mostrarAlerta(al, "Completa todos los valores (año, salario mínimo, auxilio, prestaciones y días hábiles).");
   if (!$("aAnio").disabled && parametros.some((p) => p.anio === datos.anio)) return mostrarAlerta(al, `Ya existen parámetros de ${datos.anio}; edítalos desde la tabla.`);
   try {

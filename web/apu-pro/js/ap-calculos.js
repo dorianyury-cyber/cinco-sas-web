@@ -20,10 +20,16 @@ export const BASES = {
 };
 
 // Parámetros de un año: { anio, smmlv, auxTransporte, prestacional (0,6 = 60 %), diasHabiles }.
+// auxModo: "fijo" (por defecto, como la ley y la página anterior de Cinco: el auxilio de
+// transporte se suma una vez a quien gana hasta 2 salarios mínimos) o "porFactor" (como
+// CSS 226: el auxilio se multiplica por el factor salarial).
+export const MODOS_AUXILIO = { fijo: "Una vez por trabajador (factor ≤ 2)", porFactor: "Multiplicado por el factor (como CSS 226)" };
 export function jornalMO(factor, p) {
   const f = Number(factor) || 0;
   if (!p || !f) return null;
-  const base = f * ((Number(p.smmlv) || 0) + (f <= 2 ? Number(p.auxTransporte) || 0 : 0)) / (Number(p.diasHabiles) || 21);
+  const aux = f <= 2 ? Number(p.auxTransporte) || 0 : 0;
+  const mensualBase = f * (Number(p.smmlv) || 0) + (p.auxModo === "porFactor" ? f * aux : aux);
+  const base = mensualBase / (Number(p.diasHabiles) || 21);
   const prestaciones = (Number(p.prestacional) || 0) * base;
   return { jornal: base, prestaciones, total: base + prestaciones, mensual: (base + prestaciones) * (Number(p.diasHabiles) || 21) };
 }

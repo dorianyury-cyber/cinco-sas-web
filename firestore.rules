@@ -419,6 +419,19 @@ service cloud.firestore {
       allow read, create, update: if puedeApuPro();
       allow delete: if esAdmin();
     }
+    // Proyectos (presupuestos): los ven y editan los autorizados; los borra quien los
+    // creó o el administrador. Las versiones entregadas son inmutables.
+    match /apProyectos/{proyectoId} {
+      allow read: if puedeApuPro();
+      allow create: if puedeApuPro() && request.resource.data.creadoPor == request.auth.token.email;
+      allow update: if puedeApuPro() && request.resource.data.creadoPor == resource.data.creadoPor;
+      allow delete: if puedeApuPro() && (esAdmin() || resource.data.creadoPor == request.auth.token.email);
+      match /versiones/{versionId} {
+        allow read, create: if puedeApuPro();
+        allow update: if false;
+        allow delete: if esAdmin() || get(/databases/$(database)/documents/apProyectos/$(proyectoId)).data.creadoPor == request.auth.token.email;
+      }
+    }
     // Biblioteca de APU: cada guardado deja una copia inmutable en «versiones».
     match /apApus/{codigo} {
       allow read, create, update: if puedeApuPro();

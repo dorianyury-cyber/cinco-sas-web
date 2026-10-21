@@ -125,3 +125,25 @@
 .ap-guardar label { font-size: 12.5px; font-weight: 600; color: var(--text-muted); }
 .ap-guardar input { padding: 8px 10px; border: 1px solid var(--border); border-radius: 8px; background: var(--input-bg); color: var(--text); font-size: 13px; }
 @media (max-width: 800px) { .ap-guardar { grid-template-columns: 1fr; } }
+.ap-anio::before, .ap-toolbar label::before { content: none !important; display: none !important; }
+
+/* Proyecto (presupuesto) */
+.ap-proy-cabeza { display: flex; justify-content: space-between; align-items: flex-end; gap: 12px; flex-wrap: wrap; }
+.ap-proy-cabeza .rt-acciones { align-items: center; }
+.ap-cap-nombre { display: flex; align-items: center; gap: 8px; flex: 1; min-width: 260px; }
+.ap-cap-num { font-weight: 700; color: var(--cinco-orange-dark); }
+.ap-in-capnombre { flex: 1; font-size: 15px; font-weight: 700; padding: 5px 8px; border: 1px solid transparent; border-radius: 6px; background: transparent; color: var(--text); }
+.ap-in-capnombre:hover, .ap-in-capnombre:focus { border-color: var(--border); background: var(--input-bg); }
+.ap-tabla-presu .ap-celda-apu { white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.ap-tabla-presu td { vertical-align: middle; }
+.ap-tabla-presu .ap-in-cant { text-align: right; }
+.ap-eval { display: block; font-size: 10px; color: var(--text-muted); text-align: right; min-height: 0; }
+.ap-eval:empty { display: none; }
+.ap-badge-btn { border: none; cursor: pointer; margin-left: 6px; }
+.ap-fila-nueva td { background: transparent !important; }
+.ap-in-nuevo { border-style: dashed !important; }
+.ap-agregar-cap { margin: 4px 0 14px; }
+.ap-sugerencia { margin-top: 10px; }
+.ap-sugerencia input { width: 70px; text-align: right; }
+.ap-tabla-presu .ap-celda-acciones { width: auto; }
+.ap-tabla-presu .ap-celda-acciones .rt-icono-btn { width: 26px; height: 26px; font-size: 12px; margin-left: 2px; }

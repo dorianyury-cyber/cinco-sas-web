@@ -62,7 +62,11 @@ function cargarEnFormulario(a, { copia = false } = {}) {
   $("aCategoria").value = a?.categoria || "";
   $("aNotas").value = a?.notas || "";
   lineas = Object.fromEntries(ORDEN_TIPOS.map((t) => [t, (a?.lineas?.[t] || []).map((l) => ({ ...l }))]));
-  if (editando) { $("volver").href = `apus.html#${encodeURIComponent(a.codigo)}`; }
+  if (editando) {
+    $("volver").href = `apus.html#${encodeURIComponent(a.codigo)}`;
+    $("formato").href = `apu-formato.html?c=${encodeURIComponent(a.codigo)}`;
+    $("formato").classList.remove("hidden");
+  }
   pintarCapitulos();
 }
 

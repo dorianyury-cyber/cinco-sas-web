@@ -241,6 +241,45 @@ export async function importarBiblioteca(json, user, { existentes = new Set(), p
   return { apus: nuevos.length, omitidos: json.apus.length - nuevos.length };
 }
 
+// ---------------------------------------------------------------- proyectos (presupuestos)
+// apProyectos/{id} = { codigo, nombre, cliente, ubicacion, tipo, descripcion, anioParametros,
+//   aiu, iva, regimenIva, factorMateriales, justificacionFactor, redondeo, sitios, capitulos,
+//   precios (congelados), fechaPrecios, estado, creadoPor, ... }
+// apProyectos/{id}/versiones/{auto} = copia inmutable al entregar una versión del presupuesto.
+export async function listarProyectos() {
+  const snap = await getDocs(collection(db, "apProyectos"));
+  return snap.docs.map((d) => ({ id: d.id, ...d.data() }));
+}
+export async function leerProyecto(id) {
+  const snap = await getDoc(doc(db, "apProyectos", id));
+  return snap.exists() ? { id: snap.id, ...snap.data() } : null;
+}
+export async function crearProyecto(datos, user) {
+  const ref = doc(collection(db, "apProyectos"));
+  await setDoc(ref, { ...datos, creadoPor: user.email, creadoEn: serverTimestamp(), actualizadoPor: user.email, actualizadoEn: serverTimestamp() });
+  return ref.id;
+}
+export async function guardarProyecto(id, datos, user) {
+  const { id: _, creadoPor, creadoEn, ...resto } = datos;
+  await updateDoc(doc(db, "apProyectos", id), { ...resto, actualizadoPor: user.email, actualizadoEn: serverTimestamp() });
+}
+export async function eliminarProyecto(id) {
+  const vers = await getDocs(collection(db, "apProyectos", id, "versiones"));
+  for (const d of vers.docs) await deleteDoc(d.ref);
+  await deleteDoc(doc(db, "apProyectos", id));
+}
+export async function guardarVersionProyecto(id, proyecto, resumen, user, nota = "") {
+  const previas = await getDocs(collection(db, "apProyectos", id, "versiones"));
+  const numero = Math.max(0, ...previas.docs.map((d) => Number(d.data().numero) || 0)) + 1;
+  const { id: _, creadoEn, actualizadoEn, ...copia } = proyecto;
+  await setDoc(doc(collection(db, "apProyectos", id, "versiones")), { numero, nota: String(nota || "").slice(0, 300), proyecto: copia, resumen, creadoPor: user.email, creadoEn: serverTimestamp() });
+  return numero;
+}
+export async function listarVersionesProyecto(id) {
+  const snap = await getDocs(collection(db, "apProyectos", id, "versiones"));
+  return snap.docs.map((d) => ({ id: d.id, ...d.data() })).sort((a, b) => (b.numero || 0) - (a.numero || 0));
+}
+
 // ---------------------------------------------------------------- base inicial
 // Carga el archivo «APU PRO - base inicial de insumos.json» (formato apupro-semilla):
 // parámetros por año, IPP, monedas e insumos. Los insumos que ya existan no se

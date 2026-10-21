@@ -1,0 +1,51 @@
+<!doctype html>
+<html lang="es" class="ap-preparando">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<meta name="robots" content="noindex, nofollow">
+<title>Proyectos — APU PRO</title>
+<link rel="icon" type="image/png" sizes="32x32" href="../assets/img/favicon-32.png">
+<link rel="stylesheet" href="../interventoria-pro/assets/ip.css">
+<link rel="stylesheet" href="../ahinco/assets/rt.css">
+<link rel="stylesheet" href="assets/ap.css">
+</head>
+<body>
+  <div class="app-shell">
+    <aside class="sidebar rt-sidebar" id="sidebar"></aside>
+    <main class="main rt-main">
+      <div class="rt-encabezado">
+        <h1>📁 Proyectos</h1>
+        <p class="text-muted">Presupuestos de obra, consultoría o interventoría armados con los APU de la biblioteca: capítulos, sitios, memoria de cantidades, AIU, régimen de IVA y factor de proyección de materiales.</p>
+      </div>
+      <div class="toolbar ap-toolbar">
+        <input type="search" id="buscar" placeholder="Buscar por código, nombre o cliente…">
+        <span class="text-muted ap-cuenta" id="cuenta"></span>
+        <button type="button" class="btn secondary ap-btn" id="importarBtn">⬆ Importar proyecto</button>
+        <button type="button" class="btn ap-btn" id="nuevoBtn">＋ Nuevo proyecto</button>
+        <input type="file" id="importarArchivo" accept=".json,application/json" class="hidden">
+      </div>
+      <div class="alert" id="alerta"></div>
+      <section class="card ap-vp" id="vistaPrevia"><p class="text-muted">Cargando…</p></section>
+      <div class="card ap-lista"><div class="tabla-scroll"><table class="ap-tabla ap-tabla-sel" id="tabla"></table></div></div>
+    </main>
+  </div>
+
+  <dialog class="rt-dialogo rt-dialogo-medio" id="nuevoDlg">
+    <div class="rt-dialogo-cabeza"><h2>Nuevo proyecto</h2><button type="button" class="rt-icono-btn" data-cerrar title="Cerrar">✕</button></div>
+    <form id="nuevoForm" class="rt-form-grid">
+      <div><label for="nCodigo">Código</label><input id="nCodigo" required></div>
+      <div><label for="nTipo">Tipo</label><select id="nTipo"><option value="obra">Presupuesto de obra</option><option value="consultoria">Consultoría</option><option value="interventoria">Interventoría</option></select></div>
+      <div class="rt-ancho"><label for="nNombre">Nombre del proyecto</label><input id="nNombre" required placeholder="Ej. Redes de media y baja tensión asentamiento El Sol"></div>
+      <div><label for="nCliente">Cliente</label><input id="nCliente"></div>
+      <div><label for="nUbicacion">Ubicación</label><input id="nUbicacion" placeholder="Municipio, departamento"></div>
+      <div><label for="nAnio">Parámetros del año</label><select id="nAnio"></select></div>
+      <div><label for="nSitios">Sitios (separados por coma)</label><input id="nSitios" value="Único" placeholder="Ej. Baraya, Tesalia, Quirinal"></div>
+    </form>
+    <p class="text-muted ap-nota">El AIU (15/5/5), el IVA sobre la utilidad y el factor de materiales (1,0) se ajustan dentro del proyecto.</p>
+    <div class="alert" id="nuevoAlerta"></div>
+    <div class="rt-acciones"><button type="button" class="btn" id="crearBtn">Crear proyecto</button><button type="button" class="btn secondary" data-cerrar>Cancelar</button></div>
+  </dialog>
+  <script type="module" src="js/ap-proyectos.js"></script>
+</body>
+</html>

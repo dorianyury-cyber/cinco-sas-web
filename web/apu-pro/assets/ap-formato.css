@@ -1,0 +1,99 @@
+/* Formato Cinco de un APU (pantalla e impresión). Colores y tipografía de la marca:
+   azul #1f2732, ámbar #feb209, Poppins. */
+@font-face { font-family: "Poppins"; font-weight: 400; font-display: swap; src: url("../../assets/fonts/poppins-400.woff2") format("woff2"); }
+@font-face { font-family: "Poppins"; font-weight: 500; font-display: swap; src: url("../../assets/fonts/poppins-500.woff2") format("woff2"); }
+@font-face { font-family: "Poppins"; font-weight: 600; font-display: swap; src: url("../../assets/fonts/poppins-600.woff2") format("woff2"); }
+@font-face { font-family: "Poppins"; font-weight: 700; font-display: swap; src: url("../../assets/fonts/poppins-700.woff2") format("woff2"); }
+
+.cf-pagina { --cf-azul: #1f2732; --cf-ambar: #feb209; --cf-ambar-suave: #fff3d1; --cf-gris: #f2f3f5; --cf-borde: #d6dae0; --cf-texto: #1f2732; --cf-suave: #5a6270; background: var(--bg, #eef0f3); }
+
+/* Barra superior (no se imprime) */
+.cf-barra { position: sticky; top: 0; z-index: 5; display: flex; flex-wrap: wrap; align-items: center; gap: 10px 14px; padding: 10px 20px; background: var(--card-bg); border-bottom: 1px solid var(--border); box-shadow: var(--shadow); }
+.cf-barra label { display: inline-flex; align-items: center; gap: 6px; font-size: 12.5px; font-weight: 600; color: var(--text-muted); }
+.cf-barra input, .cf-barra select { padding: 5px 8px; border: 1px solid var(--border); border-radius: 7px; background: var(--input-bg); color: var(--text); font-size: 12.5px; }
+.cf-barra input { width: 56px; text-align: right; }
+.cf-espacio { flex: 1; }
+.cf-pagina > .alert { margin: 10px 20px 0; }
+
+/* Hoja */
+.cf-contenedor { padding: 24px 16px 48px; }
+.cf-hoja { width: 100%; max-width: 900px; margin: 0 auto; background: #fff; color: var(--cf-texto); font-family: "Poppins", system-ui, sans-serif; font-size: 11.5px; padding: 30px 34px 22px; border-radius: 6px; box-shadow: 0 8px 30px rgba(20, 30, 45, .12); }
+.cf-cabeza { display: grid; grid-template-columns: 170px 1fr auto; align-items: center; gap: 18px; padding-bottom: 12px; border-bottom: 3px solid var(--cf-ambar); }
+.cf-logo { width: 170px; height: auto; display: block; }
+.cf-titulo h1 { margin: 0; font-size: 20px; font-weight: 700; letter-spacing: .3px; text-transform: uppercase; color: var(--cf-azul); }
+.cf-titulo p { margin: 2px 0 0; color: var(--cf-suave); font-size: 12px; }
+.cf-meta { margin: 0; display: grid; gap: 4px; text-align: right; }
+.cf-meta div { display: flex; gap: 8px; justify-content: flex-end; }
+.cf-meta dt { color: var(--cf-suave); font-size: 10.5px; text-transform: uppercase; letter-spacing: .5px; }
+.cf-meta dd { margin: 0; font-weight: 600; }
+
+.cf-datos { display: grid; grid-template-columns: 120px 1fr 1fr 2fr; gap: 0; margin: 14px 0 16px; border: 1px solid var(--cf-borde); border-radius: 6px; overflow: hidden; }
+.cf-dato { display: flex; flex-direction: column; gap: 2px; padding: 7px 10px; border-right: 1px solid var(--cf-borde); border-bottom: 1px solid var(--cf-borde); }
+.cf-dato span { font-size: 9.5px; font-weight: 600; text-transform: uppercase; letter-spacing: .5px; color: var(--cf-suave); }
+.cf-dato strong { font-weight: 600; font-size: 12px; }
+.cf-codigo { background: var(--cf-azul); }
+.cf-codigo span { color: #c9ced6; }
+.cf-codigo strong { color: var(--cf-ambar); font-size: 14px; }
+.cf-nombre { grid-column: span 3; background: var(--cf-ambar-suave); }
+.cf-nombre strong { font-size: 13px; }
+.cf-ancho { grid-column: auto; }
+
+.cf-tabla { width: 100%; table-layout: fixed; border-collapse: collapse; margin: 0 0 12px; font-size: 11px; }
+.cf-tabla th, .cf-tabla td { padding: 4px 7px; border: 1px solid var(--cf-borde); color: var(--cf-texto); text-align: left; vertical-align: top; text-transform: none; background: none; }
+.cf-tabla tr:hover td { background: inherit; }
+.cf-cap th { background: var(--cf-ambar); color: var(--cf-azul); font-size: 11.5px; font-weight: 700; letter-spacing: .4px; text-transform: uppercase; border-color: var(--cf-ambar); }
+.cf-enc th { background: var(--cf-gris); color: var(--cf-suave); font-size: 9.5px; font-weight: 600; text-transform: uppercase; letter-spacing: .3px; }
+.cf-ref { text-align: center !important; font-weight: 600; color: var(--cf-suave) !important; white-space: nowrap; }
+.cf-num { text-align: right !important; font-variant-numeric: tabular-nums; white-space: nowrap; }
+.cf-centro { text-align: center !important; }
+.cf-tabla small { color: var(--cf-suave); font-size: 9px; }
+.cf-vacio { color: #8a919c !important; font-style: italic; }
+.cf-aviso { color: #c0392b; font-size: 9.5px; font-weight: 600; }
+.cf-sub td { background: var(--cf-ambar-suave); font-weight: 700; text-align: right; }
+
+.cf-resumen { display: flex; justify-content: flex-end; margin-top: 6px; }
+.cf-resumen table { width: 62%; border-collapse: collapse; font-size: 12px; }
+.cf-resumen td { padding: 5px 9px; border-bottom: 1px solid var(--cf-borde); color: var(--cf-texto); background: none; }
+.cf-resumen td:first-child { text-align: right; }
+.cf-resumen td:nth-child(2) { width: 70px; color: var(--cf-suave); }
+.cf-resumen td:last-child { width: 130px; }
+.cf-cd td, .cf-st td { font-weight: 700; background: var(--cf-ambar-suave); }
+.cf-total td { background: var(--cf-azul); color: var(--cf-ambar); font-weight: 700; font-size: 14px; border-bottom: none; }
+.cf-pie { margin-top: 18px; padding-top: 8px; border-top: 1px solid var(--cf-borde); font-size: 9px; color: #8a919c; text-align: center; }
+
+@media screen and (max-width: 760px) {
+  .cf-hoja { padding: 16px; }
+  .cf-cabeza { grid-template-columns: 1fr; text-align: center; }
+  .cf-logo { margin: 0 auto; }
+  .cf-meta div { justify-content: center; }
+  .cf-datos { grid-template-columns: 1fr 1fr; }
+  .cf-nombre, .cf-ancho { grid-column: 1 / -1; }
+  .cf-resumen table { width: 100%; }
+}
+
+/* Impresión: solo la hoja, tamaño carta */
+@page { size: letter portrait; margin: 12mm; }
+@media print {
+  .cf-barra, .cf-pagina > .alert, .theme-toggle { display: none !important; }
+  html, body, .cf-pagina { background: #fff !important; }
+  .cf-contenedor { padding: 0; }
+  .cf-hoja { max-width: none; box-shadow: none; border-radius: 0; padding: 0; }
+  .cf-tabla, .cf-resumen { break-inside: avoid; }
+  * { -webkit-print-color-adjust: exact; print-color-adjust: exact; }
+}
+.cf-barra label::before, .ap-anio::before, .ap-toolbar label::before { content: none !important; display: none !important; }
+
+/* Presupuesto */
+.cf-hoja-ancha { max-width: 1100px; }
+.cf-datos-proy { grid-template-columns: 120px 1fr 1fr 1fr; }
+.cf-tabla-presu { table-layout: auto; }
+.cf-tabla-presu td:nth-child(3) { min-width: 260px; }
+.cf-tabla-presu .cf-cap th { background: var(--cf-gris); color: var(--cf-azul); border-color: var(--cf-borde); }
+.cf-tabla-presu thead .cf-enc th { background: var(--cf-ambar); color: var(--cf-azul); font-size: 10px; }
+.cf-resumen-ancho { width: 100% !important; }
+.cf-enc-res td { font-size: 10px; font-weight: 600; text-transform: uppercase; color: var(--cf-suave); }
+.cf-apus .cf-hoja { margin-bottom: 24px; }
+@media print {
+  .cf-apus .cf-hoja { break-before: page; margin: 0; }
+  .cf-apus.hidden { display: none !important; }
+}

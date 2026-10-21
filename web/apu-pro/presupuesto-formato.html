@@ -1,0 +1,28 @@
+<!doctype html>
+<html lang="es" class="ap-preparando">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<meta name="robots" content="noindex, nofollow">
+<title>Presupuesto en formato Cinco — APU PRO</title>
+<link rel="icon" type="image/png" sizes="32x32" href="../assets/img/favicon-32.png">
+<link rel="stylesheet" href="../interventoria-pro/assets/ip.css">
+<link rel="stylesheet" href="../ahinco/assets/rt.css">
+<link rel="stylesheet" href="assets/ap.css">
+<link rel="stylesheet" href="assets/ap-formato.css">
+</head>
+<body class="cf-pagina">
+  <div class="cf-barra">
+    <a class="ap-volver" href="proyectos.html" id="volver">← Volver al presupuesto</a>
+    <label><input type="checkbox" id="conApus"> Incluir los APU al imprimir</label>
+    <span class="cf-espacio"></span>
+    <button type="button" class="btn secondary ap-btn" id="imprimir">🖨 Imprimir o guardar PDF</button>
+    <button type="button" class="btn ap-btn" id="excel">⬇ Descargar Excel (presupuesto y APU)</button>
+  </div>
+  <div class="alert" id="alerta"></div>
+  <main class="cf-contenedor" id="hoja"><p class="text-muted">Cargando…</p></main>
+  <div class="cf-contenedor cf-apus hidden" id="apus"></div>
+  <script src="../js/vendor/exceljs.min.js"></script>
+  <script type="module" src="js/ap-presupuesto-pagina.js"></script>
+</body>
+</html>
