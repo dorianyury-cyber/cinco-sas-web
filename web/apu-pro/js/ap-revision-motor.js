@@ -201,8 +201,11 @@ const unidadNorm = (u) => UNIDADES[normalizar(u).replace(/[.\s]/g, "")] || norma
 function fichas(texto) {
   const t = normalizar(texto).replace(/(\d),(\d)/g, "$1.$2").replace(/[^a-z0-9./ ]/g, " ");
   const palabras = t.split(/\s+/).filter((w) => w && !VACIAS.has(w) && w.length > 1 || /^\d/.test(w));
-  return { todas: new Set(palabras), numeros: new Set(palabras.filter((w) => /^\d/.test(w))) };
+  const primera = palabras.find((w) => !/^\d/.test(w)) || "";
+  return { todas: new Set(palabras), numeros: new Set(palabras.filter((w) => /^\d/.test(w))), primera: primera.replace(/(es|s)$/, "") };
 }
+// Palabras que distinguen material o tipo: dos insumos con distintivos distintos no son el mismo.
+const DISTINTIVOS = new Set("emt imc rmc pvc lshf thhn thwn thw xlpe acsr aaac cu al aluminio cobre galvanizado galvanizada acero inoxidable hierro concreto madera fibra cat5e cat6 cat6a cat7 cat7a utp ftp stp monofasico trifasico bifasico led sodio metal sch ranurado roscado presion".split(" "));
 // Índice de la biblioteca para sugerir el APU más parecido a cada ítem.
 export function indiceApus(apus) {
   return apus.map((a) => ({ codigo: a.codigo, nombre: a.nombre, unidad: unidadNorm(a.unidad), f: fichas(a.nombre) }));
@@ -216,11 +219,20 @@ export function sugerirApus(it, indice, cuantos = 3) {
     for (const w of f.todas) if (a.f.todas.has(w)) comunes++;
     if (!comunes) continue;
     let s = (2 * comunes) / (f.todas.size + a.f.todas.size);
+    // Las medidas mandan: «Tubo EMT 1/2"» no es «Tubo EMT 1 1/2"», ni «caja 40x40x20» una caja
+    // sin medida. Si ambos traen números y no son los mismos, el parecido cae a la mitad; si
+    // solo uno los trae, baja un cuarto.
     if (f.numeros.size && a.f.numeros.size) {
-      let iguales = 0;
-      for (const x of f.numeros) if (a.f.numeros.has(x)) iguales++;
-      if (iguales < Math.min(f.numeros.size, a.f.numeros.size)) s *= 0.6;
-    }
+      const iguales = f.numeros.size === a.f.numeros.size && [...f.numeros].every((x) => a.f.numeros.has(x));
+      if (!iguales) s *= 0.5;
+    } else if (f.numeros.size || a.f.numeros.size) s *= 0.75;
+    // El material o tipo también: un tubo EMT no es un tubo PVC, ni un cable LSHF uno THHN.
+    const tf = [...f.todas].filter((w) => DISTINTIVOS.has(w)), ta = [...a.f.todas].filter((w) => DISTINTIVOS.has(w));
+    const soloF = tf.filter((w) => !ta.includes(w)), soloA = ta.filter((w) => !tf.includes(w));
+    if (soloF.length && soloA.length) s *= 0.45;
+    else if (soloF.length || soloA.length) s *= 0.8;
+    // Y el sustantivo principal (la primera palabra): «buching» no es «curva».
+    if (f.primera && a.f.primera && f.primera !== a.f.primera) s *= 0.6;
     if (u && a.unidad) s += u === a.unidad ? 0.1 : -0.15;
     if (s >= 0.25) res.push({ codigo: a.codigo, nombre: a.nombre, puntaje: Math.min(1, s) });
   }
