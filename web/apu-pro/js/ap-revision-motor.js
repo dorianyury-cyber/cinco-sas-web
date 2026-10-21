@@ -516,6 +516,69 @@ function revisarApus(rev, apus, { F, items, valor, valorFinal, agregar, precioIn
     texto: `${sinMat.length} APU dicen «suministro» pero no incluyen materiales (${sinMat.map((a) => a.item).join(", ")}): el precio solo cubre mano de obra y equipo, lo que abre la puerta a reclamaciones posteriores.`,
     itemsRef: items.filter((it) => sinMat.some((a) => codNorm(a.item) === codNorm(it.item))), impacto: null, impactoTexto: "Riesgo de adicionales", accion: "Pedir que se completen los APU o que el oferente declare por escrito que el precio incluye los materiales." });
 
+  // Ítems de cada APU (para llevar a valor final lo que se encuentre dentro de los APU).
+  const itemsDe = new Map();
+  for (const v of vinculos) { const it = items.find((x) => x.id === v.id); if (it) { if (!itemsDe.has(v.apu)) itemsDe.set(v.apu, []); itemsDe.get(v.apu).push(it); } }
+  const itemsDeApus = (lista) => [...new Set(lista.flatMap((a) => itemsDe.get(a) || []))];
+  const vtDe = (lista) => itemsDeApus(lista).reduce((s, it) => s + valor(it), 0) * F.aFinal;
+  const mat = (a) => (a.secciones.MA || []).filter((x) => Number(x.v) > 0 && x.d);
+
+  // Accesorio cobrado dos veces: un material que va dentro de muchos APU (una unidad por salida,
+  // como una caja) y además se cobra como ítem aparte cuyo APU es casi solo ese material.
+  const usoPorClave = new Map();
+  for (const a of apus) for (const x of mat(a)) if (Number(x.c) > 0 && Number(x.c) <= 2) { const k = claveInsumo(x); if (!usoPorClave.has(k)) usoPorClave.set(k, new Set()); usoPorClave.get(k).add(a); }
+  const dobles = new Map();
+  for (const a of apus) {
+    const ms = mat(a);
+    if (!ms.length) continue;
+    const principal = ms.reduce((m, x) => (x.v > m.v ? x : m));
+    const totalMa = ms.reduce((s, x) => s + x.v, 0);
+    if (principal.v < totalMa * 0.6) continue;
+    const k = claveInsumo(principal);
+    const otros = [...(usoPorClave.get(k) || [])].filter((b) => b !== a && claveInsumo(mat(b).reduce((m, x) => (x.v > m.v ? x : m), { v: -1 })) !== k);
+    if (otros.length >= 5) { const e = dobles.get(k) || { d: principal.d, separados: [], otros: new Set() }; e.separados.push(a); otros.forEach((b) => e.otros.add(b)); dobles.set(k, e); }
+  }
+  if (dobles.size) {
+    const grupos = [...dobles.values()].map((e) => { const its = itemsDeApus(e.separados); return { ...e, its, unidades: its.reduce((s, it) => s + (Number(it.cant) || 0), 0), v: vtDe(e.separados) }; }).sort((p, q) => q.v - p.v);
+    const v = grupos.reduce((s, g) => s + g.v, 0);
+    agregar({ clave: "accesoriosDobles", titulo: "Accesorios cobrados dentro de los APU y aparte", estado: "hallazgo", sev: v > valorFinal * 0.01 ? "Mayor" : "Menor", tema: "Cantidades",
+      texto: `Hay accesorios que ya van dentro de muchos APU (una o dos unidades por salida) y además se cobran como ítems separados; pueden ser cantidades cobradas dos veces: ${grupos.map((g) => `«${g.d}»: incluida en ${g.otros.size} APU y ${numTxt(g.unidades)} unidades aparte (${lista(g.its, 8)}), hasta ${pesosTxt(g.v)}`).join("; ")}.`,
+      itemsRef: grupos.flatMap((g) => g.its), impacto: null, impactoTexto: `Hasta ${pesosTxt(v)}`, accion: "Pedir la justificación de cada unidad cobrada aparte (derivación, paso, soporte adicional) con su ubicación en planos; retirar las que dupliquen las incluidas en cada salida." });
+  }
+
+  // Consumibles con peso atípico: filtros, discos, brocas o lijas que pesan más del 15 % del APU.
+  const RE_CONSUMIBLE = /filtro|disco (de corte|diamante|abrasivo|para)|broca|lija|abrasiv|segueta|guante|brocha|rodillo|estopa|consumible/;
+  const consumos = [];
+  for (const a of apus) for (const x of mat(a)) if (RE_CONSUMIBLE.test(normalizar(x.d)) && !/disco duro/.test(normalizar(x.d)) && a.cd > 0 && x.v / a.cd > 0.15) consumos.push({ a, x });
+  if (consumos.length) {
+    const v = consumos.reduce((s, { a, x }) => s + x.v * qty(a), 0) * F.final;
+    const its = itemsDeApus(consumos.map((c) => c.a));
+    agregar({ clave: "consumibles", titulo: "Consumibles con peso atípico en los APU", estado: "hallazgo", sev: v > valorFinal * 0.01 ? "Mayor" : "Menor", tema: "Insumos",
+      texto: `En ${consumos.length} APU un consumible pesa más del 15 % del costo directo: ${consumos.slice(0, 6).map(({ a, x }) => `${a.item}: ${numTxt(x.c)} ${x.u || "und"} de «${x.d}» a ${pesosTxt(x.p)} = ${pesosTxt(x.v)} (${Math.round((x.v / a.cd) * 100)} % del APU)`).join("; ")}${consumos.length > 6 ? "; …" : ""}. En toda la obra suman ${pesosTxt(v)}.`,
+      itemsRef: its, impacto: v, accion: "Pedir la justificación del consumo y ajustarlo a un valor razonable (los consumibles suelen ser una fracción menor del costo)." });
+  }
+
+  // Obra civil (cielo raso, drywall, regatas, pintura…) ejecutada por la cuadrilla eléctrica.
+  const RE_CIVIL = /cielo|drywall|panel yeso|pintura|resane|regata|demolic|desmonte de panel|muro|mamposter|estuco|enchape|panete|pañete|losa|anden/;
+  const RE_OFICIO_CIVIL = /oficial|albañil|albanil|drywall|pintor|obrero|maestro de obra|estucador|enchapador/;
+  const civiles = apus.filter((a) => RE_CIVIL.test(normalizar(a.desc)) && (a.secciones.MO || []).length && !(a.secciones.MO || []).some((x) => RE_OFICIO_CIVIL.test(normalizar(x.d))) && (a.secciones.MO || []).some((x) => /electric/.test(normalizar(x.d))));
+  if (civiles.length) {
+    const v = vtDe(civiles);
+    agregar({ clave: "obraCivil", titulo: "Obra civil ejecutada por la cuadrilla eléctrica", estado: "hallazgo", sev: v > valorFinal * 0.05 ? "Mayor" : "Observación", tema: "Alcance",
+      texto: `${civiles.length} actividades de obra civil (${civiles.slice(0, 6).map((a) => `${a.item} ${a.desc.toLowerCase()}`).join("; ")}${civiles.length > 6 ? "; …" : ""}) suman ${pesosTxt(v)} (${pctTxt(valorFinal ? v / valorFinal : 0)} de la oferta) y sus APU las asignan a electricistas, sin oficiales de obra civil. Debe verificarse que el alcance sea necesario para la instalación eléctrica (aperturas y reposiciones) y no un reemplazo completo.`,
+      itemsRef: itemsDeApus(civiles), impacto: null, impactoTexto: `${pesosTxt(v)} por justificar`, accion: "Pedir el soporte del alcance de obra civil (planos o estado existente) y los APU con la cuadrilla y los rendimientos de esos oficios." });
+  }
+
+  // Partidas globales en cifras redondas dentro de los APU (precios sin desglose).
+  const redondas = [];
+  for (const a of apus) for (const x of [...mat(a), ...(a.secciones.EQ || [])]) if (Number(x.v) >= 300000 && Number(x.p) >= 300000 && Number(x.p) % 10000 === 0 && (!x.u || /^(gl|global|und|un|u|unid)\.?$/i.test(String(x.u).trim()))) redondas.push({ a, x });
+  if (redondas.length) {
+    const apusR = [...new Set(redondas.map((r) => r.a))];
+    agregar({ clave: "globalesApu", titulo: "Partidas globales en cifras redondas dentro de los APU", estado: "hallazgo", sev: "Menor", tema: "Precios",
+      texto: `${apusR.length} APU usan partidas globales en cifras redondas, sin desglose ni cotización: ${redondas.slice(0, 6).map(({ a, x }) => `${a.item}: «${x.d}» ${pesosTxt(x.p)}`).join("; ")}${redondas.length > 6 ? "; …" : ""}.`,
+      itemsRef: itemsDeApus(apusR), impacto: null, impactoTexto: `${pesosTxt(vtDe(apusR))} sin desglose`, accion: "Pedir el desglose de cada partida (materiales, cantidades y cotización)." });
+  }
+
   // Insumos: cantidades y valores en todo el presupuesto (cantidad del APU × cantidad del ítem).
   const insumos = new Map();
   for (const a of apus) for (const [sec, ls] of Object.entries(a.secciones)) for (const x of ls) {
