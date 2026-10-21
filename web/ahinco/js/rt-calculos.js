@@ -1684,11 +1684,33 @@ export function unifilar(e, proyecto = {}, ctx = {}) {
   const kva = num(e.potencia, NaN) > 0 ? num(e.potencia) : tp ? tp.sn : td?.sn ?? NaN;
   const vs = num(e.tensionSec, NaN) > 0 ? num(e.tensionSec) : tp ? tp.vs : td?.vs ?? cc?.uBT ?? NaN;
   const z = tp ? tp.z : td?.z;
-  const barras = (cc?.barras || []).map((b) => ({ nombre: b.nombre, ik3: b.ik3 / 1000, icu: b.icu || 0, cable: b.cable ? `${b.cable.paralelos > 1 ? `${b.cable.paralelos}× ` : ""}${textoConductor(b.cable.conductor)}, ${fmt(b.cable.longitud, 0)} m` : "" }));
+  // Barras: las del primer cortocircuito (cadena) y, si hay varios cálculos de cortocircuito (uno por
+  // tablero), las barras de los demás que no estén todavía.
+  const clave = (s) => String(s || "").trim().toLowerCase();
+  const barras = [];
+  const aBarra = (b) => ({ nombre: b.nombre, ik3: b.ik3 / 1000, icu: b.icu || 0, cable: b.cable ? `${b.cable.paralelos > 1 ? `${b.cable.paralelos}× ` : ""}${textoConductor(b.cable.conductor)}, ${fmt(b.cable.longitud, 0)} m` : "" });
+  const todosCc = ctx.cortocircuitoTodos?.length ? ctx.cortocircuitoTodos : cc ? [cc] : [];
+  todosCc.forEach((c) => (c.barras || []).forEach((b) => { if (!barras.some((x) => clave(x.nombre) === clave(b.nombre))) barras.push(aBarra(b)); }));
   if (!barras.length) barras.push({ nombre: e.barraManual || (vs > 1000 ? "Barra del secundario" : "Tablero general"), ik3: NaN, icu: 0, cable: "" });
-  const iCirc = Math.max(0, barras.findIndex((b) => b.nombre.trim().toLowerCase() === String(e.barraCircuitos || "").trim().toLowerCase()));
-  const barraC = e.barraCircuitos && barras.some((b) => b.nombre.trim().toLowerCase() === String(e.barraCircuitos).trim().toLowerCase()) ? iCirc : barras.length > 1 ? 1 : 0;
-  const circuitos = (ctx.conductores?.circuitos || []).map((c) => ({ nombre: c.circuito, desc: c.descripcion, In: c.In, conductor: `${c.material} ${N.etiquetaCalibre(c.calibre)}`, I: c.I }));
+  const iCirc = Math.max(0, barras.findIndex((b) => clave(b.nombre) === clave(e.barraCircuitos)));
+  const barraC = e.barraCircuitos && barras.some((b) => clave(b.nombre) === clave(e.barraCircuitos)) ? iCirc : barras.length > 1 ? 1 : 0;
+  // Varios cálculos con una sola barra aguas abajo cada uno (tableros hermanos): se ordenan por nombre.
+  if (todosCc.length > 1 && todosCc.every((c) => (c.barras || []).length <= barraC + 2)) {
+    const post = barras.splice(barraC + 1).sort((a, b) => a.nombre.localeCompare(b.nombre, "es", { numeric: true }));
+    barras.push(...post);
+  }
+  const norm = (s) => String(s || "").toLowerCase().normalize("NFD").replace(/[\u0300-\u036f]/g, "");
+  const omitir = String(e.circuitosOmitir || "").split(",").map(norm).map((s) => s.trim()).filter(Boolean);
+  const todosCirc = (ctx.conductores?.circuitos || []).map((c) => ({ nombre: c.circuito, desc: c.descripcion, In: c.In, conductor: `${c.material} ${N.etiquetaCalibre(c.calibre)}`, I: c.I, icu: c.icu }));
+  // La acometida principal es el cable entre barras (ya dibujado), no una salida del tablero.
+  const esTronco = (c) => omitir.includes(norm(c.nombre).trim()) || (barras.length > 1 && /acometida principal|alimentador principal/.test(norm(c.desc)));
+  // Un circuito que alimenta una de las barras de aguas abajo se dibuja como esa barra (con su cable real).
+  const numeros = (s) => (norm(s).match(/\d+/) || [""])[0]; // primer número del texto
+  const palabras = (s) => new Set((norm(s).match(/[a-z]{4,}/g) || []));
+  const alimenta = (c, b) => numeros(c.desc) === numeros(b.nombre) && [...palabras(b.nombre)].some((p) => palabras(c.desc).has(p));
+  const posteriores = barras.slice(barraC + 1);
+  const circuitos = todosCirc.filter((c) => !esTronco(c) && !posteriores.some((b) => alimenta(c, b)));
+  posteriores.forEach((b) => { const c = todosCirc.find((x) => !esTronco(x) && alimenta(x, b)); if (c) b.alim = { nombre: c.nombre, icu: c.icu }; });
   const fv = ctx.fvArreglo ? { kwp: ctx.fvArreglo.pdc, kw: ctx.fvArreglo.pac } : null;
   const motores = cc?.motores || [];
   const g = { tipo: "unifilar", red: { kv: kvRed, sk: cc?.sk }, protMT: e.proteccionMT || "", dps: e.dpsMT !== "No", medidor: e.medidor || "", trafo: Number.isFinite(kva) ? { kva, vp: kvRed, vs: vs / 1000, z, grupo: e.grupo || (tp ? "YNyn0(d)" : "Dyn5") } : null, barras, barraC, circuitos, fv, motores, subestacion: !!tp };
@@ -1699,19 +1721,19 @@ export function unifilar(e, proyecto = {}, ctx = {}) {
     ...(g.trafo ? [["Transformador", `${fmt(kva, 0)} kVA; ${fmt(kvRed, 1)} / ${fmt(vs / 1000, 3)} kV; ${g.trafo.grupo}${z ? `; Z = ${fmt(z, 1)} %` : ""}`]] : []),
     ...(g.medidor ? [["Medida", g.medidor]] : []),
     ...barras.map((b, i) => [i ? `Barra ${b.nombre}` : `Barra ${b.nombre} (bornes)`, `${b.cable ? `${b.cable}; ` : ""}${Number.isFinite(b.ik3) ? `Ik" = ${fmt(b.ik3, 2)} kA` : ""}${b.icu ? `; Icu = ${fmt(b.icu, 1)} kA` : ""}`]),
-    ...circuitos.map((c) => [`Circuito ${c.nombre}`, `${c.desc}; ${c.conductor}; protección ${c.In} A; ${fmt(c.I, 1)} A`]),
+    ...todosCirc.map((c) => [`Circuito ${c.nombre}`, `${c.desc}; ${c.conductor}; protección ${c.In} A; ${fmt(c.I, 1)} A`]),
     ...(fv ? [["Generación solar fotovoltaica", `${fmt(fv.kwp, 1)} kWp / ${fmt(fv.kw, 1)} kW AC`]] : []),
     ...motores.map((m) => ["Grupo de motores", `${m.barra}: ${fmt(m.kw, 1)} kW`])
   ];
-  const faltan = [!g.trafo && "transformador (cálculo del transformador o potencia digitada)", !(cc?.barras || []).length && "barras y cables (cálculo de cortocircuito)", !circuitos.length && "circuitos (cálculo de conductores)"].filter(Boolean);
+  const faltan = [!g.trafo && "transformador (cálculo del transformador o potencia digitada)", !(cc?.barras || []).length && "barras y cables (cálculo de cortocircuito)", !todosCirc.length && "circuitos (cálculo de conductores)"].filter(Boolean);
   return {
-    resumen: [{ etiqueta: "Elementos del diagrama", valor: String(elementos.length), unidad: "" }, { etiqueta: "Circuitos", valor: String(circuitos.length), unidad: "" }],
+    resumen: [{ etiqueta: "Elementos del diagrama", valor: String(elementos.length), unidad: "" }, { etiqueta: "Circuitos", valor: String(todosCirc.length), unidad: "" }],
     grafico: g,
     tablas: [{ titulo: "Elementos del diagrama unifilar", encabezados: ["Elemento", "Características"], filas: elementos }],
     pasos: [{ titulo: "Origen de los datos", formula: "El diagrama se genera con los cálculos del proyecto", sustitucion: "Transformador: cálculo del transformador o del transformador de potencia; barras, cables e Ik\": cortocircuito; circuitos: conductores y protecciones; generación: arreglo fotovoltaico", resultado: faltan.length ? `Faltan: ${faltan.join("; ")}` : "Completo" }],
     verificaciones: [],
     notas: ["El diagrama se actualiza solo cuando cambian los cálculos del proyecto. Para el plano de construcción (literal s), use este diagrama como base y complete la información de detalle (marcas, referencias y cuadros de cargas)."],
-    conclusion: faltan.length ? `Diagrama unifilar parcial: faltan ${faltan.join("; ")}.` : `Diagrama unifilar generado con ${circuitos.length} circuito(s) y ${barras.length} barra(s).`
+    conclusion: faltan.length ? `Diagrama unifilar parcial: faltan ${faltan.join("; ")}.` : `Diagrama unifilar generado con ${todosCirc.length} circuito(s) y ${barras.length} barra(s).`
   };
 }
 

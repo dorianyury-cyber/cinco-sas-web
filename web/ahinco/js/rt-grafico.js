@@ -99,12 +99,21 @@ export function svgAPng(svg, escala = 2) {
 // la generación solar.
 const escX = (t) => String(t ?? "").replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;").replace(/"/g, "&quot;");
 const nf = (v, d = 1) => (Number.isFinite(v) ? v.toLocaleString("es-CO", { maximumFractionDigits: d }) : "—");
+// Parte un texto en dos líneas como máximo, cortando en el espacio más cercano al límite.
+const partir = (t, n = 17) => {
+  const s = String(t ?? "");
+  if (s.length <= n) return [s];
+  const i = s.lastIndexOf(" ", n);
+  const corte = i > 4 ? i : n;
+  const b = s.slice(corte).trim();
+  return [s.slice(0, corte).trim(), b.length > n ? `${b.slice(0, n - 1)}…` : b];
+};
 export function svgUnifilar(g) {
   const C = "#1f2732", NAR = "#d9820b", AZ = "#1f6fb2", VE = "#2e9e5b";
   const posteriores = g.barras.slice(g.barraC + 1);
   const salidas = [...posteriores.map((b) => ({ tipo: "b", ...b })), ...g.circuitos.map((c) => ({ tipo: "c", ...c })), ...(g.fv ? [{ tipo: "fv" }] : [])];
   const largoNombre = Math.max(10, ...g.barras.map((b) => String(b.nombre).length));
-  const paso = 100, x0 = Math.min(330, 60 + largoNombre * 6.4), W = Math.max(780, x0 + 40 + salidas.length * paso);
+  const paso = 110, x0 = Math.min(330, 60 + largoNombre * 6.4), W = Math.max(780, x0 + 40 + salidas.length * paso);
   let y = 26, s = "";
   const linea = (x1, y1, x2, y2, color = C, ancho = 2) => { s += `<line x1="${x1}" y1="${y1}" x2="${x2}" y2="${y2}" stroke="${color}" stroke-width="${ancho}"/>`; };
   const texto = (x, yy, t, { a = "start", t2 = 11, peso = "normal", color = "#222" } = {}) => { s += `<text x="${x}" y="${yy}" text-anchor="${a}" font-size="${t2}" font-weight="${peso}" fill="${color}">${escX(t)}</text>`; };
@@ -155,9 +164,12 @@ export function svgUnifilar(g) {
     if (c.tipo === "b") {
       linea(x, yC + 32, x, yC + 76);
       linea(x - 34, yC + 76, x + 34, yC + 76, C, 4);
-      texto(x, yC + 94, c.nombre, { a: "middle", peso: "bold", t2: 10 });
-      texto(x, yC + 107, Number.isFinite(c.ik3) ? `Ik" ${nf(c.ik3, 2)} kA` : "", { a: "middle", t2: 9.5, color: "#555" });
-      s += `<text x="${x + 6}" y="${yC + 46}" font-size="9.5" fill="#444">${escX(c.cable).slice(0, 34)}</text>`;
+      if (c.alim?.icu) texto(x + 11, yC + 29, `Icu ${nf(c.alim.icu, 0)} kA`, { t2: 9.5, peso: "bold" });
+      String(c.cable || "").split(", ").forEach((p, j) => texto(x + 7, yC + 48 + j * 11, p, { t2: 9.5, color: "#444" }));
+      partir(c.nombre).forEach((p, j) => texto(x, yC + 92 + j * 12, p, { a: "middle", peso: "bold", t2: 10 }));
+      const yK = yC + 92 + partir(c.nombre).length * 12 + 1;
+      if (Number.isFinite(c.ik3)) texto(x, yK, `Ik" ${nf(c.ik3, 2)} kA`, { a: "middle", t2: 9.5, color: "#555" });
+      if (c.icu) texto(x, yK + 11, `Icu ${nf(c.icu, 0)} kA`, { a: "middle", t2: 9.5, color: "#555" });
       return;
     }
     linea(x, yC + 32, x, yC + 70);
@@ -170,6 +182,6 @@ export function svgUnifilar(g) {
     texto(x, yC + 121, c.conductor, { a: "middle", t2: 9.5, color: "#333" });
     texto(x, yC + 133, `${nf(c.I, 1)} A`, { a: "middle", t2: 9.5, color: "#555" });
   });
-  const H = yC + (salidas.length ? 150 : 40);
+  const H = yC + (salidas.length ? 160 : 40);
   return `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 ${W} ${H}" width="${W}" height="${H}" font-family="Arial, Helvetica, sans-serif"><rect x="0" y="0" width="${W}" height="${H}" fill="#ffffff"/>${s}</svg>`;
 }

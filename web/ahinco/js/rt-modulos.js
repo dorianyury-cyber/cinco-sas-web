@@ -120,7 +120,8 @@ export const MODULOS = {
       { key: "proteccionMT", label: "Protección de media tensión", tipo: "texto", def: "Cortacircuitos con fusible tipo K" },
       { key: "dpsMT", label: "DPS en la llegada", tipo: "select", opciones: SI_NO, def: "Sí" },
       { key: "medidor", label: "Medida", tipo: "texto", def: "Medida semidirecta en baja tensión" },
-      { key: "barraCircuitos", label: "Barra de la que salen los circuitos (nombre del cortocircuito; vacío = la segunda barra)", tipo: "texto", def: "" }
+      { key: "barraCircuitos", label: "Barra de la que salen los circuitos (nombre del cortocircuito; vacío = la segunda barra)", tipo: "texto", def: "" },
+      { key: "circuitosOmitir", label: "Circuitos que no se dibujan como salida (códigos separados por coma; la acometida principal se omite sola)", tipo: "texto", def: "" }
     ]
   },
   cargas: {

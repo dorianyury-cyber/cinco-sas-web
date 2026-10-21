@@ -250,6 +250,7 @@ export function calcularProyecto(proyecto, guardados, { incluirEjemplos = false,
       const r = calcularModulo(id, entradas, proyecto, ctx);
       Object.assign(r, { modulo: id, clave, etiqueta: guardados[clave]?.etiqueta || "" });
       if (r.salidas && !ctx[id]) ctx[id] = r.salidas;
+      if (r.salidas) (ctx[`${id}Todos`] ||= []).push(r.salidas); // todas las instancias (p. ej. un cortocircuito por tablero)
       res[clave] = r;
     }
   }
