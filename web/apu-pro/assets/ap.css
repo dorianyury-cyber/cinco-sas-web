@@ -180,3 +180,4 @@
 #tablaManuales .ap-celda-acciones { width: auto; }
 #tablaManuales .ap-check { display: inline-flex; margin-right: 4px; }
 #consolidado { margin-top: 12px; }
+.ap-aviso-base { margin: 8px 0 0; display: flex; align-items: center; gap: 12px; flex-wrap: wrap; }

@@ -107,7 +107,8 @@ function pintarResumen() {
     <div><span>Ítems / capítulos</span><strong>${rev.items.length} / ${res.capitulos.length}</strong></div>
     <div><span>Hallazgos M / m / O</span><strong>${inc.filter((h) => h.sev === "Mayor").length} / ${inc.filter((h) => h.sev === "Menor").length} / ${inc.filter((h) => h.sev === "Observación").length}</strong></div>
     <div><span>Comparados con APU PRO</span><strong>${res.comparados.length}</strong></div>
-  </div>`;
+  </div>${res.baseSugerida ? `<div class="alert info show ap-aviso-base">El total no cuadra con lo registrado, pero sí cuadra si los valores de los ítems son «${esc(RV.BASES[res.baseSugerida].split(" (")[0])}». <button type="button" class="btn ap-btn" id="usarBase">Usar «${esc(RV.BASES[res.baseSugerida].split(" (")[0])}»</button></div>` : ""}`;
+  $("usarBase")?.addEventListener("click", () => { rev.base = res.baseSugerida; pintarDatos(); cambio(); mostrarSeccion(); });
 }
 
 function mostrarSeccion() {
@@ -224,9 +225,20 @@ function usarItems() {
     sugIns = new Map();
   }
   selItem = null; selApu = null; selIns = null;
+  // Con los APU se deduce qué incluyen los valores del presupuesto, el AIU y el IVA.
+  let deducido = "";
+  if (lecturaApus.length && rev.items.length) {
+    const d = RV.datosDesdeApus(rev.items, apusOferta);
+    if (d.base) rev.base = d.base;
+    if (d.aiu.a != null || d.aiu.i != null || d.aiu.u != null) rev.aiu = { a: d.aiu.a || 0, i: d.aiu.i || 0, u: d.aiu.u || 0 };
+    if (d.iva != null) rev.iva = d.iva;
+    if (d.regimenIva) rev.regimenIva = d.regimenIva;
+    pintarDatos();
+    if (d.base) deducido = ` Según los APU, los valores de los ítems son «${RV.BASES[d.base].split(" (")[0]}», con AIU ${numero((rev.aiu.a || 0) * 100, 2)} / ${numero((rev.aiu.i || 0) * 100, 2)} / ${numero((rev.aiu.u || 0) * 100, 2)} % e IVA del ${numero((rev.iva || 0) * 100, 2)} % ${rev.regimenIva === "utilidad" ? "sobre la utilidad" : "sobre el subtotal"}: ya quedó registrado; confírmalo en «Datos, AIU e IVA».`;
+  }
   calcularSugerencias();
   cambio();
-  mostrarAlerta(alerta, `Se cargaron ${rev.items.length} ítems${apusOferta.length ? ` y ${apusOferta.length} APU del oferente` : ""}. Registra ahora el AIU y el IVA de la oferta y guarda.`, "success");
+  mostrarAlerta(alerta, `Se cargaron ${rev.items.length} ítems${apusOferta.length ? ` y ${apusOferta.length} APU del oferente` : ""}.${deducido || " Registra ahora el AIU y el IVA de la oferta y guarda."}`, "success");
   location.hash = "datos";
 }
 

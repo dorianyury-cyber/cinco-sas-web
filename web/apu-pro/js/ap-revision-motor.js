@@ -303,7 +303,16 @@ export function revisar(rev, { precioApu = () => null, apus = [], precioInsumo =
   else if (items.length) agregar({ clave: "incompletos", titulo: "Ítems completos", estado: "ok", texto: "Todos los ítems tienen unidad, cantidad y valor unitario." });
 
   // 3. Total declarado
+  // Si el total no cuadra con lo registrado pero sí con otra base («precio final», «con AIU»),
+  // el error es del registro, no de la oferta: se avisa qué cambiar y no se cuenta como hallazgo.
+  let baseSugerida = null;
   if (declarado > 0 && items.length) {
+    const cuadra = (t) => Math.abs(declarado - t) <= Math.max(1000, declarado * 0.0005);
+    if (!cuadra(total)) baseSugerida = ["final", "conAiu", "cd"].find((b) => b !== (rev.base || "cd") && cuadra((sumaItems / factores({ ...rev, base: b }).base) * F.final)) || null;
+  }
+  if (baseSugerida) agregar({ clave: "total", titulo: "Revisa qué incluyen los valores de los ítems", estado: "info",
+    texto: `El total declarado (${pesosTxt(declarado)}) cuadra si los valores de los ítems son «${BASES[baseSugerida].split(" (")[0]}», no «${BASES[rev.base || "cd"].split(" (")[0]}» como está registrado. Corrígelo en «Datos, AIU e IVA».` });
+  else if (declarado > 0 && items.length) {
     const dif = declarado - total;
     if (Math.abs(dif) > Math.max(1000, declarado * 0.0005)) agregar({ clave: "total", titulo: "Total declarado", estado: "hallazgo", sev: Math.abs(dif) > declarado * 0.005 ? "Mayor" : "Menor", tema: "Aritmética",
       texto: `El total declarado (${pesosTxt(declarado)}) no coincide con la suma de los ítems con el AIU y el IVA declarados (${pesosTxt(total)}): diferencia de ${pesosTxt(dif)}.`, itemsRef: [], impacto: dif,
@@ -401,7 +410,36 @@ export function revisar(rev, { precioApu = () => null, apus = [], precioInsumo =
 
   const resApus = apus.length ? revisarApus(rev, apus, { F, items, valor, valorFinal, agregar, precioInsumo }) : null;
 
-  return { F, sumaItems, comp, total, declarado, valorFinal, capitulos, verificaciones: V, porItem, pareto, comparados, vExceso, apus: resApus };
+  return { F, sumaItems, comp, total, declarado, valorFinal, capitulos, verificaciones: V, porItem, pareto, comparados, vExceso, apus: resApus, baseSugerida };
+}
+
+// Lo que dicen los APU del oferente sobre la oferta: qué incluyen los valores del presupuesto
+// (si el precio de cada ítem es el costo directo, el precio con AIU o el precio final de su APU),
+// el AIU y el IVA más frecuentes. Sirve para prellenar «Datos, AIU e IVA» al importar un PDF.
+export function datosDesdeApus(items, apus) {
+  const porCodigo = new Map(apus.map((a) => [codNorm(a.item), a]));
+  const votos = { cd: 0, conAiu: 0, final: 0 };
+  const cerca = (x, y) => x != null && y != null && Math.abs(x - y) <= Math.max(1, Math.abs(y) * 0.001);
+  for (const it of items) {
+    const a = porCodigo.get(codNorm(it.item));
+    if (!a || it.vu == null) continue;
+    if (cerca(it.vu, a.pu)) votos.final++;
+    else if (cerca(it.vu, a.sai)) votos.conAiu++;
+    else if (cerca(it.vu, a.cd)) votos.cd++;
+  }
+  const moda = (vals) => { const c = new Map(); for (const v of vals) if (v != null) { const k = Math.round(v * 10000) / 10000; c.set(k, (c.get(k) || 0) + 1); } return [...c.entries()].sort((p, q) => q[1] - p[1])[0]?.[0] ?? null; };
+  const base = Object.entries(votos).sort((p, q) => q[1] - p[1])[0];
+  const pct = (k) => moda(apus.map((a) => a.aiu?.[k]?.pct));
+  const ivaPct = moda(apus.map((a) => a.iva?.pct));
+  // IVA sobre el subtotal o sobre la utilidad: el que reproduce el valor del IVA de los APU.
+  let regimen = null;
+  const conIva = apus.filter((a) => a.iva?.v != null && a.cd != null);
+  if (conIva.length && ivaPct != null) {
+    const sobreTotal = conIva.filter((a) => cerca(a.iva.v, (a.sai ?? a.cd * (1 + (pct("a") || 0) + (pct("i") || 0) + (pct("u") || 0))) * ivaPct)).length;
+    const sobreU = conIva.filter((a) => a.aiu?.u?.v != null && cerca(a.iva.v, a.aiu.u.v * ivaPct)).length;
+    regimen = sobreTotal >= sobreU ? (sobreTotal ? "total" : null) : "utilidad";
+  }
+  return { base: base[1] ? base[0] : null, votos, aiu: { a: pct("a"), i: pct("i"), u: pct("u") }, iva: ivaPct, regimenIva: regimen };
 }
 
 // ---------------------------------------------------------------- APU del oferente
