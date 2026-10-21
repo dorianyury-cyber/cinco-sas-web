@@ -147,3 +147,36 @@
 .ap-sugerencia input { width: 70px; text-align: right; }
 .ap-tabla-presu .ap-celda-acciones { width: auto; }
 .ap-tabla-presu .ap-celda-acciones .rt-icono-btn { width: 26px; height: 26px; font-size: 12px; margin-left: 2px; }
+
+/* Revisión de ofertas */
+.ap-pegar { margin-top: 12px; }
+.ap-pegar summary, .ap-corregir summary { cursor: pointer; font-size: 13px; font-weight: 600; color: var(--text-muted); }
+.ap-pegar textarea { width: 100%; margin: 8px 0; padding: 8px 10px; border: 1px solid var(--border); border-radius: 8px; background: var(--input-bg); color: var(--text); font: 12px/1.4 ui-monospace, Consolas, monospace; }
+.ap-fila-form select, .ap-fila-form input[type="number"] { padding: 7px 10px; border: 1px solid var(--border); border-radius: 8px; background: var(--input-bg); color: var(--text); font-size: 13px; }
+.ap-fila-form input[type="number"] { width: 90px; }
+.ap-fila-form .ap-crece { flex: 1 1 260px; }
+.ap-fila-form .ap-crece input { width: 100%; }
+.ap-ref { margin-top: 10px; padding-top: 8px; border-top: 1px dashed var(--border); }
+.ap-ref h3 { margin: 0 0 6px; font-size: 11px; text-transform: uppercase; letter-spacing: .5px; color: var(--text-muted); }
+.ap-sugerencias { display: flex; flex-direction: column; gap: 4px; }
+.ap-sug { display: flex; align-items: center; gap: 8px; text-align: left; padding: 5px 10px; border: 1px solid var(--border); border-radius: 8px; background: var(--card-bg); color: var(--text); font-size: 12.5px; cursor: pointer; }
+.ap-sug:hover { border-color: var(--cinco-orange); }
+.ap-sug small { margin-left: auto; color: var(--text-muted); white-space: nowrap; }
+.ap-sug .badge { padding: 0 7px; font-size: 10.5px; }
+.ap-corregir { margin-top: 8px; }
+.ap-txt-danger { color: var(--danger); font-weight: 600; }
+.ap-txt-warn { color: var(--cinco-orange-dark); font-weight: 600; }
+.ap-txt-ok { color: var(--success, #2f9e55); }
+.ap-verif { display: grid; grid-template-columns: 92px minmax(0, 1fr); gap: 10px; align-items: start; padding: 8px 0; border-bottom: 1px dotted var(--border); font-size: 13px; }
+.ap-verif > .badge { justify-self: start; text-align: center; min-width: 78px; }
+.ap-verif p { margin: 2px 0 0; color: var(--text-muted); }
+.ap-verif-h p { color: var(--text); }
+.ap-verif .ap-fila-form { margin-top: 6px; }
+.ap-verif.ap-excluido > div > strong, .ap-verif.ap-excluido p { opacity: .55; }
+.ap-check { flex-direction: row !important; align-items: center; gap: 6px !important; white-space: nowrap; align-self: center; }
+.ap-fila-form label::before, .ap-accion::before, .ap-check::before { content: none !important; display: none !important; }
+.ap-accion { display: flex; flex-direction: column; gap: 4px; margin-top: 6px; font-size: 12.5px; font-weight: 600; color: var(--text-muted); }
+.ap-accion textarea { padding: 6px 10px; border: 1px solid var(--border); border-radius: 8px; background: var(--input-bg); color: var(--text); font-size: 12.5px; font-weight: 400; }
+#tablaManuales .ap-celda-acciones { width: auto; }
+#tablaManuales .ap-check { display: inline-flex; margin-right: 4px; }
+#consolidado { margin-top: 12px; }

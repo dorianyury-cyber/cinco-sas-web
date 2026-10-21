@@ -280,6 +280,28 @@ export async function listarVersionesProyecto(id) {
   return snap.docs.map((d) => ({ id: d.id, ...d.data() })).sort((a, b) => (b.numero || 0) - (a.numero || 0));
 }
 
+// ---------------------------------------------------------------- revisiones de presupuestos de terceros
+// apRevisiones/{id} = { codigo, nombre, oferente, cliente, fechaOferta, documento, base, aiu, iva,
+//   regimenIva, totalDeclarado, capitulos, items, ajustes, hallazgos, concepto, resumen, creadoPor, ... }
+export async function listarRevisiones() {
+  const snap = await getDocs(collection(db, "apRevisiones"));
+  return snap.docs.map((d) => ({ id: d.id, ...d.data() }));
+}
+export async function leerRevision(id) {
+  const snap = await getDoc(doc(db, "apRevisiones", id));
+  return snap.exists() ? { id: snap.id, ...snap.data() } : null;
+}
+export async function crearRevision(datos, user) {
+  const ref = doc(collection(db, "apRevisiones"));
+  await setDoc(ref, { ...datos, creadoPor: user.email, creadoEn: serverTimestamp(), actualizadoPor: user.email, actualizadoEn: serverTimestamp() });
+  return ref.id;
+}
+export async function guardarRevision(id, datos, user) {
+  const { id: _, creadoPor, creadoEn, ...resto } = datos;
+  await updateDoc(doc(db, "apRevisiones", id), { ...resto, actualizadoPor: user.email, actualizadoEn: serverTimestamp() });
+}
+export async function eliminarRevision(id) { await deleteDoc(doc(db, "apRevisiones", id)); }
+
 // ---------------------------------------------------------------- base inicial
 // Carga el archivo «APU PRO - base inicial de insumos.json» (formato apupro-semilla):
 // parámetros por año, IPP, monedas e insumos. Los insumos que ya existan no se

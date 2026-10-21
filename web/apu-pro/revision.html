@@ -1,0 +1,169 @@
+<!doctype html>
+<html lang="es" class="ap-preparando">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<meta name="robots" content="noindex, nofollow">
+<title>Revisión — APU PRO</title>
+<link rel="icon" type="image/png" sizes="32x32" href="../assets/img/favicon-32.png">
+<link rel="stylesheet" href="../interventoria-pro/assets/ip.css">
+<link rel="stylesheet" href="../ahinco/assets/rt.css">
+<link rel="stylesheet" href="assets/ap.css">
+</head>
+<body>
+  <div class="app-shell">
+    <aside class="sidebar rt-sidebar" id="sidebar"></aside>
+    <main class="main rt-main">
+      <div class="rt-encabezado ap-proy-cabeza">
+        <div>
+          <a class="ap-volver" href="revisiones.html" id="volver">← Revisión de ofertas</a>
+          <h1 id="titulo">Revisión</h1>
+          <p class="text-muted" id="subtitulo"></p>
+        </div>
+        <div class="rt-acciones">
+          <span class="badge warn hidden" id="sucio">Cambios sin guardar</span>
+          <button type="button" class="btn" id="guardarBtn">💾 Guardar</button>
+        </div>
+      </div>
+      <div class="alert" id="alerta"></div>
+      <section class="card ap-resumen-apu" id="resumen"></section>
+      <nav class="ap-pestanas" id="pestanas">
+        <a href="#importar" data-sec="importar" class="ap-pestana">📥 Importar</a>
+        <a href="#datos" data-sec="datos" class="ap-pestana">⚙ Datos, AIU e IVA</a>
+        <a href="#items" data-sec="items" class="ap-pestana">📋 Ítems <span id="nItems">0</span></a>
+        <a href="#hallazgos" data-sec="hallazgos" class="ap-pestana">✅ Verificaciones y hallazgos <span id="nHallazgos">0</span></a>
+        <a href="#informe" data-sec="informe" class="ap-pestana">⬇ Informe</a>
+      </nav>
+
+      <section data-panel="importar" class="hidden">
+        <div class="card">
+          <h2>1. Tabla del presupuesto del oferente</h2>
+          <p class="text-muted ap-nota">Carga el Excel de la oferta o pega la tabla copiada desde Excel (con encabezados: ítem, descripción, unidad, cantidad, valor unitario, valor total). Si la oferta llegó en PDF, cópiala primero a Excel. Las filas con descripción y sin cantidad ni valor unitario se toman como capítulos; las de subtotales y totales se omiten.</p>
+          <div class="ap-fila-form">
+            <label>Archivo Excel (.xlsx)<input type="file" id="archivo" accept=".xlsx,application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"></label>
+            <label class="hidden" id="hojaCampo">Hoja<select id="hoja"></select></label>
+          </div>
+          <details class="ap-pegar">
+            <summary>O pega la tabla aquí</summary>
+            <textarea id="pegado" rows="6" placeholder="Copia las filas en Excel (incluidos los encabezados) y pégalas aquí."></textarea>
+            <div class="rt-acciones"><button type="button" class="btn secondary ap-btn" id="leerPegado">Leer tabla pegada</button></div>
+          </details>
+        </div>
+        <div class="card hidden" id="mapeoCard">
+          <h2>2. Columnas</h2>
+          <p class="text-muted ap-nota">Revisa que cada dato esté en la columna correcta. La vista previa muestra las primeras filas desde los encabezados.</p>
+          <div class="ap-fila-form" id="mapeo"></div>
+          <div class="tabla-scroll ap-scroll-corto"><table class="ap-tabla ap-tabla-mini" id="previa"></table></div>
+          <p class="ap-progreso" id="lectura"></p>
+          <div class="rt-acciones"><button type="button" class="btn ap-btn" id="usarItems">Usar estos ítems</button></div>
+        </div>
+      </section>
+
+      <section data-panel="datos" class="hidden">
+        <div class="card">
+          <h2>Datos de la oferta</h2>
+          <form class="rt-form-grid ap-form-apu" id="datosForm">
+            <div><label for="rCodigo">Código</label><input id="rCodigo"></div>
+            <div class="ap-ancho2"><label for="rNombre">Oferta o presupuesto revisado</label><input id="rNombre"></div>
+            <div><label for="rFecha">Fecha de la oferta</label><input id="rFecha" type="date"></div>
+            <div><label for="rOferente">Oferente</label><input id="rOferente"></div>
+            <div><label for="rCliente">Contratante</label><input id="rCliente"></div>
+            <div class="ap-ancho2"><label for="rDocumento">Documento revisado</label><input id="rDocumento" placeholder="Nombre del archivo o referencia de la oferta"></div>
+          </form>
+        </div>
+        <div class="ap-dos">
+          <div class="card">
+            <h2>AIU e IVA declarados</h2>
+            <form class="rt-form-grid" id="aiuForm">
+              <div class="rt-ancho"><label for="rBase">Los valores de los ítems son</label><select id="rBase"></select></div>
+              <div><label for="rA">Administración (%)</label><input id="rA" inputmode="decimal"></div>
+              <div><label for="rI">Imprevistos (%)</label><input id="rI" inputmode="decimal"></div>
+              <div><label for="rU">Utilidad (%)</label><input id="rU" inputmode="decimal"></div>
+              <div><label for="rIva">IVA (%)</label><input id="rIva" inputmode="decimal"></div>
+              <div class="rt-ancho"><label for="rRegimen">IVA se liquida</label><select id="rRegimen"></select></div>
+              <div class="rt-ancho"><label for="rTotal">Total declarado en la oferta ($)</label><input id="rTotal" inputmode="decimal" placeholder="Para conciliar con la suma de los ítems"></div>
+            </form>
+          </div>
+          <div class="card">
+            <h2>Concepto</h2>
+            <form class="rt-form-grid" id="conceptoForm">
+              <div class="rt-ancho"><label for="rConcepto">Concepto de la revisión</label><select id="rConcepto"></select></div>
+              <div class="rt-ancho"><label for="rConceptoTexto">Sustentación del concepto</label><textarea id="rConceptoTexto" rows="4" placeholder="Síntesis de lo encontrado y por qué"></textarea></div>
+              <div class="rt-ancho"><label for="rRecomendaciones">Recomendaciones</label><textarea id="rRecomendaciones" rows="3" placeholder="Ej. (1) definir el régimen del IVA; (2) pedir los ajustes de los hallazgos…"></textarea></div>
+            </form>
+          </div>
+        </div>
+        <div class="card">
+          <h2>Textos del informe</h2>
+          <form class="rt-form-grid" id="textosForm">
+            <div class="rt-ancho"><label for="rObjeto">Objeto y alcance (opcional: si se deja vacío se arma con los datos de la oferta)</label><textarea id="rObjeto" rows="3"></textarea></div>
+            <div class="rt-ancho"><label for="rLimitaciones">Limitaciones</label><textarea id="rLimitaciones" rows="3"></textarea></div>
+          </form>
+        </div>
+      </section>
+
+      <section data-panel="items" class="hidden">
+        <section class="card ap-vp" id="itemDetalle"></section>
+        <div class="toolbar ap-toolbar">
+          <input type="search" id="buscarItem" placeholder="Buscar por ítem o descripción…">
+          <select id="filtroItems">
+            <option value="">Todos los ítems</option>
+            <option value="obs">Con hallazgos</option>
+            <option value="sinref">Sin APU de referencia</option>
+            <option value="sugerida">Con sugerencia sin confirmar</option>
+            <option value="encima">Por encima de APU PRO</option>
+          </select>
+          <span class="text-muted ap-cuenta" id="cuentaItems"></span>
+          <button type="button" class="btn secondary ap-btn" id="confirmarSug" title="Confirma como referencia la sugerencia de cada ítem cuando su parecido es de 70 % o más">Confirmar sugerencias ≥ 70 %</button>
+        </div>
+        <div class="card ap-lista"><div class="tabla-scroll"><table class="ap-tabla ap-tabla-sel" id="tablaItems"></table></div></div>
+      </section>
+
+      <section data-panel="hallazgos" class="hidden">
+        <div class="card">
+          <h2>Verificaciones automáticas</h2>
+          <p class="text-muted ap-nota">Se recalculan con cada cambio. Los hallazgos se pueden excluir del informe, cambiar de severidad o completar con un comentario y la acción requerida.</p>
+          <div id="verificaciones"></div>
+        </div>
+        <div class="card">
+          <h2>Hallazgos del revisor</h2>
+          <p class="text-muted ap-nota">Lo que no se detecta solo: alcance frente a planos, especificaciones, insumos de los APU del oferente, cantidades verificadas en obra, condiciones contractuales…</p>
+          <div id="manuales"></div>
+          <div class="rt-acciones"><button type="button" class="btn secondary ap-btn" id="agregarHallazgo">＋ Agregar hallazgo</button></div>
+        </div>
+      </section>
+
+      <section data-panel="informe" class="hidden">
+        <div class="card">
+          <h2>Informe de la revisión</h2>
+          <p class="text-muted ap-nota">El informe RD se importa en Informes (Cinco Conecta) con «Importar JSON»; el Excel trae el resumen, los hallazgos y el presupuesto ítem por ítem con fórmulas. Guarda la revisión antes de descargar.</p>
+          <div class="rt-acciones">
+            <button type="button" class="btn ap-btn" id="descargarRD">⬇ Informe RD (JSON para Informes)</button>
+            <button type="button" class="btn secondary ap-btn" id="descargarExcel">⬇ Excel de detalle</button>
+          </div>
+          <div id="consolidado"></div>
+        </div>
+      </section>
+    </main>
+  </div>
+
+  <dialog class="rt-dialogo rt-dialogo-medio" id="hallazgoDlg">
+    <div class="rt-dialogo-cabeza"><h2 id="hallazgoTitulo">Hallazgo</h2><button type="button" class="rt-icono-btn" data-cerrar title="Cerrar">✕</button></div>
+    <form id="hallazgoForm" class="rt-form-grid">
+      <div><label for="hSev">Severidad</label><select id="hSev"></select></div>
+      <div><label for="hTema">Tema</label><input id="hTema" placeholder="Ej. Alcance, Precios, Cantidades"></div>
+      <div class="rt-ancho"><label for="hTitulo">Título corto</label><input id="hTitulo" placeholder="Ej. Cielo raso completo sin soporte"></div>
+      <div class="rt-ancho"><label for="hTexto">Hallazgo</label><textarea id="hTexto" rows="4" required></textarea></div>
+      <div><label for="hItems">Ítems</label><input id="hItems" placeholder="Ej. 8-1, 8-2"></div>
+      <div><label for="hImpacto">Impacto estimado ($)</label><input id="hImpacto" inputmode="decimal" placeholder="Vacío si no se cuantifica"></div>
+      <div class="rt-ancho"><label for="hImpactoTexto">Impacto en texto (si no es un valor)</label><input id="hImpactoTexto" placeholder="Ej. Por cotizar, Riesgo de adicionales"></div>
+      <div class="rt-ancho"><label for="hAccion">Acción requerida</label><textarea id="hAccion" rows="2"></textarea></div>
+    </form>
+    <div class="alert" id="hallazgoAlerta"></div>
+    <div class="rt-acciones"><button type="button" class="btn" id="hallazgoGuardar">Aplicar</button><button type="button" class="btn secondary" data-cerrar>Cancelar</button></div>
+  </dialog>
+  <datalist id="dlApus"></datalist>
+  <script src="../js/vendor/exceljs.min.js"></script>
+  <script type="module" src="js/ap-revision.js"></script>
+</body>
+</html>
