@@ -31,6 +31,8 @@
         <a href="#importar" data-sec="importar" class="ap-pestana">📥 Importar</a>
         <a href="#datos" data-sec="datos" class="ap-pestana">⚙ Datos, AIU e IVA</a>
         <a href="#items" data-sec="items" class="ap-pestana">📋 Ítems <span id="nItems">0</span></a>
+        <a href="#apus" data-sec="apus" class="ap-pestana hidden" id="pestanaApus">📑 APU del oferente <span id="nApus">0</span></a>
+        <a href="#insumos" data-sec="insumos" class="ap-pestana hidden" id="pestanaInsumos">🧱 Insumos <span id="nInsumos">0</span></a>
         <a href="#hallazgos" data-sec="hallazgos" class="ap-pestana">✅ Verificaciones y hallazgos <span id="nHallazgos">0</span></a>
         <a href="#informe" data-sec="informe" class="ap-pestana">⬇ Informe</a>
       </nav>
@@ -38,11 +40,12 @@
       <section data-panel="importar" class="hidden">
         <div class="card">
           <h2>1. Tabla del presupuesto del oferente</h2>
-          <p class="text-muted ap-nota">Carga el Excel de la oferta o pega la tabla copiada desde Excel (con encabezados: ítem, descripción, unidad, cantidad, valor unitario, valor total). Si la oferta llegó en PDF, cópiala primero a Excel. Las filas con descripción y sin cantidad ni valor unitario se toman como capítulos; las de subtotales y totales se omiten.</p>
+          <p class="text-muted ap-nota">Carga la oferta en PDF o en Excel, o pega la tabla copiada desde Excel (con encabezados: ítem, descripción, unidad, cantidad, valor unitario, valor total). Del PDF se leen el presupuesto y los APU del oferente (equipos, materiales, transporte, mano de obra y AIU). Las filas con descripción y sin cantidad ni valor unitario se toman como capítulos; las de subtotales y totales se omiten.</p>
           <div class="ap-fila-form">
-            <label>Archivo Excel (.xlsx)<input type="file" id="archivo" accept=".xlsx,application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"></label>
+            <label>Oferta en PDF o Excel (.pdf, .xlsx)<input type="file" id="archivo" accept=".pdf,.xlsx,application/pdf,application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"></label>
             <label class="hidden" id="hojaCampo">Hoja<select id="hoja"></select></label>
           </div>
+          <p class="ap-progreso" id="progresoPdf"></p>
           <details class="ap-pegar">
             <summary>O pega la tabla aquí</summary>
             <textarea id="pegado" rows="6" placeholder="Copia las filas en Excel (incluidos los encabezados) y pégalas aquí."></textarea>
@@ -119,6 +122,40 @@
         <div class="card ap-lista"><div class="tabla-scroll"><table class="ap-tabla ap-tabla-sel" id="tablaItems"></table></div></div>
       </section>
 
+      <section data-panel="apus" class="hidden">
+        <section class="card ap-vp" id="apuDetalle"></section>
+        <div class="toolbar ap-toolbar">
+          <input type="search" id="buscarApu" placeholder="Buscar por ítem o descripción…">
+          <select id="filtroApus">
+            <option value="">Todos los APU</option>
+            <option value="obs">Con hallazgos</option>
+            <option value="difiere">Precio distinto al del presupuesto</option>
+            <option value="sinItem">Sin ítem en el presupuesto</option>
+          </select>
+          <span class="text-muted ap-cuenta" id="cuentaApus"></span>
+        </div>
+        <div class="card ap-lista"><div class="tabla-scroll"><table class="ap-tabla ap-tabla-sel" id="tablaApus"></table></div></div>
+      </section>
+
+      <section data-panel="insumos" class="hidden">
+        <section class="card ap-vp" id="insumoDetalle"></section>
+        <div class="toolbar ap-toolbar">
+          <input type="search" id="buscarInsumo" placeholder="Buscar insumo…">
+          <select id="filtroInsumos">
+            <option value="MA">Materiales</option>
+            <option value="MO">Mano de obra</option>
+            <option value="EQ">Equipos y herramientas</option>
+            <option value="TR">Transporte</option>
+            <option value="ED">EPP y dotación</option>
+            <option value="">Todos</option>
+          </select>
+          <span class="text-muted ap-cuenta" id="cuentaInsumos"></span>
+          <button type="button" class="btn secondary ap-btn" id="confirmarSugIns" title="Confirma como referencia la sugerencia de la base de APU PRO cuando su parecido es de 70 % o más">Confirmar sugerencias ≥ 70 %</button>
+        </div>
+        <p class="text-muted ap-nota">Insumos de los APU del oferente con su cantidad y valor en todo el presupuesto (cantidad del APU × cantidad del ítem), ordenados de mayor a menor peso. Asigna el insumo equivalente de la base de APU PRO para comparar su precio.</p>
+        <div class="card ap-lista"><div class="tabla-scroll"><table class="ap-tabla ap-tabla-sel" id="tablaInsumos"></table></div></div>
+      </section>
+
       <section data-panel="hallazgos" class="hidden">
         <div class="card">
           <h2>Verificaciones automáticas</h2>
@@ -164,6 +201,7 @@
   </dialog>
   <datalist id="dlApus"></datalist>
   <script src="../js/vendor/exceljs.min.js"></script>
+  <script src="../js/vendor/pdfjs/pdf.min.js"></script>
   <script type="module" src="js/ap-revision.js"></script>
 </body>
 </html>

@@ -438,6 +438,10 @@ service cloud.firestore {
       allow create: if puedeApuPro() && request.resource.data.creadoPor == request.auth.token.email;
       allow update: if puedeApuPro() && request.resource.data.creadoPor == resource.data.creadoPor;
       allow delete: if puedeApuPro() && (esAdmin() || resource.data.creadoPor == request.auth.token.email);
+      // APU del oferente leídos del PDF, en bloques.
+      match /apus/{bloqueId} {
+        allow read, write: if puedeApuPro();
+      }
     }
     // Biblioteca de APU: cada guardado deja una copia inmutable en «versiones».
     match /apApus/{codigo} {

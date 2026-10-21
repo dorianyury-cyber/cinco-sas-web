@@ -1,30 +1,35 @@
-// Editor de una revisión de oferta de terceros: importación de la tabla del presupuesto
-// (Excel o texto pegado), datos de AIU e IVA, ítems con su APU de referencia de APU PRO,
-// verificaciones automáticas, hallazgos del revisor e informe (RD para Informes y Excel).
-import { iniciarPagina, leerRevision, guardarRevision, listarApus, listarInsumos, listarParametros, parametrosVigentes, esc, pesos, numero, leerNumero, mostrarAlerta, limpiarAlerta, errorAmigable, colgroupProporcional, aplicarAnchos } from "./ap-core.js";
+// Editor de una revisión de oferta de terceros: importación de la oferta (PDF con presupuesto
+// y APU, Excel o texto pegado), datos de AIU e IVA, ítems con su APU de referencia de APU PRO,
+// APU e insumos del oferente, verificaciones automáticas, hallazgos del revisor e informe
+// (RD para Informes y Excel).
+import { iniciarPagina, leerRevision, guardarRevision, leerApusRevision, guardarApusRevision, listarApus, listarInsumos, listarParametros, parametrosVigentes, esc, pesos, numero, leerNumero, mostrarAlerta, limpiarAlerta, errorAmigable, colgroupProporcional, aplicarAnchos } from "./ap-core.js";
 import { pintarMenu } from "./ap-shell.js";
 import { calcularApu } from "./ap-apu.js";
-import { normalizar } from "./ap-calculos.js";
+import { normalizar, valorMensual } from "./ap-calculos.js";
 import { logoBase64 } from "./ap-formato.js";
 import * as RV from "./ap-revision-motor.js";
+import { leerPaginas, tablaPresupuesto, leerApus } from "./ap-pdf.js";
 
 const ctx = await iniciarPagina();
 const $ = (id) => document.getElementById(id);
 const alerta = $("alerta");
 const id = new URLSearchParams(location.search).get("id");
-let rev = null, apus = new Map(), insumos = new Map(), parametros = null, indice = [], sugerencias = new Map(), precios = new Map();
-let res = null, hallazgos = [], sucio = false, selItem = null, matriz = null, lectura = null, editando = null;
+let rev = null, apus = new Map(), insumos = new Map(), parametros = null, indice = [], indiceIns = [], sugerencias = new Map(), sugIns = new Map(), precios = new Map();
+let res = null, hallazgos = [], sucio = false, apusSucio = false, selItem = null, selApu = null, selIns = null, matriz = null, lectura = null, lecturaApus = [], editando = null;
+let apusOferta = []; // APU del oferente leídos del PDF (se guardan aparte, en bloques)
 
 
 async function iniciar() {
   try {
-    const [r, lista, ins, par] = await Promise.all([leerRevision(id), listarApus(), listarInsumos(), listarParametros()]);
+    const [r, lista, ins, par, apo] = await Promise.all([leerRevision(id), listarApus(), listarInsumos(), listarParametros(), leerApusRevision(id).catch(() => [])]);
     if (!r) throw new Error("No se encontró la revisión.");
-    rev = { ajustes: {}, hallazgos: [], items: [], capitulos: [], ...r };
+    rev = { ajustes: {}, hallazgos: [], items: [], capitulos: [], refInsumos: {}, ...r };
+    apusOferta = apo;
     apus = new Map(lista.map((a) => [a.codigo, a]));
     insumos = new Map(ins.map((x) => [x.codigo, x]));
     parametros = parametrosVigentes(par);
     indice = RV.indiceApus(lista);
+    indiceIns = RV.indiceApus(ins.map((x) => ({ codigo: x.codigo, nombre: `${x.descripcion}`, unidad: x.unidad, tipo: x.tipo })));
     pintarMenu(ctx, { activo: "revisiones" });
     $("dlApus").innerHTML = lista.sort((a, b) => a.codigo.localeCompare(b.codigo, "es", { numeric: true })).map((a) => `<option value="${esc(`${a.codigo} — ${a.nombre}`)}"></option>`).join("");
     $("volver").href = `revisiones.html#${encodeURIComponent(id)}`;
@@ -52,13 +57,34 @@ function calcularSugerencias() {
   sugerencias = new Map();
   for (const it of rev.items) if (!it.ref?.codigo) sugerencias.set(it.id, RV.sugerirApus(it, indice, 3));
 }
+// Precio de un insumo de la base de APU PRO (mano de obra: jornal con prestaciones).
+function precioInsumo(codigo) {
+  const x = insumos.get(codigo);
+  if (!x) return null;
+  if (x.tipo === "MO") { const r = calcularApu({ rendimiento: 1, lineas: { MO: [{ codigo, cantidad: 1 }] } }, { insumo: (c) => insumos.get(c) || null, parametros, redondeo: "normal" }); return r.costoDirecto || null; }
+  // Equipos y transporte: el oferente los cobra por día; la base los tiene por mes.
+  if (x.tipo === "EH" || x.tipo === "TV") { if (x.base === "unidad") return Number(x.precio) || null; const m = valorMensual(x); return m ? m / (Number(parametros?.diasHabiles) || 21) : null; }
+  if (x.tipo === "ED") return null;
+  return x.precio != null ? Number(x.precio) : null;
+}
 function recalcular() {
-  res = RV.revisar(rev, { precioApu });
+  res = RV.revisar(rev, { precioApu, apus: apusOferta, precioInsumo });
   hallazgos = RV.hallazgosRevision(rev, res);
   const inc = hallazgos.filter((h) => h.incluir);
   $("nItems").textContent = rev.items.length;
   $("nHallazgos").textContent = inc.length;
+  $("nApus").textContent = apusOferta.length;
+  $("nInsumos").textContent = res.apus?.insumos.length || 0;
+  $("pestanaApus").classList.toggle("hidden", !apusOferta.length);
+  $("pestanaInsumos").classList.toggle("hidden", !apusOferta.length);
   pintarResumen();
+}
+function calcularSugIns() {
+  sugIns = new Map();
+  for (const e of res?.apus?.insumos || []) if (!rev.refInsumos?.[e.clave]) {
+    const tipo = { MA: "MA", MO: "MO", EQ: "EH", ED: "ED", TR: "TV" }[e.sec];
+    sugIns.set(e.clave, RV.sugerirApus({ desc: e.d, und: e.u }, indiceIns.filter((x) => !tipo || insumos.get(x.codigo)?.tipo === tipo), 3));
+  }
 }
 function marcarSucio(v = true) {
   sucio = v;
@@ -89,6 +115,8 @@ function mostrarSeccion() {
   document.querySelectorAll("[data-panel]").forEach((p) => p.classList.toggle("hidden", p.dataset.panel !== sec));
   document.querySelectorAll("#pestanas [data-sec]").forEach((a) => a.classList.toggle("activa", a.dataset.sec === sec));
   if (sec === "items") pintarItems();
+  if (sec === "apus") pintarApus();
+  if (sec === "insumos") { if (!sugIns.size) calcularSugIns(); pintarInsumos(); }
   if (sec === "hallazgos") pintarHallazgos();
   if (sec === "informe") pintarInforme();
 }
@@ -99,6 +127,8 @@ async function leerArchivo() {
   const f = $("archivo").files[0];
   if (!f) return;
   limpiarAlerta(alerta);
+  if (/\.pdf$/i.test(f.name) || f.type === "application/pdf") return leerPdf(f);
+  lecturaApus = [];
   try {
     const wb = new window.ExcelJS.Workbook();
     await wb.xlsx.load(await f.arrayBuffer());
@@ -116,7 +146,35 @@ async function leerArchivo() {
     mostrarMapeo(mejor.m, mejor.d);
   } catch (err) { mostrarAlerta(alerta, `No se pudo leer el Excel: ${errorAmigable(err)}`); }
 }
+// PDF: se lee el texto de cada página con pdf.js (en el navegador, sin enviar el archivo a
+// ningún servidor), se reconstruye la tabla del presupuesto y se leen los APU.
+async function leerPdf(f) {
+  const prog = $("progresoPdf");
+  $("hojaCampo").classList.add("hidden");
+  try {
+    const pdfjsLib = window.pdfjsLib;
+    if (!pdfjsLib) throw new Error("No se cargó el lector de PDF.");
+    pdfjsLib.GlobalWorkerOptions.workerSrc = "../js/vendor/pdfjs/pdf.worker.min.js";
+    const paginas = await leerPaginas(pdfjsLib, new Uint8Array(await f.arrayBuffer()), { progreso: (n, total) => { prog.textContent = `Leyendo la página ${n} de ${total}…`; } });
+    const conTexto = paginas.filter((p) => p.lineas.length > 3).length;
+    if (!conTexto) throw new Error("El PDF no tiene texto: parece escaneado (imágenes). Pide al oferente el PDF original o el Excel de la oferta.");
+    lecturaApus = leerApus(paginas);
+    const tp = tablaPresupuesto(paginas);
+    prog.textContent = `PDF de ${paginas.length} páginas${conTexto < paginas.length ? ` (${paginas.length - conTexto} sin texto)` : ""}: presupuesto en ${tp ? `${tp.paginas.length} página(s)` : "ninguna página"} y ${lecturaApus.length} APU.`;
+    if (!rev.documento) { rev.documento = f.name; $("rDocumento").value = f.name; }
+    if (!tp) {
+      if (!lecturaApus.length) throw new Error("No se encontró en el PDF una tabla de presupuesto (encabezados de descripción, cantidad y valor unitario) ni APU.");
+      mostrarAlerta(alerta, "No se encontró la tabla del presupuesto; se leyeron solo los APU. Puedes pegar la tabla del presupuesto abajo.", "info");
+      $("mapeoCard").classList.remove("hidden");
+      lectura = { items: [], capitulos: [], avisos: [] };
+      $("lectura").textContent = `Se leyeron ${lecturaApus.length} APU.`;
+      return;
+    }
+    mostrarMapeo(tp.matriz, RV.detectarColumnas(tp.matriz));
+  } catch (err) { prog.textContent = ""; mostrarAlerta(alerta, `No se pudo leer el PDF: ${errorAmigable(err)}`); }
+}
 function leerPegado() {
+  lecturaApus = [];
   const m = RV.textoAMatriz($("pegado").value);
   if (!m.length || !m[0].length) return mostrarAlerta(alerta, "Pega primero la tabla del presupuesto.");
   limpiarAlerta(alerta);
@@ -144,6 +202,7 @@ function releer() {
   $("lectura").innerHTML = lectura.items.length
     ? `Se leyeron <b>${lectura.items.length} ítems</b> en <b>${lectura.capitulos.length} capítulos</b>; suman ${pesos(suma)}${lectura.totalDetectado ? ` y la tabla trae un total de ${pesos(lectura.totalDetectado)}` : ""}.${(() => { const n = lectura.items.filter((it) => it.vtCalculado).length; return !n ? "" : n === lectura.items.length ? " El valor total de los ítems se calculó (cantidad × valor unitario) porque no se indicó su columna." : ` En ${n} ítem(s) la celda del valor total venía vacía o con una fórmula sin resultado guardado: se calculó como cantidad × valor unitario.`; })()}`
     : esc(lectura.avisos.join(" "));
+  if (lecturaApus.length) $("lectura").innerHTML += ` Del PDF se leyeron además <b>${lecturaApus.length} APU</b> del oferente (${lecturaApus.reduce((s, a) => s + Object.values(a.secciones).reduce((t, ls) => t + ls.length, 0), 0)} líneas de insumos).`;
   const capNom = Object.fromEntries(lectura.capitulos.map((c) => [c.num, c.nombre]));
   const enc = ["Cap.", "Ítem", "Descripción", "Und", "Cantidad", "V. unitario", "V. total"];
   const filas = lectura.items.slice(0, 14).map((it) => [`${it.cap} ${capNom[it.cap] ? "· " + capNom[it.cap] : ""}`, it.item, it.desc, it.und, numero(it.cant, 4), pesos(it.vu, 2), pesos(it.vt)]);
@@ -151,15 +210,23 @@ function releer() {
   aplicarAnchos($("previa"));
 }
 function usarItems() {
-  if (!lectura?.items.length) return mostrarAlerta(alerta, "No hay ítems para usar: revisa las columnas.");
-  if (rev.items.length && !confirm(`La revisión ya tiene ${rev.items.length} ítems. ¿Reemplazarlos por los ${lectura.items.length} leídos? Se pierden las referencias a APU asignadas.`)) return;
-  rev.items = lectura.items;
-  rev.capitulos = lectura.capitulos;
-  if (lectura.totalDetectado && !rev.totalDeclarado) { rev.totalDeclarado = lectura.totalDetectado; $("rTotal").value = numero(lectura.totalDetectado, 0); }
-  selItem = null;
+  if (!lectura?.items.length && !lecturaApus.length) return mostrarAlerta(alerta, "No hay ítems para usar: revisa las columnas.");
+  if (lectura?.items.length) {
+    if (rev.items.length && !confirm(`La revisión ya tiene ${rev.items.length} ítems. ¿Reemplazarlos por los ${lectura.items.length} leídos? Se pierden las referencias a APU asignadas.`)) return;
+    rev.items = lectura.items;
+    rev.capitulos = lectura.capitulos;
+    if (lectura.totalDetectado && !rev.totalDeclarado) { rev.totalDeclarado = lectura.totalDetectado; $("rTotal").value = numero(lectura.totalDetectado, 0); }
+  }
+  if (lecturaApus.length) {
+    if (apusOferta.length && !confirm(`La revisión ya tiene ${apusOferta.length} APU del oferente. ¿Reemplazarlos por los ${lecturaApus.length} leídos?`)) return;
+    apusOferta = lecturaApus;
+    apusSucio = true;
+    sugIns = new Map();
+  }
+  selItem = null; selApu = null; selIns = null;
   calcularSugerencias();
   cambio();
-  mostrarAlerta(alerta, `Se cargaron ${rev.items.length} ítems. Registra ahora el AIU y el IVA de la oferta y guarda.`, "success");
+  mostrarAlerta(alerta, `Se cargaron ${rev.items.length} ítems${apusOferta.length ? ` y ${apusOferta.length} APU del oferente` : ""}. Registra ahora el AIU y el IVA de la oferta y guarda.`, "success");
   location.hash = "datos";
 }
 
@@ -418,18 +485,158 @@ async function descargarExcel() {
   } catch (err) { mostrarAlerta(alerta, errorAmigable(err)); } finally { btn.disabled = false; }
 }
 
+// ---------------------------------------------------------------- APU del oferente
+const codN = (c) => normalizar(c).replace(/\s+/g, "");
+function estadoApu(a) {
+  const v = res.apus?.vinculos.find((x) => x.apu === a);
+  if (!v) return { txt: "Sin ítem", clase: "muted", v };
+  if (v.dif != null && Math.abs(v.dif) > Math.max(1, Math.abs(v.ref || 0) * 0.001)) return { txt: "Difiere", clase: "danger", v };
+  if ((res.apus?.malos || []).some((m) => m.a === a)) return { txt: "Aritmética", clase: "warn", v };
+  return { txt: "Conforme", clase: "ok", v };
+}
+function marcasApu(a) {
+  const it = rev.items.find((x) => codN(x.item) === codN(a.item));
+  return it ? numerosDe(it) : [];
+}
+function apusFiltrados() {
+  const palabras = normalizar($("buscarApu").value).split(" ").filter(Boolean);
+  const f = $("filtroApus").value;
+  return apusOferta.map((a, n) => ({ a, n })).filter(({ a }) => {
+    if (palabras.length) { const t = normalizar(`${a.item} ${a.desc}`); if (!palabras.every((w) => t.includes(w))) return false; }
+    const e = estadoApu(a);
+    if (f === "obs") return marcasApu(a).length > 0 || e.clase !== "ok";
+    if (f === "difiere") return e.txt === "Difiere";
+    if (f === "sinItem") return e.txt === "Sin ítem";
+    return true;
+  });
+}
+function pintarApus() {
+  const lista = apusFiltrados();
+  $("cuentaApus").textContent = `${lista.length} de ${apusOferta.length}`;
+  if (selApu == null || !lista.some((x) => x.n === selApu)) selApu = lista[0]?.n ?? null;
+  const enc = ["Ítem", "Descripción", "Und", "Costo directo", "Precio APU", "Presupuesto", "Estado", "Hallazgos"];
+  const filas = lista.map(({ a }) => { const e = estadoApu(a); const it = e.v ? rev.items.find((x) => x.id === e.v.id) : null; return [a.item || "—", a.desc || "—", a.und || "", pesos(a.cd), pesos(e.v?.ref ?? a.pu), it ? pesos(it.vu) : "—", e.txt, marcasApu(a).join(", ")]; });
+  const num = (j) => (j >= 3 && j <= 5 ? "ap-num" : "");
+  const tabla = $("tablaApus");
+  tabla.innerHTML = lista.length ? `${colgroupProporcional(enc, filas, { max: 45 })}
+    <thead><tr>${enc.map((h, j) => `<th class="${num(j)}">${h}</th>`).join("")}</tr></thead>
+    <tbody>${lista.map(({ a, n }, i) => `<tr data-n="${n}" class="${n === selApu ? "ap-sel" : ""}">${filas[i].map((v, j) => `<td class="${num(j)}" title="${esc(v)}">${j === 6 ? `<span class="badge ${estadoApu(a).clase}">${esc(v)}</span>` : esc(v)}</td>`).join("")}</tr>`).join("")}</tbody>`
+    : `<tbody><tr><td class="text-muted">Ningún APU coincide.</td></tr></tbody>`;
+  aplicarAnchos(tabla);
+  pintarApu();
+}
+function pintarApu() {
+  const el = $("apuDetalle");
+  const a = apusOferta[selApu];
+  if (!a) { el.innerHTML = `<p class="text-muted">Sin APU seleccionado.</p>`; return; }
+  const e = estadoApu(a), it = e.v ? rev.items.find((x) => x.id === e.v.id) : null;
+  const par = (et, v) => `<div><span>${esc(et)}</span><strong>${v}</strong></div>`;
+  const malo = (res.apus?.malos || []).find((m) => m.a === a);
+  const tablaSec = (k, ls) => {
+    const enc = ["Insumo", "Und", "Cantidad", "Precio", "Rend.", "Desp.", "Valor"];
+    const filas = ls.map((x) => [`${x.cod ? x.cod + " · " : ""}${x.d}`, x.u || "", numero(x.c, 4), pesos(x.p), numero(x.r, 2), x.dp != null ? `${numero(x.dp * 100, 1)} %` : "", pesos(x.v)]);
+    const suma = ls.reduce((s, x) => s + (Number(x.v) || 0), 0);
+    return `<table class="ap-tabla ap-tabla-apu ap-tabla-oferta">${colgroupProporcional(enc, filas, { max: 50 })}
+      <thead><tr class="ap-cap-titulo"><th colspan="7">${esc(RV.SECCIONES_APU[k] || k)}</th></tr><tr>${enc.map((h, j) => `<th class="${j >= 2 ? "ap-num" : ""}">${h}</th>`).join("")}</tr></thead>
+      <tbody>${filas.map((f) => `<tr>${f.map((v, j) => `<td class="${j >= 2 ? "ap-num" : ""}" title="${esc(v)}">${esc(v)}</td>`).join("")}</tr>`).join("")}
+      <tr class="ap-fila-total"><td colspan="6">Subtotal${a.sub?.[k] != null && Math.abs(a.sub[k] - suma) > 2 ? ` (el APU dice ${pesos(a.sub[k])})` : ""}</td><td class="ap-num">${pesos(suma)}</td></tr></tbody></table>`;
+  };
+  el.innerHTML = `
+    <div class="ap-vp-cabeza"><h2>APU ${esc(a.item || "sin código")} — ${esc(a.desc || "sin descripción")}</h2></div>
+    <div class="ap-pares ap-pares-apu">
+      ${par("Unidad", esc(a.und || "—"))}
+      ${par("Página del PDF", String(a.pagina || "—"))}
+      ${par("Costo directo", pesos(a.cd))}
+      ${par("AIU", ["a", "i", "u"].map((k) => (a.aiu?.[k]?.pct != null ? `${numero(a.aiu[k].pct * 100, 1)} %` : "—")).join(" / "))}
+      ${par("Precio del APU", pesos(e.v?.ref ?? a.pu))}
+      ${par("En el presupuesto", it ? `${pesos(it.vu)} · ${numero(it.cant, 4)} ${esc(it.und || "")}` : "No está")}
+      ${par("Estado", `<span class="badge ${e.clase}">${esc(e.txt)}</span>`)}
+      ${par("Hallazgos", esc(marcasApu(a).join(", ") || "—"))}
+    </div>
+    ${malo ? `<p class="ap-nota ap-txt-danger">${esc(malo.prob.join("; "))}</p>` : ""}
+    <div class="ap-hoja">${Object.entries(a.secciones).map(([k, ls]) => tablaSec(k, ls)).join("")}</div>`;
+  aplicarAnchos(el);
+}
+
+// ---------------------------------------------------------------- insumos del oferente
+function insumosFiltrados() {
+  const palabras = normalizar($("buscarInsumo").value).split(" ").filter(Boolean);
+  const sec = $("filtroInsumos").value;
+  return (res.apus?.insumos || []).filter((e) => (!sec || e.sec === sec) && (!palabras.length || palabras.every((w) => normalizar(e.d).includes(w))));
+}
+function pintarInsumos() {
+  const lista = insumosFiltrados();
+  $("cuentaInsumos").textContent = `${lista.length} de ${res.apus?.insumos.length || 0}`;
+  if (!selIns || !lista.some((e) => e.clave === selIns)) selIns = lista[0]?.clave || null;
+  const comp = new Map((res.apus?.comparadosIns || []).map((c) => [c.clave, c]));
+  const enc = ["Insumo", "Und", "Cantidad total", "Precio(s)", "Valor final", "APU", "APU PRO", "Dif."];
+  const filas = lista.map((e) => {
+    const c = comp.get(e.clave), ref = rev.refInsumos?.[e.clave], s = sugIns.get(e.clave)?.[0];
+    return [e.d, e.u || "", numero(e.q, 2), e.preciosLista.length > 1 ? `${pesos(e.preciosLista[0])} a ${pesos(e.preciosLista[e.preciosLista.length - 1])}` : pesos(e.preciosLista[0]), pesos(e.valorFinal), String(e.apus.length), ref || (s ? `≈ ${s.codigo} · ${Math.round(s.puntaje * 100)} %` : "—"), c ? `${c.dif >= 0 ? "+" : ""}${Math.round(c.dif * 100)} %` : ""];
+  });
+  const num = (j) => (j >= 2 && j <= 5 || j === 7 ? "ap-num" : "");
+  const tabla = $("tablaInsumos");
+  tabla.innerHTML = lista.length ? `${colgroupProporcional(enc, filas.map((f) => f.map((v, j) => (j === 7 ? "+100 %" : v))), { max: 45 })}
+    <thead><tr>${enc.map((h, j) => `<th class="${num(j)}">${h}</th>`).join("")}</tr></thead>
+    <tbody>${lista.map((e, i) => { const c = comp.get(e.clave); return `<tr data-k="${esc(e.clave)}" class="${e.clave === selIns ? "ap-sel" : ""}">${filas[i].map((v, j) => `<td class="${num(j)} ${j === 7 && c ? (c.estado === "Por encima" ? "ap-txt-danger" : c.estado === "Por debajo" ? "ap-txt-warn" : "ap-txt-ok") : j === 6 && !rev.refInsumos?.[e.clave] ? "text-muted" : ""}" title="${esc(v)}">${esc(v)}</td>`).join("")}</tr>`; }).join("")}</tbody>`
+    : `<tbody><tr><td class="text-muted">Ningún insumo coincide.</td></tr></tbody>`;
+  aplicarAnchos(tabla);
+  pintarInsumo();
+}
+function pintarInsumo() {
+  const el = $("insumoDetalle");
+  const e = (res.apus?.insumos || []).find((x) => x.clave === selIns);
+  if (!e) { el.innerHTML = `<p class="text-muted">Sin insumo seleccionado.</p>`; return; }
+  const par = (et, v) => `<div><span>${esc(et)}</span><strong>${v}</strong></div>`;
+  const c = (res.apus?.comparadosIns || []).find((x) => x.clave === e.clave);
+  const ref = rev.refInsumos?.[e.clave] ? insumos.get(rev.refInsumos[e.clave]) : null;
+  const sug = sugIns.get(e.clave) || [];
+  el.innerHTML = `
+    <div class="ap-vp-cabeza"><h2>${esc(e.d)}</h2></div>
+    <div class="ap-pares ap-pares-apu">
+      ${par("Sección", esc(RV.SECCIONES_APU[e.sec] || e.sec))}
+      ${par("Unidad", esc(e.u || "—"))}
+      ${par("Cantidad en el presupuesto", numero(e.q, 2))}
+      ${par("Precio(s) en los APU", e.preciosLista.map((p) => pesos(p)).join(" · ") || "—")}
+      ${par("Valor en el valor final", pesos(e.valorFinal))}
+      ${par("APU que lo usan", esc(e.apus.slice(0, 12).join(", ") + (e.apus.length > 12 ? "…" : "")))}
+    </div>
+    <div class="ap-ref">
+      <h3>Insumo equivalente en la base de APU PRO</h3>
+      ${ref ? `<div class="ap-pares ap-pares-apu">
+          ${par("Insumo", `${esc(ref.codigo)} ${esc(ref.descripcion)}`)}
+          ${par("Unidad", esc(ref.unidad || "—"))}
+          ${par("Precio de referencia", pesos(precioInsumo(ref.codigo)))}
+          ${c ? par("Diferencia", `${c.dif >= 0 ? "+" : ""}${Math.round(c.dif * 100)} % <span class="badge ${c.estado === "Por encima" ? "danger" : c.estado === "Por debajo" ? "warn" : "ok"}">${c.estado}</span>`) : ""}
+        </div><div class="rt-acciones"><button type="button" class="btn secondary ap-btn" id="quitarRefIns">Quitar referencia</button></div>`
+      : `<p class="text-muted ap-nota">Sin referencia. ${sug.length ? "Sugerencias por parecido de la descripción:" : "No hay insumos parecidos en la base."}</p>
+        <div class="ap-sugerencias">${sug.map((s) => `<button type="button" class="ap-sug" data-codigo="${esc(s.codigo)}"><b>${esc(s.codigo)}</b> ${esc(s.nombre)} <span class="badge ${s.puntaje >= 0.7 ? "ok" : s.puntaje >= 0.45 ? "warn" : "muted"}">${Math.round(s.puntaje * 100)} %</span> <small>${pesos(precioInsumo(s.codigo))}</small></button>`).join("")}</div>`}
+    </div>`;
+  const asignar = (codigo) => { rev.refInsumos = { ...(rev.refInsumos || {}), [e.clave]: codigo }; sugIns.delete(e.clave); cambio(); pintarInsumos(); };
+  el.querySelectorAll(".ap-sug").forEach((b) => b.addEventListener("click", () => asignar(b.dataset.codigo)));
+  el.querySelector("#quitarRefIns")?.addEventListener("click", () => { const r = { ...(rev.refInsumos || {}) }; delete r[e.clave]; rev.refInsumos = r; calcularSugIns(); cambio(); pintarInsumos(); });
+}
+function confirmarSugIns() {
+  let n = 0;
+  for (const e of res.apus?.insumos || []) { const s = sugIns.get(e.clave)?.[0]; if (!rev.refInsumos?.[e.clave] && s && s.puntaje >= 0.7) { rev.refInsumos = { ...(rev.refInsumos || {}), [e.clave]: s.codigo }; sugIns.delete(e.clave); n++; } }
+  if (!n) return mostrarAlerta(alerta, "No hay sugerencias de insumos con parecido de 70 % o más.", "info");
+  cambio(); pintarInsumos();
+  mostrarAlerta(alerta, `Se confirmaron ${n} referencias de insumos. Revísalas: el parecido es por la descripción.`, "success");
+}
+
 // ---------------------------------------------------------------- guardar
 async function guardar() {
   const btn = $("guardarBtn");
-  rev.resumen = RV.resumenRevision(rev, res, hallazgos);
+  rev.resumen = { ...RV.resumenRevision(rev, res, hallazgos), apus: apusOferta.length };
   const tam = JSON.stringify(rev).length;
   if (tam > 900000) return mostrarAlerta(alerta, `La revisión es demasiado grande para guardarse (${Math.round(tam / 1024)} KB): divide la oferta en partes.`);
   btn.disabled = true;
   try {
+    if (apusSucio) { btn.textContent = "Guardando APU…"; await guardarApusRevision(id, apusOferta); apusSucio = false; }
     await guardarRevision(id, rev, ctx.user);
     marcarSucio(false);
     mostrarAlerta(alerta, "Revisión guardada.", "success");
-  } catch (err) { mostrarAlerta(alerta, errorAmigable(err)); } finally { btn.disabled = false; }
+  } catch (err) { mostrarAlerta(alerta, errorAmigable(err)); } finally { btn.disabled = false; btn.textContent = "💾 Guardar"; }
 }
 
 function conectar() {
@@ -455,6 +662,27 @@ function conectar() {
     pintarItem();
   });
   $("confirmarSug").addEventListener("click", confirmarSugerencias);
+  $("buscarApu").addEventListener("input", () => { clearTimeout(t); t = setTimeout(pintarApus, 150); });
+  $("filtroApus").addEventListener("change", pintarApus);
+  $("tablaApus").addEventListener("click", (e) => {
+    const tr = e.target.closest("tr[data-n]");
+    if (!tr) return;
+    selApu = Number(tr.dataset.n);
+    $("tablaApus").querySelectorAll("tr.ap-sel").forEach((r) => r.classList.remove("ap-sel"));
+    tr.classList.add("ap-sel");
+    pintarApu();
+  });
+  $("buscarInsumo").addEventListener("input", () => { clearTimeout(t); t = setTimeout(pintarInsumos, 150); });
+  $("filtroInsumos").addEventListener("change", pintarInsumos);
+  $("tablaInsumos").addEventListener("click", (e) => {
+    const tr = e.target.closest("tr[data-k]");
+    if (!tr) return;
+    selIns = tr.dataset.k;
+    $("tablaInsumos").querySelectorAll("tr.ap-sel").forEach((r) => r.classList.remove("ap-sel"));
+    tr.classList.add("ap-sel");
+    pintarInsumo();
+  });
+  $("confirmarSugIns").addEventListener("click", confirmarSugIns);
   $("agregarHallazgo").addEventListener("click", () => abrirHallazgo());
   $("hallazgoGuardar").addEventListener("click", guardarHallazgo);
   $("descargarRD").addEventListener("click", descargarRD);

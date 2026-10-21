@@ -74,7 +74,8 @@ export function aNumero(v) {
   if (ult >= 0) {
     const sep = s[ult], decimales = s.length - ult - 1;
     const veces = s.split(sep).length - 1, distintos = /,/.test(s) && /\./.test(s);
-    if (decimales === 3 && (veces > 1 || !distintos)) s = s.replace(/[.,]/g, "");
+    // «1.500» es mil quinientos; «0,317» o «0.250» son decimales (nadie escribe miles con cero adelante).
+    if (decimales === 3 && (veces > 1 || !distintos) && !/^0[.,]/.test(s)) s = s.replace(/[.,]/g, "");
     else s = s.slice(0, ult).replace(/[.,]/g, "") + "." + s.slice(ult + 1);
   }
   let n = Number(s);
@@ -122,37 +123,64 @@ function adivinarColumnas(m) {
   return { item: desc > 0 ? 0 : -1, desc, und, cant: cant ?? -1, vu: vu ?? -1, vt: vt ?? -1 };
 }
 
-const RE_RESUMEN = /^(sub ?total|total|valor total|costo directo|costos? directos?|administracion|imprevistos?|utilidad|iva|a\.?\s?i\.?\s?u\.?|aiu|valor (de la )?oferta|gran total)\b/;
+const RE_RESUMEN = /^(sub ?total|total|valor total|costo directo|costos? directos?|costos? indirectos?|costo total|precio total|administracion|imprevistos?|utilidad|iva|a\.?\s?i\.?\s?u\.?|aiu|valor (de la )?oferta|gran total)\b/;
+// Total de la oferta: el mayor de estos renglones (no los de capítulo ni los de costo directo).
+const RE_TOTAL = /^(total|valor total|gran total|valor (de la )?oferta|costo total|precio total)/;
+const RE_NO_TOTAL = /capitulo|\bcap\b|parcial|grupo|directo|indirecto/;
 // Recorre la tabla desde la fila siguiente a los encabezados: las filas con descripción y sin
 // cantidad ni valor unitario son capítulos; las de totales se omiten (el mayor «total» que
 // aparezca se propone como total declarado).
 export function extraerItems(m, { fila = -1, columnas }) {
   const c = columnas, capitulos = [], items = [], avisos = [];
-  let cap = null, totalDetectado = null, n = 0;
+  let cap = null, totalDetectado = null, n = 0, pendientes = [];
   const txt = (f, k) => (c[k] >= 0 ? String(f[c[k]] ?? "").trim() : "");
   const num = (f, k) => (c[k] >= 0 ? aNumero(f[c[k]]) : null);
   for (let r = fila + 1; r < m.length; r++) {
     const f = m[r];
     // Algunos formatos ponen el nombre del capítulo o el subtotal en otra columna (la del ítem).
     const desc = (txt(f, "desc") || String(f.find((v) => typeof v === "string" && v.trim().length > 3 && aNumero(v) == null) ?? "").trim()).replace(/\s+/g, " ");
-    const nd = normalizar(desc);
+    const nd = normalizar(desc).replace(/^([a-e]|\d+|[ivx]+)[.)]\s+/, ""); // «A. TOTAL COSTOS DIRECTOS»
     const vt = num(f, "vt");
     if (!desc) continue;
     if (RE_RESUMEN.test(nd)) {
-      if (/^(total|valor total|gran total|valor (de la )?oferta)/.test(nd) && vt != null) totalDetectado = Math.max(totalDetectado || 0, vt);
+      if (RE_TOTAL.test(nd) && !RE_NO_TOTAL.test(nd) && vt != null) totalDetectado = Math.max(totalDetectado || 0, vt);
       continue;
     }
-    const cant = num(f, "cant"), vu = num(f, "vu"), codigo = txt(f, "item");
+    let cant = num(f, "cant");
+    const vu = num(f, "vu"), codigo = txt(f, "item");
     if (cant == null && vu == null) {
       if (desc.length > 160) continue;
+      // Fila con nombre y valor, sin cantidad ni precio: subtotal de un capítulo que se nombra
+      // al final (debajo de sus ítems). Si el capítulo no se abrió antes, se nombra con ella.
+      if (vt != null) {
+        if (!cap && pendientes.length) {
+          const nuevo = { num: String(capitulos.length + 1), nombre: desc };
+          capitulos.push(nuevo);
+          for (const it of pendientes) it.cap = nuevo.num;
+        }
+        pendientes = [];
+        cap = null;
+        continue;
+      }
       cap = { num: codigo && codigo !== desc && codigo.length <= 12 ? codigo : String(capitulos.length + 1), nombre: desc };
       capitulos.push(cap);
       continue;
     }
+    // «2,500» puede ser dos y medio o dos mil quinientos: decide la aritmética del ítem.
+    const crudo = c.cant >= 0 ? String(f[c.cant] ?? "").trim() : "";
+    const cuadra = (q) => Math.abs(q * vu - vt) <= Math.max(2, Math.abs(vt) * 0.002);
+    if (cant != null && vu != null && vt != null && /^\d{1,3}[.,]\d{3}$/.test(crudo) && !cuadra(cant) && cuadra(cant / 1000)) cant /= 1000;
     n++;
     const it = { id: `i${n}`, cap: cap ? cap.num : capituloDeCodigo(codigo), item: codigo || String(n), desc, und: txt(f, "und"), cant, vu, vt, fila: r + 1 };
     if (it.vt == null && cant != null && vu != null) { it.vt = Math.round(cant * vu); it.vtCalculado = true; }
+    if (!cap) pendientes.push(it);
     items.push(it);
+  }
+  // Ítems que quedaron sin capítulo después del último capítulo nombrado al final.
+  if (capitulos.length && pendientes.some((it) => !capitulos.some((k) => k.num === it.cap))) {
+    const resto = { num: String(capitulos.length + 1), nombre: "Otros ítems" };
+    capitulos.push(resto);
+    for (const it of pendientes) it.cap = resto.num;
   }
   if (!capitulos.length) {
     const vistos = [...new Set(items.map((it) => it.cap))];
@@ -217,7 +245,9 @@ export function factores(rev) {
 }
 
 // precioApu(codigo) → costo directo del APU en APU PRO (o null).
-export function revisar(rev, { precioApu = () => null } = {}) {
+// apus: APU del oferente leídos del PDF; precioInsumo(codigo) → precio del insumo en la base
+// de APU PRO (o null), para los insumos con referencia confirmada en rev.refInsumos.
+export function revisar(rev, { precioApu = () => null, apus = [], precioInsumo = () => null } = {}) {
   const items = rev.items || [];
   const F = factores(rev);
   const valor = (it) => (it.vt != null ? Number(it.vt) : (Number(it.cant) || 0) * (Number(it.vu) || 0));
@@ -357,7 +387,144 @@ export function revisar(rev, { precioApu = () => null } = {}) {
   if (comparados.length && !encima.length && !debajo.length) agregar({ clave: "precios", titulo: "Precios frente a APU PRO", estado: "ok", texto: `Los ${comparados.length} ítems comparados con los APU de Cinco S.A.S. están dentro de un ±20 % del precio de referencia.` });
   if (!comparados.length) agregar({ clave: "precios", titulo: "Precios frente a APU PRO", estado: "info", texto: "Ningún ítem tiene un APU de referencia confirmado: asígnalos en la pestaña Ítems para comparar precios." });
 
-  return { F, sumaItems, comp, total, declarado, valorFinal, capitulos, verificaciones: V, porItem, pareto, comparados, vExceso };
+  const resApus = apus.length ? revisarApus(rev, apus, { F, items, valor, valorFinal, agregar, precioInsumo }) : null;
+
+  return { F, sumaItems, comp, total, declarado, valorFinal, capitulos, verificaciones: V, porItem, pareto, comparados, vExceso, apus: resApus };
+}
+
+// ---------------------------------------------------------------- APU del oferente
+// apu = { item, desc, und, rend, secciones: { MA|MO|EQ|ED|TR: [{ d, u, c, p, r, dp, v, cod }] },
+//         sub: { MA, … }, cd, aiu: { a|i|u: { pct, v } }, iva: { pct, v }, sai, pu, pagina }
+export const SECCIONES_APU = { MA: "Materiales", MO: "Mano de obra", EQ: "Equipos y herramientas", ED: "EPP y dotación", TR: "Transporte" };
+const codNorm = (c) => normalizar(c).replace(/\s+/g, "");
+export const claveInsumo = (l) => `${normalizar(l.d).replace(/[^a-z0-9]+/g, " ").trim()}|${unidadNorm(l.u)}`;
+const RE_DIRECCION = /ingenier|capataz|residente|director|inspector|supervisor|profesional|\bsst\b|\bhse\b|siso|coordinador/;
+
+function revisarApus(rev, apus, { F, items, valor, valorFinal, agregar, precioInsumo }) {
+  const tol = (x) => Math.max(2, Math.abs(x) * 0.002);
+  const porCodigo = new Map(apus.map((a) => [codNorm(a.item), a]));
+  const cantDe = new Map(); // cantidad del presupuesto que usa cada APU
+  const vinculos = [];
+  const sinApu = [], difieren = [];
+  let vDif = 0;
+  for (const it of items) {
+    const a = porCodigo.get(codNorm(it.item));
+    if (!a) { sinApu.push(it); continue; }
+    cantDe.set(a, (cantDe.get(a) || 0) + (Number(it.cant) || 0));
+    // El valor del APU que corresponde a la base de los valores de la oferta.
+    const ref = rev.base === "cd" ? a.cd : rev.base === "conAiu" ? a.sai ?? (a.cd != null ? a.cd * (1 + F.A) : null) : a.pu ?? a.sai ?? null;
+    const dif = ref != null && it.vu != null ? it.vu - ref : null;
+    vinculos.push({ id: it.id, item: it.item, apu: a, ref, dif });
+    if (dif != null && Math.abs(dif) > Math.max(1, Math.abs(it.vu) * 0.001)) { difieren.push(it); vDif += dif * (Number(it.cant) || 0) * F.aFinal; }
+  }
+  const usados = new Set(vinculos.map((v) => v.apu));
+  const huerfanos = apus.filter((a) => !usados.has(a));
+  const qty = (a) => cantDe.get(a) || 0;
+
+  if (difieren.length) agregar({ clave: "apuPrecio", titulo: "Precio del presupuesto distinto al de su APU", estado: "hallazgo", sev: Math.abs(vDif) > valorFinal * 0.005 ? "Mayor" : "Menor", tema: "Consistencia",
+    texto: `En ${difieren.length} ítem(s) el valor unitario del presupuesto no coincide con el precio de su APU (${lista(difieren)}). La diferencia neta es de ${pesosTxt(vDif)} en el valor final (positiva: el presupuesto cobra más que el APU).`,
+    itemsRef: difieren, impacto: vDif, accion: "Pedir al oferente que concilie el presupuesto con los APU; prevalece el menor valor." });
+  else if (vinculos.length) agregar({ clave: "apuPrecio", titulo: "Presupuesto y APU", estado: "ok", texto: `Los ${vinculos.length} ítems con APU tienen el mismo precio en el presupuesto y en su análisis.` });
+  if (sinApu.length) agregar({ clave: "sinApu", titulo: "Ítems sin APU", estado: "hallazgo", sev: "Menor", tema: "Consistencia",
+    texto: `${sinApu.length} ítem(s) del presupuesto no tienen análisis de precio unitario en la oferta (${lista(sinApu)}), por lo que su precio no se puede verificar.`,
+    itemsRef: sinApu, impacto: null, impactoTexto: `${pesosTxt(sinApu.reduce((s, it) => s + valor(it), 0) * F.aFinal)} sin APU`, accion: "Pedir los APU faltantes." });
+  if (huerfanos.length) agregar({ clave: "apuSinItem", titulo: "APU que no están en el presupuesto", estado: "hallazgo", sev: "Observación", tema: "Consistencia",
+    texto: `${huerfanos.length} APU no corresponden a ningún ítem del presupuesto (${huerfanos.slice(0, 12).map((a) => a.item || "sin código").join(", ")}${huerfanos.length > 12 ? "…" : ""}).`, itemsRef: [], impacto: null, accion: "Aclarar con el oferente si sobran o si falta el ítem en el presupuesto." });
+
+  // Aritmética interna de cada APU: secciones contra su subtotal, subtotales contra el costo
+  // directo y AIU contra sus porcentajes.
+  const malos = [];
+  for (const a of apus) {
+    const prob = [];
+    for (const [k, ls] of Object.entries(a.secciones)) {
+      const s = ls.reduce((t, x) => t + (Number(x.v) || 0), 0);
+      if (a.sub?.[k] != null && Math.abs(s - a.sub[k]) > tol(a.sub[k])) prob.push(`${SECCIONES_APU[k] || k}: líneas ${pesosTxt(s)} y subtotal ${pesosTxt(a.sub[k])}`);
+    }
+    const subs = Object.keys(a.secciones).map((k) => a.sub?.[k] ?? a.secciones[k].reduce((t, x) => t + (Number(x.v) || 0), 0)).reduce((t, x) => t + x, 0);
+    if (a.cd != null && Math.abs(subs - a.cd) > tol(a.cd)) prob.push(`costo directo ${pesosTxt(a.cd)} y suma de secciones ${pesosTxt(subs)}`);
+    for (const k of ["a", "i", "u"]) { const x = a.aiu?.[k]; if (x?.pct != null && x.v != null && a.cd != null && Math.abs(a.cd * x.pct - x.v) > tol(x.v) + 1) prob.push(`${{ a: "administración", i: "imprevistos", u: "utilidad" }[k]} ${pesosTxt(x.v)} en vez de ${pesosTxt(a.cd * x.pct)}`); }
+    if (prob.length) malos.push({ a, prob });
+  }
+  if (malos.length) agregar({ clave: "apuAritmetica", titulo: "Aritmética de los APU", estado: "hallazgo", sev: "Menor", tema: "Aritmética",
+    texto: `${malos.length} APU tienen operaciones que no cuadran: ${malos.slice(0, 6).map((m) => `${m.a.item} (${m.prob[0]})`).join("; ")}${malos.length > 6 ? "; …" : ""}.`,
+    itemsRef: items.filter((it) => malos.some((m) => codNorm(m.a.item) === codNorm(it.item))), impacto: null, accion: "Pedir al oferente que corrija los APU." });
+  else agregar({ clave: "apuAritmetica", titulo: "Aritmética de los APU", estado: "ok", texto: `Las sumas de los ${apus.length} APU (secciones, costo directo y AIU) son correctas.` });
+
+  // APU sin descripción y APU de suministro sin materiales.
+  const sinDesc = apus.filter((a) => !a.desc || codNorm(a.desc) === codNorm(a.item));
+  if (sinDesc.length) agregar({ clave: "apuSinDesc", titulo: "APU sin descripción", estado: "hallazgo", sev: "Menor", tema: "Consistencia",
+    texto: `${sinDesc.length} APU no ${sinDesc.length === 1 ? "describe" : "describen"} la actividad (${sinDesc.map((a) => a.item).join(", ")}): el alcance de lo que se paga queda indefinido.`,
+    itemsRef: items.filter((it) => sinDesc.some((a) => codNorm(a.item) === codNorm(it.item))), impacto: null, accion: "Pedir la descripción completa de la actividad." });
+  const sinMat = apus.filter((a) => /suministr/.test(normalizar(a.desc)) && !(a.secciones.MA || []).some((x) => Number(x.v) > 0));
+  if (sinMat.length) agregar({ clave: "apuSinMateriales", titulo: "APU de suministro sin materiales", estado: "hallazgo", sev: "Menor", tema: "Consistencia",
+    texto: `${sinMat.length} APU dicen «suministro» pero no incluyen materiales (${sinMat.map((a) => a.item).join(", ")}): el precio solo cubre mano de obra y equipo, lo que abre la puerta a reclamaciones posteriores.`,
+    itemsRef: items.filter((it) => sinMat.some((a) => codNorm(a.item) === codNorm(it.item))), impacto: null, impactoTexto: "Riesgo de adicionales", accion: "Pedir que se completen los APU o que el oferente declare por escrito que el precio incluye los materiales." });
+
+  // Insumos: cantidades y valores en todo el presupuesto (cantidad del APU × cantidad del ítem).
+  const insumos = new Map();
+  for (const a of apus) for (const [sec, ls] of Object.entries(a.secciones)) for (const x of ls) {
+    if (!(Number(x.v) > 0)) continue;
+    const k = `${sec}|${claveInsumo(x)}`;
+    // Materiales: cantidad × (1 + desperdicio). Mano de obra, equipos y transporte: jornales o
+    // días = cantidad ÷ rendimiento (el de la línea o el del APU).
+    const rend = Number(x.r) || Number(a.rend) || 0;
+    const e = insumos.get(k) || { clave: k, sec, d: x.d, u: x.u || (sec === "MO" ? "jornal" : sec === "EQ" || sec === "TR" ? (rend ? "día" : "") : ""), cod: x.cod || "", precios: new Map(), q: 0, valor: 0, apus: new Set() };
+    const porUnidad = sec === "MA" || sec === "ED" || !rend;
+    const q = (porUnidad ? (Number(x.c) || (sec === "MA" ? 1 : 0)) * (1 + (Number(x.dp) || 0)) : (Number(x.c) || 1) / rend) * qty(a);
+    e.q += q;
+    e.valor += x.v * qty(a);
+    if (x.p != null) e.precios.set(x.p, (e.precios.get(x.p) || 0) + q);
+    e.apus.add(a.item);
+    insumos.set(k, e);
+  }
+  const listaIns = [...insumos.values()].map((e) => ({ ...e, apus: [...e.apus], preciosLista: [...e.precios.keys()].sort((p, q) => p - q), valorFinal: e.valor * F.final }));
+  listaIns.sort((p, q) => q.valor - p.valor);
+
+  // Mismo insumo con precios distintos (materiales).
+  const varios = listaIns.filter((e) => e.sec === "MA" && e.preciosLista.length > 1 && e.preciosLista[e.preciosLista.length - 1] / e.preciosLista[0] > 1.01);
+  let vVarios = 0;
+  for (const e of varios) { const min = e.preciosLista[0]; for (const [p, q] of e.precios) vVarios += (p - min) * q * F.final; }
+  if (varios.length) agregar({ clave: "insumoPrecios", titulo: "Mismo insumo con precios distintos", estado: "hallazgo", sev: vVarios > valorFinal * 0.005 ? "Mayor" : "Menor", tema: "Precios",
+    texto: `${varios.length} materiales tienen precios distintos según el APU: ${varios.slice(0, 5).map((e) => `${e.d} (${pesosTxt(e.preciosLista[0])} a ${pesosTxt(e.preciosLista[e.preciosLista.length - 1])})`).join("; ")}${varios.length > 5 ? "; …" : ""}. Llevados al menor precio, el valor bajaría en ${pesosTxt(vVarios)}.`,
+    itemsRef: items.filter((it) => varios.some((e) => e.apus.some((c) => codNorm(c) === codNorm(it.item)))), impacto: vVarios, accion: "Pedir la justificación o unificar cada insumo en su menor precio." });
+
+  // Jornales: un mismo cargo con jornal distinto; personal de dirección en el costo directo.
+  const cargos = listaIns.filter((e) => e.sec === "MO");
+  const jornalesVarios = cargos.filter((e) => e.preciosLista.length > 1 && e.preciosLista[e.preciosLista.length - 1] / e.preciosLista[0] > 1.01);
+  if (jornalesVarios.length) agregar({ clave: "jornales", titulo: "Jornales distintos para un mismo cargo", estado: "hallazgo", sev: "Observación", tema: "Mano de obra",
+    texto: `${jornalesVarios.map((e) => `${e.d}: ${e.preciosLista.map(pesosTxt).join(", ")}`).join("; ")}.`, itemsRef: [], impacto: null, accion: "Pedir que se unifiquen los jornales por cargo." });
+  else if (cargos.length) agregar({ clave: "jornales", titulo: "Jornales", estado: "ok", texto: `Jornales uniformes en todos los APU: ${cargos.slice(0, 6).map((e) => `${e.d} ${pesosTxt(e.preciosLista[0])}`).join("; ")}.` });
+  const direccion = cargos.filter((e) => RE_DIRECCION.test(normalizar(e.d)));
+  const vDir = direccion.reduce((s, e) => s + e.valorFinal, 0);
+  if (direccion.length && F.aiu.a > 0) agregar({ clave: "direccion", titulo: "Personal de dirección en el costo directo", estado: "hallazgo", sev: "Observación", tema: "Mano de obra",
+    texto: `Los APU incluyen en el costo directo personal de dirección o supervisión (${direccion.map((e) => e.d).join(", ")}) por ${pesosTxt(vDir)} en el valor final, además del ${pctTxt(F.aiu.a)} de administración.`,
+    itemsRef: [], impacto: null, impactoTexto: `${pesosTxt(vDir)} por aclarar`, accion: "Confirmar que el personal de dirección no se cobre también en la administración." });
+
+  // Insumos comparados con la base de APU PRO (referencias confirmadas por el revisor).
+  const comparadosIns = [];
+  for (const e of listaIns) {
+    const cod = rev.refInsumos?.[e.clave];
+    const base = cod ? precioInsumo(cod) : null;
+    if (!(base > 0) || !e.preciosLista.length) continue;
+    const p = e.preciosLista[e.preciosLista.length - 1];
+    const dif = p / base - 1;
+    const estado = dif > 0.2 ? "Por encima" : dif < -0.2 ? "Por debajo" : "En rango";
+    let exceso = 0;
+    if (estado === "Por encima") for (const [pp, q] of e.precios) if (pp > base * 1.2) exceso += (pp - base * 1.2) * q * F.final;
+    comparadosIns.push({ clave: e.clave, d: e.d, u: e.u, q: e.q, p, codigo: cod, base, dif, estado, exceso });
+  }
+  const encimaIns = comparadosIns.filter((c) => c.estado === "Por encima");
+  const vIns = encimaIns.reduce((s, c) => s + c.exceso, 0);
+  if (encimaIns.length) agregar({ clave: "insumosBase", titulo: "Insumos por encima de la base de APU PRO", estado: "hallazgo", sev: vIns > valorFinal * 0.01 ? "Mayor" : "Menor", tema: "Precios",
+    texto: `De ${comparadosIns.length} insumos comparados con la base de precios de Cinco S.A.S., ${encimaIns.length} superan en más del 20 % el precio de referencia (${encimaIns.slice(0, 6).map((c) => `${c.d} +${Math.round(c.dif * 100)} %`).join("; ")}${encimaIns.length > 6 ? "; …" : ""}). El exceso sobre la referencia más un 20 % es de ${pesosTxt(vIns)} en el valor final.`,
+    itemsRef: items.filter((it) => encimaIns.some((c) => (insumos.get(c.clave)?.apus || new Set()).has(it.item))), impacto: vIns, accion: "Pedir cotizaciones de soporte de estos insumos y ajustar los APU." });
+
+  // Días-cuadrilla: cantidad del ítem ÷ rendimiento de la cuadrilla (el de mano de obra o el del APU).
+  let dias = 0;
+  for (const v of vinculos) { const r = (v.apu.secciones.MO || []).find((x) => Number(x.r) > 0)?.r || v.apu.rend; const it = items.find((x) => x.id === v.id); if (r > 0 && it?.cant) dias += it.cant / r; }
+  if (dias > 0) agregar({ clave: "diasCuadrilla", titulo: "Plazo según los rendimientos", estado: "info", texto: `Los rendimientos de los APU suman unos ${Math.round(dias)} días-cuadrilla: con el plazo de la obra se puede estimar cuántas cuadrillas simultáneas exige.` });
+
+  return { vinculos, sinApu, huerfanos, malos, insumos: listaIns, comparadosIns, dias };
 }
 
 // ---------------------------------------------------------------- hallazgos consolidados
@@ -450,6 +617,22 @@ export function informeRD(rev, res, hallazgos, { firmaNombre = "", firmaCargo = 
       ["Ítem", "Descripción", "Und", "Cantidad", "Precio oferta", "Referencia APU PRO", "Diferencia", "Estado"],
       ...res.comparados.map((c) => [c.item, c.desc.length > 90 ? c.desc.slice(0, 87) + "..." : c.desc, c.und || "", numTxt(c.cant), pesosTxt(c.vu), `${pesosTxt(c.ref)} (${c.codigo})`, `${c.dif >= 0 ? "+" : ""}${Math.round(c.dif * 100)} %`, c.estado])
     ], `Referencia: costo directo del APU de Cinco S.A.S. con los precios vigentes de la base de APU PRO${rev.base === "cd" ? "" : ", llevado a la misma base de la oferta"}. Se considera en rango una diferencia de hasta +/-20 %.`)] : []),
+    ...(res.apus ? [
+      H2("APU del oferente"),
+      P(escH(`Se leyeron ${res.apus.vinculos.length + res.apus.huerfanos.length} APU de la oferta: ${res.apus.vinculos.length} corresponden a ítems del presupuesto${res.apus.sinApu.length ? `, ${res.apus.sinApu.length} ítems no tienen APU` : ""}${res.apus.huerfanos.length ? ` y ${res.apus.huerfanos.length} APU no están en el presupuesto` : ""}. Las cantidades de cada insumo en toda la obra se calcularon multiplicando la cantidad del APU por la cantidad del ítem.`)),
+      T("Insumos de mayor peso (materiales)", [
+        ["Insumo", "Und", "Cantidad en la obra", "Precio en los APU", "Valor final", "APU que lo usan"],
+        ...res.apus.insumos.filter((e) => e.sec === "MA").slice(0, 15).map((e) => [e.d.length > 80 ? e.d.slice(0, 77) + "..." : e.d, e.u || "", numTxt(Math.round(e.q * 100) / 100), e.preciosLista.length > 1 ? `${pesosTxt(e.preciosLista[0])} a ${pesosTxt(e.preciosLista[e.preciosLista.length - 1])}` : pesosTxt(e.preciosLista[0]), pesosTxt(e.valorFinal), String(e.apus.length)])
+      ], "Valor final con el AIU y el IVA de la oferta. Son los insumos cuyo precio conviene verificar con cotizaciones."),
+      T("Jornales de los APU", [
+        ["Cargo", "Jornal con prestaciones", "Valor final en la obra"],
+        ...res.apus.insumos.filter((e) => e.sec === "MO").slice(0, 12).map((e) => [e.d, e.preciosLista.map(pesosTxt).join(" / "), pesosTxt(e.valorFinal)])
+      ]),
+      ...(res.apus.comparadosIns.length ? [T("Insumos comparados con la base de precios de Cinco S.A.S.", [
+        ["Insumo", "Und", "Precio oferta", "Referencia APU PRO", "Diferencia", "Estado"],
+        ...res.apus.comparadosIns.map((c) => [c.d, c.u || "", pesosTxt(c.p), `${pesosTxt(c.base)} (${c.codigo})`, `${c.dif >= 0 ? "+" : ""}${Math.round(c.dif * 100)} %`, c.estado])
+      ], "Referencia: base de precios de APU PRO vigente a la fecha de la revisión. En rango: hasta +/-20 %.")] : [])
+    ] : []),
     H1("Consolidado de hallazgos"),
     T("Hallazgos y acciones requeridas", [
       ["No.", "Hallazgo", "Ítems", "Severidad", "Impacto estimado", "Acción requerida"],
@@ -569,5 +752,20 @@ export function libroRevision(ExcelJS, rev, res, hallazgos, { logo = null } = {}
   const tot = wsI.addRow(["", "", "Total", "", null, null, { formula: `SUM(G4:G${wsI.rowCount})` }, { formula: `SUM(H4:H${wsI.rowCount})` }, { formula: `SUM(I4:I${wsI.rowCount})` }, { formula: `SUM(J4:J${wsI.rowCount})` }]);
   tot.font = { bold: true };
   [7, 8, 9, 10].forEach((j) => { tot.getCell(j).numFmt = MONEDA; });
+
+  if (res.apus) {
+    const A = res.apus;
+    const malos = new Map(A.malos.map((m) => [m.a, m.prob.join("; ")]));
+    const filasApu = [...A.vinculos.map((v) => ({ a: v.apu, it: items.find((x) => x.id === v.id), ref: v.ref, dif: v.dif })), ...A.huerfanos.map((a) => ({ a, it: null, ref: a.pu, dif: null }))];
+    hoja(wb, "APU oferente", "APU del oferente frente al presupuesto",
+      [{ h: "Ítem", al: "center" }, { h: "Descripción", wrap: true }, { h: "Und", al: "center" }, ...Object.keys(SECCIONES_APU).map((k) => ({ h: SECCIONES_APU[k], n: MONEDA, w: 14 })), { h: "Costo directo", n: MONEDA, w: 15 }, { h: "Precio APU", n: MONEDA, w: 15 }, { h: "Valor unitario presupuesto", n: MONEDA, w: 15 }, { h: "Diferencia", n: MONEDA, w: 13 }, { h: "Observación", wrap: true }],
+      filasApu.map(({ a, it, ref, dif }) => [a.item, a.desc, a.und, ...Object.keys(SECCIONES_APU).map((k) => (a.sub?.[k] ?? (a.secciones[k] ? a.secciones[k].reduce((s, x) => s + (Number(x.v) || 0), 0) : null))), a.cd, ref, it?.vu ?? null, dif, [it ? "" : "No está en el presupuesto", malos.get(a) || ""].filter(Boolean).join(". ")]),
+      { colorFila: (f) => (f[f.length - 1] || (f[f.length - 2] && Math.abs(f[f.length - 2]) > 1) ? "FFFFF4D6" : null), anchoMax: 55 });
+    const comp = new Map(A.comparadosIns.map((c) => [c.clave, c]));
+    hoja(wb, "Insumos", "Insumos de los APU en toda la obra (cantidad del APU × cantidad del ítem)",
+      [{ h: "Sección" }, { h: "Insumo", wrap: true }, { h: "Und", al: "center" }, { h: "Cantidad en la obra", n: "#,##0.00" }, { h: "Precio mínimo", n: MONEDA, w: 14 }, { h: "Precio máximo", n: MONEDA, w: 14 }, { h: "Valor (costo directo)", n: MONEDA, w: 16 }, { h: "Valor final", n: MONEDA, w: 16 }, { h: "N.º de APU", al: "center" }, { h: "APU PRO", al: "center" }, { h: "Precio referencia", n: MONEDA, w: 14 }, { h: "Dif.", n: "0%" }],
+      A.insumos.map((e) => { const c = comp.get(e.clave); return [SECCIONES_APU[e.sec] || e.sec, e.d, e.u, Math.round(e.q * 100) / 100, e.preciosLista[0] ?? null, e.preciosLista[e.preciosLista.length - 1] ?? null, Math.round(e.valor), Math.round(e.valorFinal), e.apus.length, c?.codigo || "", c ? Math.round(c.base) : null, c ? c.dif : null]; }),
+      { colorFila: (f) => (f[4] != null && f[5] != null && f[5] / f[4] > 1.01 ? "FFFFF4D6" : null), anchoMax: 60 });
+  }
   return wb;
 }

@@ -300,7 +300,24 @@ export async function guardarRevision(id, datos, user) {
   const { id: _, creadoPor, creadoEn, ...resto } = datos;
   await updateDoc(doc(db, "apRevisiones", id), { ...resto, actualizadoPor: user.email, actualizadoEn: serverTimestamp() });
 }
-export async function eliminarRevision(id) { await deleteDoc(doc(db, "apRevisiones", id)); }
+export async function eliminarRevision(id) {
+  const bloques = await getDocs(collection(db, "apRevisiones", id, "apus"));
+  for (const d of bloques.docs) await deleteDoc(d.ref);
+  await deleteDoc(doc(db, "apRevisiones", id));
+}
+// APU del oferente (leídos del PDF): van aparte, en bloques de 100, porque una oferta grande
+// no cabe en el documento de la revisión (límite de 1 MB por documento).
+export async function leerApusRevision(id) {
+  const snap = await getDocs(collection(db, "apRevisiones", id, "apus"));
+  return snap.docs.map((d) => d.data()).sort((a, b) => a.n - b.n).flatMap((d) => d.apus || []);
+}
+export async function guardarApusRevision(id, apus) {
+  const previos = await getDocs(collection(db, "apRevisiones", id, "apus"));
+  const lote = writeBatch(db);
+  previos.docs.forEach((d) => lote.delete(d.ref));
+  for (let i = 0, n = 0; i < apus.length; i += 100, n++) lote.set(doc(db, "apRevisiones", id, "apus", `b${String(n).padStart(3, "0")}`), { n, apus: apus.slice(i, i + 100) });
+  await lote.commit();
+}
 
 // ---------------------------------------------------------------- base inicial
 // Carga el archivo «APU PRO - base inicial de insumos.json» (formato apupro-semilla):
