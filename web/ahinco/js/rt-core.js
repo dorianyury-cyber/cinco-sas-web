@@ -175,7 +175,7 @@ export async function restaurarVersion(id, version, guardadosActuales, user) {
 // Archivo JSON con los datos del proyecto y todos sus cálculos, para pasar
 // un proyecto entre personas o cargar uno preparado por fuera.
 const FORMATO = "ahinco-proyecto";
-const CAMPOS_PROYECTO = ["nombre", "modo", "cliente", "ubicacion", "altitud", "tempAmbiente", "tipoDiseno", "descripcion", "autorDiseno", "documentosRevisados", "disenador", "matricula", "radicado", "literales"];
+const CAMPOS_PROYECTO = ["nombre", "modo", "cliente", "ubicacion", "altitud", "tempAmbiente", "tipoDiseno", "descripcion", "autorDiseno", "documentosRevisados", "disenador", "matricula", "radicado", "literales", "notasHallazgos"];
 export function exportarProyecto(proyecto, guardados) {
   const datos = Object.fromEntries(CAMPOS_PROYECTO.filter((k) => proyecto[k] !== undefined).map((k) => [k, proyecto[k]]));
   const calculos = Object.fromEntries(Object.entries(guardados).map(([k, v]) => [k, { entradas: v.entradas, etiqueta: v.etiqueta || "" }]));

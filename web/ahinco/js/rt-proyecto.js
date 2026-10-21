@@ -154,7 +154,7 @@ function iniciar(proyecto, guardados) {
       ? "Cada criterio que no cumple en los cálculos es un hallazgo de la interventoría sobre el diseño revisado. La tabla sale también al inicio del informe PDF y Word, lista para el oficio al contratista."
       : "Criterios que todavía no cumplen. Corríjalos en cada cálculo antes de entregar la memoria.";
     document.getElementById("tablaHall").innerHTML = hall.length
-      ? tablaHtml(["N.º", "Cálculo", "Criterio", "Valor", "Límite", "Norma", "Lit."], hall.map((h) => [`<strong>${h.codigo}</strong>`, `<a href="${urlCalculo(proyecto.id, h.clave)}">${esc(h.calculo)}</a>`, esc(h.criterio), esc(h.valor), esc(h.limite), esc(h.norma), esc(h.literales)]), "rt-tabla-hall")
+      ? tablaHtml(["N.º", "Cálculo", "Criterio", "Valor", "Límite", "Norma", "Lit.", "Nota del revisor"], hall.map((h) => [`<strong>${h.codigo}</strong>`, `<a href="${urlCalculo(proyecto.id, h.clave)}">${esc(h.calculo)}</a>`, esc(h.criterio), esc(h.valor), esc(h.limite), esc(h.norma), esc(h.literales), `<textarea class="rt-nota-hall" data-llave="${esc(h.llave)}" rows="3" maxlength="600" placeholder="Contexto o acción requerida (sale en el informe)">${esc(h.nota)}</textarea>`]), "rt-tabla-hall")
       : `<p class="rt-vacio">✔ Todos los criterios verificados cumplen.</p>`;
     document.getElementById("introSup").textContent = verif
       ? "Valores marcados con «(S)» en los literales y en los cálculos: son supuestos de la interventoría y deben confirmarse con el contratista o el operador de red."
@@ -252,6 +252,17 @@ function iniciar(proyecto, guardados) {
       mostrarAlerta(alerta, `Versión V${n} guardada.`, "success");
       await pintarVersiones();
     } catch (err) { mostrarAlerta(alerta, errorAmigable(err)); } finally { btn.disabled = false; }
+  });
+  document.getElementById("tablaHall").addEventListener("change", async (e) => {
+    const t = e.target.closest("textarea[data-llave]");
+    if (!t) return;
+    const notas = { ...(proyecto.notasHallazgos || {}) };
+    if (t.value.trim()) notas[t.dataset.llave] = t.value.trim(); else delete notas[t.dataset.llave];
+    try {
+      await actualizarProyecto(proyecto.id, { notasHallazgos: notas }, ctx.user);
+      proyecto.notasHallazgos = notas;
+      mostrarAlerta(alerta, "Nota guardada.", "success");
+    } catch (err) { mostrarAlerta(alerta, errorAmigable(err)); }
   });
   document.getElementById("actualizarBtn").addEventListener("click", () => document.getElementById("actualizarArchivo").click());
   document.getElementById("actualizarArchivo").addEventListener("change", async (e) => {

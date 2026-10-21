@@ -1638,17 +1638,18 @@ export async function construirLibro({ proyecto, resultados, guardados, rapido =
   const hall = hallazgos(proyecto, resultados), sup = supuestos(proyecto, guardados || {});
   if (!rapido && (hall.length || sup.length)) {
     const hs = wb.addWorksheet(verif ? "Hallazgos" : "Pendientes", { properties: { tabColor: { argb: "FFD64545" } }, pageSetup: { orientation: "landscape", fitToPage: true, fitToWidth: 1, fitToHeight: 0, paperSize: 9 } });
-    hs.columns = [{ width: 7 }, { width: 30 }, { width: 46 }, { width: 16 }, { width: 22 }, { width: 40 }, { width: 8 }];
+    const conNota = hall.some((h) => h.nota);
+    hs.columns = [{ width: 7 }, { width: 30 }, { width: 46 }, { width: 16 }, { width: 22 }, { width: 40 }, { width: 8 }, ...(conNota ? [{ width: 52 }] : [])];
     bandaTitulo(hs, verif ? "Hallazgos de la interventoría" : "Pendientes por corregir", verif ? "Criterios que no cumplen en el diseño revisado: el contratista debe aclararlos o corregirlos." : "Criterios que todavía no cumplen: corríjalos antes de entregar la memoria.", 7);
     const enc = (fila, textos) => textos.forEach((t, i) => { const c = hs.getCell(fila, i + 1); c.value = t; c.font = { bold: true, color: { argb: "FFFFFFFF" }, size: 9 }; c.fill = relleno(C_NAVY); c.border = BORDES; c.alignment = { wrapText: true, vertical: "middle" }; });
     let f = 4;
-    enc(f++, ["N.º", "Cálculo", "Criterio", "Valor", "Límite", "Norma o referencia", "Lit."]);
+    enc(f++, ["N.º", "Cálculo", "Criterio", "Valor", "Límite", "Norma o referencia", "Lit.", ...(conNota ? ["Nota del revisor"] : [])]);
     hall.forEach((h) => {
-      hs.getRow(f).values = [h.codigo, h.calculo, h.criterio, h.valor, h.limite, h.norma, h.literales];
+      hs.getRow(f).values = [h.codigo, h.calculo, h.criterio, h.valor, h.limite, h.norma, h.literales, ...(conNota ? [h.nota] : [])];
       hs.getRow(f).alignment = { wrapText: true, vertical: "top" };
       hs.getRow(f).eachCell((c) => { c.border = BORDES; c.font = { size: 9 }; });
       hs.getCell(f, 1).font = { bold: true, size: 9, color: { argb: "FFB42318" } };
-      hs.getRow(f).height = 13 * Math.max(2, Math.ceil(h.criterio.length / 44), Math.ceil(h.norma.length / 38)) + 4;
+      hs.getRow(f).height = 13 * Math.max(2, Math.ceil(h.criterio.length / 44), Math.ceil(h.norma.length / 38), Math.ceil(h.nota.length / 50)) + 4;
       f++;
     });
     if (sup.length) {

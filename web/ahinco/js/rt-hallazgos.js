@@ -22,7 +22,8 @@ export function hallazgos(proyecto, resultados) {
   const lista = [];
   Object.values(resultados).forEach((r) => {
     (r.verificaciones || []).filter((v) => v.cumple === false).forEach((v) => {
-      lista.push({ codigo: `${pre}-${lista.length + 1}`, calculo: titulo(r), clave: r.clave, modulo: r.modulo, criterio: v.criterio, valor: v.valor, limite: v.limite, norma: v.norma, literales: literalesDe(r.modulo).join(", ") });
+      const llave = `${r.clave}|${v.criterio}`;
+      lista.push({ codigo: `${pre}-${lista.length + 1}`, calculo: titulo(r), clave: r.clave, modulo: r.modulo, criterio: v.criterio, valor: v.valor, limite: v.limite, norma: v.norma, literales: literalesDe(r.modulo).join(", "), llave, nota: proyecto.notasHallazgos?.[llave] || "" });
     });
   });
   return lista;

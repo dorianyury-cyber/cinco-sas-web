@@ -89,7 +89,8 @@ export async function construirMemoria({ proyecto, resultados, guardados }) {
     const hall = hallazgos(proyecto, resultados), sup = supuestos(proyecto, guardados);
     b.push(T(1, "Resumen de hallazgos de la interventoría"));
     b.push(P(hall.length ? `La verificación encontró <b>${hall.length} hallazgo${hall.length === 1 ? "" : "s"}</b> que el contratista debe aclarar o corregir antes de construir. El detalle de cada cálculo está en el literal indicado.` : "La verificación no encontró incumplimientos en los criterios evaluados."));
-    if (hall.length) b.push(tabla("Hallazgos de la interventoría", ["N.º", "Cálculo", "Criterio", "Valor", "Límite", "Norma o referencia", "Lit."], hall.map((h) => [h.codigo, h.calculo, h.criterio, h.valor, h.limite, h.norma, h.literales])));
+    const conNota = hall.some((h) => h.nota);
+    if (hall.length) b.push(tabla("Hallazgos de la interventoría", ["N.º", "Cálculo", "Criterio", "Valor", "Límite", "Norma o referencia", "Lit.", ...(conNota ? ["Nota del revisor"] : [])], hall.map((h) => [h.codigo, h.calculo, h.criterio, h.valor, h.limite, h.norma, h.literales, ...(conNota ? [h.nota] : [])])));
     if (sup.length) {
       b.push(P("Los siguientes valores son supuestos de la interventoría (marcados «(S)» en este informe), adoptados porque el dato no está en los documentos revisados. El contratista o el operador de red deben confirmarlos; si cambian, los resultados deben recalcularse."));
       b.push(tabla("Supuestos y datos pendientes", ["Origen", "Supuesto"], sup.map((s) => [s.origen, s.texto])));

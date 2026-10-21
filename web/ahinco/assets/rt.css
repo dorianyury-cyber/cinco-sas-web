@@ -227,8 +227,9 @@ body.rt-verificacion .rt-solo-verif { display: block; }
 /* Hallazgos */
 .rt-tabla-hall td:first-child { white-space: nowrap; color: var(--danger); }
 .rt-tabla-hall, .rt-tabla-sup, .rt-tabla-versiones { table-layout: fixed; width: 100%; }
-.rt-tabla-hall th:nth-child(1) { width: 4.5%; } .rt-tabla-hall th:nth-child(2) { width: 17%; } .rt-tabla-hall th:nth-child(3) { width: 30%; }
-.rt-tabla-hall th:nth-child(4) { width: 10%; } .rt-tabla-hall th:nth-child(5) { width: 12%; } .rt-tabla-hall th:nth-child(6) { width: 22%; } .rt-tabla-hall th:nth-child(7) { width: 4.5%; }
+.rt-tabla-hall th:nth-child(1) { width: 4%; } .rt-tabla-hall th:nth-child(2) { width: 13%; } .rt-tabla-hall th:nth-child(3) { width: 21%; }
+.rt-tabla-hall th:nth-child(4) { width: 8%; } .rt-tabla-hall th:nth-child(5) { width: 9%; } .rt-tabla-hall th:nth-child(6) { width: 14%; } .rt-tabla-hall th:nth-child(7) { width: 4%; } .rt-tabla-hall th:nth-child(8) { width: 27%; }
+.rt-nota-hall { width: 100%; min-height: 54px; font: inherit; font-size: 12px; resize: vertical; }
 .rt-tabla-sup th:first-child { width: 19%; }
 .rt-tabla-versiones th:nth-child(1) { width: 5%; } .rt-tabla-versiones th:nth-child(2) { width: 11%; } .rt-tabla-versiones th:nth-child(3) { width: 17%; } .rt-tabla-versiones th:nth-child(4) { width: 26%; }
 .rt-tabla-versiones th:nth-child(5), .rt-tabla-versiones th:nth-child(6) { width: 7%; } .rt-tabla-versiones th:nth-child(7) { width: 27%; }
