@@ -45,6 +45,10 @@ const selectLinea = document.getElementById("lineaServicio");
 const filtroOfertaInput = document.getElementById("filtroOferta");
 const filtroOfertaLineaSelect = document.getElementById("filtroOfertaLinea");
 const filtroOfertaContratoSelect = document.getElementById("filtroOfertaContrato");
+// Contratos por id, para que el filtro por contrato también encuentre las ofertas sin contrato asignado cuyo cliente es el del contrato (como el visor de ofertas relacionadas).
+const contratosParaFiltro = {};
+const sinTildes = (t) => String(t || "").normalize("NFD").replace(/[\u0300-\u036f]/g, "").toLowerCase().replace(/\s+/g, " ").trim();
+const mismoCliente = (a, b) => { const x = sinTildes(a), y = sinTildes(b); return Boolean(x && y && (x.includes(y) || y.includes(x))); };
 const selectTipo = document.getElementById("tipo");
 const selectFirma = document.getElementById("firmaEmail");
 const bloquesEditor = document.getElementById("bloquesEditor");
@@ -1006,7 +1010,7 @@ function aplicarFiltroOfertas() {
   const contratoId = filtroOfertaContratoSelect.value;
   ofertasListaActual = ofertasListaCompleta.filter((of) => {
     if (linea && of.lineaServicio !== linea) return false;
-    if (contratoId && of.contratoId !== contratoId) return false;
+    if (contratoId && of.contratoId !== contratoId && !(!of.contratoId && mismoCliente(of.cliente, contratosParaFiltro[contratoId]?.cliente))) return false;
     if (!texto) return true;
     return `${of.radicado || ""} ${of.titulo || ""} ${of.cliente || ""}`.toLowerCase().includes(texto);
   });
@@ -1293,6 +1297,7 @@ requireAuth(async (user) => {
   contratosSnap.forEach((docSnap) => {
     const c = docSnap.data();
     contratosPorId[docSnap.id] = c;
+    contratosParaFiltro[docSnap.id] = c;
     const etiqueta = `${c.codigo || "(sin código)"} — ${truncar(c.nombre)}`;
     const opt = document.createElement("option");
     opt.value = docSnap.id;

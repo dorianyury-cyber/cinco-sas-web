@@ -98,6 +98,7 @@ function filtrosEnBotones(raiz) {
       const opciones = Array.from(sel.options);
       sel.classList.toggle("ctl-chip-oculto", false);
       if (opciones.length < 2 || opciones.length > 5) return;
+      if (opciones.some((op) => op.textContent.trim().length > 20)) return; // etiquetas largas (contratos, clientes): se dejan como lista
       grupo = document.createElement("div");
       grupo.className = "ctl-chips";
       grupo.setAttribute("role", "group");
