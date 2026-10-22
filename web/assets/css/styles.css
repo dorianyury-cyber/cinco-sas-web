@@ -2314,3 +2314,39 @@ body.app-control.ctl-con-menu .control-barra-acciones select { border-radius: 8p
   body.ctl-lista-fija .control-tabla-wrap thead th { position: sticky; top: 0; z-index: 3; background: var(--card-bg); box-shadow: inset 0 -1px 0 var(--border); }
   body.app-control.ctl-lista-fija table.control-tabla-seleccionable tbody tr { scroll-margin-top: 34px; scroll-margin-bottom: 8px; }
 }
+
+/* ---- Botones y formularios del módulo con menú lateral: el mismo botón pequeño y elegante de los
+   aplicativos (píldora azul marino con franjas ámbar y línea ámbar abajo), campos más compactos. ---- */
+body.app-control.ctl-con-menu .btn,
+body.app-control.ctl-con-menu .control-btn-nuevo {
+  position: relative; overflow: hidden; display: inline-flex; align-items: center; justify-content: center; gap: 6px;
+  width: auto; margin: 0; padding: 7px 18px; border: 0; border-radius: 999px; cursor: pointer; white-space: nowrap;
+  font-family: "Poppins", "Segoe UI", sans-serif; font-weight: 700; font-size: 11.5px; letter-spacing: 0.06em; text-transform: uppercase;
+  color: #feb209;
+  background: repeating-linear-gradient(135deg, rgba(254, 178, 9, 0.14) 0 8px, rgba(254, 178, 9, 0) 8px 16px), linear-gradient(135deg, #1f2732 0%, #161c25 100%);
+  box-shadow: 0 4px 10px rgba(18, 22, 29, 0.2), inset 0 1px 0 rgba(255, 255, 255, 0.10), inset 0 -2px 5px rgba(0, 0, 0, 0.3);
+  transition: transform 0.12s ease, filter 0.12s ease, box-shadow 0.12s ease;
+}
+body.app-control.ctl-con-menu .btn::after,
+body.app-control.ctl-con-menu .control-btn-nuevo::after { content: ""; position: absolute; left: 0; right: 0; bottom: 0; height: 1.5px; background: linear-gradient(90deg, #d99400, #feb209, #d99400); }
+body.app-control.ctl-con-menu .btn:hover:not(:disabled),
+body.app-control.ctl-con-menu .control-btn-nuevo:hover:not(:disabled) { transform: translateY(-1px); filter: brightness(1.14); text-decoration: none; color: #feb209; }
+body.app-control.ctl-con-menu .btn:active:not(:disabled),
+body.app-control.ctl-con-menu .control-btn-nuevo:active:not(:disabled) { transform: translateY(0); }
+body.app-control.ctl-con-menu .btn:disabled { opacity: 0.5; cursor: not-allowed; }
+body.app-control.ctl-con-menu .control-barra-acciones .control-btn-nuevo { padding: 7px 16px; font-size: 11.5px; }
+body.app-control.ctl-con-menu .control-btn-nuevo.control-btn-abierto { background: transparent; color: var(--text); box-shadow: inset 0 0 0 1.5px var(--border); }
+body.app-control.ctl-con-menu .control-btn-nuevo.control-btn-abierto::after { display: none; }
+body.app-control.ctl-con-menu .control-btn-mini { padding: 3px 11px; font-size: 11px; }
+/* Formularios: campos y rótulos más compactos, en una columna angosta a la izquierda. */
+body.ctl-con-menu form.pqr-form label { font-size: 12.5px; margin: 10px 0 4px; }
+body.ctl-con-menu form.pqr-form input,
+body.ctl-con-menu form.pqr-form textarea,
+body.ctl-con-menu form.pqr-form select { padding: 7px 11px; font-size: 13.5px; border-radius: 8px; }
+.ctl-main .container.control-container-angosto { max-width: 440px; margin-left: 0; }
+body.ctl-con-menu form.pqr-form > .btn,
+body.ctl-con-menu form.pqr-form > button[type="submit"] { margin-top: 16px; }
+body.ctl-con-menu .control-clave-wrap { position: relative; display: block; }
+body.ctl-con-menu .control-clave-wrap input { padding-right: 38px; }
+body.ctl-con-menu .control-clave-wrap .control-clave-toggle { position: absolute; left: auto; right: 4px; top: 50%; transform: translateY(-50%); margin: 0; width: 28px; height: 28px; padding: 0; font-size: 14px; }
+body.app-control.ctl-con-menu .control-btn-danger { padding: 3px 11px; font-size: 11px; border-radius: 999px; }
