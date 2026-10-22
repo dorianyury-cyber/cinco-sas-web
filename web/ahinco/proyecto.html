@@ -96,6 +96,19 @@
           <p class="text-muted" id="introHall"></p>
           <div id="tablaHall"></div>
         </div>
+        <div class="card rt-solo-verif">
+          <h2>Agregar un hallazgo manual</h2>
+          <p class="text-muted">Para lo que ningún cálculo detecta: una medición sin validez, una diferencia entre la memoria y los planos, un documento que falta. Sale en la misma tabla, en el informe y en el Excel.</p>
+          <form id="hallManualForm" class="rt-form-grid">
+            <div class="rt-ancho"><label for="hmTitulo">Hallazgo</label><input id="hmTitulo" required maxlength="200" placeholder="Ej. La memoria excluye la reserva de la demanda"></div>
+            <div><label for="hmValor">Lo que dice el diseño</label><input id="hmValor" maxlength="120" placeholder="Ej. 65,5 kVA (87,4 %)"></div>
+            <div><label for="hmLimite">Lo que corresponde</label><input id="hmLimite" maxlength="120" placeholder="Ej. 76,0 kVA (101 %)"></div>
+            <div><label for="hmNorma">Norma o referencia</label><input id="hmNorma" maxlength="160" placeholder="Ej. NTC 2050 220.44"></div>
+            <div><label for="hmLit">Literal(es)</label><input id="hmLit" maxlength="40" placeholder="Ej. c), h)"></div>
+            <div class="rt-ancho"><label for="hmDetalle">Detalle y acción requerida</label><textarea id="hmDetalle" rows="3" maxlength="1200"></textarea></div>
+            <div class="rt-acciones"><button type="submit" class="btn">Agregar hallazgo</button></div>
+          </form>
+        </div>
         <div class="card">
           <h2>Supuestos y datos pendientes</h2>
           <p class="text-muted" id="introSup"></p>

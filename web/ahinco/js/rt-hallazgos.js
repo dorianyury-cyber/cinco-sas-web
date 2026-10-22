@@ -26,6 +26,10 @@ export function hallazgos(proyecto, resultados) {
       lista.push({ codigo: `${pre}-${lista.length + 1}`, calculo: titulo(r), clave: r.clave, modulo: r.modulo, criterio: v.criterio, valor: v.valor, limite: v.limite, norma: v.norma, literales: literalesDe(r.modulo).join(", "), llave, nota: proyecto.notasHallazgos?.[llave] || "" });
     });
   });
+  // Hallazgos manuales: los que ningún cálculo detecta (documentos, planos, mediciones, coherencia entre ellos).
+  (proyecto.hallazgosManuales || []).forEach((m) => {
+    lista.push({ codigo: `${pre}-${lista.length + 1}`, calculo: m.calculo || "Documentos del diseño", clave: null, modulo: null, criterio: m.titulo || "", valor: m.valor || "—", limite: m.limite || "—", norma: m.norma || "", literales: m.literales || "", llave: `manual|${m.id}`, nota: m.detalle || "", manual: true, severidad: m.severidad || "" });
+  });
   return lista;
 }
 

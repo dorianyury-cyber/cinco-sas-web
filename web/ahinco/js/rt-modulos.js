@@ -156,7 +156,8 @@ export const MODULOS = {
         { key: "corriente", label: "I carga (A)", tipo: "numero", ancho: 8 }, { key: "continua", label: "Continua", tipo: "select", opciones: SI_NO, ancho: 7 },
         { key: "material", label: "Mat.", tipo: "select", opciones: lista(["Cu", "Al"]), ancho: 6 }, { key: "tAisl", label: "T aisl. (°C)", tipo: "select", opciones: lista([60, 75, 90]), ancho: 7 },
         { key: "tTerm", label: "T term. (°C)", tipo: "select", opciones: lista([60, 75]), ancho: 7 }, { key: "portadores", label: "Portadores", tipo: "numero", ancho: 7 },
-        { key: "tAmb", label: "T amb. (°C)", tipo: "numero", ancho: 7 }, { key: "icc", label: "Icc (kA)", tipo: "numero", ancho: 7 }, { key: "icu", label: "Icu (kA)", tipo: "numero", ancho: 7 }
+        { key: "tAmb", label: "T amb. (°C)", tipo: "numero", ancho: 7 }, { key: "icc", label: "Icc (kA)", tipo: "numero", ancho: 7 }, { key: "icu", label: "Icu (kA)", tipo: "numero", ancho: 7 },
+        { key: "dis", label: "Conductor del diseño (opc.)", tipo: "select", opciones: [{ valor: "", texto: "—" }, ...opcionesConductor().filter((o) => !o.valor.startsWith("aereo"))], ancho: 14 }, { key: "protDis", label: "Protección del diseño (A, opc.)", tipo: "numero", ancho: 9 }
       ], nueva: { continua: "Sí", material: "Cu", tAisl: 90, tTerm: 75, portadores: 3, tAmb: 30 }, def: [
         { circuito: "AL", descripcion: "Alimentador tablero general", corriente: 120, continua: "Sí", material: "Cu", tAisl: 90, tTerm: 75, portadores: 3, tAmb: 32, icc: 10, icu: 25 },
         { circuito: "1", descripcion: "Alumbrado", corriente: 8, continua: "Sí", material: "Cu", tAisl: 90, tTerm: 60, portadores: 6, tAmb: 32, icc: 5, icu: 10 },

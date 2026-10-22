@@ -119,6 +119,19 @@ export function conductores(e, proyecto = {}) {
     }
     verificaciones.push({ criterio: `Circuito ${c.circuito}: protección ≤ capacidad del conductor`, norma: "NTC 2050 240.4; RETIE 2024 art. 3.27.3 c", valor: `${sel.In} A`, limite: `${fmt(sel.ampFinal, 1)} A (o normalizado inmediato)`, cumple: true });
     if (icc > 0 && icu > 0) verificaciones.push({ criterio: `Circuito ${c.circuito}: capacidad de interrupción`, norma: "NTC 2050 110.9; RETIE 2024 art. 3.17.19", valor: `${fmt(icu, 1)} kA`, limite: `≥ ${fmt(icc, 1)} kA`, cumple: icu >= icc });
+    // Conductor y protección que trae el diseño (opcionales): se comparan con la carga y con la ampacidad corregida.
+    const [matDis, calDis] = String(c.dis || "").split(":");
+    if (calDis && N.AMPACIDAD[matDis]?.[calDis]) {
+      const amp = N.AMPACIDAD[matDis][calDis], tA = num(c.tAisl, 90), tT = num(c.tTerm, 75);
+      const ampAisl = amp[N.COLUMNA_TEMP[tA]] * (factorTemp(num(c.tAmb, tAmbDef), N.COLUMNA_TEMP[tA]) ?? 0) * factorAgrup(num(c.portadores, 3)), ampTerm = amp[N.COLUMNA_TEMP[tT]];
+      const capacidad = Math.min(ampAisl, ampTerm), iDis = I * (c.continua !== "No" ? 1.25 : 1), nombreCal = `${matDis} ${N.etiquetaCalibre(calDis)}`;
+      verificaciones.push({ criterio: `Circuito ${c.circuito}: conductor del diseño (${nombreCal}) soporta la carga`, norma: "NTC 2050 210.19(A)(1) y 310.15(B)(16)", valor: `${fmt(capacidad, 1)} A`, limite: `≥ ${fmt(iDis, 1)} A`, cumple: ampTerm >= iDis && ampAisl >= I });
+      const prot = num(c.protDis, 0);
+      if (prot > 0) {
+        const permitido = capacidad <= 800 ? sigNormal(N.PROTECCIONES_NORMALIZADAS, capacidad) : capacidad; // 240.4(B): el valor normalizado inmediato superior, hasta 800 A
+        verificaciones.push({ criterio: `Circuito ${c.circuito}: protección del diseño (${prot} A) sobre el conductor ${nombreCal}`, norma: "NTC 2050 240.4; RETIE 2024 art. 3.27.3 c", valor: `${prot} A`, limite: `≤ ${fmt(permitido, 0)} A (ampacidad ${fmt(capacidad, 1)} A)`, cumple: prot <= permitido + 1e-9 });
+      }
+    }
     circ.push({ circuito: c.circuito || "", descripcion: c.descripcion || "", I, material: mat, calibre: sel.calibre, In: sel.In, icu });
     return [c.circuito || "", c.descripcion || "", fmt(I, 1), mat, N.etiquetaCalibre(sel.calibre), fmt(sel.ft, 2), fmt(sel.fa, 2), fmt(sel.ampFinal, 1), `${sel.In} A`, icu ? `${fmt(icu, 1)} kA` : "—"];
   });
