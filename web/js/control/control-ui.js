@@ -49,6 +49,8 @@ function armarMenuLateral() {
     </div>
     <nav class="ctl-nav">
       <a href="../conecta.html" class="ctl-volver">← Cinco Conecta</a>
+      ${item("inicio.html", "🏠", "Inicio")}
+      <div class="ctl-nav-titulo">Contratos</div>
       ${item("contratos.html", "📋", "Contratos")}
       <div class="ctl-nav-titulo">Gestión</div>
       ${item("documentos.html", "📑", "Documentos")}

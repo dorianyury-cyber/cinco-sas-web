@@ -2446,3 +2446,47 @@ body.app-control .ctl-main .page-banner .eyebrow:has(a) { display: block; margin
 .ctl-icono-btn:hover { background: color-mix(in srgb, var(--text) 8%, transparent); text-decoration: none; }
 
 :root[data-theme="dark"] body.app-control.ctl-con-menu .btn:not(:disabled), :root[data-theme="dark"] body.app-control.ctl-con-menu .control-btn-nuevo:not(.control-btn-abierto) { box-shadow: 0 4px 10px rgba(0, 0, 0, 0.4), inset 0 1px 0 rgba(255, 255, 255, 0.10), 0 0 0 1px rgba(254, 178, 9, 0.35); }
+
+/* ---- Inicio del módulo interno: contadores y alertas ---- */
+.ctl-kpis { display: grid; grid-template-columns: repeat(auto-fit, minmax(190px, 1fr)); gap: 10px; }
+.ctl-kpi { display: flex; align-items: center; gap: 12px; padding: 11px 14px; border: 1px solid var(--border); border-radius: var(--radius); background: var(--card-bg); color: var(--text); box-shadow: var(--shadow); text-decoration: none; transition: border-color 0.15s ease, transform 0.12s ease; }
+.ctl-kpi:hover { border-color: var(--cinco-amber); transform: translateY(-1px); text-decoration: none; }
+.ctl-kpi-icono { font-size: 24px; line-height: 1; }
+.ctl-kpi-texto { display: flex; flex-direction: column; min-width: 0; line-height: 1.25; }
+.ctl-kpi-texto strong { font-size: 22px; font-weight: 800; }
+.ctl-kpi-texto span { font-size: 12.5px; font-weight: 600; }
+.ctl-kpi-texto small { font-size: 11px; color: var(--text-muted); }
+.ctl-kpi-peligro { border-color: #d64545; }
+.ctl-kpi-peligro .ctl-kpi-texto strong { color: #d64545; }
+.ctl-kpi-aviso { border-color: var(--cinco-amber-dark); }
+.ctl-kpi-aviso .ctl-kpi-texto strong { color: var(--cinco-amber-dark); }
+.ctl-tablero { display: grid; grid-template-columns: 1.25fr 1fr; gap: 12px; margin-top: 12px; }
+.ctl-tablero > .card { margin: 0; padding: 14px 16px; }
+.ctl-tablero > .card h2 { margin: 0 0 10px; }
+.ctl-alerta, .ctl-ultimo { display: flex; align-items: flex-start; gap: 10px; padding: 7px 0; border-bottom: 1px solid var(--border); color: var(--text); text-decoration: none; }
+.ctl-alerta:last-of-type, .ctl-ultimo:last-of-type { border-bottom: 0; }
+.ctl-alerta:hover, .ctl-ultimo:hover { text-decoration: none; background: color-mix(in srgb, var(--text) 4%, transparent); }
+.ctl-alerta-cuerpo, .ctl-ultimo-cuerpo { display: flex; flex-direction: column; min-width: 0; flex: 1; line-height: 1.3; }
+.ctl-alerta-cuerpo strong, .ctl-ultimo-cuerpo strong { font-size: 13px; }
+.ctl-alerta-cuerpo small, .ctl-ultimo-cuerpo small { font-size: 11.5px; color: var(--text-muted); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.ctl-ultimo time { font-size: 11px; color: var(--text-muted); white-space: nowrap; }
+.ctl-nivel { display: inline-block; flex-shrink: 0; min-width: 74px; text-align: center; padding: 1px 8px; border-radius: 999px; font-size: 10.5px; font-weight: 700; }
+.ctl-nivel-peligro { background: rgba(214, 69, 69, 0.15); color: #d64545; }
+.ctl-nivel-aviso { background: rgba(217, 130, 11, 0.16); color: var(--cinco-amber-dark); }
+.ctl-nivel-info { background: color-mix(in srgb, var(--text-muted) 16%, transparent); color: var(--text-muted); }
+.ctl-mas { margin: 6px 0 0; font-size: 12px; }
+table.ctl-mini { width: 100%; border-collapse: collapse; font-size: 12.5px; table-layout: fixed; }
+table.ctl-mini th { text-align: left; font-size: 10.5px; text-transform: uppercase; letter-spacing: 0.4px; color: var(--text-muted); padding: 3px 6px; border-bottom: 1px solid var(--border); }
+table.ctl-mini td { padding: 5px 6px; border-bottom: 1px solid var(--border); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+table.ctl-mini th:nth-child(1), table.ctl-mini td:nth-child(1) { width: 25%; }
+table.ctl-mini th:nth-child(3), table.ctl-mini td:nth-child(3) { width: 26%; }
+table.ctl-mini th:nth-child(4), table.ctl-mini td:nth-child(4) { width: 70px; }
+.ctl-resumen { display: grid; grid-template-columns: repeat(4, 1fr); gap: 8px; }
+.ctl-resumen div { display: flex; flex-direction: column; padding: 8px 10px; border-radius: 10px; background: color-mix(in srgb, var(--text) 5%, transparent); }
+.ctl-resumen strong { font-size: 22px; font-weight: 800; }
+.ctl-resumen span { font-size: 11.5px; color: var(--text-muted); }
+.ctl-valor { margin: 10px 0 0; font-size: 13px; }
+@media (max-width: 1100px) { .ctl-tablero { grid-template-columns: 1fr; } }
+
+table.ctl-mini td .ctl-nivel { min-width: 0; padding: 1px 7px; }
+table.ctl-mini th:nth-child(4), table.ctl-mini td:nth-child(4) { width: 76px; text-align: right; }

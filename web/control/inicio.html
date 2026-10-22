@@ -1,0 +1,66 @@
+<!doctype html>
+<html lang="es">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<meta name="robots" content="noindex, nofollow">
+<title>Inicio — Control de Contratos — Cinco S.A.S.</title>
+<link rel="icon" type="image/png" sizes="32x32" href="../assets/img/favicon-32.png">
+<link rel="icon" type="image/png" sizes="16x16" href="../assets/img/favicon-16.png">
+<link rel="apple-touch-icon" sizes="180x180" href="../assets/img/apple-touch-icon.png">
+<link rel="stylesheet" href="../assets/css/styles.css">
+</head>
+<body class="app-control">
+  <header class="site-header">
+    <div class="container">
+      <a class="brand" href="../conecta.html">
+        <img src="../assets/img/logo.png" alt="Cinco S.A.S.">
+        <span class="brand-tagline">Hacerlo mejor es nuestro reto.</span>
+      </a>
+      <div class="control-userbar">
+        <span id="userEmail"></span>
+        <button id="logoutBtn" class="btn-outline">Cerrar sesión</button>
+      </div>
+    </div>
+  </header>
+
+  <div class="page-banner">
+    <div class="container">
+      <span class="eyebrow">Uso interno</span>
+      <h1>Inicio</h1>
+      <p>Estado de los contratos, ofertas y documentos de Cinco S.A.S., con las alertas de vencimientos.</p>
+    </div>
+  </div>
+
+  <section class="section">
+    <div class="container">
+      <div class="ctl-kpis" id="kpis"><p class="text-muted">Cargando…</p></div>
+
+      <div class="ctl-tablero">
+        <div class="card">
+          <h2>Alertas y vencimientos</h2>
+          <div id="alertas"></div>
+        </div>
+        <div class="card">
+          <h2>Contratos que vencen en los próximos 90 días</h2>
+          <div id="porVencer"></div>
+        </div>
+      </div>
+
+      <div class="ctl-tablero">
+        <div class="card">
+          <h2>Resumen de contratos</h2>
+          <div id="resumen"></div>
+        </div>
+        <div class="card">
+          <h2>Últimos radicados</h2>
+          <div id="ultimos"></div>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <script type="module" src="../js/control/control-ui.js"></script>
+  <script type="module" src="../js/control/inicio.js"></script>
+</body>
+</html>

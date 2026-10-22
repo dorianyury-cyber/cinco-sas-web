@@ -9,7 +9,7 @@ agregarToggleClave(document.getElementById("clave"));
 
 // Si ya hay sesión activa, saltar directo a la lista de contratos.
 onAuthStateChanged(auth, (user) => {
-  if (user) window.location.href = "contratos.html";
+  if (user) window.location.href = "inicio.html";
 });
 
 const form = document.getElementById("loginForm");
@@ -32,7 +32,7 @@ form.addEventListener("submit", async (e) => {
 
   try {
     await signInWithEmailAndPassword(auth, email, clave);
-    window.location.href = "contratos.html";
+    window.location.href = "inicio.html";
     return;
   } catch (err) {
     // Sin cuenta propia en Cinco SAS control (o clave distinta a la de acá)
@@ -47,7 +47,7 @@ form.addEventListener("submit", async (e) => {
     try {
       const { data } = await httpsCallable(functions, "iniciarSesionConConecta")({ email, password: clave });
       await signInWithCustomToken(auth, data.customToken);
-      window.location.href = "contratos.html";
+      window.location.href = "inicio.html";
     } catch (err2) {
       mostrarAlerta("Correo o clave incorrectos.", "error");
       submitBtn.disabled = false;
