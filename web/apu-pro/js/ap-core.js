@@ -179,6 +179,29 @@ export async function registrarPrecio(insumo, precio, user) {
   await actualizarInsumo(insumo.codigo, datos, user);
   return datos;
 }
+// Registra muchos precios a la vez (una propuesta por insumo, ya revisada): cada uno entra al
+// historial del insumo y, si es el más reciente, pasa a ser el vigente. Devuelve los insumos con el
+// historial nuevo para que la pantalla no tenga que releer la base.
+export async function registrarPreciosLote(insumos, cambios, user, progreso = () => {}) {
+  const porCodigo = new Map(insumos.map((x) => [x.codigo, x]));
+  const resultado = [];
+  for (let i = 0; i < cambios.length; i += 400) {
+    const lote = writeBatch(db);
+    for (const c of cambios.slice(i, i + 400)) {
+      const ins = porCodigo.get(c.codigo);
+      if (!ins) continue;
+      const entrada = { valor: c.valor, fecha: c.fecha, fuente: c.fuente || "", url: c.url || "", metodo: c.metodo || "manual", registradoPor: user.email };
+      const precios = [entrada, ...(ins.precios || [])].sort((a, b) => String(b.fecha || "").localeCompare(String(a.fecha || "")));
+      const vigente = precios[0];
+      const datos = { precios, precio: vigente.valor, fechaPrecio: vigente.fecha, fuente: vigente.fuente, url: vigente.url, incluyeIva: c.incluyeIva ?? ins.incluyeIva };
+      lote.update(doc(db, "apInsumos", c.codigo), { ...limpiar(datos), actualizadoPor: user.email, actualizadoEn: serverTimestamp() });
+      resultado.push({ ...ins, ...datos });
+    }
+    await lote.commit();
+    progreso(Math.min(i + 400, cambios.length), cambios.length);
+  }
+  return resultado;
+}
 export async function eliminarInsumo(codigo) { await deleteDoc(doc(db, "apInsumos", codigo)); }
 
 // ---------------------------------------------------------------- APU (biblioteca)

@@ -21,6 +21,7 @@ export function pintarMenu(ctx, { activo = "", conteos = {}, apus, proyectos, re
       ${item("apus.html", "apus", "📚", "Biblioteca de APU", apus !== undefined ? `<span class="rt-nav-cuenta">${apus}</span>` : "")}
       <div class="rt-nav-titulo">Base de precios</div>
       ${ORDEN_TIPOS.map((t) => item(`insumos.html#${t}`, `insumos-${t}`, TIPOS[t].icono, TIPOS[t].nombre, conteos[t] !== undefined ? `<span class="rt-nav-cuenta">${conteos[t]}</span>` : "")).join("")}
+      ${item("precios.html", "precios", "🔄", "Actualizar precios")}
       ${item("parametros.html", "parametros", "⚙", "Parámetros e IPP")}
     </nav>
     <div class="spacer"></div>
@@ -48,7 +49,7 @@ export function pintarMenu(ctx, { activo = "", conteos = {}, apus, proyectos, re
 export function marcarActivo(clave) {
   document.querySelectorAll("#sidebar nav a").forEach((a) => {
     const href = a.getAttribute("href") || "";
-    const k = href.startsWith("insumos.html#") ? `insumos-${href.split("#")[1]}` : href === "inicio.html" ? "tablero" : href === "parametros.html" ? "parametros" : href === "apus.html" ? "apus" : href === "proyectos.html" ? "proyectos" : href === "revisiones.html" ? "revisiones" : "";
+    const k = href.startsWith("insumos.html#") ? `insumos-${href.split("#")[1]}` : href === "inicio.html" ? "tablero" : href === "parametros.html" ? "parametros" : href === "precios.html" ? "precios" : href === "apus.html" ? "apus" : href === "proyectos.html" ? "proyectos" : href === "revisiones.html" ? "revisiones" : "";
     a.classList.toggle("active", k === clave);
   });
 }

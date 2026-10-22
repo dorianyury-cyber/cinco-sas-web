@@ -181,3 +181,11 @@
 #tablaManuales .ap-check { display: inline-flex; margin-right: 4px; }
 #consolidado { margin-top: 12px; }
 .ap-aviso-base { margin: 8px 0 0; display: flex; align-items: center; gap: 12px; flex-wrap: wrap; }
+
+/* Actualizar precios */
+.ap-check { display: inline-flex; align-items: center; gap: 4px; margin-right: 10px; font-size: 13px; }
+.ap-tipos { border: 1px solid var(--border); border-radius: 8px; padding: 4px 10px 6px; }
+.ap-tipos legend { font-size: 11px; color: var(--text-muted); padding: 0 4px; }
+.ap-var-alta { color: var(--danger); font-weight: 600; }
+.ap-alerta-txt { color: var(--text-muted); font-size: 11.5px; }
+#tablaPropuesta select { width: 100%; max-width: 100%; font-size: 12px; }

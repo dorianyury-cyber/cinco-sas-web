@@ -1030,3 +1030,6 @@ export function libroRevision(ExcelJS, rev, res, hallazgos, { logo = null } = {}
   }
   return wb;
 }
+
+// Formato Cinco compartido con otros libros de Excel (p. ej. la plantilla de precios).
+export { AZUL, AMBAR, AMBAR_SUAVE, GRIS, GRIS_TXT, BORDES, fx, relleno, altoPara };

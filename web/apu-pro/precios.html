@@ -1,0 +1,98 @@
+<!doctype html>
+<html lang="es" class="ap-preparando">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<meta name="robots" content="noindex, nofollow">
+<title>Actualizar precios — APU PRO</title>
+<link rel="icon" type="image/png" sizes="32x32" href="../assets/img/favicon-32.png">
+<link rel="stylesheet" href="../interventoria-pro/assets/ip.css">
+<link rel="stylesheet" href="../ahinco/assets/rt.css">
+<link rel="stylesheet" href="assets/ap.css">
+</head>
+<body>
+  <div class="app-shell">
+    <aside class="sidebar rt-sidebar" id="sidebar"></aside>
+    <main class="main rt-main">
+      <div class="rt-encabezado">
+        <h1>🔄 Actualizar precios</h1>
+        <p class="text-muted">Actualiza muchos precios de la base a la vez. Siempre se muestra primero una propuesta con la variación de cada precio y sus alertas; no se guarda nada hasta que la apliques. Cada precio nuevo queda en el historial del insumo con su fuente y su fecha.</p>
+      </div>
+      <div class="alert" id="alerta"></div>
+
+      <div class="ap-pestanas" id="pestanas">
+        <button type="button" class="ap-pestana activa" data-origen="excel">📊 Desde Excel</button>
+        <button type="button" class="ap-pestana" data-origen="ipp">📈 Reajuste por IPP</button>
+        <button type="button" class="ap-pestana" data-origen="pdf">📄 Desde cotización (PDF)</button>
+      </div>
+
+      <section class="card" id="origen-excel">
+        <h2>Desde Excel</h2>
+        <p class="text-muted ap-nota">Descarga la plantilla con los insumos que quieras actualizar, llena <strong>Precio nuevo</strong>, <strong>Fecha</strong> y <strong>Fuente</strong>, y súbela. También sirve una lista de precios de un proveedor: se empareja por código o por la descripción.</p>
+        <div class="ap-fila-form">
+          <label>Insumos de la plantilla<select id="xTipo"></select></label>
+          <label>Precios<select id="xEstado">
+            <option value="">Todos</option>
+            <option value="viejos">Por revisar y desactualizados (más de 6 meses)</option>
+            <option value="danger">Desactualizados (más de 12 meses)</option>
+            <option value="muted">Sin precio o sin fecha</option>
+          </select></label>
+          <button type="button" class="btn secondary ap-btn" id="xPlantilla">⬇ Descargar plantilla</button>
+        </div>
+        <div class="ap-fila-form">
+          <label>Fecha si el archivo no la trae<input type="date" id="xFecha"></label>
+          <label>Fuente si el archivo no la trae<input id="xFuente" placeholder="Proveedor, cotización No…"></label>
+          <input type="file" id="xArchivo" accept=".xlsx,.xlsm" class="hidden">
+          <button type="button" class="btn ap-btn" id="xSubir">⬆ Subir Excel con precios</button>
+        </div>
+        <p class="text-muted ap-progreso" id="xProgreso"></p>
+      </section>
+
+      <section class="card hidden" id="origen-ipp">
+        <h2>Reajuste por IPP</h2>
+        <p class="text-muted ap-nota">Sirve para llevar los precios antiguos a hoy mientras llegan cotizaciones nuevas. Los precios reajustados quedan marcados como «Reajuste por IPP» en la fuente, para no confundirlos con precios de mercado. La mano de obra no se reajusta aquí: se calcula con los parámetros del año.</p>
+        <div id="ippEstado" class="ap-nota"></div>
+        <div class="ap-fila-form">
+          <fieldset class="ap-tipos"><legend>Insumos</legend><span id="iTipos"></span></fieldset>
+          <label>Antigüedad mínima (meses)<input id="iMeses" type="number" min="1" max="120" value="7"></label>
+          <label>Llevar los precios hasta<input type="date" id="iHasta"></label>
+          <label>Factor<select id="iModo"><option value="serie">Serie del IPP</option><option value="tasa">Tasa anual digitada</option></select></label>
+          <label class="hidden" id="iTasaCaja">Tasa anual (%)<input id="iTasa" inputmode="decimal" placeholder="Ej. 5,5"></label>
+          <button type="button" class="btn ap-btn" id="iCalcular">Calcular propuesta</button>
+        </div>
+      </section>
+
+      <section class="card hidden" id="origen-pdf">
+        <h2>Desde una cotización</h2>
+        <p class="text-muted ap-nota">Sube la cotización en PDF (con texto, no escaneada) o pega la tabla copiada del PDF o de un correo. Se leen la descripción y el valor unitario de cada ítem, y se proponen los insumos más parecidos de la base para que los confirmes.</p>
+        <div class="ap-fila-form">
+          <label>Proveedor o fuente<input id="pFuente" placeholder="Nombre del proveedor y número de cotización"></label>
+          <label>Fecha de la cotización<input type="date" id="pFecha"></label>
+          <label>Los valores<select id="pIva"><option value="">Como la base (sin convertir)</option><option value="si">Incluyen IVA</option><option value="no">No incluyen IVA</option></select></label>
+          <input type="file" id="pArchivo" accept=".pdf,application/pdf" class="hidden">
+          <button type="button" class="btn ap-btn" id="pSubir">⬆ Subir PDF</button>
+        </div>
+        <div class="rt-ancho"><label for="pTexto">O pega aquí la tabla de la cotización</label><textarea id="pTexto" rows="4" placeholder="Descripción, unidad y valor unitario (separados por tabulaciones, punto y coma o espacios)"></textarea></div>
+        <div class="rt-acciones"><button type="button" class="btn secondary" id="pLeerTexto">Leer el texto pegado</button></div>
+        <p class="text-muted ap-progreso" id="pProgreso"></p>
+      </section>
+
+      <section class="card hidden" id="propuestaCard">
+        <div class="ap-vp-cabeza"><h2 id="propuestaTitulo">Propuesta</h2><div class="rt-acciones"><button type="button" class="btn" id="aplicarBtn">Aplicar precios marcados</button></div></div>
+        <p class="text-muted ap-nota" id="propuestaResumen"></p>
+        <div class="ap-fila-form">
+          <label>Mostrar<select id="verFiltro"><option value="">Todas las filas</option><option value="alertas">Solo con alertas</option><option value="marcadas">Solo marcadas</option></select></label>
+          <button type="button" class="btn secondary ap-btn" id="marcarSinAlertas">Marcar las que no tienen alertas</button>
+          <button type="button" class="btn secondary ap-btn" id="marcarTodas" title="Marca todas las filas que se pueden aplicar, también las que tienen alertas">Marcar todas (ya las revisé)</button>
+          <button type="button" class="btn secondary ap-btn" id="desmarcarTodo">Quitar todas las marcas</button>
+        </div>
+        <div class="tabla-scroll"><table class="ap-tabla" id="tablaPropuesta"></table></div>
+      </section>
+    </main>
+  </div>
+
+  <script src="../js/vendor/exceljs.min.js"></script>
+  <script src="../js/vendor/pdfjs/pdf.min.js"></script>
+  <script type="module" src="js/ap-precios.js"></script>
+</body>
+</html>
