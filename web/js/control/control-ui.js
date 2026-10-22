@@ -1,7 +1,10 @@
 // Comportamiento común de las páginas del módulo interno (web/control/*):
 //
-// 1. Cabecera fija: el menú superior, la franja de la página ("Uso interno ·
-//    Contratos") y la barra de acciones quedan siempre visibles al bajar.
+// 0. Menú lateral: el menú superior se convierte en una barra lateral como la de los
+//    aplicativos (APU PRO, AHÍNCO). Se arma aquí, sobre el HTML de cada página, y conserva
+//    los id que usan los scripts (userEmail, logoutBtn, navOrdenesTrabajo).
+// 1. Cabecera fija: la franja de la página ("Uso interno · Contratos") y la barra de
+//    acciones quedan siempre visibles al bajar.
 // 2. Barra de acciones: el botón "+ Nuevo…" (o el desplegable "+ Nueva
 //    oferta/carta/informe", que aquí se convierte en un botón que lo abre) y
 //    los filtros de la lista suben a una sola fila dentro de la cabecera
@@ -23,12 +26,63 @@ function fueraDeModalYFormulario(el) {
   return !el.closest(".modal-backdrop, .modal, form, details:not([id])");
 }
 
-function armarCabeceraFija() {
+// Barra lateral: reemplaza la cabecera superior. Devuelve el <main> donde queda el contenido.
+function armarMenuLateral() {
   if (!header) return null;
+  const archivo = location.pathname.split("/").pop() || "contratos.html";
+  const activa = { "contrato.html": "contratos.html", "documento.html": "documentos.html" }[archivo] || archivo;
+  const item = (href, icono, texto, extra = "") => `<a href="${href}"${extra} class="${activa === href ? "active" : ""}"><span class="ctl-nav-icono">${icono}</span>${texto}</a>`;
+  const aside = document.createElement("aside");
+  aside.className = "sidebar ctl-sidebar";
+  aside.innerHTML = `<div class="ctl-sidebar-cabeza">
+      <a href="../conecta.html" class="ctl-brand"><img class="ctl-logo-oscuro" src="../assets/img/logo.png" alt="CINCO S.A.S."><img class="ctl-logo-claro" src="../assets/img/logo-texto-oscuro.png" alt="CINCO S.A.S."><span>Control interno<small>Contratos y documentos</small></span></a>
+      <button type="button" class="ctl-menu-movil" id="ctlMenuMovil" aria-expanded="false">☰ Menú</button>
+    </div>
+    <nav class="ctl-nav">
+      <a href="../conecta.html" class="ctl-volver">← Cinco Conecta</a>
+      ${item("contratos.html", "📋", "Contratos")}
+      <div class="ctl-nav-titulo">Gestión</div>
+      ${item("documentos.html", "📑", "Documentos")}
+      ${item("correspondencia.html", "✉️", "Correspondencia")}
+      ${item("informes.html", "📊", "Informes")}
+      ${item("ofertas.html", "💼", "Ofertas")}
+      ${item("ordenes-trabajo.html", "🛠", "Orden de trabajo", ' id="navOrdenesTrabajo"')}
+      <div class="ctl-nav-titulo">Administración</div>
+      ${item("empleados.html", "👥", "Empleados")}
+      ${item("cambiar-clave.html", "🔒", "Cambiar clave")}
+    </nav>
+    <div class="ctl-espacio"></div>
+    <div class="ctl-usuario">
+      <span id="userEmail"></span>
+      <button type="button" id="logoutBtn" class="ctl-salir">Cerrar sesión</button>
+    </div>`;
+  const main = document.createElement("main");
+  main.className = "main ctl-main";
+  const shell = document.createElement("div");
+  shell.className = "app-shell ctl-shell";
+  shell.append(aside, main);
+  header.parentNode.insertBefore(shell, header);
+  header.remove();
+  // Todo lo demás de la página (franja, secciones) pasa al contenido; los scripts y las ventanas modales se quedan.
+  Array.from(document.body.children).forEach((el) => {
+    if (el === shell || el.tagName === "SCRIPT" || el.matches(".modal-backdrop, .modal, dialog")) return;
+    main.appendChild(el);
+  });
+  document.body.classList.add("ctl-con-menu");
+  const movil = aside.querySelector("#ctlMenuMovil");
+  movil.addEventListener("click", () => {
+    const abierto = aside.classList.toggle("ctl-menu-abierto");
+    movil.setAttribute("aria-expanded", String(abierto));
+    movil.textContent = abierto ? "✕ Cerrar" : "☰ Menú";
+  });
+  return main;
+}
+
+function armarCabeceraFija(main) {
+  if (!main) return null;
   const cabecera = document.createElement("div");
   cabecera.className = "control-cabecera-fija";
-  header.parentNode.insertBefore(cabecera, header);
-  cabecera.appendChild(header);
+  main.prepend(cabecera);
   if (banner) cabecera.appendChild(banner);
   return cabecera;
 }
@@ -155,7 +209,7 @@ function navegacionConFlechas() {
   });
 }
 
-const cabecera = armarCabeceraFija();
+const cabecera = armarCabeceraFija(armarMenuLateral());
 armarBarraAcciones(cabecera);
 publicarAltoCabecera(cabecera);
 navegacionConFlechas();

@@ -2178,3 +2178,49 @@ form.modal-form-grid label.apu-check { display: flex; align-items: center; gap: 
 
 /* Ofertas: resumen de «Traer de APU PRO» */
 #apuResumen { margin-top: 12px; }
+
+/* ---- Menú lateral del módulo interno (js/control/control-ui.js): mismo lenguaje visual que
+   APU PRO y AHÍNCO — tarjeta flotante con línea ámbar, secciones en mayúscula y cajón en el celular. ---- */
+body.app-control:not(.ctl-con-menu) { opacity: 0; animation: ctl-mostrar 0.01s 1.5s forwards; } /* evita ver el encabezado viejo un instante */
+@keyframes ctl-mostrar { to { opacity: 1; } }
+body.ctl-con-menu .ctl-shell { display: flex; gap: 20px; padding: 20px; min-height: 100vh; align-items: flex-start; background: var(--bg); }
+.ctl-sidebar { width: 250px; flex-shrink: 0; position: sticky; top: 20px; max-height: calc(100vh - 40px); overflow-y: auto; display: flex; flex-direction: column; padding: 20px 14px 14px; background: var(--card-bg); color: var(--text); border-radius: var(--radius); box-shadow: var(--shadow); border-top: 3px solid var(--cinco-amber); }
+.ctl-brand { display: flex; align-items: center; gap: 10px; padding: 4px 6px 16px; border-bottom: 1px solid var(--border); margin-bottom: 12px; color: var(--text); }
+.ctl-brand:hover { text-decoration: none; opacity: 0.85; }
+.ctl-brand img { height: 38px; width: auto; }
+.ctl-brand span { display: flex; flex-direction: column; line-height: 1.15; font-weight: 700; font-size: 14.5px; }
+.ctl-brand small { font-weight: 500; font-size: 11px; color: var(--text-muted); }
+.ctl-logo-oscuro { display: none; }
+@media (prefers-color-scheme: dark) { .ctl-logo-oscuro { display: block; } .ctl-logo-claro { display: none; } }
+.ctl-menu-movil { display: none; }
+.ctl-nav a { display: flex; align-items: center; gap: 10px; padding: 9px 12px; margin-bottom: 2px; border-radius: 10px; color: var(--text-muted); font-size: 13.5px; transition: background 0.15s ease, color 0.15s ease; }
+.ctl-nav a:hover { background: color-mix(in srgb, var(--text) 7%, transparent); color: var(--text); text-decoration: none; }
+.ctl-nav a.active { background: color-mix(in srgb, var(--cinco-amber) 16%, transparent); color: var(--cinco-amber-dark); font-weight: 600; box-shadow: inset 3px 0 0 var(--cinco-amber); }
+.ctl-nav a.oculto { display: none; }
+.ctl-nav a.ctl-volver { font-size: 12.5px; padding: 4px 12px; margin-bottom: 6px; }
+.ctl-nav-icono { width: 20px; text-align: center; flex-shrink: 0; }
+.ctl-nav-titulo { padding: 14px 12px 6px; font-size: 11px; font-weight: 700; text-transform: uppercase; letter-spacing: 0.6px; color: var(--text-muted); }
+.ctl-espacio { flex: 1; min-height: 14px; }
+.ctl-usuario { border-top: 1px solid var(--border); padding: 12px 4px 2px; font-size: 12px; color: var(--text-muted); }
+.ctl-usuario #userEmail { display: block; margin-bottom: 8px; overflow-wrap: anywhere; color: var(--text); font-weight: 600; }
+.ctl-salir { width: 100%; padding: 7px 10px; border-radius: 10px; border: 1px solid var(--border); background: transparent; color: var(--text); font: inherit; font-size: 13px; cursor: pointer; }
+.ctl-salir:hover { background: color-mix(in srgb, var(--text) 7%, transparent); }
+.ctl-main { flex: 1; min-width: 0; }
+.ctl-main .container { max-width: none; padding: 0; }
+body.app-control .ctl-main section.section { padding: 8px 0 24px; }
+body.app-control .ctl-main .control-cabecera-fija { top: 0; background: var(--bg); box-shadow: none; padding-top: 2px; }
+body.app-control .ctl-main .page-banner { background: none; padding: 4px 0 10px; border: 0; }
+body.app-control .ctl-main .page-banner h1 { color: var(--text); font-size: 24px; }
+body.app-control .ctl-main .page-banner p { color: var(--text-muted); }
+body.app-control .ctl-main .control-barra-acciones { border-radius: 12px; border: 1px solid var(--border); background: var(--card-bg); margin-bottom: 8px; }
+body.app-control .ctl-main .control-barra-acciones-interior { padding-left: 12px; padding-right: 12px; }
+@media (max-width: 900px) {
+  body.ctl-con-menu .ctl-shell { flex-direction: column; padding: 12px; gap: 12px; }
+  .ctl-sidebar { width: 100%; position: static; max-height: none; }
+  .ctl-brand { border-bottom: 0; margin-bottom: 0; padding-bottom: 4px; }
+  .ctl-sidebar-cabeza { display: flex; align-items: center; justify-content: space-between; gap: 10px; }
+  .ctl-menu-movil { display: inline-block; padding: 7px 12px; border-radius: 10px; border: 1px solid var(--border); background: transparent; color: var(--text); font: inherit; font-size: 13px; cursor: pointer; }
+  .ctl-sidebar nav, .ctl-sidebar .ctl-usuario, .ctl-sidebar .ctl-espacio { display: none; }
+  .ctl-sidebar.ctl-menu-abierto nav, .ctl-sidebar.ctl-menu-abierto .ctl-usuario { display: block; }
+}
+@media (max-width: 900px) { .ctl-main { max-width: 100%; overflow-x: auto; } }
