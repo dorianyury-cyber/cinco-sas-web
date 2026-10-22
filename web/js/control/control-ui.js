@@ -18,6 +18,15 @@
 // elemento está oculto (ej. la vista del jefe en Órdenes de Trabajo cuando
 // entra un participante), el elemento también se oculta en la barra.
 
+// Tema claro/oscuro: el mismo interruptor y la misma preferencia guardada que usan APU PRO, AHÍNCO e Interventoría PRO.
+const CLAVE_TEMA = "ip-theme";
+(function aplicarTema() {
+  let tema = null;
+  try { tema = localStorage.getItem(CLAVE_TEMA); } catch (e) { /* sin almacenamiento */ }
+  if (tema !== "light" && tema !== "dark") tema = matchMedia("(prefers-color-scheme: dark)").matches ? "dark" : "light";
+  document.documentElement.setAttribute("data-theme", tema);
+})();
+
 const contenedorPagina = document.querySelector("section.section > .container");
 const header = document.querySelector(".site-header");
 const banner = document.querySelector(".page-banner");
@@ -49,12 +58,15 @@ function armarMenuLateral() {
       ${item("ordenes-trabajo.html", "🛠", "Orden de trabajo", ' id="navOrdenesTrabajo"')}
       <div class="ctl-nav-titulo">Administración</div>
       ${item("empleados.html", "👥", "Empleados")}
-      ${item("cambiar-clave.html", "🔒", "Cambiar clave")}
     </nav>
     <div class="ctl-espacio"></div>
     <div class="ctl-usuario">
-      <span id="userEmail"></span>
-      <button type="button" id="logoutBtn" class="ctl-salir">Cerrar sesión</button>
+      <strong id="userEmail"></strong>
+      <div class="ctl-iconos">
+        <button type="button" class="ctl-icono-btn" id="ctlTema" title="Cambiar modo claro/oscuro">🌓</button>
+        <a class="ctl-icono-btn" href="cambiar-clave.html" title="Cambiar clave">🔒</a>
+        <button type="button" class="ctl-icono-btn" id="logoutBtn" title="Cerrar sesión">⏻</button>
+      </div>
     </div>`;
   const main = document.createElement("main");
   main.className = "main ctl-main";
@@ -76,6 +88,11 @@ function armarMenuLateral() {
     document.body.classList.add("ctl-lista-fija");
     tablas.forEach((t) => { for (let p = t.parentElement; p && p !== main; p = p.parentElement) p.classList.add("ctl-cadena"); });
   }
+  aside.querySelector("#ctlTema").addEventListener("click", () => {
+    const nuevo = document.documentElement.getAttribute("data-theme") === "dark" ? "light" : "dark";
+    document.documentElement.setAttribute("data-theme", nuevo);
+    try { localStorage.setItem(CLAVE_TEMA, nuevo); } catch (e) { /* sin almacenamiento */ }
+  });
   const movil = aside.querySelector("#ctlMenuMovil");
   movil.addEventListener("click", () => {
     const abierto = aside.classList.toggle("ctl-menu-abierto");
