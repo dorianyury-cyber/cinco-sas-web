@@ -43,6 +43,13 @@ function calcular({ contratos, ofertas, documentos, ordenes, informes, cartas, e
       }
       if (aprobadores > 0 && Object.keys(c.aprobaciones || {}).length < aprobadores) sinAprobar++;
     });
+    // Contratos activos ya iniciados que no tienen ningún informe de este mes (los informes llevan el contrato elegido).
+    if (informes) {
+      const mesActual = `${HOY.getFullYear()}-${String(HOY.getMonth() + 1).padStart(2, "0")}`;
+      const conInforme = new Set(informes.filter((i) => i.mes === mesActual || mismoMes(deTimestamp(i.creadoEn))).map((i) => i.contratoId).filter(Boolean));
+      const sinInforme = contratos.filter((c) => c.estado !== "cerrado" && aFecha(c.fechaInicio) && aFecha(c.fechaInicio) <= HOY && !conInforme.has(c.id));
+      if (sinInforme.length) alertas.push({ nivel: "info", icono: "📊", titulo: `${plural(sinInforme.length, "contrato activo", "contratos activos")} sin informe de este mes`, detalle: sinInforme.slice(0, 4).map((c) => c.codigo).filter(Boolean).join(", ") + (sinInforme.length > 4 ? "…" : ""), href: "informes.html", orden: 1003 });
+    }
     if (sinAprobar) alertas.push({ nivel: "info", icono: "⏳", titulo: `${plural(sinAprobar, "contrato activo", "contratos activos")} con aprobación pendiente`, detalle: "Faltan firmas de los aprobadores.", href: "contratos.html", orden: 1000 });
     if (sinFecha) alertas.push({ nivel: "info", icono: "📅", titulo: `${plural(sinFecha, "contrato activo", "contratos activos")} sin fecha de finalización`, detalle: "Sin fecha no se puede avisar su vencimiento.", href: "contratos.html", orden: 1001 });
   }
