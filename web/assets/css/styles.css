@@ -2281,3 +2281,18 @@ body.ctl-con-menu .control-vista-previa .control-vp-grupo-titulo { font-size: 9.
 body.ctl-con-menu .control-vista-previa .control-vp-campo { padding: 2px 0; }
 body.app-control.ctl-con-menu .control-vista-previa .control-vp-etiqueta { font-size: 8.5px; }
 body.app-control.ctl-con-menu .control-vista-previa .control-vp-valor { font-size: 11.5px; padding-left: 11px; }
+
+/* ---- Un solo control para "+ Nuevo...", filtros en botones y contador (js/control/control-ui.js) ---- */
+details.control-nuevo.ctl-sin-resumen > summary { display: none; }
+details.control-nuevo.ctl-sin-resumen:not([open]) { display: none; }
+body.app-control .control-btn-abierto { background: none; border: 1.5px solid var(--cinco-amber-dark); color: var(--cinco-amber-dark); box-shadow: none; }
+.ctl-chips { display: inline-flex; flex-wrap: wrap; gap: 4px; }
+.ctl-chip { padding: 3px 11px; border: 1px solid var(--border); border-radius: 999px; background: var(--card-bg); color: var(--text); font: inherit; font-size: 12px; font-weight: 600; cursor: pointer; line-height: 1.5; }
+.ctl-chip:hover { border-color: var(--cinco-amber); }
+.ctl-chip.activo { background: var(--cinco-amber); border-color: var(--cinco-amber); color: #1b1b1b; }
+select.ctl-chip-oculto { display: none; }
+.ctl-cuenta { margin-left: auto; font-size: 11.5px; color: var(--text-muted); white-space: nowrap; }
+body.app-control.ctl-con-menu .control-barra-acciones input[type="text"],
+body.app-control.ctl-con-menu .control-barra-acciones select { border-radius: 8px; }
+.ctl-chips { align-items: center; }
+.ctl-chips-titulo { font-size: 10.5px; font-weight: 700; text-transform: uppercase; letter-spacing: 0.4px; color: var(--text-muted); margin-right: 2px; }

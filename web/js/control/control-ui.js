@@ -87,6 +87,60 @@ function armarCabeceraFija(main) {
   return cabecera;
 }
 
+// Un desplegable de filtro con pocas opciones (estado, tipo, rol...) se muestra como un grupo de botones; el
+// desplegable sigue existiendo (oculto) y se mantiene sincronizado, así que el script de la página no cambia.
+function filtrosEnBotones(raiz) {
+  if (!raiz) return;
+  raiz.querySelectorAll("select").forEach((sel) => {
+    let grupo = null;
+    const construir = () => {
+      grupo?.remove();
+      const opciones = Array.from(sel.options);
+      sel.classList.toggle("ctl-chip-oculto", false);
+      if (opciones.length < 2 || opciones.length > 5) return;
+      grupo = document.createElement("div");
+      grupo.className = "ctl-chips";
+      grupo.setAttribute("role", "group");
+      // Título corto del grupo («Estados», «Tipos») a partir del primer desplegable «Todos los estados», salvo si ya está dentro de una etiqueta.
+      const m = !sel.closest("label") && /^(todos|todas) (los|las) (.+)$/i.exec(opciones[0].textContent.trim());
+      if (m) { const t = document.createElement("span"); t.className = "ctl-chips-titulo"; t.textContent = m[3].charAt(0).toUpperCase() + m[3].slice(1); grupo.appendChild(t); }
+      const botones = opciones.map((op) => {
+        const b = document.createElement("button");
+        b.type = "button";
+        b.className = "ctl-chip";
+        b.dataset.valor = op.value;
+        b.textContent = op.value === "" ? (/^todas/i.test(op.textContent.trim()) ? "Todas" : "Todos") : op.textContent.trim();
+        b.addEventListener("click", () => { sel.value = op.value; sel.dispatchEvent(new Event("change", { bubbles: true })); marcar(); });
+        grupo.appendChild(b);
+        return b;
+      });
+      const marcar = () => botones.forEach((b) => b.classList.toggle("activo", b.dataset.valor === sel.value));
+      sel.addEventListener("change", marcar);
+      marcar();
+      sel.classList.add("ctl-chip-oculto");
+      sel.parentNode.insertBefore(grupo, sel);
+    };
+    construir();
+    // Si la página cambia las opciones después (por ejemplo, las carga de la base de datos), se reconstruye.
+    new MutationObserver(construir).observe(sel, { childList: true });
+  });
+}
+
+// "N registros" al final de la barra, según las filas visibles de la lista principal.
+function contadorDeRegistros(interior) {
+  const tabla = document.querySelector("table.control-tabla-seleccionable, table.control-tabla-documentos");
+  if (!tabla || !interior) return;
+  const cuenta = document.createElement("span");
+  cuenta.className = "ctl-cuenta";
+  interior.appendChild(cuenta);
+  const actualizar = () => {
+    const n = Array.from(tabla.querySelectorAll("tbody tr")).filter((tr) => tr.children.length > 1 && tr.style.display !== "none" && !tr.hidden).length;
+    cuenta.textContent = `${n} ${n === 1 ? "registro" : "registros"}`;
+  };
+  actualizar();
+  new MutationObserver(actualizar).observe(tabla, { childList: true, subtree: true });
+}
+
 function armarBarraAcciones(cabecera) {
   if (!cabecera || !contenedorPagina) return;
 
@@ -124,11 +178,21 @@ function armarBarraAcciones(cabecera) {
     const boton = document.createElement("button");
     boton.type = "button";
     boton.className = "control-btn-nuevo";
-    boton.textContent = (summary?.textContent || "+ Nuevo").trim();
+    const textoNuevo = (summary?.textContent || "+ Nuevo").trim();
+    boton.textContent = textoNuevo;
+    // Con el menú lateral el desplegable no repite el botón: el de la barra abre y cierra el formulario.
+    const conMenu = document.body.classList.contains("ctl-con-menu");
+    if (conMenu) detallesNuevo.classList.add("ctl-sin-resumen");
+    const sincronizar = () => {
+      if (!conMenu) return;
+      boton.textContent = detallesNuevo.open ? "✕ Cerrar" : textoNuevo;
+      boton.classList.toggle("control-btn-abierto", detallesNuevo.open);
+    };
     boton.addEventListener("click", () => {
-      detallesNuevo.open = true;
-      detallesNuevo.scrollIntoView({ behavior: "smooth", block: "start" });
+      detallesNuevo.open = conMenu ? !detallesNuevo.open : true;
+      if (detallesNuevo.open) detallesNuevo.scrollIntoView({ behavior: "smooth", block: "start" });
     });
+    detallesNuevo.addEventListener("toggle", sincronizar);
     const marcador = document.createElement("span");
     marcador.hidden = true;
     detallesNuevo.parentNode.insertBefore(marcador, detallesNuevo);
@@ -137,6 +201,7 @@ function armarBarraAcciones(cabecera) {
     movidos.push({ el: boton, marcador, sigue: detallesNuevo });
   }
   if (filtros) mover(filtros);
+  if (document.body.classList.contains("ctl-con-menu")) { filtrosEnBotones(filtros); contadorDeRegistros(interior); }
 
   // Un elemento movido se oculta en la barra si su lugar original quedó
   // dentro de algo oculto, o si lo que sigue (el desplegable) está oculto.
