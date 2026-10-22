@@ -2224,3 +2224,44 @@ body.app-control .ctl-main .control-barra-acciones-interior { padding-left: 12px
   .ctl-sidebar.ctl-menu-abierto nav, .ctl-sidebar.ctl-menu-abierto .ctl-usuario { display: block; }
 }
 @media (max-width: 900px) { .ctl-main { max-width: 100%; overflow-x: auto; } }
+
+/* ---- Compactación del módulo interno con menú lateral: menú más angosto y de menor altura,
+   márgenes y etiquetas más chicos, para ver más filas en pantallas pequeñas. ---- */
+body.ctl-con-menu .ctl-shell { padding: 10px 14px 10px 10px; gap: 14px; }
+.ctl-sidebar { width: 212px; top: 10px; max-height: calc(100vh - 20px); padding: 12px 8px 8px; }
+.ctl-brand { padding: 2px 4px 9px; margin-bottom: 6px; gap: 8px; }
+.ctl-brand img { height: 30px; }
+.ctl-brand span { font-size: 13px; white-space: nowrap; }
+.ctl-brand small { font-size: 10px; }
+.ctl-nav a { padding: 5px 9px; margin-bottom: 1px; font-size: 12.8px; gap: 8px; border-radius: 8px; }
+.ctl-nav a.ctl-volver { padding: 1px 9px 3px; font-size: 11.5px; margin-bottom: 2px; }
+.ctl-nav-icono { width: 18px; font-size: 13px; }
+.ctl-nav-titulo { padding: 9px 9px 3px; font-size: 10px; }
+.ctl-espacio { min-height: 6px; }
+.ctl-usuario { padding: 7px 2px 0; font-size: 11px; }
+.ctl-usuario #userEmail { margin-bottom: 5px; font-size: 11px; }
+.ctl-salir { padding: 4px 8px; font-size: 12px; }
+body.app-control .ctl-main .page-banner { padding: 0 0 6px; }
+body.app-control .ctl-main .page-banner h1 { font-size: 20px; }
+body.app-control .ctl-main .page-banner p { font-size: 12px; }
+body.app-control .ctl-main .page-banner .eyebrow { font-size: 9.5px; }
+body.app-control .ctl-main .control-cabecera-fija { padding-top: 0; }
+body.app-control .ctl-main .control-barra-acciones { margin-bottom: 6px; border-radius: 10px; }
+body.app-control .ctl-main .control-barra-acciones-interior { padding: 6px 10px; gap: 6px 10px; }
+body.app-control.ctl-con-menu .control-barra-acciones .control-btn-nuevo { padding: 6px 14px; font-size: 13px; }
+body.app-control.ctl-con-menu .control-barra-acciones input,
+body.app-control.ctl-con-menu .control-barra-acciones select { padding: 4px 9px; font-size: 12.5px; }
+body.app-control .ctl-main section.section { padding: 2px 0 14px; }
+body.ctl-con-menu .control-lista { margin-top: 6px; }
+body.ctl-con-menu .control-vista-previa { padding: 9px 12px; gap: 7px; margin-bottom: 8px; }
+body.ctl-con-menu .control-vista-previa .control-vp-titulo { font-size: 14.5px; }
+body.ctl-con-menu .control-badge,
+body.ctl-con-menu .control-estado-pill { padding: 1px 9px; font-size: 11px; }
+body.ctl-con-menu table.control-tabla-cambios th,
+body.ctl-con-menu table.control-tabla-cambios td { padding: 6px 10px; }
+body.app-control.ctl-con-menu table.control-tabla-documentos td { padding-top: 3px; padding-bottom: 3px; }
+@media (max-height: 720px) {
+  .ctl-brand small { display: none; }
+  .ctl-nav a { padding: 4px 9px; }
+  .ctl-nav-titulo { padding-top: 6px; }
+}
