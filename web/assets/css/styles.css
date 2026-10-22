@@ -2296,3 +2296,21 @@ body.app-control.ctl-con-menu .control-barra-acciones input[type="text"],
 body.app-control.ctl-con-menu .control-barra-acciones select { border-radius: 8px; }
 .ctl-chips { align-items: center; }
 .ctl-chips-titulo { font-size: 10.5px; font-weight: 700; text-transform: uppercase; letter-spacing: 0.4px; color: var(--text-muted); margin-right: 2px; }
+
+/* ---- Lista con encabezado fijo: título, barra y tarjeta de detalle no se mueven; solo se desplaza la tabla,
+   con los títulos de las columnas siempre visibles (js/control/control-ui.js marca la cadena de contenedores). ---- */
+@media (min-width: 901px) and (min-height: 521px) {
+  html:has(body.ctl-lista-fija), body.ctl-lista-fija { height: 100%; }
+  body.ctl-lista-fija .ctl-shell { height: 100vh; overflow: hidden; align-items: stretch; box-sizing: border-box; }
+  body.ctl-lista-fija .ctl-main { display: flex; flex-direction: column; min-height: 0; overflow: hidden; }
+  body.ctl-lista-fija .ctl-main > .control-cabecera-fija { flex: none; position: static; }
+  body.ctl-lista-fija .ctl-cadena { display: flex; flex-direction: column; flex: 1 1 auto; min-height: 0; }
+  body.ctl-lista-fija .ctl-cadena.oculto { display: none; }
+  body.ctl-lista-fija .ctl-cadena > :not(.ctl-cadena) { flex: none; }
+  body.ctl-lista-fija .control-vista-previa { max-height: 42vh; overflow: auto; }
+  body.ctl-lista-fija details.control-nuevo[open] { max-height: 50vh; overflow: auto; }
+  body.ctl-lista-fija .ctl-cadena > .control-tabla-wrap { flex: 1 1 auto; min-height: 0; overflow: auto; border-radius: var(--radius); box-shadow: var(--shadow); background: var(--card-bg); }
+  body.ctl-lista-fija .control-tabla-wrap > table { box-shadow: none; border-radius: 0; }
+  body.ctl-lista-fija .control-tabla-wrap thead th { position: sticky; top: 0; z-index: 3; background: var(--card-bg); box-shadow: inset 0 -1px 0 var(--border); }
+  body.app-control.ctl-lista-fija table.control-tabla-seleccionable tbody tr { scroll-margin-top: 34px; scroll-margin-bottom: 8px; }
+}

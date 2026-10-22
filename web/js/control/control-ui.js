@@ -69,6 +69,13 @@ function armarMenuLateral() {
     main.appendChild(el);
   });
   document.body.classList.add("ctl-con-menu");
+  // Páginas con lista: lo de arriba (título, barra, tarjeta de detalle) queda fijo y solo se mueve la tabla,
+  // con los títulos de las columnas siempre visibles. La cadena de contenedores hasta la tabla se vuelve flexible.
+  const tablas = main.querySelectorAll(".control-tabla-wrap");
+  if (tablas.length) {
+    document.body.classList.add("ctl-lista-fija");
+    tablas.forEach((t) => { for (let p = t.parentElement; p && p !== main; p = p.parentElement) p.classList.add("ctl-cadena"); });
+  }
   const movil = aside.querySelector("#ctlMenuMovil");
   movil.addEventListener("click", () => {
     const abierto = aside.classList.toggle("ctl-menu-abierto");
