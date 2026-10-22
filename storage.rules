@@ -17,6 +17,21 @@ service firebase.storage {
     match /contratos/{contratoId}/documentos/{archivo} {
       allow read, write: if request.auth != null;
     }
+    // Documentos adjuntos a un ítem del checklist de un contrato (contrato.html):
+    // hasta 25 MB; PDF, imágenes, Word y Excel. Quién puede adjuntar lo filtran
+    // las reglas de Firestore sobre contratos/{id}/items.
+    match /contratos/{contratoId}/items/{itemId}/{archivo} {
+      allow read: if request.auth != null;
+      allow delete: if request.auth != null;
+      allow create, update: if request.auth != null
+        && request.resource.size < 25 * 1024 * 1024
+        && (request.resource.contentType == 'application/pdf'
+          || request.resource.contentType.matches('image/.*')
+          || request.resource.contentType == 'application/msword'
+          || request.resource.contentType == 'application/vnd.openxmlformats-officedocument.wordprocessingml.document'
+          || request.resource.contentType == 'application/vnd.ms-excel'
+          || request.resource.contentType == 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet');
+    }
     // Gráficos/imágenes insertados en un Informe de diseño propio
     // (web/control/informes.html).
     match /informes/{informeId}/{archivo} {

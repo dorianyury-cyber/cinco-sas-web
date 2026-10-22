@@ -2,7 +2,7 @@
 // Cada colección se lee por separado: si el usuario no tiene permiso sobre una, su contador y sus alertas
 // simplemente no aparecen.
 import { signOut } from "https://www.gstatic.com/firebasejs/10.7.1/firebase-auth.js";
-import { collection, getDocs } from "https://www.gstatic.com/firebasejs/10.7.1/firebase-firestore.js";
+import { collection, getDocs, query, orderBy, limit } from "https://www.gstatic.com/firebasejs/10.7.1/firebase-firestore.js";
 import { auth, db, requireAuth, obtenerPerfil } from "./firebase-control.js";
 
 const esc = (t) => String(t ?? "").replace(/[&<>"']/g, (c) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" }[c]));
@@ -121,6 +121,30 @@ function pintar(r) {
     : '<p class="text-muted">Todavía no hay radicados.</p>';
 }
 
+// Últimas actuaciones registradas en la bitácora de los contratos (5 por contrato, los 10 más recientes).
+// Si no hay permiso sobre la bitácora de un contrato, simplemente se omite.
+async function actividadReciente(contratos) {
+  const recientes = [...(contratos || [])]
+    .filter((c) => c.estado !== "cerrado")
+    .sort((a, b) => (b.actualizadoEn?.toMillis?.() || 0) - (a.actualizadoEn?.toMillis?.() || 0))
+    .slice(0, 12);
+  const listas = await Promise.all(recientes.map(async (c) => {
+    try {
+      const snap = await getDocs(query(collection(db, "contratos", c.id, "actividad"), orderBy("en", "desc"), limit(5)));
+      return snap.docs.map((d) => ({ ...d.data(), contrato: c }));
+    } catch (e) { return []; }
+  }));
+  return listas.flat().filter((r) => r.en?.toDate).sort((a, b) => b.en.toMillis() - a.en.toMillis()).slice(0, 10);
+}
+
+function pintarActividad(registros) {
+  const caja = document.getElementById("actividad");
+  if (!caja) return;
+  caja.innerHTML = registros.length
+    ? registros.map((r) => `<a class="ctl-ultimo" href="contrato.html?id=${esc(r.contrato.id)}"><span>📝</span><span class="ctl-ultimo-cuerpo"><strong>${esc(r.nombre || r.por)} — ${esc(r.detalle)}</strong><small>${esc(r.contrato.codigo || "")} ${esc(r.item || r.seccion || "")}</small></span><time>${esc(r.en.toDate().toLocaleString("es-CO", { dateStyle: "short", timeStyle: "short" }))}</time></a>`).join("")
+    : '<p class="text-muted">Todavía no hay actuaciones registradas.</p>';
+}
+
 requireAuth(async (user) => {
   document.getElementById("userEmail").textContent = user.email;
   const perfil = await obtenerPerfil(user.email);
@@ -128,6 +152,7 @@ requireAuth(async (user) => {
   const nombres = ["contratos", "ofertas", "documentos", "ordenesTrabajo", "informes", "correspondencia", "empleados"];
   const [contratos, ofertas, documentos, ordenes, informes, cartas, empleados] = await Promise.all(nombres.map(leer));
   pintar(calcular({ contratos, ofertas, documentos, ordenes, informes, cartas, empleados }));
+  pintarActividad(await actividadReciente(contratos));
 });
 
 document.getElementById("logoutBtn").addEventListener("click", () => {

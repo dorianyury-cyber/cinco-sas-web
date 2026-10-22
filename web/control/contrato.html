@@ -193,6 +193,16 @@
         </div>
       </div>
 
+      <details class="card control-campo" open id="actividadDetails">
+        <summary><span>7. Actividad</span><span class="control-badge" id="actividadBadge"></span></summary>
+        <p class="text-muted control-informes-ayuda">Quién cambió qué y cuándo en este contrato: estados, fechas, responsables, notas, documentos, aprobaciones y equipo. No se puede borrar.</p>
+        <div class="control-actividad-filtros">
+          <select id="actividadPersona" aria-label="Filtrar por persona"><option value="">Todas las personas</option></select>
+          <select id="actividadSeccion" aria-label="Filtrar por sección"><option value="">Todas las secciones</option></select>
+        </div>
+        <ul class="control-actividad" id="actividadLista"></ul>
+      </details>
+
       <details class="card control-campo" open>
         <summary><span>Aprobación del contrato</span><span class="control-badge" id="aprobacionBadge"></span></summary>
         <p class="text-muted control-informes-ayuda">Lo debe leer y aprobar cada persona marcada como aprobadora obligatoria (ver Empleados).</p>

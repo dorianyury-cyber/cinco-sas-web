@@ -7,6 +7,9 @@ import { ref, uploadBytes, getDownloadURL } from "https://www.gstatic.com/fireba
 import { auth, db, storage, requireAuth, obtenerPerfil } from "./firebase-control.js";
 import { CAMPOS, FASES, COLUMNAS_ITEM } from "./plantillas.js";
 import { capitalizarOracion, capitalizarNombrePropio } from "./texto.js";
+import { iniciarBitacora, registrarActividad, alCambiarActividad } from "./actividad.js";
+import { crearCeldaDocumentos } from "./adjuntos.js";
+import { TIPOS_ACTIVIDAD, detalleCambio, personasDe, seccionesDe, filtrarActividad } from "./actividad-motor.js";
 
 const TIPO_DOC_LABEL = { contrato: "Contrato", interno: "Interno", externo: "Externo" };
 
@@ -72,6 +75,12 @@ function celdaOculta() {
   return campo("span", { class: "control-item-oculto", text: "—" });
 }
 
+// Nombre de la sección de un ítem, para la bitácora (p. ej. «Actividades · Ejecución»).
+function nombreSeccion(item) {
+  const base = CAMPOS.find((c) => c.clave === item.campo)?.nombre || item.campo || "";
+  return item.fase && FASE_NOMBRE[item.fase] ? `${base} · ${FASE_NOMBRE[item.fase]}` : base;
+}
+
 // Fila compacta de un ítem del checklist, más un panel de detalle opcional
 // (oculto por defecto) con historial de estados y verificación — se abre
 // con el botón "⋯" para no recargar visualmente la tabla del día a día.
@@ -117,15 +126,12 @@ function crearFilaItem(item, user, onEstadoChange, contenedor, todosLosItems, pe
   responsable.disabled = !pResponsable.editable;
   fila.appendChild(pResponsable.visible ? responsable : celdaOculta());
 
+  // Documentos adjuntos (varios archivos o enlaces); la columna conserva el permiso «enlace».
   const pEnlace = permisos.permisoColumna("enlace");
-  const enlace = document.createElement("input");
-  enlace.type = "url";
-  enlace.className = "control-item-enlace";
-  enlace.placeholder = "Enlace OneDrive";
-  enlace.maxLength = 500;
-  enlace.value = item.enlace || "";
-  enlace.disabled = !pEnlace.editable;
-  fila.appendChild(pEnlace.visible ? enlace : celdaOculta());
+  const seccionItem = nombreSeccion(item);
+  fila.appendChild(pEnlace.visible
+    ? crearCeldaDocumentos({ item, contratoId: id, user, editable: pEnlace.editable, seccion: seccionItem })
+    : celdaOculta());
 
   const pNotas = permisos.permisoColumna("notas");
   const celdaNotas = campo("div", { class: "control-item-notas-celda" });
@@ -176,6 +182,21 @@ function crearFilaItem(item, user, onEstadoChange, contenedor, todosLosItems, pe
   historialBox.appendChild(listaHistorial);
   panel.appendChild(historialBox);
 
+  const actividadBox = campo("div", { class: "control-item-historial" });
+  actividadBox.appendChild(campo("strong", { text: "Actividad de este ítem" }));
+  const listaActividad = document.createElement("ul");
+  actividadBox.appendChild(listaActividad);
+  panel.appendChild(actividadBox);
+  alCambiarActividad((registros) => {
+    listaActividad.replaceChildren();
+    const propios = filtrarActividad(registros, { itemId: item.id }).slice(0, 30);
+    if (!propios.length) {
+      listaActividad.appendChild(campo("li", { class: "text-muted", text: "Sin actuaciones registradas todavía." }));
+      return;
+    }
+    propios.forEach((r) => listaActividad.appendChild(campo("li", { text: `${formatearFechaHora(r.en)} — ${r.nombre || r.por}: ${r.detalle}` })));
+  });
+
   // Borrar ítem: mismo permiso que "+ Agregar ítem" (solo Admin/Coadministrador)
   // — pedido del usuario tras crear por error un ítem suelto que no debía
   // estar ahí, sin forma de quitarlo. Queda dentro del panel "⋯" (no en la
@@ -193,6 +214,7 @@ function crearFilaItem(item, user, onEstadoChange, contenedor, todosLosItems, pe
       if (!confirmado) return;
       borrarItemBtn.disabled = true;
       try {
+        await registrarActividad({ tipo: "item", seccion: seccionItem, item: item.nombre, itemId: item.id, detalle: `Borró el ítem «${item.nombre}»` });
         await deleteDoc(item.ref);
         window.location.reload();
       } catch (err) {
@@ -221,8 +243,17 @@ function crearFilaItem(item, user, onEstadoChange, contenedor, todosLosItems, pe
 
   botonMas.addEventListener("click", () => { panel.hidden = !panel.hidden; });
 
-  const guardar = (campoDoc, valor) =>
-    updateDoc(item.ref, { [campoDoc]: valor, actualizadoEn: serverTimestamp(), actualizadoPor: user.email });
+  const ETIQUETA_CAMPO = { fecha: "Fecha", responsable: "Responsable", notas: "Notas", verificadoPor: "Verificado por", fechaVerificacion: "Fecha de verificación" };
+  const guardar = (campoDoc, valor) => {
+    const antes = item[campoDoc];
+    item[campoDoc] = valor;
+    registrarActividad({
+      tipo: campoDoc.startsWith("verific") || campoDoc === "fechaVerificacion" ? "verificacion" : campoDoc,
+      seccion: seccionItem, item: item.nombre, itemId: item.id,
+      detalle: detalleCambio(ETIQUETA_CAMPO[campoDoc] || campoDoc, antes, valor)
+    });
+    return updateDoc(item.ref, { [campoDoc]: valor, actualizadoEn: serverTimestamp(), actualizadoPor: user.email });
+  };
 
   selectEstado.addEventListener("change", () => {
     const nuevoValor = selectEstado.value;
@@ -238,6 +269,11 @@ function crearFilaItem(item, user, onEstadoChange, contenedor, todosLosItems, pe
       }
     }
 
+    const etiquetaEstado = (v) => ESTADOS.find((e) => e.valor === v)?.label || v;
+    registrarActividad({
+      tipo: "estado", seccion: seccionItem, item: item.nombre, itemId: item.id,
+      detalle: detalleCambio("Estado", etiquetaEstado(item.estado), etiquetaEstado(nuevoValor))
+    });
     item.estado = nuevoValor;
     item.historialEstado = [...(item.historialEstado || []), { estado: nuevoValor, por: user.email, en: new Date() }];
     updateDoc(item.ref, {
@@ -252,7 +288,6 @@ function crearFilaItem(item, user, onEstadoChange, contenedor, todosLosItems, pe
   // "change" (no "input") para no escribir en cada tecla: solo al salir del campo.
   fecha.addEventListener("change", () => guardar("fecha", fecha.value));
   responsable.addEventListener("change", () => guardar("responsable", responsable.value));
-  enlace.addEventListener("change", () => guardar("enlace", enlace.value));
   notas.addEventListener("change", () => guardar("notas", notas.value));
   verificadoPor.addEventListener("change", () => guardar("verificadoPor", verificadoPor.value));
   fechaVerificacion.addEventListener("change", () => guardar("fechaVerificacion", fechaVerificacion.value));
@@ -267,7 +302,7 @@ function encabezadoItems() {
   fila.appendChild(campo("span", { text: "Estado" }));
   fila.appendChild(campo("span", { text: "Fecha" }));
   fila.appendChild(campo("span", { text: "Responsable" }));
-  fila.appendChild(campo("span", { text: "Enlace" }));
+  fila.appendChild(campo("span", { text: "Documentos" }));
   fila.appendChild(campo("span", { text: "Notas" }));
   return fila;
 }
@@ -320,6 +355,7 @@ function cargarEquipo(contratoRef, contrato, puedeGestionar, empleados) {
         quitar.textContent = "Quitar";
         quitar.addEventListener("click", async () => {
           await updateDoc(contratoRef, { equipo: arrayRemove(email), actualizadoEn: serverTimestamp() });
+          registrarActividad({ tipo: "equipo", seccion: "Equipo asignado", detalle: `Quitó del equipo a ${porEmail[email]?.nombre || email}` });
           contrato.equipo = (contrato.equipo || []).filter((e) => e !== email);
           renderSelect();
           render();
@@ -349,6 +385,7 @@ function cargarEquipo(contratoRef, contrato, puedeGestionar, empleados) {
       e.preventDefault();
       if (!select.value) return;
       await updateDoc(contratoRef, { equipo: arrayUnion(select.value), actualizadoEn: serverTimestamp() });
+      registrarActividad({ tipo: "equipo", seccion: "Equipo asignado", detalle: `Agregó al equipo a ${porEmail[select.value]?.nombre || select.value}` });
       contrato.equipo = [...(contrato.equipo || []), select.value];
       renderSelect();
       render();
@@ -408,9 +445,11 @@ function cargarAprobaciones(contratoRef, contrato, empleados, user) {
               const restante = { ...contrato.aprobaciones };
               delete restante[user.email];
               contrato.aprobaciones = restante;
+              registrarActividad({ tipo: "aprobacion", seccion: "Aprobación del contrato", detalle: "Quitó su aprobación" });
             } else {
               await updateDoc(contratoRef, { [`aprobaciones.${user.email}`]: { en: serverTimestamp() }, actualizadoEn: serverTimestamp() });
               contrato.aprobaciones = { ...(contrato.aprobaciones || {}), [user.email]: { en: new Date() } };
+              registrarActividad({ tipo: "aprobacion", seccion: "Aprobación del contrato", detalle: "Marcó el contrato como leído y aprobado" });
             }
             render();
           } catch (err) {
@@ -621,6 +660,7 @@ function cargarDocumentosContrato(contratoId, contrato, esEmpleado, puedeArchiva
           borrar.disabled = true;
           try {
             await deleteDoc(docSnap.ref);
+            registrarActividad({ tipo: "doc_eliminado", seccion: "Documentos del contrato", detalle: `Borró el documento «${d.nombre}»` });
           } catch (err) {
             window.alert(err.message || "No se pudo borrar el documento.");
             borrar.disabled = false;
@@ -678,6 +718,7 @@ function cargarDocumentosContrato(contratoId, contrato, esEmpleado, puedeArchiva
           actualizadoPor: auth.currentUser.email,
           actualizadoEn: serverTimestamp()
         });
+        registrarActividad({ tipo: "doc_adjunto", seccion: "Documentos del contrato", detalle: `Editó el documento «${datos.nombre}»` });
       } else {
         await setDoc(docRef, {
           ...datos,
@@ -685,6 +726,7 @@ function cargarDocumentosContrato(contratoId, contrato, esEmpleado, puedeArchiva
           creadoPor: auth.currentUser.email,
           creadoEn: serverTimestamp()
         });
+        registrarActividad({ tipo: "doc_adjunto", seccion: "Documentos del contrato", detalle: `Agregó el documento «${datos.nombre}»` });
       }
       cerrarModal();
     } catch (err) {
@@ -694,6 +736,54 @@ function cargarDocumentosContrato(contratoId, contrato, esEmpleado, puedeArchiva
       btn.disabled = false;
     }
   });
+}
+
+// ---- Bitácora de actuaciones: línea de tiempo con filtros por persona y sección ----
+function pintarBitacora() {
+  const lista = document.getElementById("actividadLista");
+  const badge = document.getElementById("actividadBadge");
+  const filtroPersona = document.getElementById("actividadPersona");
+  const filtroSeccion = document.getElementById("actividadSeccion");
+  if (!lista) return;
+
+  const llenar = (select, valores, todas) => {
+    const actual = select.value;
+    select.replaceChildren(campo("option", { value: "", text: todas }));
+    valores.forEach((v) => select.appendChild(campo("option", { value: v, text: v })));
+    if (valores.includes(actual)) select.value = actual;
+  };
+
+  let ultimos = [];
+  const pintar = () => {
+    const filtrados = filtrarActividad(ultimos, { persona: filtroPersona.value, seccion: filtroSeccion.value });
+    badge.textContent = String(ultimos.length);
+    lista.replaceChildren();
+    if (!filtrados.length) {
+      lista.appendChild(campo("li", { class: "text-muted", text: ultimos.length ? "Nada coincide con los filtros." : "Todavía no hay actuaciones registradas (la bitácora cuenta desde que se activó)." }));
+      return;
+    }
+    filtrados.slice(0, 200).forEach((r) => {
+      const li = campo("li", { class: "control-actividad-fila" });
+      li.appendChild(campo("span", { class: "control-actividad-tipo", text: TIPOS_ACTIVIDAD[r.tipo] || r.tipo }));
+      const cuerpo = campo("span", { class: "control-actividad-cuerpo" });
+      cuerpo.appendChild(campo("strong", { text: r.nombre || r.por }));
+      cuerpo.appendChild(document.createTextNode(` — ${r.detalle}`));
+      const donde = [r.seccion, r.item].filter(Boolean).join(" › ");
+      if (donde) cuerpo.appendChild(campo("small", { text: donde }));
+      li.appendChild(cuerpo);
+      li.appendChild(campo("time", { text: formatearFechaHora(r.en) }));
+      lista.appendChild(li);
+    });
+  };
+
+  alCambiarActividad((registros) => {
+    ultimos = registros;
+    llenar(filtroPersona, personasDe(registros), "Todas las personas");
+    llenar(filtroSeccion, seccionesDe(registros), "Todas las secciones");
+    pintar();
+  });
+  filtroPersona.addEventListener("change", pintar);
+  filtroSeccion.addEventListener("change", pintar);
 }
 
 requireAuth(async (user) => {
@@ -755,6 +845,8 @@ requireAuth(async (user) => {
   selectContratoEstado.value = contrato.estado || "activo";
   selectContratoEstado.disabled = !esGestor;
   selectContratoEstado.addEventListener("change", (e) => {
+    registrarActividad({ tipo: "contrato", seccion: "Contrato", detalle: detalleCambio("Estado del contrato", contrato.estado || "activo", e.target.value) });
+    contrato.estado = e.target.value;
     updateDoc(contratoRef, { estado: e.target.value, actualizadoEn: serverTimestamp() });
   });
 
@@ -803,6 +895,8 @@ requireAuth(async (user) => {
           actualizadoEn: serverTimestamp()
         };
         await updateDoc(contratoRef, cambios);
+        const modificados = ["nombre", "cliente", "tipo", "numero", "valorContrato", "fechaInicio", "fechaFin", "supervisor"].filter((k) => (contrato[k] ?? "") !== (cambios[k] ?? ""));
+        if (modificados.length) registrarActividad({ tipo: "contrato", seccion: "Contrato", detalle: `Editó los datos del contrato (${modificados.join(", ")})` });
         Object.assign(contrato, cambios);
         pintarCabecera();
         editarForm.classList.add("oculto");
@@ -836,6 +930,9 @@ requireAuth(async (user) => {
 
   const empleadosSnap = await getDocs(query(collection(db, "empleados"), orderBy("nombre")));
   const empleados = empleadosSnap.docs.map((d) => d.data());
+
+  iniciarBitacora({ db, contratoId: id, user, nombre: perfil?.nombre });
+  pintarBitacora();
 
   cargarEquipo(contratoRef, contrato, esGestor, empleados);
   cargarAprobaciones(contratoRef, contrato, empleados, user);
@@ -886,6 +983,7 @@ requireAuth(async (user) => {
           orden: ordenMax + 1, estado: "pendiente", responsable: "", fecha: null, enlace: "", notas: "",
           actualizadoEn: serverTimestamp(), actualizadoPor: user.email
         });
+        await registrarActividad({ tipo: "item", seccion: nombreSeccion({ campo: campoClave, fase: faseClave }), item: nombre.trim(), itemId: itemRef.id, detalle: `Agregó el ítem «${nombre.trim()}»` });
         window.location.reload();
       } catch (err) {
         window.alert(err.message || "No se pudo agregar el ítem.");

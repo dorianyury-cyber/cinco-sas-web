@@ -121,7 +121,20 @@ service cloud.firestore {
           || (esApoyo()
               && enEquipo(get(/databases/$(database)/documents/contratos/$(contratoId)).data)
               && request.resource.data.diff(resource.data).affectedKeys()
-                   .hasOnly(camposPermitidosApoyo().concat(['actualizadoEn', 'actualizadoPor', 'historialEstado'])));
+                   .hasOnly(camposPermitidosApoyo().concat(['actualizadoEn', 'actualizadoPor', 'historialEstado'])
+                     // Los documentos adjuntos van con la columna «enlace» (la que reemplazan).
+                     .concat('enlace' in camposPermitidosApoyo() ? ['documentos'] : [])));
+      }
+
+      // Bitácora de actuaciones del contrato: quién hizo qué y cuándo.
+      // Solo se agrega (a nombre de quien la escribe) y nunca se edita ni se borra.
+      match /actividad/{regId} {
+        allow read: if esGestor() || enEquipo(get(/databases/$(database)/documents/contratos/$(contratoId)).data) || esAprobadorContratos();
+        allow create: if request.resource.data.por == request.auth.token.email
+          && (esGestor()
+              || esAprobadorContratos()
+              || (esApoyo() && enEquipo(get(/databases/$(database)/documents/contratos/$(contratoId)).data)));
+        allow update, delete: if false;
       }
 
       // Carpeta de documentos del contrato (referencias a "documentos" o
