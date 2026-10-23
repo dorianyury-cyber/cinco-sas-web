@@ -830,6 +830,7 @@ requireAuth(async (user) => {
   function pintarCabecera() {
     document.getElementById("contratoCodigo").textContent = contrato.codigo || "";
     document.getElementById("contratoNombre").textContent = contrato.nombre;
+    document.getElementById("contratoNombre").title = contrato.nombre;
     document.getElementById("contratoCliente").textContent = contrato.cliente;
     document.getElementById("contratoTipo").textContent = TIPO_LABEL[contrato.tipo] || contrato.tipo;
     document.getElementById("contratoNumero").textContent = contrato.numero ? `N.º ${contrato.numero}` : "";
