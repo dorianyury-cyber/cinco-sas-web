@@ -48,6 +48,14 @@
         <form class="pqr-form" id="nuevaOfertaForm">
           <input type="hidden" id="ofertaIdEnEdicion">
 
+          <details class="control-nuevo">
+            <summary>Importar oferta desde un archivo JSON (cotización ya elaborada)</summary>
+            <p class="text-muted control-informes-ayuda">Carga el título, cliente, bloques, ítems, impuestos y condiciones de una oferta ya armada. No guarda nada: revisas el formulario, eliges quién firma y pulsas Guardar, que es lo que asigna el radicado.</p>
+            <input type="file" id="importarOfertaArchivo" accept=".json,application/json">
+            <textarea id="importarOfertaTexto" rows="4" placeholder='o pega aquí el JSON: {"titulo": "...", "items": [...]}'></textarea>
+            <button type="button" class="control-btn-mini" id="importarOfertaBtn">Cargar en el formulario</button>
+          </details>
+
           <label for="titulo">Título de la oferta</label>
           <input type="text" id="titulo" required maxlength="200" placeholder="Ej. Oferta de Interventoría — Conjunto Prados del Norte">
 

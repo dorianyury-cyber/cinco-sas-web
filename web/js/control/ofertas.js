@@ -987,12 +987,79 @@ function cargarEnFormulario(oferta, paraEditar) {
     cancelarEdicionBtn.classList.add("oculto");
     parteSGI.disabled = false;
     ofertaGuardadaActual = null;
-    mostrarAlerta("Datos cargados desde " + oferta.radicado + " — revisa qué cambiar antes de generar.", "ok");
+    mostrarAlerta(oferta.radicado ? "Datos cargados desde " + oferta.radicado + " — revisa qué cambiar antes de generar." : "Oferta importada — revisa los datos, elige quién firma y pulsa Guardar para asignar el radicado.", "ok");
   }
   actualizarDescargarBtn();
   document.getElementById("nuevaOfertaDetails").open = true;
   document.getElementById("nuevaOfertaDetails").scrollIntoView({ behavior: "smooth" });
 }
+
+// ---- Importar una oferta ya elaborada (JSON) ----
+// Mismo criterio que "Importar bloques desde JSON" de Informes: precarga el
+// formulario como un "Duplicar" sin partir de una oferta guardada. No guarda
+// nada — el radicado lo asigna Guardar. Se valida ANTES de tocar el
+// formulario para no dejarlo a medio cargar. Si el JSON trae
+// "incluirPresentacion": true, antepone la presentación de Cinco por defecto
+// (quiénes somos, líneas de servicio, por qué elegirnos) a los bloques propios.
+function importarOfertaJson(texto) {
+  let datos;
+  try {
+    datos = JSON.parse(texto);
+  } catch (err) {
+    mostrarAlerta("Ese contenido no es un JSON válido.", "error");
+    return;
+  }
+  if (!datos || typeof datos !== "object" || !datos.titulo || !datos.cliente) {
+    mostrarAlerta('El JSON debe traer al menos "titulo" y "cliente".', "error");
+    return;
+  }
+  const itemsImp = Array.isArray(datos.items) ? datos.items : [];
+  if (!itemsImp.length || itemsImp.some((it) => !it.descripcion || !(Number(it.cantidad) > 0) || !(Number(it.valorUnitario) >= 0))) {
+    mostrarAlerta('Cada ítem necesita "descripcion", "cantidad" mayor que 0 y "valorUnitario".', "error");
+    return;
+  }
+  if (datos.lineaServicio && !LINEAS_SERVICIO.some((l) => l.clave === datos.lineaServicio)) {
+    mostrarAlerta(`La línea de servicio "${datos.lineaServicio}" no existe. Usa una de: ${LINEAS_SERVICIO.map((l) => l.clave).join(", ")}.`, "error");
+    return;
+  }
+  const TIPOS_BLOQUE = ["titulo1", "titulo2", "titulo3", "titulo4", "parrafo", "tabla"];
+  const propios = Array.isArray(datos.bloques) ? datos.bloques : [];
+  for (let i = 0; i < propios.length; i++) {
+    const b = propios[i];
+    if (!TIPOS_BLOQUE.includes(b.tipo)) {
+      mostrarAlerta(`El bloque #${i + 1} tiene un "tipo" no admitido ("${b.tipo}"). Usa: ${TIPOS_BLOQUE.join(", ")}.`, "error");
+      return;
+    }
+    if (b.tipo === "tabla" && !(Array.isArray(b.filas) && b.filas.length && b.filas.every((f) => Array.isArray(f) && f.length))) {
+      mostrarAlerta(`El bloque #${i + 1} es una tabla sin "filas" completas.`, "error");
+      return;
+    }
+  }
+  const presentacion = datos.incluirPresentacion ? bloquesPorDefecto().slice(0, 7) : [];
+  cargarEnFormulario({
+    titulo: datos.titulo,
+    lineaServicio: datos.lineaServicio || "",
+    tipo: datos.tipo === "obra" ? "obra" : "servicio",
+    cliente: datos.cliente,
+    portada: datos.portada || "oscura",
+    bloques: [...presentacion, ...propios.map((b) => (b.tipo === "tabla" ? b : { ...b, texto: b.texto || "" }))],
+    items: itemsImp.map((it) => ({ descripcion: String(it.descripcion), unidad: it.unidad || "", cantidad: Number(it.cantidad), valorUnitario: Number(it.valorUnitario) })),
+    aiu: datos.aiu,
+    iva: datos.iva,
+    condiciones: datos.condiciones || {}
+  }, false);
+  document.getElementById("importarOfertaTexto").value = "";
+  document.getElementById("importarOfertaTexto").closest("details").open = false;
+}
+document.getElementById("importarOfertaBtn").addEventListener("click", () => {
+  const texto = document.getElementById("importarOfertaTexto").value.trim();
+  if (texto) importarOfertaJson(texto);
+});
+document.getElementById("importarOfertaArchivo").addEventListener("change", async (e) => {
+  const archivo = e.target.files[0];
+  e.target.value = "";
+  if (archivo) importarOfertaJson(await archivo.text());
+});
 
 // Fila = solo lo justo para escanear y elegir (una sola línea, sin
 // acciones) — mismo patrón que Contratos/Correspondencia/Órdenes de
