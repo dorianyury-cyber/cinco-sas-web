@@ -2523,3 +2523,4 @@ body.app-control .ctl-main .page-banner:has(#contratoNombre) .container { paddin
 body.app-control .ctl-main .page-banner:has(#contratoNombre) .eyebrow:has(a) { margin-bottom: 4px; }
 body.app-control .ctl-main #contratoNombre { max-width: 1100px; font-size: 17px; font-weight: 600; letter-spacing: 0; line-height: 1.4; display: -webkit-box; -webkit-line-clamp: 3; -webkit-box-orient: vertical; overflow: hidden; }
 body.app-control .ctl-main #contratoCliente { margin-top: 5px; font-size: 12.5px; }
+.w-135 { width: 135px; }
