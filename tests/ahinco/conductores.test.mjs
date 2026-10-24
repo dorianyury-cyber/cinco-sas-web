@@ -28,3 +28,21 @@ test("un conductor del diseño de menor capacidad que la carga continua no cumpl
 test("sin conductor del diseño no se agregan verificaciones de diseño", () => {
   assert.equal(verif(circuito({})).some((x) => /del diseño/.test(x.criterio)), false);
 });
+
+test("con conductor del diseño, la tabla y la salida adoptan el del diseño y muestran el mínimo aparte", () => {
+  const r = CALCULOS.conductores({ circuitos: [circuito({ corriente: 41.2, tAisl: 90, dis: "Cu:2", protDis: 110 })] }, { tempAmbiente: 30 });
+  const fila = r.tablas[0].filas[0], enc = r.tablas[0].encabezados;
+  assert.equal(fila[enc.indexOf("Conductor adoptado")], "2 AWG");
+  assert.equal(fila[enc.indexOf("Mínimo requerido")], "Cu 8 AWG");
+  assert.equal(fila[enc.indexOf("Protección")], "110 A");
+  assert.match(fila[enc.indexOf("Aislamiento")], /THHN/);
+  assert.equal(r.salidas.circuitos[0].calibre, "2");   // lo que lee el unifilar
+  assert.equal(r.salidas.circuitos[0].In, 110);
+  assert.equal(r.salidas.circuitos[0].calibreMinimo, "8");
+});
+
+test("sin conductor del diseño se adopta el mínimo calculado", () => {
+  const r = CALCULOS.conductores({ circuitos: [circuito({ corriente: 41.2, tAisl: 90 })] }, { tempAmbiente: 30 });
+  assert.equal(r.salidas.circuitos[0].calibre, "8");
+  assert.equal(r.salidas.circuitos[0].calibreMinimo, "8");
+});

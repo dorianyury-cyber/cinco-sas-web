@@ -115,16 +115,21 @@ export function conductores(e, proyecto = {}) {
     const icc = num(c.icc, 0), icu = num(c.icu, 0);
     if (!sel.calibre) {
       verificaciones.push({ criterio: `Circuito ${c.circuito}: conductor disponible`, norma: "NTC 2050 Tabla 310.15(B)(16)", valor: `${fmt(I, 1)} A`, limite: "≤ 1000 kcmil", cumple: false });
-      return [c.circuito || "", c.descripcion || "", fmt(I, 1), mat, "—", "—", "—", "—", "—", "—"];
+      return [c.circuito || "", c.descripcion || "", fmt(I, 1), mat, "—", "—", "—", "—", "—", "—", "—", "—"];
     }
     verificaciones.push({ criterio: `Circuito ${c.circuito}: protección ≤ capacidad del conductor`, norma: "NTC 2050 240.4; RETIE 2024 art. 3.27.3 c", valor: `${sel.In} A`, limite: `${fmt(sel.ampFinal, 1)} A (o normalizado inmediato)`, cumple: true });
     if (icc > 0 && icu > 0) verificaciones.push({ criterio: `Circuito ${c.circuito}: capacidad de interrupción`, norma: "NTC 2050 110.9; RETIE 2024 art. 3.17.19", valor: `${fmt(icu, 1)} kA`, limite: `≥ ${fmt(icc, 1)} kA`, cumple: icu >= icc });
     // Conductor y protección que trae el diseño (opcionales): se comparan con la carga y con la ampacidad corregida.
     const [matDis, calDis] = String(c.dis || "").split(":");
-    if (calDis && N.AMPACIDAD[matDis]?.[calDis]) {
+    const hayDis = !!(calDis && N.AMPACIDAD[matDis]?.[calDis]);
+    let capacidadAdoptada = sel.ampFinal, protAdoptada = sel.In;
+    if (hayDis) {
       const amp = N.AMPACIDAD[matDis][calDis], tA = num(c.tAisl, 90), tT = num(c.tTerm, 75);
       const ampAisl = amp[N.COLUMNA_TEMP[tA]] * (factorTemp(num(c.tAmb, tAmbDef), N.COLUMNA_TEMP[tA]) ?? 0) * factorAgrup(num(c.portadores, 3)), ampTerm = amp[N.COLUMNA_TEMP[tT]];
-      const capacidad = Math.min(ampAisl, ampTerm), iDis = I * (c.continua !== "No" ? 1.25 : 1), nombreCal = `${matDis} ${N.etiquetaCalibre(calDis)}`;
+      const capacidad = Math.min(ampAisl, ampTerm), iDis = I * (c.continua !== "No" ? 1.25 : 1);
+      capacidadAdoptada = capacidad;
+      if (num(c.protDis, 0) > 0) protAdoptada = num(c.protDis, 0);
+      const nombreCal = `${matDis} ${N.etiquetaCalibre(calDis)}`;
       verificaciones.push({ criterio: `Circuito ${c.circuito}: conductor del diseño (${nombreCal}) soporta la carga`, norma: "NTC 2050 210.19(A)(1) y 310.15(B)(16)", valor: `${fmt(capacidad, 1)} A`, limite: `≥ ${fmt(iDis, 1)} A`, cumple: ampTerm >= iDis && ampAisl >= I });
       const prot = num(c.protDis, 0);
       if (prot > 0) {
@@ -132,13 +137,16 @@ export function conductores(e, proyecto = {}) {
         verificaciones.push({ criterio: `Circuito ${c.circuito}: protección del diseño (${prot} A) sobre el conductor ${nombreCal}`, norma: "NTC 2050 240.4; RETIE 2024 art. 3.27.3 c", valor: `${prot} A`, limite: `≤ ${fmt(permitido, 0)} A (ampacidad ${fmt(capacidad, 1)} A)`, cumple: prot <= permitido + 1e-9 });
       }
     }
-    circ.push({ circuito: c.circuito || "", descripcion: c.descripcion || "", I, material: mat, calibre: sel.calibre, In: sel.In, icu });
-    return [c.circuito || "", c.descripcion || "", fmt(I, 1), mat, N.etiquetaCalibre(sel.calibre), fmt(sel.ft, 2), fmt(sel.fa, 2), fmt(sel.ampFinal, 1), `${sel.In} A`, icu ? `${fmt(icu, 1)} kA` : "—"];
+    // Con conductor del diseño, ese es el adoptado (tabla, unifilar y Excel); el mínimo calculado se muestra aparte para comparar.
+    const matAdop = hayDis ? matDis : mat, calAdop = hayDis ? calDis : sel.calibre;
+    const aislamiento = ({ 60: "60 °C (TW)", 75: "75 °C (THWN)", 90: "90 °C (THHN/THWN-2)" })[num(c.tAisl, 90)] || `${num(c.tAisl, 90)} °C`;
+    circ.push({ circuito: c.circuito || "", descripcion: c.descripcion || "", I, material: matAdop, calibre: calAdop, In: protAdoptada, calibreMinimo: sel.calibre, aislamiento, icu });
+    return [c.circuito || "", c.descripcion || "", fmt(I, 1), matAdop, N.etiquetaCalibre(calAdop), `${mat} ${N.etiquetaCalibre(sel.calibre)}`, aislamiento, fmt(sel.ft, 2), fmt(sel.fa, 2), fmt(capacidadAdoptada, 1), `${protAdoptada} A`, icu ? `${fmt(icu, 1)} kA` : "—"];
   });
   return {
     resumen: [{ etiqueta: "Circuitos dimensionados", valor: String(tabla.length), unidad: "" }],
     salidas: { circuitos: circ },
-    tablas: [{ titulo: "Selección de conductores y protecciones", encabezados: ["Circ.", "Descripción", "I carga (A)", "Mat.", "Conductor", "Ft", "Fa", "Capacidad corregida (A)", "Protección", "Icu"], filas: tabla }],
+    tablas: [{ titulo: "Selección de conductores y protecciones", encabezados: ["Circ.", "Descripción", "I carga (A)", "Mat.", "Conductor adoptado", "Mínimo requerido", "Aislamiento", "Ft", "Fa", "Capacidad corregida (A)", "Protección", "Icu"], filas: tabla }],
     pasos: [
       { titulo: "Corriente de diseño", formula: "I diseño = 1,25 × I carga continua + I no continua", sustitucion: "NTC 2050 210.19(A) y 215.2", resultado: "Por circuito" },
       { titulo: "Capacidad corregida del conductor", formula: "I corregida = I tabla (T aislamiento) × Ft × Fa ≥ I carga", sustitucion: "Ft: Tabla 310.15(B)(16) (temperatura ambiente); Fa: 310.15(B)(3)(a) (más de 3 portadores)", resultado: "Por circuito" },

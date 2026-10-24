@@ -494,7 +494,7 @@ const HOJAS = {
   },
   conductores(wb, e, r, p) {
     const h = new Hoja(wb, "k-m Conductores", "Selección de conductores y protecciones (RETIE 2024 literales k y m; NTC 2050)");
-    h.nota("El calibre adoptado es el que seleccionó AHÍNCO; cámbielo y la hoja verifica de nuevo capacidad, terminales y protección.");
+    h.nota("El calibre adoptado es el del diseño (si el circuito lo trae) o, si no, el mínimo que seleccionó AHÍNCO; cámbielo y la hoja verifica de nuevo capacidad, terminales y protección.");
     const sel = r?.tablas?.[0]?.filas || [];
     const filas = vacias(e.circuitos).map((f, i) => ({ ...f, cal: String(sel[i]?.[4] || "").replace(/ (AWG|kcmil)$/, "") || "4/0" }));
     const colAmp = (rr, tcol) => `IF($E${rr}="Al",4,1)+MATCH(${tcol}${rr},{60,75,90},0)`;
