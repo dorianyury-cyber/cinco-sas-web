@@ -133,7 +133,8 @@ export function conductores(e, proyecto = {}) {
       verificaciones.push({ criterio: `Circuito ${c.circuito}: conductor del diseño (${nombreCal}) soporta la carga`, norma: "NTC 2050 210.19(A)(1) y 310.15(B)(16)", valor: `${fmt(capacidad, 1)} A`, limite: `≥ ${fmt(iDis, 1)} A`, cumple: ampTerm >= iDis && ampAisl >= I });
       const prot = num(c.protDis, 0);
       if (prot > 0) {
-        const permitido = capacidad <= 800 ? sigNormal(N.PROTECCIONES_NORMALIZADAS, capacidad) : capacidad; // 240.4(B): el valor normalizado inmediato superior, hasta 800 A
+        const limitePequeno = N.LIMITE_PEQUENOS[matDis]?.[calDis]; // 240.4(D): 14, 12 y 10 AWG Cu = 15, 20 y 30 A
+        const permitido = limitePequeno ? Math.min(limitePequeno, capacidad) : capacidad <= 800 ? sigNormal(N.PROTECCIONES_NORMALIZADAS, capacidad) : capacidad; // 240.4(B): el valor normalizado inmediato superior, hasta 800 A
         verificaciones.push({ criterio: `Circuito ${c.circuito}: protección del diseño (${prot} A) sobre el conductor ${nombreCal}`, norma: "NTC 2050 240.4; RETIE 2024 art. 3.27.3 c", valor: `${prot} A`, limite: `≤ ${fmt(permitido, 0)} A (ampacidad ${fmt(capacidad, 1)} A)`, cumple: prot <= permitido + 1e-9 });
       }
     }
@@ -178,6 +179,14 @@ export function impedanciaConductor(cond, canal = "PVC", dmg = 1000) {
   return { R, X: acero ? t[1] : t[0], nombre: `${tipo === "Al" ? "Aluminio" : "Cobre"} ${N.etiquetaCalibre(cal)}` };
 }
 
+// Resistencia a la temperatura de operación T: R(T) = R75 × (k + T) / (k + 75), con k = 234,5 (Cu) o 228,1 (Al).
+export function factorResistenciaTemp(conductor, temperatura) {
+  const T = num(temperatura, 75), tipo = String(conductor || "Cu").split(":")[0];
+  if (tipo === "aereo") return 1;
+  const k = tipo === "Al" ? 228.1 : 234.5;
+  return (k + T) / (k + 75);
+}
+
 export function regulacion(e) {
   const V = num(e.tension, 208), trif = e.sistema !== "1F";
   const fp = Math.min(1, Math.max(0.1, num(e.fp, 0.9))), sen = Math.sqrt(1 - fp * fp);
@@ -187,7 +196,8 @@ export function regulacion(e) {
   const res = {};
   const calc = tramos.map((t) => {
     const L = num(t.longitud) / 1000, S = num(t.carga) * 1000, n = Math.max(1, num(t.paralelos, 1));
-    const z = impedanciaConductor(t.conductor, t.canalizacion, num(t.dmg, 1000));
+    const z0 = impedanciaConductor(t.conductor, t.canalizacion, num(t.dmg, 1000));
+    const z = { ...z0, R: z0.R * factorResistenciaTemp(t.conductor, e.temperatura) };
     const I = trif ? S / (Math.sqrt(3) * V) : S / V;
     const dV = (k * I * L * (z.R * fp + z.X * sen)) / n;
     const dVp = (dV / V) * 100;

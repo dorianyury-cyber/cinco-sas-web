@@ -7,7 +7,7 @@
 import * as N from "./rt-normas.js";
 import { MODULOS } from "./rt-modulos.js";
 import { LITERALES, FUENTE_LITERALES, exigido } from "./rt-literales.js";
-import { SISTEMAS_BT, impedanciaConductor, ajusteDosCapas, ampacidadTablaMT, esTierra, paresCoordinacion, puntosPerfil, espectroGrupo } from "./rt-calculos.js";
+import { SISTEMAS_BT, impedanciaConductor, factorResistenciaTemp, ajusteDosCapas, ampacidadTablaMT, esTierra, paresCoordinacion, puntosPerfil, espectroGrupo } from "./rt-calculos.js";
 import { hallazgos, supuestos, esVerificacion } from "./rt-hallazgos.js";
 
 const NAVY = "FF1F2732", AMARILLO = "FFFFF4CC", GRIS = "FFF2F3F5";
@@ -526,7 +526,7 @@ const HOJAS = {
     const fp = h.dato("Factor de potencia", n(e.fp, 0.9), ""), sen = h.calc("sen φ", `SQRT(1-${fp}^2)`, "");
     const lp = h.dato("Regulación máxima por tramo", n(e.limiteParcial, 3), "%"), lt = h.dato("Regulación máxima acumulada", n(e.limiteTotal, 5), "%");
     h.seccion("Tramos");
-    const filas = vacias(e.tramos).map((f) => ({ ...f, z: impedanciaConductor(f.conductor, f.canalizacion, n(f.dmg, 1000)) }));
+    const filas = vacias(e.tramos).map((f) => { const z0 = impedanciaConductor(f.conductor, f.canalizacion, n(f.dmg, 1000)); return { ...f, z: { ...z0, R: z0.R * factorResistenciaTemp(f.conductor, e.temperatura) } }; });
     const t = h.tabla([
       { t: "Tramo", v: (f) => String(f.tramo ?? ""), entrada: true }, { t: "Desde", v: (f) => String(f.desde ?? ""), entrada: true }, { t: "Hasta", v: (f) => String(f.hasta ?? ""), entrada: true },
       { t: "L (m)", v: (f) => n(f.longitud), entrada: true }, { t: "S (kVA)", v: (f) => n(f.carga), entrada: true }, { t: "Conductor", v: (f) => f.z.nombre, ancho: 22 },

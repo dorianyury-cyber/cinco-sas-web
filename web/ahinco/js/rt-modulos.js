@@ -173,6 +173,7 @@ export const MODULOS = {
       { key: "sistema", label: "Sistema", tipo: "select", opciones: [{ valor: "3F", texto: "Trifásico" }, { valor: "1F", texto: "Monofásico" }], def: "3F" },
       { key: "tension", label: "Tensión nominal (línea-línea en trifásico)", tipo: "numero", unidad: "V", def: 208 },
       { key: "fp", label: "Factor de potencia", tipo: "numero", def: 0.9 },
+      { key: "temperatura", label: "Temperatura de operación del conductor (la Tabla 9 de la NTC 2050 está a 75 °C)", tipo: "numero", unidad: "°C", def: 75 },
       { key: "limiteParcial", label: "Regulación máxima por tramo", tipo: "numero", unidad: "%", def: 3 },
       { key: "limiteTotal", label: "Regulación máxima acumulada", tipo: "numero", unidad: "%", def: 5 },
       { key: "tramos", label: "Tramos (el tramo continúa donde termina otro: «Desde» = «Hasta» del anterior)", tipo: "tabla", columnas: [

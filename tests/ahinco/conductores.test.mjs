@@ -46,3 +46,21 @@ test("sin conductor del diseño se adopta el mínimo calculado", () => {
   assert.equal(r.salidas.circuitos[0].calibre, "8");
   assert.equal(r.salidas.circuitos[0].calibreMinimo, "8");
 });
+
+test("protección de 32 A sobre 10 AWG de cobre excede el límite de 30 A de la NTC 2050 240.4(D)", () => {
+  const v = verif(circuito({ corriente: 18.8, dis: "Cu:10", protDis: 32 }));
+  const p = v.find((x) => /protección del diseño/.test(x.criterio));
+  assert.equal(p.cumple, false);
+  assert.match(p.limite, /≤ 30 A/);
+  assert.equal(verif(circuito({ corriente: 18.8, dis: "Cu:10", protDis: 30 })).find((x) => /protección del diseño/.test(x.criterio)).cumple, true);
+});
+
+test("la regulación corrige la resistencia de la Tabla 9 (75 °C) a la temperatura de operación indicada", async () => {
+  const { CALCULOS } = await import("../../web/ahinco/js/rt-calculos.js");
+  const base = { sistema: "3F", tension: 208, fp: 0.95, tramos: [{ tramo: "A", desde: "T", hasta: "B", longitud: 100, carga: 20, conductor: "Cu:8", paralelos: 1, canalizacion: "acero" }] };
+  const a75 = CALCULOS.regulacion({ ...base, temperatura: 75 }).resumen[0].valor;
+  const a70 = CALCULOS.regulacion({ ...base, temperatura: 70 }).resumen[0].valor;
+  const sinDato = CALCULOS.regulacion(base).resumen[0].valor;
+  assert.equal(sinDato, a75);                       // sin temperatura se conserva el comportamiento anterior
+  assert.ok(Number(a70.replace(",", ".")) < Number(a75.replace(",", ".")));
+});
