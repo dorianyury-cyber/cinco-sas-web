@@ -89,3 +89,44 @@ test("pérdidas L1 típicas de la Tabla 26 y de la Tabla 27", () => {
   casi(f.perdidas.L1.LA, 1e-3 * 1e-2);
   assert.equal(N.LF_TIPO.publico.v, 0.002);
 });
+
+test("partir la estructura en dos zonas idénticas no cambia el riesgo (los riesgos de las zonas se suman)", () => {
+  const e1 = { ...base, longLinea: 300, personasZona: 40, personasTotal: 40, tipoEstructura: "hospital", provisiones: "manual" };
+  const una = evaluarRayos(e1, factoresRayos(e1), "ninguno", "ninguno", "ninguna");
+  const e2 = { ...e1, zonas: [{ zona: "Norte", personas: 30 }, { zona: "Sur", personas: 10 }] };
+  const dos = evaluarRayos(e2, factoresRayos(e2), "ninguno", "ninguno", "ninguna");
+  casi(dos.R1, una.R1, 1e-9);
+  assert.equal(dos.zonas.length, 2);
+  casi(dos.zonas[0].R1 / dos.zonas[1].R1, 3, 1e-9); // 30 de 40 personas frente a 10 de 40
+});
+
+test("una zona con superficie distinta (RU) cambia solo el riesgo de esa zona", () => {
+  const e = { ...base, longLinea: 300, personasTotal: 40, zonas: [{ zona: "Concreto", personas: 20 }, { zona: "Alfombra", personas: 20, suelo: "grava" }] };
+  const r = evaluarRayos(e, factoresRayos(e), "ninguno", "ninguno", "ninguna");
+  assert.ok(r.zonas[0].c1.RU > r.zonas[1].c1.RU * 50);
+  casi(r.zonas[0].c1.RB, r.zonas[1].c1.RB, 1e-9);
+});
+
+test("acometida sin pantalla como objeto de protección: Ia = 0 y P' = 1; R'2 con la Tabla 31", () => {
+  const e = { ...base, longLinea: 400, lineaEnterrada: "No", trafoLinea: "No", ce: "0.5", evaluaServicio: "Sí" };
+  const f = factoresRayos(e);
+  const r = evaluarRayos(e, f, "ninguno", "ninguno", "ninguna");
+  const l = f.lineas[0], s = r.servicios[0], PZ = 0.4; // Uw 2,5 kV sin pantalla (Tabla 20)
+  casi(s.R2, f.ND * 1e-2 + f.ND * 1e-3 + l.NL * 1e-2 + l.NL * 1e-3 + Math.max(0, l.NI - l.NL) * PZ * 1e-3, 1e-9);
+});
+
+test("acometida apantallada: Ia = 25 n Uw / (Rs Kd Kp) y P' de la Tabla 25", () => {
+  const e = { ...base, longLinea: 400, lineaPantalla: "1", kdLinea: "contacto", kpLinea: "ninguna", uwCable: "p1", evaluaServicio: "Sí" };
+  const s = evaluarRayos(e, factoresRayos(e), "ninguno", "ninguno", "ninguna").servicios[0];
+  casi(s.iaB, 25 * 1 * 15 / 1);                 // 375 kA
+  assert.equal(s.PpB, 0.005);                   // escalón de 300 kA
+  assert.equal(N.pDeIa(0), 1);
+  assert.equal(N.pDeIa(35), 0.6);
+  assert.equal(N.pDeIa(1000), 0.001);
+  const sin = evaluarRayos({ ...e, lineaPantalla: "ninguna" }, factoresRayos({ ...e, lineaPantalla: "ninguna" }), "ninguno", "ninguno", "ninguna").servicios[0];
+  assert.ok(s.R2 < sin.R2);
+});
+
+test("sin activar las acometidas no se calculan R'2 ni R'4", () => {
+  assert.equal(evaluarRayos(base, factoresRayos(base), "ninguno", "ninguno", "ninguna").servicios.length, 0);
+});

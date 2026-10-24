@@ -7,7 +7,7 @@
 import * as N from "./rt-normas.js";
 import { MODULOS } from "./rt-modulos.js";
 import { LITERALES, FUENTE_LITERALES, exigido } from "./rt-literales.js";
-import { SISTEMAS_BT, impedanciaConductor, factorResistenciaTemp, factoresRayos, evaluarRayos, ajusteDosCapas, ampacidadTablaMT, esTierra, paresCoordinacion, puntosPerfil, espectroGrupo } from "./rt-calculos.js";
+import { SISTEMAS_BT, fmt, impedanciaConductor, factorResistenciaTemp, factoresRayos, evaluarRayos, ajusteDosCapas, ampacidadTablaMT, esTierra, paresCoordinacion, puntosPerfil, espectroGrupo } from "./rt-calculos.js";
 import { hallazgos, supuestos, esVerificacion } from "./rt-hallazgos.js";
 
 const NAVY = "FF1F2732", AMARILLO = "FFFFF4CC", GRIS = "FFF2F3F5";
@@ -783,6 +783,7 @@ const HOJAS = {
     const h = new Hoja(wb, "b Rayos", "Análisis de riesgo por rayos — R1 a R4 (RETIE 2024 literal b; NTC 4552-2)");
     const f = factoresRayos(e), sipra = e.sipra || "ninguno", dps = e.dps || "ninguno", medidas = e.medidas || "ninguna";
     const ev = evaluarRayos(e, f, sipra, dps, medidas), P = ev.p;
+    const nz = f.zonas.length;
     const L = h.dato("Largo L", f.L, "m"), W = h.dato("Ancho W", f.W, "m"), H = h.dato("Altura H", f.H, "m");
     const ddt = h.dato("Densidad de descargas a tierra DDT", f.DDT, "descargas/km²·año", f.origenDDT), cd = h.dato("Cd (ubicación relativa, Tabla 10)", f.Cd, "");
     h.seccion("Eventos peligrosos por año (NTC 4552-2, 6.5)");
@@ -792,58 +793,88 @@ const HOJAS = {
     const nm = h.calc("NM — descargas cercanas a la estructura", `MAX(0,${ddt}*(${am}-${ad}*${cd})*1E-6)`, "/año");
     const ada = h.dato("Ada — área efectiva de la estructura adyacente", f.Ada, "m²");
     const ha = h.dato("Ha — altura de la estructura de donde viene la línea", n(e.haRemoto, 0), "m");
-    const lineas = f.lineas.map((l, i) => {
-      const t = l.nombre;
-      const lc = h.dato(`Lc — línea de ${t.toLowerCase()}`, l.Lc, "m"), ent = h.dato(`Enterrada (1 = sí) — ${t.toLowerCase()}`, l.enterrada ? 1 : 0, "");
-      const hc = h.dato(`Hc — altura de los conductores (${t.toLowerCase()})`, n(e.hLinea, 6), "m"), rho = h.dato(`ρ — resistividad del terreno (${t.toLowerCase()})`, Math.min(500, n(e.rhoLinea, 500)), "Ω·m");
-      const ce = h.dato(`Ce (ambiente) — ${t.toLowerCase()}`, f.Ce, ""), ct = h.dato(`Ct (transformador) — ${t.toLowerCase()}`, l.ct, "");
+    const lineas = f.lineas.map((l) => {
+      const t = l.nombre.toLowerCase();
+      const lc = h.dato(`Lc — línea de ${t}`, l.Lc, "m"), ent = h.dato(`Enterrada (1 = sí) — ${t}`, l.enterrada ? 1 : 0, "");
+      const hc = h.dato(`Hc — altura de los conductores (${t})`, n(e.hLinea, 6), "m"), rho = h.dato(`ρ — resistividad del terreno (${t})`, Math.min(500, n(e.rhoLinea, 500)), "Ω·m");
+      const ce = h.dato(`Ce (ambiente) — ${t}`, f.Ce, ""), ct = h.dato(`Ct (transformador) — ${t}`, l.ct, "");
       const base = `MAX(0,MIN(1000,${lc})-3*(${ha}+${H}))`;
-      const al = h.calc(`Al — área de impactos sobre la línea de ${t.toLowerCase()}`, `IF(${ent}=1,${base}*SQRT(${rho}),${base}*6*${hc})`, "m²");
-      const ai = h.calc(`Ai — área de impactos cercanos a la línea de ${t.toLowerCase()}`, `IF(${ent}=1,25*MIN(1000,${lc})*SQRT(${rho}),1000*MIN(1000,${lc}))`, "m²");
-      const nl = h.calc(`NL — descargas sobre la línea de ${t.toLowerCase()}`, `${ddt}*${al}*${cd}*${ct}*1E-6`, "/año");
-      const ni = h.calc(`NI — descargas cercanas a la línea de ${t.toLowerCase()}`, `${ddt}*${ai}*${ce}*${ct}*1E-6`, "/año");
-      const nda = h.calc(`NDa — descargas sobre la estructura adyacente (${t.toLowerCase()})`, `${ddt}*${ada}*${cd}*${ct}*1E-6`, "/año");
-      return { nl, ni, nda, p: P.lineas[i] };
+      const al = h.calc(`Al — área de impactos sobre la línea de ${t}`, `IF(${ent}=1,${base}*SQRT(${rho}),${base}*6*${hc})`, "m²");
+      const ai = h.calc(`Ai — área de impactos cercanos a la línea de ${t}`, `IF(${ent}=1,25*MIN(1000,${lc})*SQRT(${rho}),1000*MIN(1000,${lc}))`, "m²");
+      const nl = h.calc(`NL — descargas sobre la línea de ${t}`, `${ddt}*${al}*${cd}*${ct}*1E-6`, "/año");
+      const ni = h.calc(`NI — descargas cercanas a la línea de ${t}`, `${ddt}*${ai}*${ce}*${ct}*1E-6`, "/año");
+      const nda = h.calc(`NDa — descargas sobre la estructura adyacente (${t})`, `${ddt}*${ada}*${cd}*${ct}*1E-6`, "/año");
+      return { nl, ni, nda };
     });
     h.seccion("Probabilidades de daño con las medidas adoptadas (NTC 4552-2, 6.6)");
-    const pa = h.dato("PA", P.PA, "", "Tabla 14 × PB"), pb = h.dato("PB", P.PB, "", "Tabla 15"), pc = h.dato("PC", P.PC, "", "Tabla 16"), pm = h.dato("PM", P.PM, "", "Tablas 17, 18 y 16");
-    const pl = lineas.map((l, i) => {
-      const t = f.lineas[i].nombre.toLowerCase();
-      return { pu: h.dato(`PU — ${t}`, l.p.PU, "", "Tablas 19 y 16"), pv: h.dato(`PV — ${t}`, l.p.PV, "", "Tablas 19 y 16"), pw: h.dato(`PW — ${t}`, l.p.PW, "", "Tablas 19 y 16"), pz: h.dato(`PZ — ${t}`, l.p.PZ, "", "Tablas 20 y 16") };
+    const pa = h.dato("PA", P.PA, "", "Tabla 14 × PB"), pb = h.dato("PB", P.PB, "", "Tabla 15");
+    const suf = (z) => (nz > 1 ? ` — ${z.nombre}` : "");
+    const zonas = f.zonas.map((z, iz) => {
+      const pz = P.zonas[iz];
+      const pc = h.dato(`PC${suf(z)}`, pz.PC, "", "Tabla 16"), pm = h.dato(`PM${suf(z)}`, pz.PM, "", "Tablas 17, 18 y 16");
+      const pl = pz.lineas.map((l) => {
+        const t = l.nombre.toLowerCase();
+        return { pu: h.dato(`PU — ${t}${suf(z)}`, l.PU, "", "Tablas 19 y 16"), pv: h.dato(`PV — ${t}${suf(z)}`, l.PV, "", "Tablas 19 y 16"), pw: h.dato(`PW — ${t}${suf(z)}`, l.PW, "", "Tablas 19 y 16"), pz: h.dato(`PZ — ${t}${suf(z)}`, l.PZ, "", "Tablas 20 y 16") };
+      });
+      return { z, pc, pm, pl };
     });
     h.seccion("Pérdidas consecuentes (NTC 4552-2, 6.7)");
-    const sens = h.dato("Sistemas internos sensibles (1 = sí)", f.sensible ? 1 : 0, "", "Si no hay, RC, RM, RW y RZ valen cero");
-    const sumaSistemas = h.dato("R1 suma RC, RM, RW y RZ (1 = sí)", ev.sistemas1 ? 1 : 0, "", "Solo hospitales o riesgo de explosión");
     const animales = h.dato("Pérdida de animales (1 = sí): RA y RU suman en R4", f.animales ? 1 : 0, "");
     const perd = (k, tabla) => (tabla ? Object.fromEntries(Object.entries(tabla).map(([c, val]) => [c, h.dato(`${c} — ${k}`, val, "")])) : null);
-    const L1 = perd("L1", f.perdidas.L1), L2 = perd("L2", f.perdidas.L2), L3 = perd("L3", f.perdidas.L3), L4 = perd("L4", f.perdidas.L4);
+    const LA1 = h.dato("LA — personas fuera de la estructura (L1)", f.LA1, ""), LA4 = h.dato("LA — personas fuera de la estructura (L4)", f.LA4, "");
+    zonas.forEach((zz) => {
+      const z = zz.z;
+      zz.sens = h.dato(`Sistemas internos sensibles (1 = sí)${suf(z)}`, z.sensible ? 1 : 0, "", "Si no hay, RC, RM, RW y RZ valen cero");
+      zz.sumaSist = h.dato(`R1 suma RC, RM, RW y RZ (1 = sí)${suf(z)}`, z.crit !== "ninguna" ? 1 : 0, "", "Solo hospitales o riesgo de explosión");
+      zz.L1 = perd(`L1${suf(z)}`, z.perdidas.L1); zz.L2 = perd(`L2${suf(z)}`, z.perdidas.L2); zz.L3 = perd(`L3${suf(z)}`, z.perdidas.L3); zz.L4 = perd(`L4${suf(z)}`, z.perdidas.L4);
+    });
     h.seccion("Componentes de riesgo (RX = NX · PX · LX)");
-    const comp = (T, L) => {
+    const comp = (T, zz, L) => {
       const g = (k) => (L[k] ? L[k] : "0");
+      const s = (campo) => lineas.map((l, i) => `(${l.nl}+${l.nda})*${zz.pl[i][campo]}`).join("+");
       const r = {};
-      r.RA = h.calc(`RA — ${T}`, `${nd}*${pa}*${g("LA")}`, "");
-      r.RB = h.calc(`RB — ${T}`, `${nd}*${pb}*${g("LB")}`, "");
-      r.RC = h.calc(`RC — ${T}`, `${nd}*${pc}*${g("LC")}*${sens}`, "");
-      r.RM = h.calc(`RM — ${T}`, `${nm}*${pm}*${g("LM")}*${sens}`, "");
-      r.RU = h.calc(`RU — ${T}`, lineas.length ? `(${lineas.map((l, i) => `(${l.nl}+${l.nda})*${pl[i].pu}`).join("+")})*${g("LU")}` : "0", "");
-      r.RV = h.calc(`RV — ${T}`, lineas.length ? `(${lineas.map((l, i) => `(${l.nl}+${l.nda})*${pl[i].pv}`).join("+")})*${g("LV")}` : "0", "");
-      r.RW = h.calc(`RW — ${T}`, lineas.length ? `(${lineas.map((l, i) => `(${l.nl}+${l.nda})*${pl[i].pw}`).join("+")})*${g("LW")}*${sens}` : "0", "");
-      r.RZ = h.calc(`RZ — ${T}`, lineas.length ? `(${lineas.map((l, i) => `MAX(0,${l.ni}-${l.nl})*${pl[i].pz}`).join("+")})*${g("LZ")}*${sens}` : "0", "");
+      r.RB = h.calc(`RB — ${T}${suf(zz.z)}`, `${nd}*${pb}*${g("LB")}`, "");
+      r.RC = h.calc(`RC — ${T}${suf(zz.z)}`, `${nd}*${zz.pc}*${g("LC")}*${zz.sens}`, "");
+      r.RM = h.calc(`RM — ${T}${suf(zz.z)}`, `${nm}*${zz.pm}*${g("LM")}*${zz.sens}`, "");
+      r.RU = h.calc(`RU — ${T}${suf(zz.z)}`, lineas.length ? `(${s("pu")})*${g("LU")}` : "0", "");
+      r.RV = h.calc(`RV — ${T}${suf(zz.z)}`, lineas.length ? `(${s("pv")})*${g("LV")}` : "0", "");
+      r.RW = h.calc(`RW — ${T}${suf(zz.z)}`, lineas.length ? `(${s("pw")})*${g("LW")}*${zz.sens}` : "0", "");
+      r.RZ = h.calc(`RZ — ${T}${suf(zz.z)}`, lineas.length ? `(${lineas.map((l, i) => `MAX(0,${l.ni}-${l.nl})*${zz.pl[i].pz}`).join("+")})*${g("LZ")}*${zz.sens}` : "0", "");
       return r;
     };
-    const c1 = comp("R1", L1);
-    const r1 = h.calc("R1 — pérdida de vidas humanas", `${c1.RA}+${c1.RB}+${c1.RU}+${c1.RV}+${sumaSistemas}*(${c1.RC}+${c1.RM}+${c1.RW}+${c1.RZ})`, "");
+    const ra1 = h.calc("RA — R1", `${nd}*${pa}*${LA1}`, "");
+    const c1 = zonas.map((zz) => comp("R1", zz, zz.L1));
+    const r1 = h.calc("R1 — pérdida de vidas humanas", `${ra1}+` + zonas.map((zz, i) => `${c1[i].RB}+${c1[i].RU}+${c1[i].RV}+${zz.sumaSist}*(${c1[i].RC}+${c1[i].RM}+${c1[i].RW}+${c1[i].RZ})`).join("+"), "");
     h.verif("R1 ≤ 1E-5 (riesgo tolerable)", `${r1}<=1E-5`, "NTC 4552-2 Tabla 7");
     let r2 = null, r3 = null;
-    if (L2) { const c2 = comp("R2", L2); r2 = h.calc("R2 — pérdida de servicio público", `${c2.RB}+${c2.RV}+${c2.RC}+${c2.RM}+${c2.RW}+${c2.RZ}`, ""); h.verif("R2 ≤ 1E-3 (riesgo tolerable)", `${r2}<=1E-3`, "NTC 4552-2 Tabla 7"); }
-    if (L3) { const c3 = comp("R3", L3); r3 = h.calc("R3 — pérdida de patrimonio cultural", `${c3.RB}+${c3.RV}`, ""); h.verif("R3 ≤ 1E-3 (riesgo tolerable)", `${r3}<=1E-3`, "NTC 4552-2 Tabla 7"); }
-    const c4 = comp("R4", L4);
-    const r4 = h.calc("R4 — pérdida de valor económico", `${animales}*(${c4.RA}+${c4.RU})+${c4.RB}+${c4.RV}+${c4.RC}+${c4.RM}+${c4.RW}+${c4.RZ}`, "", "Se compara con el costo de la protección (NTC 4552-2, 5.6)");
-    const ct0 = n(e.valorEstructura, 0), cpm0 = n(e.costoProtAnual, 0);
+    if (zonas[0].L2) { const c2 = zonas.map((zz) => comp("R2", zz, zz.L2)); r2 = h.calc("R2 — pérdida de servicio público", c2.map((c) => `${c.RB}+${c.RV}+${c.RC}+${c.RM}+${c.RW}+${c.RZ}`).join("+"), ""); h.verif("R2 ≤ 1E-3 (riesgo tolerable)", `${r2}<=1E-3`, "NTC 4552-2 Tabla 7"); }
+    if (zonas[0].L3) { const c3 = zonas.map((zz) => comp("R3", zz, zz.L3)); r3 = h.calc("R3 — pérdida de patrimonio cultural", c3.map((c) => `${c.RB}+${c.RV}`).join("+"), ""); h.verif("R3 ≤ 1E-3 (riesgo tolerable)", `${r3}<=1E-3`, "NTC 4552-2 Tabla 7"); }
+    const ra4 = h.calc("RA — R4", `${nd}*${pa}*${LA4}`, "");
+    const c4 = zonas.map((zz) => comp("R4", zz, zz.L4));
+    const r4 = h.calc("R4 — pérdida de valor económico", `${animales}*(${ra4}+` + c4.map((c) => c.RU).join("+") + `)+` + c4.map((c) => `${c.RB}+${c.RV}+${c.RC}+${c.RM}+${c.RW}+${c.RZ}`).join("+"), "", "Se compara con el costo de la protección (NTC 4552-2, 5.6)");
+    const rs = [];
+    if (ev.servicios.length) {
+      h.seccion("Acometidas de servicio como objeto de protección (NTC 4552-2, Tabla 9)");
+      ev.servicios.forEach((s, i) => {
+        const t = s.nombre.toLowerCase(), l = lineas[i];
+        const pB = h.dato(`P'B = P'C — ${t}`, s.PpB, "", `Ia = ${fmt(s.iaB, 1)} kA (Tabla 25)`), pV = h.dato(`P'V = P'W — ${t}`, s.PpV, "", `Ia = ${fmt(s.iaV, 1)} kA (Tabla 25)`), pZ = h.dato(`P'Z — ${t}`, s.PpZ, "", "Tabla 20");
+        const comp2 = (rot, lf, lo) => ({
+          lf: h.dato(`L'f (B y V) — ${rot} ${t}`, lf, ""), lo: h.dato(`L'o (C, W y Z) — ${rot} ${t}`, lo, "")
+        });
+        const lf2 = N.SERVICIO_PUBLICO.energia_tlc.v.lf, lo2 = N.SERVICIO_PUBLICO.energia_tlc.v.lo, ecoT = (N.TIPO_ECONOMICO[e.tipoEconomico] || N.TIPO_ECONOMICO.otro).v;
+        const a = comp2("R'2", lf2, lo2), b = comp2("R'4", ecoT.lf, ecoT.lo);
+        const rr = (k, a_) => `${nd}*${pB}*${a_.lf}+${nd}*${pB}*${a_.lo}+${l.nl}*${pV}*${a_.lf}+${l.nl}*${pV}*${a_.lo}+MAX(0,${l.ni}-${l.nl})*${pZ}*${a_.lo}`;
+        const r2s = h.calc(`R'2 — acometida de ${t}`, rr("2", a), "");
+        h.verif(`R'2 ≤ 1E-3 — acometida de ${t}`, `${r2s}<=1E-3`, "NTC 4552-2 Tabla 7");
+        const r4s = h.calc(`R'4 — acometida de ${t}`, rr("4", b), "");
+        rs.push({ t: `Riesgo R'2 — acometida de ${t}`, f: r2s, fmt: "0.00E+00", nota: "Tolerable: ≤ 1,00E-03" });
+      });
+    }
     const res = [{ t: "Riesgo R1 con las medidas adoptadas", f: r1, fmt: "0.00E+00", nota: "Tolerable: ≤ 1,00E-05" }];
     if (r2) res.push({ t: "Riesgo R2 con las medidas adoptadas", f: r2, fmt: "0.00E+00", nota: "Tolerable: ≤ 1,00E-03" });
     if (r3) res.push({ t: "Riesgo R3 con las medidas adoptadas", f: r3, fmt: "0.00E+00", nota: "Tolerable: ≤ 1,00E-03" });
     res.push({ t: "Riesgo R4 (valor económico)", f: r4, fmt: "0.00E+00" });
+    res.push(...rs);
     res.push({ t: "Medidas de protección adoptadas", texto: true, valor: `${(N.PB_SIPRA[sipra] || N.PB_SIPRA.ninguno).nombre}; ${(N.PEB_DPS[dps] || N.PEB_DPS.ninguno).nombre}; ${(N.PTA_MEDIDAS[medidas] || N.PTA_MEDIDAS.ninguna).nombre}` });
     h.resumen(res);
   },

@@ -635,9 +635,12 @@ export function malla(e) {
   };
 }
 
-// ================================================================ 9. RIESGO POR RAYOS (NTC 4552-2 / IEC 62305-2; SIPRA: NTC 4552-3; parámetros: NTC 4552-1)
+// ================================================================ 9. RIESGO POR RAYOS (NTC 4552-2 / IEC 62305-2:2006; SIPRA: NTC 4552-3; parámetros: NTC 4552-1)
 // Escalón de la Tabla 18: PMS a partir de KMS (se toma el escalón inmediatamente superior de KMS, del lado de la seguridad).
 export const pmsDeKms = (k) => (N.PMS_TABLA.find(([kk]) => k <= kk + 1e-12) || N.PMS_TABLA[N.PMS_TABLA.length - 1])[1];
+// Resistencia máxima de la pantalla de la clase indicada (Ω/km): del lado de la seguridad para la corriente de falla Ia.
+const RS_CLASE = { ninguna: 0, 20: 20, 5: 5, 1: 1 };
+const IDX_PANTALLA = { ninguna: 0, 20: 1, 5: 2, 1: 3 };
 
 // Todos los factores de la evaluación (numéricos) a partir de las entradas del módulo; los usan el cálculo y el Excel.
 export function factoresRayos(e) {
@@ -659,7 +662,6 @@ export function factoresRayos(e) {
   const trafo = e.trafoLinea === "Sí" ? 0.2 : 1;
   const Ce = num(e.ce, 0.5);
   const hLinea = num(e.hLinea, 6), rho = Math.min(500, num(e.rhoLinea, 500)), Ha = num(e.haRemoto, 0);
-  const UW = String(v(N.UW_EQUIPO, e.uw, "2.5"));
   const linea = (nombre, Lc0, enterrada, pantalla, ct) => {
     const Lc = Math.min(1000, Lc0);
     const base = Math.max(0, Lc - 3 * (Ha + H));
@@ -672,69 +674,112 @@ export function factoresRayos(e) {
   if (Lc1 > 0) lineas.push(linea("Potencia", Lc1, e.lineaEnterrada === "Sí", v(N.PANTALLA_LINEA, e.lineaPantalla, "ninguna"), trafo));
   const Lc2 = num(e.tcLong, 0);
   if (Lc2 > 0) lineas.push(linea("Telecomunicaciones", Lc2, e.tcEnterrada === "Sí", v(N.PANTALLA_LINEA, e.tcPantalla, "ninguna"), 1));
-  // pérdidas (6.7)
-  const nz = num(e.personasZona, 10), nt = Math.max(num(e.personasTotal, 10), nz), tz = num(e.horas, 8760);
-  const frac = (nz / nt) * (tz / 8760);
+  // zonas (6.2 y 6.4): sin tabla de zonas, la estructura es una sola zona con los datos generales
   const calculados = e.modoPerdidas === "calculados";
-  const ra = v(N.RT_SUELO, e.suelo, "agricola");
-  const rp = v(N.RP_PROVISIONES, e.provisiones, "ninguna"), rf = v(N.RF_INCENDIO, e.incendio, "ordinario"), hz = v(N.HZ_PANICO, e.panico, "ninguno");
-  const crit = e.criticidad && N.CRITICIDAD[e.criticidad] ? e.criticidad : "ninguna";
-  const LtFuera = e.personasFuera === "No" ? 0 : 1e-2;
-  const LtDentro = calculados ? frac : 1e-4;
-  const Lf1 = calculados ? frac : v(N.LF_TIPO, e.tipoEstructura, "otro");
-  const Lo1 = N.CRITICIDAD[crit].v === 0 ? 0 : calculados ? frac : N.CRITICIDAD[crit].v;
+  const filasZ = filas(e.zonas);
+  const multi = filasZ.length > 0;
+  const base0 = { personas: num(e.personasZona, 10), horas: num(e.horas, 8760), suelo: e.suelo, incendio: e.incendio, provisiones: e.provisiones, panico: e.panico, tipoEstructura: e.tipoEstructura, criticidad: e.criticidad, equipoSensible: e.equipoSensible, uw: e.uw, cableado: e.cableado, wMalla: e.wMalla, fraccion: 0 };
+  const vacio = (x) => x === "" || x == null;
+  const zonasEnt = multi
+    ? filasZ.map((fila, i) => ({ nombre: fila.zona || `Zona ${i + 1}`, ...Object.fromEntries(Object.keys(base0).map((k) => [k, k === "personas" ? num(fila.personas, 0) : vacio(fila[k]) ? base0[k] : fila[k]])) }))
+    : [{ nombre: "Estructura completa", ...base0 }];
+  const sumaPersonas = zonasEnt.reduce((s, z) => s + num(z.personas, 0), 0);
+  const nt = Math.max(1, multi ? Math.max(num(e.personasTotal, 0), sumaPersonas) : Math.max(num(e.personasTotal, 10), num(e.personasZona, 10)));
   const sp = N.SERVICIO_PUBLICO[e.servicioPublico || "ninguno"] || N.SERVICIO_PUBLICO.ninguno;
   const eco = (N.TIPO_ECONOMICO[e.tipoEconomico] || N.TIPO_ECONOMICO.otro).v;
-  const perdidas = {
-    L1: { LA: ra * LtFuera, LB: rp * rf * hz * Lf1, LC: Lo1, LM: Lo1, LU: ra * LtDentro, LV: rp * rf * hz * Lf1, LW: Lo1, LZ: Lo1 },
-    L2: sp.v ? { LB: rp * rf * sp.v.lf, LC: sp.v.lo, LM: sp.v.lo, LV: rp * rf * sp.v.lf, LW: sp.v.lo, LZ: sp.v.lo } : null,
-    L3: e.patrimonio === "Sí" ? { LB: rp * rf * 0.1, LV: rp * rf * 0.1 } : null,
-    L4: { LA: ra * 1e-2, LB: rp * rf * hz * eco.lf, LC: eco.lo, LM: eco.lo, LU: ra * 1e-4, LV: rp * rf * hz * eco.lf, LW: eco.lo, LZ: eco.lo }
-  };
-  return { v, L, W, H, DDT, origenDDT, Cd, Ad, ND, Am, NM, Ada, lineas, UW, Ce, frac, calculados, ra, rp, rf, hz, crit, perdidas, sensible: e.equipoSensible !== "No", animales: e.animales === "Sí" };
+  const zonas = zonasEnt.map((z) => {
+    const np = num(z.personas, 0), tp = num(z.horas, 8760), share = np / nt;
+    const w1 = multi ? share : 1;                                   // ponderación de L1 en varias zonas
+    const wv = multi ? (num(z.fraccion, 0) > 0 ? num(z.fraccion) / 100 : share > 0 ? share : 1 / zonasEnt.length) : 1; // ponderación de L2 a L4
+    const ra = v(N.RT_SUELO, z.suelo, "agricola"), rp = v(N.RP_PROVISIONES, z.provisiones, "ninguna"), rf = v(N.RF_INCENDIO, z.incendio, "ordinario"), hz = v(N.HZ_PANICO, z.panico, "ninguno");
+    const crit = z.criticidad && N.CRITICIDAD[z.criticidad] ? z.criticidad : "ninguna";
+    const LtDentro = calculados ? share * tp / 8760 : 1e-4 * w1;
+    const Lf1 = calculados ? share * tp / 8760 : v(N.LF_TIPO, z.tipoEstructura, "otro") * w1;
+    const Lo1 = N.CRITICIDAD[crit].v === 0 ? 0 : calculados ? share * tp / 8760 : N.CRITICIDAD[crit].v * w1;
+    const perdidas = {
+      L1: { LB: rp * rf * hz * Lf1, LC: Lo1, LM: Lo1, LU: ra * LtDentro, LV: rp * rf * hz * Lf1, LW: Lo1, LZ: Lo1 },
+      L2: sp.v ? { LB: rp * rf * sp.v.lf * wv, LC: sp.v.lo * wv, LM: sp.v.lo * wv, LV: rp * rf * sp.v.lf * wv, LW: sp.v.lo * wv, LZ: sp.v.lo * wv } : null,
+      L3: e.patrimonio === "Sí" ? { LB: rp * rf * 0.1 * wv, LV: rp * rf * 0.1 * wv } : null,
+      L4: { LU: ra * 1e-4 * w1, LB: rp * rf * hz * eco.lf * wv, LC: eco.lo * wv, LM: eco.lo * wv, LV: rp * rf * hz * eco.lf * wv, LW: eco.lo * wv, LZ: eco.lo * wv }
+    };
+    return { nombre: z.nombre, np, tp, share, w1, wv, ra, rp, rf, hz, crit, sensible: z.equipoSensible !== "No", UW: String(v(N.UW_EQUIPO, z.uw, "2.5")), cableado: z.cableado, w: num(z.wMalla, 0), perdidas };
+  });
+  // pérdidas de las personas fuera de la estructura (RA): siempre a nivel de la estructura
+  const raExt = v(N.RT_SUELO, e.suelo, "agricola");
+  const LA1 = e.personasFuera === "No" ? 0 : raExt * 1e-2, LA4 = raExt * 1e-2;
+  const z0 = zonas[0];
+  const perdidas = { L1: { ...z0.perdidas.L1, LA: LA1 }, L2: z0.perdidas.L2, L3: z0.perdidas.L3, L4: { ...z0.perdidas.L4, LA: LA4 } };
+  // acometidas de servicio como objeto de protección (R'2 y R'4)
+  const servicio = { evalua: e.evaluaServicio === "Sí", kd: v(N.KD_LINEA, e.kdLinea, "contacto"), kp: v(N.KP_LINEA, e.kpLinea, "ninguna"), uwc: v(N.UW_CABLE, e.uwCable, "p1") };
+  return { v, L, W, H, DDT, origenDDT, Cd, Ad, ND, Am, NM, Ada, lineas, UW: z0.UW, Ce, calculados, multi, nt, zonas, LA1, LA4, perdidas, servicio, ra: z0.ra, rp: z0.rp, rf: z0.rf, hz: z0.hz, crit: z0.crit, sensible: z0.sensible, frac: z0.share, animales: e.animales === "Sí" };
 }
 
 // Probabilidades de daño con las medidas indicadas (SIPRA, DPS y medidas contra tensiones de paso y contacto).
 export function probabilidadesRayos(e, f, sipra, dps, medidas) {
   const v = f.v;
   const PB = v(N.PB_SIPRA, sipra, "ninguno"), PSPD = v(N.PEB_DPS, dps, "ninguno"), PTA = v(N.PTA_MEDIDAS, medidas, "ninguna");
-  const coord = dps && dps !== "ninguno";
-  const w = num(e.wMalla, 0), KS1 = w > 0 ? 0.12 * w : 1, KS2 = KS1, KS3 = v(N.KS3_CABLEADO, e.cableado, "sinPantalla_lazos");
-  const KS4 = Math.min(1, 1.5 / Number(f.UW));
-  const KMS = KS1 * KS2 * KS3 * KS4, PMS = pmsDeKms(KMS);
-  const idx = { ninguna: 0, 20: 1, 5: 2, 1: 3 };
-  const lineas = f.lineas.map((l) => {
-    const i = idx[l.pantalla] ?? 0;
-    const PLD = N.PLD_TABLA[f.UW][i], PLI = N.PLI_TABLA[f.UW][i];
-    return { ...l, PLD, PLI, PU: (coord ? Math.min(PSPD, PLD) : PLD) * PTA, PV: coord ? Math.min(PSPD, PLD) : PLD, PW: coord ? Math.min(PSPD, PLD) : PLD, PZ: coord ? Math.min(PSPD, PLI) : PLI };
+  const coord = !!dps && dps !== "ninguno";
+  const zonas = f.zonas.map((z) => {
+    const KS1 = z.w > 0 ? 0.12 * z.w : 1, KS3 = v(N.KS3_CABLEADO, z.cableado, "sinPantalla_lazos"), KS4 = Math.min(1, 1.5 / Number(z.UW));
+    const KMS = KS1 * KS1 * KS3 * KS4, PMS = pmsDeKms(KMS);
+    const lineas = f.lineas.map((l) => {
+      const i = IDX_PANTALLA[l.pantalla] ?? 0;
+      const PLD = N.PLD_TABLA[z.UW][i], PLI = N.PLI_TABLA[z.UW][i];
+      return { ...l, PLD, PLI, PU: (coord ? Math.min(PSPD, PLD) : PLD) * PTA, PV: coord ? Math.min(PSPD, PLD) : PLD, PW: coord ? Math.min(PSPD, PLD) : PLD, PZ: coord ? Math.min(PSPD, PLI) : PLI };
+    });
+    return { nombre: z.nombre, PC: PSPD, PM: coord ? Math.min(PMS, PSPD) : PMS, PMS, KMS, KS3, KS4, lineas };
   });
-  return { PA: PTA * PB, PB, PC: PSPD, PM: coord ? Math.min(PMS, PSPD) : PMS, PMS, KMS, KS3, KS4, PSPD, PTA, coord, lineas };
+  return { PA: PTA * PB, PB, PSPD, PTA, coord, zonas, ...zonas[0], lineas: zonas[0].lineas };
 }
 
-// Componentes y riesgos R1 a R4 para unas medidas dadas.
+// Componentes y riesgos R1 a R4 para unas medidas dadas (la suma de las zonas, más RA de las personas fuera de la estructura).
 export function evaluarRayos(e, f, sipra, dps, medidas) {
   const p = probabilidadesRayos(e, f, sipra, dps, medidas);
-  const sens = f.sensible ? 1 : 0;
-  const comp = (L) => {
-    const r = { RA: f.ND * p.PA * (L.LA ?? 0), RB: f.ND * p.PB * (L.LB ?? 0), RC: f.ND * p.PC * (L.LC ?? 0) * sens, RM: f.NM * p.PM * (L.LM ?? 0) * sens, RU: 0, RV: 0, RW: 0, RZ: 0 };
-    for (const l of p.lineas) {
-      r.RU += (l.NL + l.NDa) * l.PU * (L.LU ?? 0);
-      r.RV += (l.NL + l.NDa) * l.PV * (L.LV ?? 0);
-      r.RW += (l.NL + l.NDa) * l.PW * (L.LW ?? 0) * sens;
-      r.RZ += Math.max(0, l.NI - l.NL) * l.PZ * (L.LZ ?? 0) * sens;
-    }
-    return r;
-  };
-  const P = f.perdidas;
-  const c1 = comp(P.L1), c2 = P.L2 ? comp(P.L2) : null, c3 = P.L3 ? comp(P.L3) : null, c4 = comp(P.L4);
-  const sum = (c, claves) => claves.reduce((s, k) => s + (c[k] || 0), 0);
-  const sistemas1 = f.crit !== "ninguna";
-  const R1 = sum(c1, ["RA", "RB", "RU", "RV", ...(sistemas1 ? ["RC", "RM", "RW", "RZ"] : [])]);
-  const R2 = c2 ? sum(c2, ["RB", "RV", "RC", "RM", "RW", "RZ"]) : null;
-  const R3 = c3 ? sum(c3, ["RB", "RV"]) : null;
-  const R4 = sum(c4, [...(f.animales ? ["RA", "RU"] : []), "RB", "RV", "RC", "RM", "RW", "RZ"]);
-  return { p, c1, c2, c3, c4, R1, R2, R3, R4, sistemas1 };
+  const CLAVES = ["RA", "RB", "RC", "RM", "RU", "RV", "RW", "RZ"];
+  const cero = () => Object.fromEntries(CLAVES.map((k) => [k, 0]));
+  const sumar = (a, b) => { const r = cero(); for (const k of CLAVES) r[k] = (a?.[k] || 0) + (b?.[k] || 0); return r; };
+  const zonasR = f.zonas.map((z, iz) => {
+    const pz = p.zonas[iz], sens = z.sensible ? 1 : 0;
+    const comp = (Lz) => {
+      if (!Lz) return null;
+      const r = { ...cero(), RB: f.ND * p.PB * (Lz.LB ?? 0), RC: f.ND * pz.PC * (Lz.LC ?? 0) * sens, RM: f.NM * pz.PM * (Lz.LM ?? 0) * sens };
+      for (const l of pz.lineas) {
+        r.RU += (l.NL + l.NDa) * l.PU * (Lz.LU ?? 0);
+        r.RV += (l.NL + l.NDa) * l.PV * (Lz.LV ?? 0);
+        r.RW += (l.NL + l.NDa) * l.PW * (Lz.LW ?? 0) * sens;
+        r.RZ += Math.max(0, l.NI - l.NL) * l.PZ * (Lz.LZ ?? 0) * sens;
+      }
+      return r;
+    };
+    const c1 = comp(z.perdidas.L1);
+    const R1 = c1.RB + c1.RU + c1.RV + (z.crit !== "ninguna" ? c1.RC + c1.RM + c1.RW + c1.RZ : 0);
+    return { nombre: z.nombre, crit: z.crit, c1, c2: comp(z.perdidas.L2), c3: comp(z.perdidas.L3), c4: comp(z.perdidas.L4), R1 };
+  });
+  const RA1 = f.ND * p.PA * f.LA1, RA4 = f.ND * p.PA * f.LA4;
+  const agr = (clave, extra) => zonasR.reduce((s, z) => (z[clave] ? sumar(s, z[clave]) : s), { ...cero(), ...extra });
+  const c1 = agr("c1", { RA: RA1 }), c4 = agr("c4", { RA: RA4 });
+  const hay2 = zonasR.some((z) => z.c2), hay3 = zonasR.some((z) => z.c3);
+  const c2 = hay2 ? agr("c2") : null, c3 = hay3 ? agr("c3") : null;
+  const R1 = RA1 + zonasR.reduce((s, z) => s + z.R1, 0);
+  const R2 = c2 ? c2.RB + c2.RV + c2.RC + c2.RM + c2.RW + c2.RZ : null;
+  const R3 = c3 ? c3.RB + c3.RV : null;
+  const R4 = (f.animales ? c4.RA + c4.RU : 0) + c4.RB + c4.RV + c4.RC + c4.RM + c4.RW + c4.RZ;
+  // acometidas de servicio como objeto de protección (NTC 4552-2, Tabla 9 y 6.6.9 a 6.6.11)
+  const eco = (N.TIPO_ECONOMICO[e.tipoEconomico] || N.TIPO_ECONOMICO.otro).v;
+  const servicios = !f.servicio.evalua ? [] : f.lineas.map((l, i) => {
+    const rs = RS_CLASE[l.pantalla] ?? 0, n = f.lineas.length, { kd, kp, uwc } = f.servicio;
+    const iaB = rs > 0 ? 25 * n * uwc / (rs * kd * kp) : 0, iaV = rs > 0 ? 25 * uwc / (rs * kd * kp) : 0;
+    const PpB = p.coord ? p.PSPD : pDeIaN(iaB), PpV = pDeIaN(iaV);
+    const PpZ = p.zonas[0].lineas[i].PZ;
+    const comp = (lf, lo) => ({ RB: f.ND * PpB * lf, RC: f.ND * PpB * lo, RV: l.NL * PpV * lf, RW: l.NL * PpV * lo, RZ: Math.max(0, l.NI - l.NL) * PpZ * lo });
+    const lf2 = N.SERVICIO_PUBLICO.energia_tlc.v.lf, lo2 = N.SERVICIO_PUBLICO.energia_tlc.v.lo;
+    const c2s = comp(lf2, lo2), c4s = comp(eco.lf, eco.lo);
+    const tot = (c) => c.RB + c.RC + c.RV + c.RW + c.RZ;
+    return { nombre: l.nombre, iaB, iaV, PpB, PpV, PpZ, c2: c2s, c4: c4s, R2: tot(c2s), R4: tot(c4s) };
+  });
+  return { p, c1, c2, c3, c4, R1, R2, R3, R4, zonas: zonasR, servicios, sistemas1: f.zonas.some((z) => z.crit !== "ninguna") };
 }
+const pDeIaN = (ia) => N.pDeIa(ia);
 
 export function rayos(e) {
   const f = factoresRayos(e);
@@ -743,7 +788,7 @@ export function rayos(e) {
   const medidas = e.medidas || "ninguna";
   const conProt = evaluarRayos(e, f, e.sipra || "ninguno", e.dps || "ninguno", medidas);
   const RT = N.RIESGO_TOLERABLE;
-  const cumpleTodos = (r) => r.R1 <= RT.R1 && (r.R2 == null || r.R2 <= RT.R2) && (r.R3 == null || r.R3 <= RT.R3);
+  const cumpleTodos = (r) => r.R1 <= RT.R1 && (r.R2 == null || r.R2 <= RT.R2) && (r.R3 == null || r.R3 <= RT.R3) && r.servicios.every((s) => s.R2 <= RT.R2);
   let recomendacion = null;
   if (!cumpleTodos(conProt)) {
     outer: for (const s of SIPRA) for (const d of DPS) {
@@ -755,7 +800,8 @@ export function rayos(e) {
   const verificaciones = [
     { criterio: "Riesgo de pérdida de vidas humanas R1 con las medidas adoptadas", norma: "NTC 4552-2 Tabla 7 (RT = 10⁻⁵)", valor: x(conProt.R1), limite: "≤ 1,00e-5", cumple: conProt.R1 <= RT.R1 },
     ...(conProt.R2 != null ? [{ criterio: "Riesgo de pérdida de servicio público R2 con las medidas adoptadas", norma: "NTC 4552-2 Tabla 7 (RT = 10⁻³)", valor: x(conProt.R2), limite: "≤ 1,00e-3", cumple: conProt.R2 <= RT.R2 }] : []),
-    ...(conProt.R3 != null ? [{ criterio: "Riesgo de pérdida de patrimonio cultural R3 con las medidas adoptadas", norma: "NTC 4552-2 Tabla 7 (RT = 10⁻³)", valor: x(conProt.R3), limite: "≤ 1,00e-3", cumple: conProt.R3 <= RT.R3 }] : [])
+    ...(conProt.R3 != null ? [{ criterio: "Riesgo de pérdida de patrimonio cultural R3 con las medidas adoptadas", norma: "NTC 4552-2 Tabla 7 (RT = 10⁻³)", valor: x(conProt.R3), limite: "≤ 1,00e-3", cumple: conProt.R3 <= RT.R3 }] : []),
+    ...conProt.servicios.map((s) => ({ criterio: `Riesgo R'2 de la acometida de ${s.nombre.toLowerCase()} con las medidas adoptadas`, norma: "NTC 4552-2 Tabla 7 (RT = 10⁻³)", valor: x(s.R2), limite: "≤ 1,00e-3", cumple: s.R2 <= RT.R2 }))
   ];
   // Diseño del SIPRA según la NTC 4552-3 para el nivel adoptado (o el recomendado si el adoptado no basta)
   const nivelSel = N.NIVELES_SIPRA[e.sipra] ? e.sipra : N.NIVELES_SIPRA[(recomendacion || {}).sipra] ? recomendacion.sipra : null;
@@ -786,7 +832,8 @@ export function rayos(e) {
   const ct = num(e.valorEstructura, 0), cpm = num(e.costoProtAnual, 0);
   const CL = ct > 0 ? sinProt.R4 * ct : null, CRL = ct > 0 ? conProt.R4 * ct : null;
   const economica = ct > 0 && cpm > 0 ? CL >= CRL + cpm : null;
-  const filaR = (nombre, a, b) => [nombre, a == null ? "—" : x(a), b == null ? "—" : x(b)];
+  const nz = f.zonas.length;
+  const sufZ = (z) => (nz > 1 ? ` — ${z.nombre}` : "");
   const compFila = (k, nombre) => [`${k} (${nombre})`, x(sinProt.c1[k] ?? 0), x(conProt.c1[k] ?? 0)];
   const nombres = { RA: "tensiones de paso y contacto fuera de la estructura", RB: "daño físico por impacto en la estructura", RC: "falla de sistemas internos por impacto en la estructura", RM: "falla de sistemas internos por impacto cercano", RU: "tensiones de contacto por impacto en la línea", RV: "daño físico por impacto en la línea", RW: "falla de sistemas internos por impacto en la línea", RZ: "falla de sistemas internos por impacto cercano a la línea" };
   const tabs = [
@@ -795,19 +842,31 @@ export function rayos(e) {
       ...f.lineas.flatMap((l) => [[`NL — descargas sobre la línea de ${l.nombre.toLowerCase()} (${l.enterrada ? "subterránea" : "aérea"}, ${fmt(l.Lc, 0)} m)`, fmt(l.Al, 1), x(l.NL)], [`NI — descargas cercanas a la línea de ${l.nombre.toLowerCase()}`, fmt(l.Ai, 0), x(l.NI)]]),
       ...(f.Ada > 0 ? [["NDa — descargas sobre la estructura adyacente", fmt(f.Ada, 1), x(f.lineas[0] ? f.lineas[0].NDa : 0)]] : [])
     ] },
+    ...(nz > 1 ? [{ titulo: "Zonas de la estructura (NTC 4552-2, 6.2 y 6.4)", encabezados: ["Zona", "Personas", "Fracción de las personas", "R1 sin protección", "R1 con las medidas"], filas: [
+      ...f.zonas.map((z, i) => [z.nombre, fmt(z.np, 0), fmt(z.share * 100, 1) + " %", x(sinProt.zonas[i].R1), x(conProt.zonas[i].R1)]),
+      ["RA (personas fuera de la estructura)", "—", "—", x(sinProt.c1.RA), x(conProt.c1.RA)]
+    ] }] : []),
     { titulo: "Probabilidades de daño (NTC 4552-2, 6.6)", encabezados: ["Probabilidad", "Sin protección", "Con las medidas adoptadas"], filas: [
       ["PA (lesiones por tensiones de paso y contacto)", fmt(sinProt.p.PA, 4), fmt(conProt.p.PA, 4)], ["PB (daño físico)", fmt(sinProt.p.PB, 4), fmt(conProt.p.PB, 4)],
-      ["PC (falla de sistemas internos, impacto en la estructura)", fmt(sinProt.p.PC, 4), fmt(conProt.p.PC, 4)], ["PM (falla de sistemas internos, impacto cercano; KMS = " + fmt(conProt.p.KMS, 4) + ")", fmt(sinProt.p.PM, 4), fmt(conProt.p.PM, 4)],
-      ...f.lineas.flatMap((l, i) => ["PU", "PV", "PW", "PZ"].map((k) => [`${k} — línea de ${l.nombre.toLowerCase()}`, fmt(sinProt.p.lineas[i][k], 4), fmt(conProt.p.lineas[i][k], 4)]))
+      ...f.zonas.flatMap((z, iz) => {
+        const a = sinProt.p.zonas[iz], b = conProt.p.zonas[iz];
+        return [
+          [`PC (falla de sistemas internos, impacto en la estructura)${sufZ(z)}`, fmt(a.PC, 4), fmt(b.PC, 4)],
+          [`PM (falla de sistemas internos, impacto cercano; KMS = ${fmt(b.KMS, 4)})${sufZ(z)}`, fmt(a.PM, 4), fmt(b.PM, 4)],
+          ...f.lineas.flatMap((l, i) => ["PU", "PV", "PW", "PZ"].map((k) => [`${k} — línea de ${l.nombre.toLowerCase()}${sufZ(z)}`, fmt(a.lineas[i][k], 4), fmt(b.lineas[i][k], 4)]))
+        ];
+      })
     ] },
-    { titulo: "Pérdidas consecuentes de la categoría L1 (NTC 4552-2, 6.7.2)", encabezados: ["Pérdida", "Valor"], filas: Object.entries(f.perdidas.L1).map(([k, val]) => [k, x(val)]) },
-    { titulo: "Componentes de riesgo de R1", encabezados: ["Componente", "Sin protección", "Con las medidas adoptadas"], filas: [...["RA", "RB", "RC", "RM", "RU", "RV", "RW", "RZ"].map((k) => compFila(k, nombres[k])), ["R1 total" + (conProt.sistemas1 ? "" : " (RC, RM, RW y RZ no se suman: la estructura no es hospital ni tiene riesgo de explosión)"), x(sinProt.R1), x(conProt.R1)]] },
+    { titulo: "Pérdidas consecuentes de la categoría L1 (NTC 4552-2, 6.7.2)", encabezados: ["Pérdida", "Valor"], filas: [["LA — personas fuera de la estructura", x(f.LA1)], ...f.zonas.flatMap((z) => Object.entries(z.perdidas.L1).map(([k, val]) => [`${k}${sufZ(z)}`, x(val)]))] },
+    { titulo: "Componentes de riesgo de R1", encabezados: ["Componente", "Sin protección", "Con las medidas adoptadas"], filas: [...["RA", "RB", "RC", "RM", "RU", "RV", "RW", "RZ"].map((k) => compFila(k, nombres[k])), ["R1 total" + (conProt.sistemas1 ? " (RC, RM, RW y RZ suman solo en las zonas con riesgo de explosión o donde la falla de sistemas internos pone en peligro la vida)" : " (RC, RM, RW y RZ no se suman: ninguna zona es hospital ni tiene riesgo de explosión)"), x(sinProt.R1), x(conProt.R1)]] },
     { titulo: "Riesgos frente al tolerable (NTC 4552-2 Tabla 7)", encabezados: ["Riesgo", "Sin protección", "Con las medidas adoptadas", "Tolerable"], filas: [
       ["R1 — pérdida de vidas humanas", x(sinProt.R1), x(conProt.R1), "1,00e-5"],
       ["R2 — pérdida de servicio público", sinProt.R2 == null ? "No aplica" : x(sinProt.R2), conProt.R2 == null ? "No aplica" : x(conProt.R2), "1,00e-3"],
       ["R3 — pérdida de patrimonio cultural", sinProt.R3 == null ? "No aplica" : x(sinProt.R3), conProt.R3 == null ? "No aplica" : x(conProt.R3), "1,00e-3"],
-      ["R4 — pérdida de valor económico", x(sinProt.R4), x(conProt.R4), "Análisis costo-beneficio"]
+      ["R4 — pérdida de valor económico", x(sinProt.R4), x(conProt.R4), "Análisis costo-beneficio"],
+      ...conProt.servicios.flatMap((s, i) => [[`R'2 — acometida de ${s.nombre.toLowerCase()}`, x(sinProt.servicios[i].R2), x(s.R2), "1,00e-3"], [`R'4 — acometida de ${s.nombre.toLowerCase()}`, x(sinProt.servicios[i].R4), x(s.R4), "Análisis costo-beneficio"]])
     ] },
+    ...(conProt.servicios.length ? [{ titulo: "Acometidas de servicio como objeto de protección (NTC 4552-2, Tabla 9 y 6.6.9 a 6.6.11)", encabezados: ["Acometida", "Ia (kA)", "P'B = P'C", "P'V = P'W", "P'Z", "R'2", "R'4"], filas: conProt.servicios.map((s) => [s.nombre, `${fmt(s.iaB, 1)} / ${fmt(s.iaV, 1)}`, fmt(s.PpB, 4), fmt(s.PpV, 4), fmt(s.PpZ, 4), x(s.R2), x(s.R4)]) }] : []),
     { titulo: "Medidas de protección adoptadas", encabezados: ["Medida", "Valor"], filas: [
       ["Sistema de protección externo (SIPRA)", (N.PB_SIPRA[e.sipra] || N.PB_SIPRA.ninguno).nombre], ["DPS coordinados", (N.PEB_DPS[e.dps] || N.PEB_DPS.ninguno).nombre],
       ["Medidas contra tensiones de paso y contacto", (N.PTA_MEDIDAS[medidas] || N.PTA_MEDIDAS.ninguna).nombre], ["Densidad de descargas a tierra DDT", `${fmt(f.DDT, 2)} descargas/km²·año (${f.origenDDT})`]
@@ -819,7 +878,8 @@ export function rayos(e) {
     ] }] : [])
   ];
   const notas = [
-    "Evaluación con una sola zona, con una línea de potencia y, si se indica, una de telecomunicaciones; para estructuras con zonas de características distintas, evalúe cada zona por separado (NTC 4552-2, 6.4). Las acometidas de servicio como objeto de protección (R'1, R'2 y R'4) no se evalúan aquí.",
+    nz > 1 ? `La estructura se evaluó en ${nz} zonas (NTC 4552-2, 6.4.1.2): el riesgo es la suma de los de cada zona; RA, de las personas fuera de la estructura, se cuenta una sola vez. Las pérdidas típicas de cada zona se ponderan con su fracción de personas (L1) o de valor (L2 a L4).` : "Evaluación con una sola zona; si hay partes con características distintas (piso, compartimentos contra fuego o zonas blindadas), defínalas en la tabla de zonas (NTC 4552-2, 6.2).",
+    f.servicio.evalua ? "Las acometidas de servicio se evaluaron como objeto de protección (R'2 y R'4, Tablas 9 y 25); la resistencia de la pantalla se toma en el límite de su clase. R'1 solo aplica a tuberías metálicas que transportan fluidos explosivos y no se evalúa. La fibra óptica y las tuberías metálicas están «bajo consideración» en la norma." : "Las acometidas de servicio como objeto de protección (R'2 y R'4) no se evaluaron: actívelas con «Evaluar las acometidas de servicio» si el operador de la red lo exige.",
     "En R1 los componentes RC, RM, RW y RZ solo se suman para estructuras con riesgo de explosión y para hospitales u otras donde la falla de sistemas internos ponga en peligro la vida (NTC 4552-2, Tabla 2).",
     "La Tabla 20 de la NTC 4552-2 trae para 6 kV los valores 1 y 0,2, que rompen la secuencia decreciente; se usan 0,1 y 0,02 de la IEC 62305-2. La NTC no da Lf para «otros» en la Tabla 26: se adopta el de industrial y comercial.",
     f.calculados ? "Las pérdidas de L1 se calcularon con (np / nt) · (tp / 8760), con np = víctimas posibles (ecuaciones 15 a 27); las de fuera de la estructura usan el valor típico de 10⁻² (Tabla 26)." : "Las pérdidas de L1 usan los valores típicos de la Tabla 26 (la norma los permite cuando np, nt y tp son inciertos); L2 y L4 usan los de las Tablas 31 y 32."
@@ -831,7 +891,8 @@ export function rayos(e) {
       { etiqueta: "R1 sin protección", valor: x(sinProt.R1), unidad: "" },
       { etiqueta: "R1 con las medidas adoptadas", valor: x(conProt.R1), unidad: "" },
       ...(conProt.R2 != null ? [{ etiqueta: "R2 con las medidas adoptadas", valor: x(conProt.R2), unidad: "" }] : []),
-      ...(conProt.R3 != null ? [{ etiqueta: "R3 con las medidas adoptadas", valor: x(conProt.R3), unidad: "" }] : [])
+      ...(conProt.R3 != null ? [{ etiqueta: "R3 con las medidas adoptadas", valor: x(conProt.R3), unidad: "" }] : []),
+      ...conProt.servicios.map((s) => ({ etiqueta: `R'2 acometida de ${s.nombre.toLowerCase()}`, valor: x(s.R2), unidad: "" }))
     ],
     tablas: tabs,
     pasos: [
@@ -839,12 +900,13 @@ export function rayos(e) {
       { titulo: "Área efectiva de la estructura", formula: "Ad = L W + 6 H (L + W) + 9 π H²", sustitucion: `L = ${fmt(f.L, 1)}; W = ${fmt(f.W, 1)}; H = ${fmt(f.H, 1)} m`, resultado: `Ad = ${fmt(f.Ad, 1)} m²` },
       { titulo: "Descargas sobre la estructura y cercanas", formula: "ND = DDT · Ad · Cd · 10⁻⁶; NM = DDT · (Am − Ad · Cd) · 10⁻⁶", sustitucion: `Cd = ${fmt(f.Cd, 2)}; Am = ${fmt(f.Am, 0)} m² (franja de 250 m)`, resultado: `ND = ${f.ND.toExponential(3)}; NM = ${f.NM.toExponential(3)}` },
       { titulo: "Descargas sobre las líneas y cercanas", formula: "NL = DDT · Al · Cd · Ct · 10⁻⁶; NI = DDT · Ai · Ce · Ct · 10⁻⁶", sustitucion: "Al aérea = (Lc − 3(Ha + Hb)) · 6 Hc; subterránea = (Lc − 3(Ha + Hb)) · √ρ; Ai aérea = 1000 Lc; subterránea = 25 Lc √ρ (Tabla 12)", resultado: f.lineas.map((l) => `${l.nombre}: NL = ${l.NL.toExponential(2)}, NI = ${l.NI.toExponential(2)}`).join("; ") || "Sin líneas de servicio" },
-      { titulo: "Componentes de riesgo", formula: "RX = NX · PX · LX", sustitucion: "RA, RB, RC, RM, RU, RV, RW y RZ según las Tablas 8 y 2", resultado: `R1 = ${x(conProt.R1)}` },
-      { titulo: "Riesgos", formula: "R1 = RA + RB + RU + RV (+ RC + RM + RW + RZ en hospitales y riesgo de explosión); R2 = RB + RV + RC + RM + RW + RZ; R3 = RB + RV; R4 = RA* + RB + RC + RM + RU* + RV + RW + RZ", sustitucion: "* RA y RU solo con pérdida de animales", resultado: `R1 = ${x(conProt.R1)}; R4 = ${x(conProt.R4)}` }
+      { titulo: "Componentes de riesgo", formula: "RX = NX · PX · LX, por zona", sustitucion: "RA, RB, RC, RM, RU, RV, RW y RZ según las Tablas 8 y 2", resultado: `R1 = ${x(conProt.R1)}` },
+      { titulo: "Riesgos", formula: "R1 = RA + Σ zonas (RB + RU + RV [+ RC + RM + RW + RZ en hospitales y riesgo de explosión]); R2 = Σ (RB + RV + RC + RM + RW + RZ); R3 = Σ (RB + RV); R4 = RA* + Σ (RB + RC + RM + RU* + RV + RW + RZ)", sustitucion: "* RA y RU solo con pérdida de animales", resultado: `R1 = ${x(conProt.R1)}; R4 = ${x(conProt.R4)}` },
+      ...(conProt.servicios.length ? [{ titulo: "Acometidas de servicio", formula: "R'B = ND P'B L'B; R'C = ND P'C L'C; R'V = NL P'V L'V; R'W = NL P'W L'W; R'Z = (NI − NL) P'Z L'Z; Ia = 25 n Uw / (Rs Kd Kp)", sustitucion: "P' de la Tabla 25 según Ia; con DPS, P'B y P'C = PDPS (Tabla 16); L' de la Tabla 31 (R'2) o 32 (R'4)", resultado: conProt.servicios.map((s) => `${s.nombre}: R'2 = ${x(s.R2)}`).join("; ") }] : [])
     ],
     verificaciones,
     notas,
-    conclusion: cumpleTodos(conProt) ? `Con las medidas adoptadas, R1 = ${x(conProt.R1)} ≤ 10⁻⁵${conProt.R2 != null ? `, R2 = ${x(conProt.R2)} ≤ 10⁻³` : ""}${conProt.R3 != null ? `, R3 = ${x(conProt.R3)} ≤ 10⁻³` : ""}: el riesgo es tolerable.` : `Los riesgos superan el tolerable: R1 = ${x(conProt.R1)}${conProt.R2 != null ? `, R2 = ${x(conProt.R2)}` : ""}${conProt.R3 != null ? `, R3 = ${x(conProt.R3)}` : ""}.${textoRec}`
+    conclusion: cumpleTodos(conProt) ? `Con las medidas adoptadas, R1 = ${x(conProt.R1)} ≤ 10⁻⁵${conProt.R2 != null ? `, R2 = ${x(conProt.R2)} ≤ 10⁻³` : ""}${conProt.R3 != null ? `, R3 = ${x(conProt.R3)} ≤ 10⁻³` : ""}: el riesgo es tolerable.` : `Los riesgos superan el tolerable: R1 = ${x(conProt.R1)}${conProt.R2 != null ? `, R2 = ${x(conProt.R2)}` : ""}${conProt.R3 != null ? `, R3 = ${x(conProt.R3)}` : ""}${conProt.servicios.filter((s) => s.R2 > RT.R2).map((s) => `, R'2 (${s.nombre.toLowerCase()}) = ${x(s.R2)}`).join("")}.${textoRec}`
   };
 }
 

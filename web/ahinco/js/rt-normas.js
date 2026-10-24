@@ -295,6 +295,21 @@ export const PLD_TABLA = { "1.5": [1, 1, 0.8, 0.4], "2.5": [1, 0.95, 0.6, 0.2], 
 // La norma impresa trae 1 y 0,2 para 6 kV en «sin pantalla» y «5 < Rs ≤ 20», que rompen la secuencia decreciente
 // (erratas); se usan 0,1 y 0,02 de la IEC 62305-2.
 export const PLI_TABLA = { "1.5": [1, 0.15, 0.04, 0.02], "2.5": [0.4, 0.06, 0.02, 0.008], "4": [0.2, 0.03, 0.008, 0.004], "6": [0.1, 0.02, 0.004, 0.002] };
+// NTC 4552-2 Tablas 21 y 22 (corriente de falla Ia de la pantalla de una línea, ecuaciones 13 y 14) y Tabla 23 (Uw del cable).
+export const KD_LINEA = { contacto: { nombre: "Pantalla en contacto con el suelo (1)", v: 1 }, sinContacto: { nombre: "Pantalla sin contacto con el suelo (0,4)", v: 0.4 } };
+export const KP_LINEA = {
+  ninguna: { nombre: "Sin medidas adicionales (1)", v: 1 }, un_cable: { nombre: "Un cable apantallado adicional, 30 cm sobre la línea (0,6)", v: 0.6 },
+  dos_cables: { nombre: "Dos cables apantallados adicionales, simétricos (0,4)", v: 0.4 }, ducto: { nombre: "Ducto de cables de baja resistividad protegido contra rayo (0,1)", v: 0.1 },
+  cable_rayo: { nombre: "Cable especial protegido contra rayos, con pantalla continua en el suelo (0,02)", v: 0.02 }, tubo_acero: { nombre: "Cables apantallados adicionales en tubo de acero (0,01)", v: 0.01 }
+};
+export const UW_CABLE = {
+  tlc_papel: { nombre: "Telecomunicaciones aislado en papel (1,5 kV)", v: 1.5 }, tlc_pvc: { nombre: "Telecomunicaciones aislado en PVC (5 kV)", v: 5 },
+  p1: { nombre: "Potencia Un ≤ 1 kV (15 kV)", v: 15 }, p3: { nombre: "Potencia 3 kV (45 kV)", v: 45 }, p6: { nombre: "Potencia 6 kV (60 kV)", v: 60 },
+  p10: { nombre: "Potencia 10 kV (75 kV)", v: 75 }, p15: { nombre: "Potencia 15 kV (95 kV)", v: 95 }, p20: { nombre: "Potencia 20 kV (125 kV)", v: 125 }
+};
+// NTC 4552-2 Tabla 25: P'B, P'C, P'V y P'W según la corriente de falla Ia (kA); se toma el escalón de Ia inmediatamente inferior.
+export const P_IA_TABLA = [[0, 1], [3, 0.99], [5, 0.95], [10, 0.9], [20, 0.8], [30, 0.6], [40, 0.4], [50, 0.3], [60, 0.2], [80, 0.1], [100, 0.05], [150, 0.02], [200, 0.01], [300, 0.005], [400, 0.002], [600, 0.001]];
+export const pDeIa = (ia) => { let p = 1; for (const [k, v] of P_IA_TABLA) if (ia >= k) p = v; return p; };
 export const RIESGO_TOLERABLE_R1 = 1e-5;
 // NTC 4552-2 Tabla 7: riesgo tolerable RT (1/año).
 export const RIESGO_TOLERABLE = { R1: 1e-5, R2: 1e-3, R3: 1e-3 };
