@@ -212,6 +212,36 @@ export async function generarCartaDocxBlob(datos) {
       }
       continue;
     }
+    if (bloque.tipo === "tabla") {
+      const filasT = (bloque.filas || []).map((f) => (Array.isArray(f) ? f : (f && f.celdas) || [])).filter((f) => f.length);
+      if (filasT.length) {
+        const nCols = Math.max(...filasT.map((f) => f.length));
+        // Ancho de cada columna proporcional al texto más largo de su contenido (mínimo razonable), no partes iguales.
+        const pesos = Array.from({ length: nCols }, (_, c) => Math.min(40, Math.max(6, ...filasT.map((f) => Math.max(...String(f[c] ?? "").split("\n").map((l) => l.length))))));
+        const totalTw = Math.round(ANCHO_UTIL_MM * 56.7), suma = pesos.reduce((a, b) => a + b, 0);
+        const colTw = pesos.map((p) => Math.round(totalTw * p / suma));
+        const borde = { style: "single", size: 4, color: "B9BFC9" };
+        cuerpo.push(new Table({
+          width: { size: totalTw, type: WidthType.DXA }, columnWidths: colTw,
+          rows: filasT.map((f, r) => new TableRow({
+            tableHeader: r === 0, cantSplit: true,
+            children: Array.from({ length: nCols }, (_, c) => new TableCell({
+              width: { size: colTw[c], type: WidthType.DXA },
+              verticalAlign: VerticalAlign.CENTER,
+              margins: { top: 50, bottom: 50, left: 80, right: 80 },
+              borders: { top: borde, bottom: borde, left: borde, right: borde },
+              shading: r === 0 ? { type: ShadingType.CLEAR, fill: NAVY_HEX, color: "auto" } : r % 2 === 0 ? { type: ShadingType.CLEAR, fill: "F5F6F8", color: "auto" } : undefined,
+              children: String(f[c] ?? "").split("\n").map((linea) => new Paragraph({
+                alignment: r === 0 || String(f[c] ?? "").length <= 18 ? AlignmentType.CENTER : AlignmentType.LEFT,
+                children: [new TextRun({ text: linea, bold: r === 0, color: r === 0 ? "FFFFFF" : "14161A", size: 17 })]
+              }))
+            }))
+          }))
+        }));
+        cuerpo.push(new Paragraph({ text: "" }));
+      }
+      continue;
+    }
     cuerpo.push(new Paragraph({ children: runsParaDocx(TextRun, bloque.texto, 21) }));
     cuerpo.push(new Paragraph({ text: "" }));
   }

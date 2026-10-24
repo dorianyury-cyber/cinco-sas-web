@@ -2524,3 +2524,11 @@ body.app-control .ctl-main .page-banner:has(#contratoNombre) .eyebrow:has(a) { m
 body.app-control .ctl-main #contratoNombre { max-width: 1100px; font-size: 17px; font-weight: 600; letter-spacing: 0; line-height: 1.4; display: -webkit-box; -webkit-line-clamp: 3; -webkit-box-orient: vertical; overflow: hidden; }
 body.app-control .ctl-main #contratoCliente { margin-top: 5px; font-size: 12.5px; }
 .w-135 { width: 135px; }
+
+/* ---- Tabla editable dentro de una carta (Correspondencia) ---- */
+.control-tabla-carta-scroll { overflow-x: auto; }
+.control-tabla-carta-grid { border-collapse: collapse; width: 100%; }
+.control-tabla-carta-grid td { padding: 2px; vertical-align: top; }
+.control-tabla-carta-grid textarea { width: 100%; min-width: 96px; box-sizing: border-box; padding: 3px 5px; line-height: 1.25; height: 62px; border: 1px solid var(--border); border-radius: 6px; background: var(--card-bg); color: var(--text); font: inherit; font-size: 12px; resize: vertical; }
+.control-tabla-carta-grid td.encabezado textarea { background: #1f2732; color: #fff; font-weight: 700; text-align: center; }
+.control-tabla-carta .control-btn-danger { padding: 2px 8px; font-size: 11px; }

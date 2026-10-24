@@ -61,6 +61,36 @@ function formatearFechaLarga(fechaISO) {
   return fecha.toLocaleDateString("es-CO", { day: "numeric", month: "long", year: "numeric" });
 }
 
+// Reparto del ancho entre las columnas de una tabla: cada una recibe lo que necesita su contenido (sin partir las
+// palabras más largas) y el sobrante se reparte en proporción a lo que cada una pide — así una columna corta («No.»,
+// «A») no queda con un hueco enorme y una larga («Acometida») no queda apretada.
+function anchosColumnasTabla(doc, filas, anchoUtil, tam) {
+  const n = Math.max(...filas.map((f) => f.length));
+  const pad = 2;
+  const min = Array(n).fill(0), des = Array(n).fill(0);
+  filas.forEach((fila, r) => {
+    for (let c = 0; c < n; c++) {
+      doc.setFont("helvetica", r === 0 ? "bold" : "normal");
+      doc.setFontSize(tam);
+      const texto = String(fila[c] ?? "");
+      for (const linea of texto.split("\n")) {
+        const wl = doc.getTextWidth(linea) * 1.08 + pad * 2 + 0.6;
+        des[c] = Math.max(des[c], wl);
+        // Una celda corta («1 × No. 8», «THHN/THWN-2») no debe partirse: su mínimo es la línea completa.
+        if (linea.length <= 14) min[c] = Math.max(min[c], wl);
+        for (const palabra of linea.split(/\s+/)) min[c] = Math.max(min[c], doc.getTextWidth(palabra) * 1.08 + pad * 2 + 0.6);
+      }
+    }
+  });
+  const sumaDes = des.reduce((a, b) => a + b, 0);
+  if (sumaDes <= anchoUtil) return des.map((d) => d + (anchoUtil - sumaDes) * (d / sumaDes));
+  const sumaMin = min.reduce((a, b) => a + b, 0);
+  const extra = Math.max(0, anchoUtil - sumaMin), pide = des.map((d, c) => Math.max(0, d - min[c])), sumaPide = pide.reduce((a, b) => a + b, 0) || 1;
+  const w = min.map((m, c) => m + extra * (pide[c] / sumaPide));
+  const esc = anchoUtil / w.reduce((a, b) => a + b, 0);
+  return w.map((x) => x * esc);
+}
+
 export async function generarCartaPDF(datos) {
   const { jsPDF } = window.jspdf;
   const doc = new jsPDF({ unit: "mm", format: "letter" });
@@ -160,6 +190,58 @@ export async function generarCartaPDF(datos) {
         doc.text(" no se pudo cargar esta imagen al generar el documento.", margenX + 16, y + altoAviso / 2 + 1.5);
         y += altoAviso + 6;
       }
+      continue;
+    }
+
+    if (bloque.tipo === "tabla") {
+      const filasT = (bloque.filas || []).map((f) => (Array.isArray(f) ? f : (f && f.celdas) || [])).filter((f) => f.length);
+      if (!filasT.length) continue;
+      // Se reduce la letra (hasta 6,5 pt) si ni así caben sin partir las palabras más largas en el ancho útil.
+      let tam = 8.5;
+      let anchos = anchosColumnasTabla(doc, filasT, anchoUtil, tam);
+      const sinPartir = (a, t) => filasT.every((f) => f.every((txt, c) => String(txt ?? "").split(/s+/).every((p) => { doc.setFont("helvetica", f === filasT[0] ? "bold" : "normal"); doc.setFontSize(t); return doc.getTextWidth(p) * 1.08 + 4.6 <= a[c] + 0.01; })));
+      while (!sinPartir(anchos, tam) && tam > 6.5) { tam -= 0.5; anchos = anchosColumnasTabla(doc, filasT, anchoUtil, tam); }
+      const pad = 2.2, interlinea = tam * 0.3528 * 1.18;
+      const nCols = anchos.length;
+      // Las columnas cuyo contenido es corto se centran; las de texto largo van a la izquierda.
+      const centrada = anchos.map((_, c) => filasT.slice(1).every((f) => String(f[c] ?? "").length <= 18));
+      const lineasDe = (fila, r) => {
+        doc.setFont("helvetica", r === 0 ? "bold" : "normal");
+        doc.setFontSize(tam);
+        return Array.from({ length: nCols }, (_, c) => doc.splitTextToSize(String(fila[c] ?? ""), anchos[c] - 2 * 2));
+      };
+      const dibujarFila = (fila, r, yFila) => {
+        const lineas = lineasDe(fila, r);
+        const alto = Math.max(...lineas.map((l) => l.length)) * interlinea + pad * 2;
+        return { lineas, alto, yFila };
+      };
+      const pintarFila = (fila, r, yFila) => {
+        const { lineas, alto } = dibujarFila(fila, r, yFila);
+        let x = margenX;
+        for (let c = 0; c < nCols; c++) {
+          if (r === 0) doc.setFillColor(...NAVY); else if (r % 2 === 0) doc.setFillColor(...GRIS_CLARO); else doc.setFillColor(255, 255, 255);
+          doc.setDrawColor(185, 191, 201);
+          doc.setLineWidth(0.2);
+          doc.rect(x, yFila, anchos[c], alto, "FD");
+          doc.setFont("helvetica", r === 0 ? "bold" : "normal");
+          doc.setFontSize(tam);
+          if (r === 0) doc.setTextColor(255, 255, 255); else doc.setTextColor(20, 22, 26);
+          const alinear = r === 0 || centrada[c] ? "center" : "left";
+          const xt = alinear === "center" ? x + anchos[c] / 2 : x + 2;
+          doc.text(lineas[c], xt, yFila + pad + 2.9, { align: alinear, baseline: "alphabetic", lineHeightFactor: interlinea / (tam * 0.3528) });
+          x += anchos[c];
+        }
+        return alto;
+      };
+      for (let r = 0; r < filasT.length; r++) {
+        const { alto } = dibujarFila(filasT[r], r, y);
+        if (y + alto > altoPagina - 45) {
+          doc.addPage(); y = 20;
+          if (r > 0) y += pintarFila(filasT[0], 0, y); // se repite el encabezado en la página nueva
+        }
+        y += pintarFila(filasT[r], r, y);
+      }
+      y += 6;
       continue;
     }
 

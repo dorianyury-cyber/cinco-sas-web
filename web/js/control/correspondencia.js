@@ -104,10 +104,21 @@ function quitarBloque(indice) {
 // bloque que maneja una carta (texto/imagen, sin títulos ni tablas).
 let indiceInsertarImagen = null;
 
+// Tabla de la carta: filas de celdas de texto (la primera fila es el encabezado). Se edita aquí, celda por celda.
+function nuevaTabla() {
+  return { tipo: "tabla", filas: [["", ""], ["", ""]] };
+}
+const celdasDeFila = (fila) => (Array.isArray(fila) ? fila : (fila && fila.celdas) || []);
+
 function insertarBloqueEn(indice, tipo) {
   if (tipo === "imagen") {
     indiceInsertarImagen = indice;
     inputImagen.click();
+    return;
+  }
+  if (tipo === "tabla") {
+    bloques.splice(indice, 0, nuevaTabla());
+    renderBloques();
     return;
   }
   bloques.splice(indice, 0, { tipo: "texto", texto: "" });
@@ -120,7 +131,7 @@ function insertarBloqueEn(indice, tipo) {
 function renderHueco(indice) {
   const hueco = document.createElement("div");
   hueco.className = "control-bloque-gap";
-  [{ tipo: "texto", etiqueta: "Párrafo" }, { tipo: "imagen", etiqueta: "Gráfico / imagen" }].forEach(({ tipo, etiqueta }) => {
+  [{ tipo: "texto", etiqueta: "Párrafo" }, { tipo: "imagen", etiqueta: "Gráfico / imagen" }, { tipo: "tabla", etiqueta: "Tabla" }].forEach(({ tipo, etiqueta }) => {
     const btn = document.createElement("button");
     btn.type = "button";
     btn.className = "control-btn-mini";
@@ -129,6 +140,67 @@ function renderHueco(indice) {
     hueco.appendChild(btn);
   });
   return hueco;
+}
+
+// Editor de una tabla: una celda de texto por casilla; «+ Fila» y «+ Columna» agregan al final y «✕» quita esa fila o columna.
+function renderTablaCarta(bloque) {
+  const cont = document.createElement("div");
+  cont.className = "control-tabla-carta";
+  const pintar = () => {
+    cont.innerHTML = "";
+    const filas = bloque.filas;
+    const nCols = Math.max(1, ...filas.map((f) => f.length));
+    const tabla = document.createElement("table");
+    tabla.className = "control-tabla-carta-grid";
+    filas.forEach((fila, r) => {
+      const tr = document.createElement("tr");
+      for (let c = 0; c < nCols; c++) {
+        const td = document.createElement("td");
+        if (r === 0) td.className = "encabezado";
+        const t = document.createElement("textarea");
+        t.rows = 3;
+        t.value = fila[c] ?? "";
+        t.addEventListener("input", () => { while (bloque.filas[r].length <= c) bloque.filas[r].push(""); bloque.filas[r][c] = t.value; });
+        td.appendChild(t);
+        tr.appendChild(td);
+      }
+      const tdq = document.createElement("td");
+      const q = document.createElement("button");
+      q.type = "button"; q.className = "control-btn-danger"; q.textContent = "✕"; q.title = "Quitar esta fila";
+      q.disabled = filas.length <= 1;
+      q.addEventListener("click", () => { bloque.filas.splice(r, 1); pintar(); });
+      tdq.appendChild(q);
+      tr.appendChild(tdq);
+      tabla.appendChild(tr);
+    });
+    const trq = document.createElement("tr");
+    for (let c = 0; c < nCols; c++) {
+      const td = document.createElement("td");
+      const q = document.createElement("button");
+      q.type = "button"; q.className = "control-btn-danger"; q.textContent = "✕ columna"; q.title = "Quitar esta columna";
+      q.disabled = nCols <= 1;
+      q.addEventListener("click", () => { bloque.filas.forEach((f) => f.splice(c, 1)); pintar(); });
+      td.appendChild(q);
+      trq.appendChild(td);
+    }
+    tabla.appendChild(trq);
+    const envoltura = document.createElement("div");
+    envoltura.className = "control-tabla-carta-scroll";
+    envoltura.appendChild(tabla);
+    cont.appendChild(envoltura);
+    const botones = document.createElement("div");
+    botones.className = "control-bloques-botones";
+    const masF = document.createElement("button");
+    masF.type = "button"; masF.className = "control-btn-mini"; masF.textContent = "+ Fila";
+    masF.addEventListener("click", () => { bloque.filas.push(Array(nCols).fill("")); pintar(); });
+    const masC = document.createElement("button");
+    masC.type = "button"; masC.className = "control-btn-mini"; masC.textContent = "+ Columna";
+    masC.addEventListener("click", () => { bloque.filas.forEach((f) => { while (f.length < nCols) f.push(""); f.push(""); }); pintar(); });
+    botones.append(masF, masC);
+    cont.appendChild(botones);
+  };
+  pintar();
+  return cont;
 }
 
 function renderBloques() {
@@ -146,6 +218,8 @@ function renderBloques() {
         placeholder: "Escribe un párrafo...",
         onInput: (html) => { bloque.texto = html; }
       }));
+    } else if (bloque.tipo === "tabla") {
+      contenido.appendChild(renderTablaCarta(bloque));
     } else {
       const img = document.createElement("img");
       img.src = bloque.previewUrl;
@@ -188,6 +262,7 @@ document.getElementById("agregarTextoBtn").addEventListener("click", () => {
 });
 
 document.getElementById("agregarImagenBtn").addEventListener("click", () => inputImagen.click());
+document.getElementById("agregarTablaBtn").addEventListener("click", () => { bloques.push(nuevaTabla()); renderBloques(); });
 
 // ---- Importar una carta ya elaborada (JSON) ----
 // Igual que «Importar oferta» y «Importar bloques» de Informes: precarga el formulario sin guardar;
@@ -225,8 +300,14 @@ function importarCartaJson(texto) {
         return;
       }
       nuevos.push({ tipo: "imagen", blob, previewUrl: URL.createObjectURL(blob) });
+    } else if (b.tipo === "tabla") {
+      if (!Array.isArray(b.filas) || !b.filas.length || !b.filas.every((f) => Array.isArray(f) && f.length)) {
+        mostrarAlerta(`El bloque #${i + 1} es una tabla sin "filas" completas (arreglo de arreglos de texto).`, "error");
+        return;
+      }
+      nuevos.push({ tipo: "tabla", filas: b.filas.map((f) => f.map((c) => String(c ?? ""))) });
     } else {
-      mostrarAlerta(`El bloque #${i + 1} tiene un "tipo" no admitido ("${b.tipo}"): use "texto" o "imagen".`, "error");
+      mostrarAlerta(`El bloque #${i + 1} tiene un "tipo" no admitido ("${b.tipo}"): use "texto", "imagen" o "tabla".`, "error");
       return;
     }
   }
@@ -293,7 +374,7 @@ document.getElementById("vistaPreviaBtn").addEventListener("click", async () => 
   try {
     const bloquesPreview = bloques.map((b) => b.tipo === "imagen"
       ? { tipo: "imagen", url: URL.createObjectURL(b.blob) }
-      : { tipo: "texto", texto: b.texto });
+      : b.tipo === "tabla" ? { tipo: "tabla", filas: b.filas } : { tipo: "texto", texto: b.texto });
     const datosPreview = {
       destinatario: document.getElementById("destinatario").value,
       ciudad: document.getElementById("ciudad").value || "Neiva",
@@ -611,6 +692,8 @@ requireAuth(async (user) => {
       for (const bloque of bloques) {
         if (bloque.tipo === "texto") {
           bloquesFinal.push({ tipo: "texto", texto: bloque.texto });
+        } else if (bloque.tipo === "tabla") {
+          bloquesFinal.push({ tipo: "tabla", filas: bloque.filas.map((celdas) => ({ celdas })) });
         } else {
           n += 1;
           const archivoRef = ref(storage, `correspondencia/${cartaRef.id}/${n}.jpg`);
