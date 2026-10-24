@@ -189,6 +189,72 @@ document.getElementById("agregarTextoBtn").addEventListener("click", () => {
 
 document.getElementById("agregarImagenBtn").addEventListener("click", () => inputImagen.click());
 
+// ---- Importar una carta ya elaborada (JSON) ----
+// Igual que «Importar oferta» y «Importar bloques» de Informes: precarga el formulario sin guardar;
+// el radicado lo asigna «Guardar». Las imágenes viajan como data URL (PNG o JPG) y se convierten en
+// blobs aquí mismo, sin pasar por fetch (la CSP no permite data: en connect-src).
+function blobDeDataUrl(dataUrl) {
+  const m = /^data:(image\/(?:png|jpeg));base64,([A-Za-z0-9+/=]+)$/.exec(String(dataUrl || ""));
+  if (!m) return null;
+  const bin = atob(m[2]);
+  const bytes = new Uint8Array(bin.length);
+  for (let i = 0; i < bin.length; i++) bytes[i] = bin.charCodeAt(i);
+  return new Blob([bytes], { type: m[1] });
+}
+function importarCartaJson(texto) {
+  let datos;
+  try {
+    datos = JSON.parse(texto);
+  } catch (err) {
+    mostrarAlerta("Ese contenido no es un JSON válido.", "error");
+    return;
+  }
+  if (!datos || typeof datos !== "object" || !datos.destinatario || !datos.asunto || !Array.isArray(datos.bloques) || !datos.bloques.length) {
+    mostrarAlerta('El JSON debe traer "destinatario", "asunto" y un arreglo "bloques" con al menos un bloque.', "error");
+    return;
+  }
+  const nuevos = [];
+  for (let i = 0; i < datos.bloques.length; i++) {
+    const b = datos.bloques[i];
+    if (b.tipo === "texto") {
+      nuevos.push({ tipo: "texto", texto: String(b.texto || "") });
+    } else if (b.tipo === "imagen") {
+      const blob = blobDeDataUrl(b.dataUrl);
+      if (!blob || blob.size > 8 * 1024 * 1024) {
+        mostrarAlerta(`El bloque #${i + 1} es una imagen sin un "dataUrl" PNG o JPG válido (máximo 8 MB).`, "error");
+        return;
+      }
+      nuevos.push({ tipo: "imagen", blob, previewUrl: URL.createObjectURL(blob) });
+    } else {
+      mostrarAlerta(`El bloque #${i + 1} tiene un "tipo" no admitido ("${b.tipo}"): use "texto" o "imagen".`, "error");
+      return;
+    }
+  }
+  document.getElementById("destinatario").value = datos.destinatario;
+  document.getElementById("ciudad").value = datos.ciudad || "Neiva";
+  document.getElementById("asunto").value = datos.asunto;
+  document.getElementById("firmaNombre").value = datos.firmaNombre || "";
+  document.getElementById("firmaCargo").value = datos.firmaCargo || "";
+  const cod = String(datos.contratoCodigo || "").trim();
+  const opcion = cod ? [...selectContrato.options].find((o) => o.textContent.includes(cod)) : null;
+  selectContrato.value = opcion ? opcion.value : "";
+  bloques = nuevos;
+  renderBloques();
+  document.getElementById("importarCartaTexto").value = "";
+  document.getElementById("importarCartaTexto").closest("details").open = false;
+  document.getElementById("nuevaCartaDetails").open = true;
+  mostrarAlerta(`Carta importada con ${nuevos.length} bloques${cod && !opcion ? ` — no encontré el contrato «${cod}»: elígelo en «Contrato relacionado»` : ""}. Revísala con «Visualizar» y pulsa «Guardar» para asignar el radicado.`, "ok");
+}
+document.getElementById("importarCartaBtn").addEventListener("click", () => {
+  const texto = document.getElementById("importarCartaTexto").value.trim();
+  if (texto) importarCartaJson(texto);
+});
+document.getElementById("importarCartaArchivo").addEventListener("change", async (e) => {
+  const archivo = e.target.files[0];
+  e.target.value = "";
+  if (archivo) importarCartaJson(await archivo.text());
+});
+
 inputImagen.addEventListener("change", async () => {
   const archivos = [...inputImagen.files];
   const fallidos = [];

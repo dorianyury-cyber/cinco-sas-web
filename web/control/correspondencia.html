@@ -46,6 +46,14 @@
       <details class="card control-nuevo" id="nuevaCartaDetails">
         <summary>+ Nueva carta</summary>
         <form class="pqr-form" id="nuevaCartaForm">
+          <details class="control-nuevo">
+            <summary>Importar una carta ya elaborada desde un archivo JSON</summary>
+            <p class="text-muted control-informes-ayuda">Carga el destinatario, el asunto, el cuerpo (texto e imágenes) y la firma. No guarda nada: revisas con «Visualizar» y pulsas «Guardar», que es lo que asigna el radicado.</p>
+            <input type="file" id="importarCartaArchivo" accept=".json,application/json">
+            <textarea id="importarCartaTexto" rows="4" placeholder='o pega aquí el JSON: {"destinatario": "...", "asunto": "...", "bloques": [...]}'></textarea>
+            <button type="button" class="control-btn-mini" id="importarCartaBtn">Cargar en el formulario</button>
+          </details>
+
           <label for="destinatario">Destinatario</label>
           <textarea id="destinatario" rows="2" required maxlength="300" placeholder="Ej. Empresa / Nombre de contacto"></textarea>
 
