@@ -7,7 +7,7 @@
 import * as N from "./rt-normas.js";
 import { MODULOS } from "./rt-modulos.js";
 import { LITERALES, FUENTE_LITERALES, exigido } from "./rt-literales.js";
-import { SISTEMAS_BT, impedanciaConductor, factorResistenciaTemp, ajusteDosCapas, ampacidadTablaMT, esTierra, paresCoordinacion, puntosPerfil, espectroGrupo } from "./rt-calculos.js";
+import { SISTEMAS_BT, impedanciaConductor, factorResistenciaTemp, factoresRayos, evaluarRayos, ajusteDosCapas, ampacidadTablaMT, esTierra, paresCoordinacion, puntosPerfil, espectroGrupo } from "./rt-calculos.js";
 import { hallazgos, supuestos, esVerificacion } from "./rt-hallazgos.js";
 
 const NAVY = "FF1F2732", AMARILLO = "FFFFF4CC", GRIS = "FFF2F3F5";
@@ -152,7 +152,7 @@ const CONSTANTES = {
   cableMT: [["K = 143 / 94", "A·√s/mm²", "Constante adiabática para conductor de cobre / aluminio con aislamiento XLPE o EPR (90 °C → 250 °C)", "IEC 60949"], ["K = 115 / 76", "A·√s/mm²", "Constante adiabática para aislamiento PVC (cobre / aluminio)", "IEC 60949"], ["0,017241 / 0,028264", "Ω·mm²/m", "Resistividad del cobre / aluminio a 20 °C (para la resistencia a 90 °C)", "IEC 60228"]],
   coordinacion: [["k, α y B", "", "Constantes de t = TMS × (k / ((I/Is)^α − 1) + B). IEC (B = 0): SI 0,14 y 0,02; VI 13,5 y 1; EI 80 y 2; LTI 120 y 1. IEEE: MI 0,0515, 0,02 y 0,114; VI 19,61, 2 y 0,491; EI 28,2, 2 y 0,1217", "IEC 60255-151 / IEEE C37.112"], ["CTI", "s", "Margen mínimo entre la protección principal y su respaldo (típico 0,2 a 0,4 s)", "IEEE 242"]],
   malla: [["1000", "Ω", "Resistencia del cuerpo humano", "IEEE 80-2013 §7"], ["0,116 / 0,157", "", "Constante de la persona de 50 kg / 70 kg en las tensiones tolerables", "IEEE 80-2013 ec. 29 a 32"], ["1,5 y 6", "", "Factores de la resistencia de los pies en contacto y en paso", "IEEE 80-2013"], ["0,09", "m", "Constante del factor Cs de la capa superficial", "IEEE 80-2013 ec. 27"], ["60", "Hz", "Frecuencia del sistema (constante de tiempo Ta = X/(2π·60·R))", ""], ["0,644 y 0,148", "", "Constantes del factor de irregularidad Ki", "IEEE 80-2013 ec. 89"], ["(ρa máx + ρa mín) / 2", "Ω·m", "Resistividad uniforme equivalente de un suelo no uniforme (solo con el modelo de dos capas)", "IEEE 80 Anexo E, ec. E.2"], ["Zs/2 + √(Zs·Rt)", "Ω", "Impedancia de un cable de guarda o neutro con sus puestas a tierra, vista desde la subestación (solo con Sf calculado)", "Endrenyi; IEEE 80 §15.9"]],
-  rayos: [["3H", "m", "El área colectiva se extiende 3 veces la altura de la estructura", "IEC 62305-2 Anexo A"], ["40 · LL", "m²", "Área colectiva de la línea de servicio", "IEC 62305-2 Anexo A"], ["10⁻⁶", "", "Conversión de m² a km² (NG está en descargas por km² al año)", ""], ["8760", "h", "Horas de un año", ""], ["10⁻⁵", "", "Riesgo tolerable de pérdida de vidas humanas (R1)", "IEC 62305-2 Tabla 7"]],
+  rayos: [["Ad = LW + 6H(L + W) + 9πH²", "m²", "Área efectiva de la estructura aislada", "NTC 4552-2 ecuación 6"], ["Am: franja de 250 m", "m²", "Área de influencia para descargas cercanas a la estructura", "NTC 4552-2 6.5.3"], ["Al y Ai", "m²", "Áreas efectivas de la línea: aérea (Lc − 3(Ha + Hb))·6Hc y 1000·Lc; subterránea (Lc − 3(Ha + Hb))·√ρ y 25·Lc·√ρ", "NTC 4552-2 Tabla 12"], ["RT: 1E-5 / 1E-3 / 1E-3", "", "Riesgos tolerables de R1, R2 y R3", "NTC 4552-2 Tabla 7"]],
   apantallamiento: [["2,2", "", "Constante de la corriente crítica Ic = 2,2 × BIL / Zs", "IEEE 998"], ["8 · k", "", "Distancia de impacto S = 8 k Ic^0,65 (k = 1,2 mástiles, 1 cables de guarda)", "IEEE 998"]],
   aislamiento: [["k", "", "Factor de falla a tierra: 1,3 neutro sólido, 1,4 efectivo, 1,73 aislado o no efectivo", "IEC 60071-2"], ["8150", "m", "Constante de la corrección por altitud Ka = e^(H/8150)", "IEC 60071-2"], ["300", "m/µs", "Velocidad de la onda en la línea", "IEC 60071-2"], ["20", "%", "Margen de protección mínimo recomendado", "IEEE C62.22"]],
   distancias: [["3 % por cada 300 m", "", "Aumento de la distancia sobre 1000 m de altitud, solo para tensiones de más de 57,5 kV", "RETIE 2024 Libro 3, art. 3.10, Nota 2"], ["Tablas 3.10.1.a y 3.10.2.a", "m", "Distancias mínimas de seguridad", "RETIE 2024 Libro 3"], ["Tabla 3.19.1.a", "m", "Ancho mínimo de la zona de servidumbre; máximo = tabla + 10 % (Nota 3)", "RETIE 2024 art. 3.19.1 h"]],
@@ -780,23 +780,72 @@ const HOJAS = {
     ]);
   },
   rayos(wb, e) {
-    const h = new Hoja(wb, "b Rayos", "Análisis de riesgo por rayos — R1 (RETIE 2024 literal b; NTC 4552-2 / IEC 62305-2)");
-    const v = (tabla, k, def) => (tabla[k] || tabla[def]).v;
-    const L = h.dato("Largo L", n(e.largo, 30), "m"), W = h.dato("Ancho W", n(e.ancho, 15), "m"), H = h.dato("Altura H", n(e.alto, 9), "m"), ng = h.dato("NG", n(e.ng, 8), "descargas/km²·año");
-    const cd = h.dato("CD (ubicación)", v(N.CD_UBICACION, e.ubicacion, "rodeada_iguales"), ""), ll = h.dato("Longitud línea LL", n(e.longLinea, 500), "m");
-    const ci = h.dato("CI", e.lineaEnterrada === "Sí" ? 0.5 : 1, ""), ce = h.dato("CE", n(e.ce, 0.5), ""), ct = h.dato("CT", e.trafoLinea === "Sí" ? 0.2 : 1, "");
-    const nz = h.dato("Personas en la zona nz", n(e.personasZona, 20), ""), nt = h.dato("Personas totales nt", n(e.personasTotal, 20), ""), tz = h.dato("Horas de presencia tz", n(e.horas, 2920), "h");
-    const rt = h.dato("rt (superficie)", v(N.RT_SUELO, e.suelo, "agricola"), ""), rp = h.dato("rp (provisiones)", v(N.RP_PROVISIONES, e.provisiones, "ninguna"), "");
-    const rf = h.dato("rf (incendio)", v(N.RF_INCENDIO, e.incendio, "ordinario"), ""), hz = h.dato("hz (peligro especial)", v(N.HZ_PANICO, e.panico, "ninguno"), ""), lf = h.dato("LF", v(N.LF_TIPO, e.tipoEstructura, "otro"), "");
-    const pb = h.dato("PB (SIPRA adoptado)", v(N.PB_SIPRA, e.sipra, "ninguno"), ""), peb = h.dato("PEB (DPS adoptados)", v(N.PEB_DPS, e.dps, "ninguno"), ""), pta = h.dato("PTA (medidas paso/contacto)", v(N.PTA_MEDIDAS, e.medidas, "ninguna"), "");
-    h.seccion("Cálculos");
-    const ad = h.calc("AD", `${L}*${W}+2*(3*${H})*(${L}+${W})+PI()*(3*${H})^2`, "m²"), nd = h.calc("ND", `${ng}*${ad}*${cd}*1E-6`, "/año");
-    const nl = h.calc("NL", `${ng}*40*${ll}*${ci}*${ce}*${ct}*1E-6`, "/año"), fr = h.calc("(nz/nt)·(tz/8760)", `${nz}/MAX(${nt},${nz})*${tz}/8760`, "");
-    const la = h.calc("LA", `${rt}*0.01*${fr}`, ""), lb = h.calc("LB", `${rp}*${rf}*${hz}*${lf}*${fr}`, "");
-    const ra = h.calc("RA", `${nd}*${pta}*${pb}*${la}`, ""), rb = h.calc("RB", `${nd}*${pb}*${lb}`, ""), ru = h.calc("RU", `${nl}*${pta}*${peb}*${la}`, ""), rv = h.calc("RV", `${nl}*${peb}*${lb}`, "");
-    const r1 = h.calc("R1", `${ra}+${rb}+${ru}+${rv}`, "");
-    h.verif("R1 ≤ 1E-5 (riesgo tolerable)", `${r1}<=1E-5`, "IEC 62305-2");
-    h.resumen([{ t: "Riesgo R1 con las medidas adoptadas", f: r1, fmt: "0.00E+00", nota: "Tolerable: ≤ 1,00E-05" }, { t: "Medidas de protección adoptadas", texto: true, valor: `${(N.PB_SIPRA[e.sipra] || N.PB_SIPRA.ninguno).nombre}; ${(N.PEB_DPS[e.dps] || N.PEB_DPS.ninguno).nombre}; ${(N.PTA_MEDIDAS[e.medidas] || N.PTA_MEDIDAS.ninguna).nombre}` }]);
+    const h = new Hoja(wb, "b Rayos", "Análisis de riesgo por rayos — R1 a R4 (RETIE 2024 literal b; NTC 4552-2)");
+    const f = factoresRayos(e), sipra = e.sipra || "ninguno", dps = e.dps || "ninguno", medidas = e.medidas || "ninguna";
+    const ev = evaluarRayos(e, f, sipra, dps, medidas), P = ev.p;
+    const L = h.dato("Largo L", f.L, "m"), W = h.dato("Ancho W", f.W, "m"), H = h.dato("Altura H", f.H, "m");
+    const ddt = h.dato("Densidad de descargas a tierra DDT", f.DDT, "descargas/km²·año", f.origenDDT), cd = h.dato("Cd (ubicación relativa, Tabla 10)", f.Cd, "");
+    h.seccion("Eventos peligrosos por año (NTC 4552-2, 6.5)");
+    const ad = h.calc("Ad — área efectiva de la estructura", `${L}*${W}+6*${H}*(${L}+${W})+9*PI()*${H}^2`, "m²");
+    const nd = h.calc("ND — descargas sobre la estructura", `${ddt}*${ad}*${cd}*1E-6`, "/año");
+    const am = h.calc("Am — área de influencia (250 m)", `2*250*(${L}+${W})+PI()*250^2`, "m²");
+    const nm = h.calc("NM — descargas cercanas a la estructura", `MAX(0,${ddt}*(${am}-${ad}*${cd})*1E-6)`, "/año");
+    const ada = h.dato("Ada — área efectiva de la estructura adyacente", f.Ada, "m²");
+    const ha = h.dato("Ha — altura de la estructura de donde viene la línea", n(e.haRemoto, 0), "m");
+    const lineas = f.lineas.map((l, i) => {
+      const t = l.nombre;
+      const lc = h.dato(`Lc — línea de ${t.toLowerCase()}`, l.Lc, "m"), ent = h.dato(`Enterrada (1 = sí) — ${t.toLowerCase()}`, l.enterrada ? 1 : 0, "");
+      const hc = h.dato(`Hc — altura de los conductores (${t.toLowerCase()})`, n(e.hLinea, 6), "m"), rho = h.dato(`ρ — resistividad del terreno (${t.toLowerCase()})`, Math.min(500, n(e.rhoLinea, 500)), "Ω·m");
+      const ce = h.dato(`Ce (ambiente) — ${t.toLowerCase()}`, f.Ce, ""), ct = h.dato(`Ct (transformador) — ${t.toLowerCase()}`, l.ct, "");
+      const base = `MAX(0,MIN(1000,${lc})-3*(${ha}+${H}))`;
+      const al = h.calc(`Al — área de impactos sobre la línea de ${t.toLowerCase()}`, `IF(${ent}=1,${base}*SQRT(${rho}),${base}*6*${hc})`, "m²");
+      const ai = h.calc(`Ai — área de impactos cercanos a la línea de ${t.toLowerCase()}`, `IF(${ent}=1,25*MIN(1000,${lc})*SQRT(${rho}),1000*MIN(1000,${lc}))`, "m²");
+      const nl = h.calc(`NL — descargas sobre la línea de ${t.toLowerCase()}`, `${ddt}*${al}*${cd}*${ct}*1E-6`, "/año");
+      const ni = h.calc(`NI — descargas cercanas a la línea de ${t.toLowerCase()}`, `${ddt}*${ai}*${ce}*${ct}*1E-6`, "/año");
+      const nda = h.calc(`NDa — descargas sobre la estructura adyacente (${t.toLowerCase()})`, `${ddt}*${ada}*${cd}*${ct}*1E-6`, "/año");
+      return { nl, ni, nda, p: P.lineas[i] };
+    });
+    h.seccion("Probabilidades de daño con las medidas adoptadas (NTC 4552-2, 6.6)");
+    const pa = h.dato("PA", P.PA, "", "Tabla 14 × PB"), pb = h.dato("PB", P.PB, "", "Tabla 15"), pc = h.dato("PC", P.PC, "", "Tabla 16"), pm = h.dato("PM", P.PM, "", "Tablas 17, 18 y 16");
+    const pl = lineas.map((l, i) => {
+      const t = f.lineas[i].nombre.toLowerCase();
+      return { pu: h.dato(`PU — ${t}`, l.p.PU, "", "Tablas 19 y 16"), pv: h.dato(`PV — ${t}`, l.p.PV, "", "Tablas 19 y 16"), pw: h.dato(`PW — ${t}`, l.p.PW, "", "Tablas 19 y 16"), pz: h.dato(`PZ — ${t}`, l.p.PZ, "", "Tablas 20 y 16") };
+    });
+    h.seccion("Pérdidas consecuentes (NTC 4552-2, 6.7)");
+    const sens = h.dato("Sistemas internos sensibles (1 = sí)", f.sensible ? 1 : 0, "", "Si no hay, RC, RM, RW y RZ valen cero");
+    const sumaSistemas = h.dato("R1 suma RC, RM, RW y RZ (1 = sí)", ev.sistemas1 ? 1 : 0, "", "Solo hospitales o riesgo de explosión");
+    const animales = h.dato("Pérdida de animales (1 = sí): RA y RU suman en R4", f.animales ? 1 : 0, "");
+    const perd = (k, tabla) => (tabla ? Object.fromEntries(Object.entries(tabla).map(([c, val]) => [c, h.dato(`${c} — ${k}`, val, "")])) : null);
+    const L1 = perd("L1", f.perdidas.L1), L2 = perd("L2", f.perdidas.L2), L3 = perd("L3", f.perdidas.L3), L4 = perd("L4", f.perdidas.L4);
+    h.seccion("Componentes de riesgo (RX = NX · PX · LX)");
+    const comp = (T, L) => {
+      const g = (k) => (L[k] ? L[k] : "0");
+      const r = {};
+      r.RA = h.calc(`RA — ${T}`, `${nd}*${pa}*${g("LA")}`, "");
+      r.RB = h.calc(`RB — ${T}`, `${nd}*${pb}*${g("LB")}`, "");
+      r.RC = h.calc(`RC — ${T}`, `${nd}*${pc}*${g("LC")}*${sens}`, "");
+      r.RM = h.calc(`RM — ${T}`, `${nm}*${pm}*${g("LM")}*${sens}`, "");
+      r.RU = h.calc(`RU — ${T}`, lineas.length ? `(${lineas.map((l, i) => `(${l.nl}+${l.nda})*${pl[i].pu}`).join("+")})*${g("LU")}` : "0", "");
+      r.RV = h.calc(`RV — ${T}`, lineas.length ? `(${lineas.map((l, i) => `(${l.nl}+${l.nda})*${pl[i].pv}`).join("+")})*${g("LV")}` : "0", "");
+      r.RW = h.calc(`RW — ${T}`, lineas.length ? `(${lineas.map((l, i) => `(${l.nl}+${l.nda})*${pl[i].pw}`).join("+")})*${g("LW")}*${sens}` : "0", "");
+      r.RZ = h.calc(`RZ — ${T}`, lineas.length ? `(${lineas.map((l, i) => `MAX(0,${l.ni}-${l.nl})*${pl[i].pz}`).join("+")})*${g("LZ")}*${sens}` : "0", "");
+      return r;
+    };
+    const c1 = comp("R1", L1);
+    const r1 = h.calc("R1 — pérdida de vidas humanas", `${c1.RA}+${c1.RB}+${c1.RU}+${c1.RV}+${sumaSistemas}*(${c1.RC}+${c1.RM}+${c1.RW}+${c1.RZ})`, "");
+    h.verif("R1 ≤ 1E-5 (riesgo tolerable)", `${r1}<=1E-5`, "NTC 4552-2 Tabla 7");
+    let r2 = null, r3 = null;
+    if (L2) { const c2 = comp("R2", L2); r2 = h.calc("R2 — pérdida de servicio público", `${c2.RB}+${c2.RV}+${c2.RC}+${c2.RM}+${c2.RW}+${c2.RZ}`, ""); h.verif("R2 ≤ 1E-3 (riesgo tolerable)", `${r2}<=1E-3`, "NTC 4552-2 Tabla 7"); }
+    if (L3) { const c3 = comp("R3", L3); r3 = h.calc("R3 — pérdida de patrimonio cultural", `${c3.RB}+${c3.RV}`, ""); h.verif("R3 ≤ 1E-3 (riesgo tolerable)", `${r3}<=1E-3`, "NTC 4552-2 Tabla 7"); }
+    const c4 = comp("R4", L4);
+    const r4 = h.calc("R4 — pérdida de valor económico", `${animales}*(${c4.RA}+${c4.RU})+${c4.RB}+${c4.RV}+${c4.RC}+${c4.RM}+${c4.RW}+${c4.RZ}`, "", "Se compara con el costo de la protección (NTC 4552-2, 5.6)");
+    const ct0 = n(e.valorEstructura, 0), cpm0 = n(e.costoProtAnual, 0);
+    const res = [{ t: "Riesgo R1 con las medidas adoptadas", f: r1, fmt: "0.00E+00", nota: "Tolerable: ≤ 1,00E-05" }];
+    if (r2) res.push({ t: "Riesgo R2 con las medidas adoptadas", f: r2, fmt: "0.00E+00", nota: "Tolerable: ≤ 1,00E-03" });
+    if (r3) res.push({ t: "Riesgo R3 con las medidas adoptadas", f: r3, fmt: "0.00E+00", nota: "Tolerable: ≤ 1,00E-03" });
+    res.push({ t: "Riesgo R4 (valor económico)", f: r4, fmt: "0.00E+00" });
+    res.push({ t: "Medidas de protección adoptadas", texto: true, valor: `${(N.PB_SIPRA[sipra] || N.PB_SIPRA.ninguno).nombre}; ${(N.PEB_DPS[dps] || N.PEB_DPS.ninguno).nombre}; ${(N.PTA_MEDIDAS[medidas] || N.PTA_MEDIDAS.ninguna).nombre}` });
+    h.resumen(res);
   },
   aislamiento(wb, e, r, p) {
     const h = new Hoja(wb, "d Aislamiento", "Coordinación de aislamiento y DPS (RETIE 2024 literal d; IEC 60071 / 60099-5)");

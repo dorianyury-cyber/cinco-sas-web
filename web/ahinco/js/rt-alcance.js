@@ -59,8 +59,8 @@ export const ALCANCE = {
     limitaciones: ["Con suelo de dos capas, las ecuaciones de la IEEE 80 se aplican con una resistividad uniforme equivalente (Anexo E), no con un cálculo de dos capas: frente a un programa de dos capas, la resistencia sale mayor (conservadora) pero la tensión de contacto puede salir menor cuando la capa superior es más resistiva (K < 0). Por eso se muestran como referencia Em y Es con ρ1 y Rg con ρ2; si el contraste de resistividades es grande, confirme con software de dos capas o multicapa.", "Malla rectangular con espaciamiento uniforme; formas en L o irregulares se aproximan por el rectángulo equivalente.", "El Sf calculado ignora los acoples mutuos entre conductores y supone líneas largas de vanos iguales (método de Endrenyi); el Sf de una subestación con aporte local de corriente de falla debe tomarse de un estudio detallado.", "Las tensiones transferidas se revisan comparando el GPR con la tensión de contacto tolerable; no se calcula el potencial en la superficie fuera del cerramiento ni en cercas separadas."]
   },
   rayos: {
-    metodo: "IEC 62305-2 / NTC 4552-2: componentes RA, RB, RU y RV del riesgo de pérdida de vidas humanas R1, con búsqueda de la combinación mínima de SIPRA y DPS.",
-    limitaciones: ["Solo R1. No calcula R2 (servicio público), R3 (patrimonio) ni R4 (pérdidas económicas), ni las componentes RC, RM, RW y RZ, necesarias en hospitales, estructuras con riesgo de explosión o redes de servicio público.", "Una sola zona y una sola línea de servicio por estructura."]
+    metodo: "NTC 4552-2 (IEC 62305-2:2006): número de eventos peligrosos ND, NM, NL, NI y NDa; probabilidades PA a PZ con las Tablas 14 a 25; pérdidas de las Tablas 26 a 32; los ocho componentes RA a RZ y los riesgos R1 (vidas humanas), R2 (servicio público), R3 (patrimonio cultural) y R4 (valor económico, con la conveniencia económica de 5.6). Busca la combinación mínima de SIPRA y DPS que lleva R1, R2 y R3 al tolerable y da los parámetros de diseño del SIPRA de la NTC 4552-3 (esfera rodante, malla, bajantes, electrodo l1 y distancia de separación) y los de la NTC 4552-1 (corrientes máxima y mínima y eficacia del nivel).",
+    limitaciones: ["Una sola zona por estructura (si hay zonas con características distintas, cree un cálculo por zona) y a lo sumo dos líneas de servicio: potencia y telecomunicaciones.", "No evalúa las acometidas de servicio como objeto de protección (R'1, R'2 y R'4) ni líneas de fibra óptica o tuberías metálicas, que la NTC 4552-2 deja en estudio.", "El método del ángulo de protección de la NTC 4552-3 (Figura 3) no se calcula: se usa la esfera rodante, que es la que fija la norma como método de referencia."]
   },
   armonicos: {
     metodo: "Espectro de corriente por grupo de carga (convertidores de 6 y 12 pulsos teóricos, fuentes conmutadas típicas o espectro medido), THDi y TDD frente a los límites de la IEEE 519-2014 según ISC/IL, distorsión de tensión estimada en el PCC, factor K (UL 1561) y capacidad del transformador con armónicos (IEEE C57.110), y corriente en el neutro por armónicos triples.",
@@ -135,7 +135,7 @@ export const VALIDACION = [
 export const LIMITACIONES_GENERALES = [
   "AHÍNCO es una herramienta de cálculo y de verificación. La responsabilidad del diseño es del ingeniero que firma la memoria, que debe revisar los datos de entrada y los resultados.",
   "Los métodos son los de cálculo manual de las normas citadas, adecuados para memorias de distribución y para verificación de interventoría. Para subestaciones de alta tensión, el estudio definitivo de cortocircuito, coordinación y transitorios debe hacerse con software especializado.",
-  "No incluye todavía flujo de carga, planos de construcción ni los riesgos por rayos R2 a R4 (servicio público, patrimonio cultural y pérdidas económicas): esos aspectos se desarrollan como texto.",
+  "No incluye todavía flujo de carga ni planos de construcción: esos aspectos se desarrollan como texto.",
   "Los datos marcados «(S)» son supuestos: quedan listados en la sección de hallazgos o pendientes y deben confirmarse antes de firmar.",
   "El historial de versiones guarda una copia de los datos, literales y cálculos de cada revisión; las versiones no se pueden modificar y solo el dueño del proyecto puede borrarlas (con el proyecto)."
 ];
@@ -146,6 +146,6 @@ export const MEJORAS = [
   ["Media", "Cálculo IEC 60287 / Neher-McGrath de cables de media tensión para bancos de ductos con otra resistividad del suelo, otra disposición o más circuitos que las tablas."],
   ["Media", "Coordinación con bandas de tolerancia de fusibles e interruptores de BT, reconectadores y protección diferencial; protección combinada de varios captadores en el apantallamiento."],
   ["Media", "Fotovoltaica: horas sol pico mensuales, simulación horaria con la curva de carga del usuario, varias orientaciones, sombras, módulos bifaciales y flujo de caja con los beneficios de la Ley 1715."],
-  ["Media", "Riesgo por rayos R2 a R4 con los componentes de sistemas internos (RC, RM, RW, RZ) de la NTC 4552-2 / IEC 62305-2."],
+  ["Media", "Riesgo por rayos con varias zonas por estructura y las acometidas de servicio como objeto de protección (R'1, R'2, R'4) de la NTC 4552-2."],
   ["Baja", "Flujo de carga; campos electromagnéticos en 3D para subestaciones con geometría compleja."]
 ];

@@ -229,18 +229,92 @@ export const RETIE_RESISTENCIA_SPT = {
 
 // ---------------------------------------------------------------- rayos (IEC 62305-2 / NTC 4552-2)
 
-export const PB_SIPRA = { ninguno: { nombre: "Sin SIPRA", v: 1 }, IV: { nombre: "SIPRA nivel IV", v: 0.2 }, III: { nombre: "SIPRA nivel III", v: 0.1 }, II: { nombre: "SIPRA nivel II", v: 0.05 }, I: { nombre: "SIPRA nivel I", v: 0.02 } };
-export const PEB_DPS = { ninguno: { nombre: "Sin DPS coordinados", v: 1 }, "III-IV": { nombre: "DPS nivel III-IV", v: 0.05 }, II: { nombre: "DPS nivel II", v: 0.02 }, I: { nombre: "DPS nivel I", v: 0.01 } };
-export const PTA_MEDIDAS = { ninguna: { nombre: "Sin medidas de protección", v: 1 }, avisos: { nombre: "Avisos de advertencia", v: 0.1 }, aislamiento: { nombre: "Aislamiento eléctrico de bajantes", v: 0.01 }, equipotencial: { nombre: "Equipotencialización efectiva del suelo", v: 0.01 }, barreras: { nombre: "Barreras físicas", v: 0 } };
-export const CD_UBICACION = { rodeada_altos: { nombre: "Rodeada de objetos más altos", v: 0.25 }, rodeada_iguales: { nombre: "Rodeada de objetos de igual o menor altura", v: 0.5 }, aislada: { nombre: "Aislada, sin objetos cercanos", v: 1 }, cima: { nombre: "Aislada en cima de colina", v: 2 } };
-export const RT_SUELO = { agricola: { nombre: "Agrícola o concreto", v: 1e-2 }, marmol: { nombre: "Mármol o cerámica", v: 1e-3 }, grava: { nombre: "Grava, alfombra o tapete", v: 1e-4 }, asfalto: { nombre: "Asfalto, linóleo o madera", v: 1e-5 } };
+// ---------------------------------------------------------------- riesgo por rayos (NTC 4552-1, -2 y -3)
+// Cada tabla es { clave: { nombre, v } } para poder armar las listas de la pantalla; v es el valor que usa el cálculo.
+
+// NTC 4552-2 Tabla 15: probabilidad de daño físico PB según el nivel de protección del SIPRA.
+export const PB_SIPRA = {
+  ninguno: { nombre: "Sin SIPRA", v: 1 }, IV: { nombre: "SIPRA nivel IV", v: 0.2 }, III: { nombre: "SIPRA nivel III", v: 0.1 },
+  II: { nombre: "SIPRA nivel II", v: 0.05 }, I: { nombre: "SIPRA nivel I", v: 0.02 },
+  I_concreto: { nombre: "SIPRA nivel I con el acero de refuerzo como bajantes", v: 0.01 },
+  I_metalico: { nombre: "Techo metálico o captación completa del techo, con el acero de refuerzo como bajantes", v: 0.001 }
+};
+// NTC 4552-2 Tabla 16: PDPS (sistema coordinado de DPS según el nivel de protección para el que se diseñó).
+export const PEB_DPS = {
+  ninguno: { nombre: "Sin sistema coordinado de DPS", v: 1 }, "III-IV": { nombre: "DPS nivel III-IV", v: 0.03 },
+  II: { nombre: "DPS nivel II", v: 0.02 }, I: { nombre: "DPS nivel I", v: 0.01 }
+};
+// NTC 4552-2 Tabla 14: PA según las medidas contra tensiones de paso y contacto (se multiplican si hay varias).
+export const PTA_MEDIDAS = {
+  ninguna: { nombre: "Sin medidas de protección", v: 1 }, avisos: { nombre: "Avisos de advertencia", v: 0.1 },
+  aislamiento: { nombre: "Aislamiento eléctrico de las bajantes expuestas (3 mm de polietileno)", v: 0.01 },
+  equipotencial: { nombre: "Equipotencialización efectiva del suelo", v: 0.01 },
+  avisos_aislamiento: { nombre: "Avisos y aislamiento de las bajantes", v: 0.001 },
+  avisos_equipotencial: { nombre: "Avisos y equipotencialización del suelo", v: 0.001 },
+  aislamiento_equipotencial: { nombre: "Aislamiento de las bajantes y equipotencialización del suelo", v: 0.0001 },
+  barreras: { nombre: "Restricciones físicas o bajantes naturales (acero de refuerzo)", v: 0 }
+};
+// NTC 4552-2 Tabla 10: factor de localización Cd.
+export const CD_UBICACION = { rodeada_altos: { nombre: "Rodeada de objetos o árboles más altos", v: 0.25 }, rodeada_iguales: { nombre: "Rodeada de objetos de igual o menor altura", v: 0.5 }, aislada: { nombre: "Aislada, sin objetos cercanos", v: 1 }, cima: { nombre: "Aislada en la cima de una colina", v: 2 } };
+// NTC 4552-2 Tabla 13: factor ambiental Ce.
+export const CE_AMBIENTE = { rural: { nombre: "Rural (1)", v: 1 }, suburbano: { nombre: "Suburbano, edificaciones de menos de 10 m (0,5)", v: 0.5 }, urbano: { nombre: "Urbano, edificaciones de 10 a 20 m (0,1)", v: 0.1 }, urbano_altos: { nombre: "Urbano con edificaciones de más de 20 m (0)", v: 0 } };
+// NTC 4552-2 Tabla 27: factores ra y ru según la superficie.
+export const RT_SUELO = { agricola: { nombre: "Agricultura o concreto", v: 1e-2 }, marmol: { nombre: "Mármol o cerámica", v: 1e-3 }, grava: { nombre: "Gravilla o tapete", v: 1e-4 }, asfalto: { nombre: "Asfalto, madera o linóleo", v: 1e-5 } };
+// NTC 4552-2 Tabla 29: factor rf según el riesgo de incendio.
 export const RF_INCENDIO = { explosion: { nombre: "Riesgo de explosión", v: 1 }, alto: { nombre: "Riesgo de incendio alto", v: 0.1 }, ordinario: { nombre: "Riesgo de incendio ordinario", v: 0.01 }, bajo: { nombre: "Riesgo de incendio bajo", v: 0.001 }, ninguno: { nombre: "Sin riesgo de incendio", v: 0 } };
-export const RP_PROVISIONES = { ninguna: { nombre: "Sin provisiones", v: 1 }, manual: { nombre: "Extintores o alarma manual", v: 0.5 }, automatica: { nombre: "Extinción o alarma automática", v: 0.2 } };
-export const HZ_PANICO = { ninguno: { nombre: "Sin peligro especial", v: 1 }, bajo: { nombre: "Pánico bajo (≤ 2 pisos, < 100 personas)", v: 2 }, medio: { nombre: "Pánico medio (100 a 1000 personas)", v: 5 }, evacuacion: { nombre: "Evacuación difícil", v: 5 }, alto: { nombre: "Pánico alto (> 1000 personas)", v: 10 } };
-export const LF_TIPO = { hospital: { nombre: "Hospital, hotel, escuela, edificio civil", v: 0.1 }, publico: { nombre: "Entretenimiento público, iglesia, museo", v: 0.05 }, industrial: { nombre: "Industrial o comercial", v: 0.02 }, otro: { nombre: "Otros", v: 0.01 } };
+// NTC 4552-2 Tabla 28: factor rp según las provisiones contra incendio.
+export const RP_PROVISIONES = { ninguna: { nombre: "Sin provisiones", v: 1 }, manual: { nombre: "Extintores, alarma manual, hidrantes, compartimientos o rutas de evacuación", v: 0.5 }, automatica: { nombre: "Extinción o alarma automática (protegida contra sobretensiones; bomberos en menos de 10 min)", v: 0.2 } };
+// NTC 4552-2 Tabla 30: factor hz.
+export const HZ_PANICO = { ninguno: { nombre: "Sin peligro especial", v: 1 }, bajo: { nombre: "Pánico bajo (dos pisos y hasta 100 personas)", v: 2 }, medio: { nombre: "Pánico medio (100 a 1000 personas)", v: 5 }, evacuacion: { nombre: "Evacuación difícil (personas inmovilizadas)", v: 5 }, alto: { nombre: "Pánico alto (más de 1000 personas)", v: 10 }, ambiente: { nombre: "Peligro para el ambiente que lo rodea", v: 20 }, contaminacion: { nombre: "Contaminación del ambiente", v: 50 } };
+// NTC 4552-2 Tabla 26: Lf típico para L1. «otro» no figura en la norma: se adopta el valor de industrial y comercial.
+export const LF_TIPO = { hospital: { nombre: "Hospitales, hoteles, edificios civiles", v: 0.1 }, industrial: { nombre: "Industrial, comercial, escuelas", v: 0.05 }, publico: { nombre: "Entretenimiento público, iglesias, museos", v: 0.002 }, otro: { nombre: "Otro (la norma no da valor: se adopta 5 × 10⁻²)", v: 0.05 } };
+// NTC 4552-2 Tabla 26: Lo típico para L1 (solo estructuras con riesgo de explosión u hospitales).
+export const CRITICIDAD = { ninguna: { nombre: "Ninguna (R1 sin sistemas internos)", v: 0 }, hospital: { nombre: "Hospital u otra estructura donde la falla de sistemas internos pone en peligro la vida", v: 1e-3 }, explosion: { nombre: "Estructura con riesgo de explosión", v: 1e-1 } };
+// NTC 4552-2 Tabla 31: pérdida de servicio público (L2), { Lf, Lo }.
+export const SERVICIO_PUBLICO = { ninguno: { nombre: "No presta servicio público", v: null }, gas_agua: { nombre: "Gas o acueducto (Lf 10⁻¹; Lo 10⁻²)", v: { lf: 1e-1, lo: 1e-2 } }, energia_tlc: { nombre: "TV, telecomunicaciones o suministro de potencia (Lf 10⁻²; Lo 10⁻³)", v: { lf: 1e-2, lo: 1e-3 } } };
+// NTC 4552-2 Tabla 32: pérdida económica (L4), { Lf, Lo }.
+export const TIPO_ECONOMICO = {
+  hospital: { nombre: "Hospital", v: { lf: 0.5, lo: 1e-2 } }, industria: { nombre: "Industria", v: { lf: 0.5, lo: 1e-2 } },
+  museo_agro: { nombre: "Museo o uso agrícola", v: { lf: 0.5, lo: 1e-3 } }, hotel_oficina: { nombre: "Hotel, oficinas o banco", v: { lf: 0.2, lo: 1e-2 } },
+  escuela_comercial: { nombre: "Escuela, iglesia o centro comercial", v: { lf: 0.2, lo: 1e-3 } }, otro: { nombre: "Otros", v: { lf: 0.1, lo: 1e-4 } }
+};
+// NTC 4552-2 Tabla 17: KS3 según el cableado interno.
+export const KS3_CABLEADO = {
+  sinPantalla_lazos: { nombre: "Sin pantalla, sin precaución para evitar lazos", v: 1 }, sinPantalla_grandes: { nombre: "Sin pantalla, evitando grandes lazos", v: 0.2 },
+  sinPantalla_lazos_pequenos: { nombre: "Sin pantalla, evitando lazos (mismo cable)", v: 0.02 }, pantalla_20: { nombre: "Cable apantallado, 5 < Rs ≤ 20 Ω/km", v: 0.001 },
+  pantalla_5: { nombre: "Cable apantallado, 1 < Rs ≤ 5 Ω/km", v: 0.0002 }, pantalla_1: { nombre: "Cable apantallado, Rs ≤ 1 Ω/km", v: 0.0001 }
+};
+// NTC 4552-2 Tabla 18: PMS en función de KMS ([KMS, PMS]; se toma el escalón de KMS inmediatamente superior).
+export const PMS_TABLA = [[0.0130, 0.0001], [0.014, 0.001], [0.015, 0.003], [0.016, 0.005], [0.021, 0.01], [0.035, 0.1], [0.07, 0.5], [0.15, 0.9], [0.4, 1]];
+// Tensión soportable al impulso Uw del equipo (kV) y resistencia de la pantalla de la línea.
+export const UW_EQUIPO = { "1.5": { nombre: "1,5 kV (electrónico)", v: 1.5 }, "2.5": { nombre: "2,5 kV (aparato eléctrico de usuario)", v: 2.5 }, "4": { nombre: "4 kV", v: 4 }, "6": { nombre: "6 kV (aparato eléctrico de red)", v: 6 } };
+export const PANTALLA_LINEA = { ninguna: { nombre: "Sin pantalla", v: "ninguna" }, "20": { nombre: "Apantallada, 5 < Rs ≤ 20 Ω/km", v: "20" }, "5": { nombre: "Apantallada, 1 < Rs ≤ 5 Ω/km", v: "5" }, "1": { nombre: "Apantallada, Rs ≤ 1 Ω/km", v: "1" } };
+// NTC 4552-2 Tabla 19 (PLD, descargas sobre la línea) por Uw: [sin pantalla, 5<Rs≤20, 1<Rs≤5, Rs≤1].
+export const PLD_TABLA = { "1.5": [1, 1, 0.8, 0.4], "2.5": [1, 0.95, 0.6, 0.2], "4": [1, 0.9, 0.3, 0.04], "6": [1, 0.8, 0.1, 0.02] };
+// NTC 4552-2 Tabla 20 (PL1, descargas cercanas a la línea) por Uw: [sin pantalla, 5<Rs≤20, 1<Rs≤5, Rs≤1].
+// La norma impresa trae 1 y 0,2 para 6 kV en «sin pantalla» y «5 < Rs ≤ 20», que rompen la secuencia decreciente
+// (erratas); se usan 0,1 y 0,02 de la IEC 62305-2.
+export const PLI_TABLA = { "1.5": [1, 0.15, 0.04, 0.02], "2.5": [0.4, 0.06, 0.02, 0.008], "4": [0.2, 0.03, 0.008, 0.004], "6": [0.1, 0.02, 0.004, 0.002] };
 export const RIESGO_TOLERABLE_R1 = 1e-5;
-// Radio de la esfera rodante (m) y tamaño de malla (m) por nivel de protección.
-export const NIVELES_SIPRA = { I: { esfera: 20, malla: "5 × 5" }, II: { esfera: 30, malla: "10 × 10" }, III: { esfera: 45, malla: "15 × 15" }, IV: { esfera: 60, malla: "20 × 20" } };
+// NTC 4552-2 Tabla 7: riesgo tolerable RT (1/año).
+export const RIESGO_TOLERABLE = { R1: 1e-5, R2: 1e-3, R3: 1e-3 };
+// NTC 4552-1 Tablas 3 a 5 y NTC 4552-3 Tablas 2, 3 y 6 (clase del SIPRA = nivel de protección).
+export const NIVELES_SIPRA = {
+  I: { esfera: 20, malla: "5 × 5", mallaM: 5, iMax: 200, iMin: 3, prob: 0.99, bajantes: 10, ki: 0.08 },
+  II: { esfera: 30, malla: "10 × 10", mallaM: 10, iMax: 150, iMin: 5, prob: 0.97, bajantes: 10, ki: 0.06 },
+  III: { esfera: 45, malla: "15 × 15", mallaM: 15, iMax: 100, iMin: 10, prob: 0.91, bajantes: 15, ki: 0.04 },
+  IV: { esfera: 60, malla: "20 × 20", mallaM: 20, iMax: 100, iMin: 16, prob: 0.84, bajantes: 20, ki: 0.04 }
+};
+// NTC 4552-3 Figura 6: longitud mínima l1 (m) de cada electrodo según la resistividad del suelo ρ (Ω·m).
+export const L1_ELECTRODO = (nivel, rho) => {
+  const r = Math.min(3000, Math.max(0, rho));
+  if (nivel === "I") return r <= 500 ? 5 : 5 + 0.03 * (r - 500);
+  if (nivel === "II") return r <= 800 ? 5 : 5 + (45 / 2200) * (r - 800);
+  return 5;
+};
+// NTC 4552-3 Tabla 13: km. Tabla 5: sección mínima del captador y de las bajantes en cobre (mm²).
+export const KM_AISLAMIENTO = { aire: { nombre: "Aire", v: 1 }, concreto: { nombre: "Concreto", v: 0.5 } };
+export const SECCION_MIN_CAPTACION_CU = 50;
 
 // ---------------------------------------------------------------- aislamiento (IEC 60071-1)
 
