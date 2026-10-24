@@ -2532,3 +2532,6 @@ body.app-control .ctl-main #contratoCliente { margin-top: 5px; font-size: 12.5px
 .control-tabla-carta-grid textarea { width: 100%; min-width: 96px; box-sizing: border-box; padding: 3px 5px; line-height: 1.25; height: 62px; border: 1px solid var(--border); border-radius: 6px; background: var(--card-bg); color: var(--text); font: inherit; font-size: 12px; resize: vertical; }
 .control-tabla-carta-grid td.encabezado textarea { background: #1f2732; color: #fff; font-weight: 700; text-align: center; }
 .control-tabla-carta .control-btn-danger { padding: 2px 8px; font-size: 11px; }
+
+.control-firma-img { display: flex; align-items: center; gap: 10px; flex-wrap: wrap; }
+.control-firma-img img { height: 56px; background: #fff; border: 1px solid var(--border); border-radius: 6px; padding: 2px; }

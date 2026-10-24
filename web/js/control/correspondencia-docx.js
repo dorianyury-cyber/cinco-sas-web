@@ -9,7 +9,9 @@ import { parsearHtmlARuns } from "./texto-rico.js";
 
 const NAVY_HEX = "1F2732";
 const MUTED_HEX = "5C6570";
+import { firmaGuardada } from "./firma-local.js";
 const LOGO_URL = "../assets/img/logo.png";
+
 // Código y versión del formato en blanco, tal como quedó registrado en el
 // Listado Maestro de Documentos (documentos.html, área AC — Actividades) —
 // mismo criterio que en correspondencia-pdf.js, actualizar los dos si
@@ -248,8 +250,17 @@ export async function generarCartaDocxBlob(datos) {
 
   // ---- cierre y firma ----
   cuerpo.push(new Paragraph({ children: [new TextRun({ text: "Cordialmente,", size: 21 })] }));
-  cuerpo.push(new Paragraph({ text: "" }));
-  cuerpo.push(new Paragraph({ text: "" }));
+  const urlF = firmaGuardada();
+  let firmaPuesta = false;
+  if (urlF) {
+    try {
+      const f = await cargarImagenParaDocx(urlF, "#ffffff", "image/png", "png");
+      const altoPx = Math.round(19 * PX_POR_MM), anchoPx = Math.round(altoPx * (f.ancho / f.alto));
+      cuerpo.push(new Paragraph({ children: [new ImageRun({ data: f.buffer, transformation: { width: anchoPx, height: altoPx }, type: "png" })] }));
+      firmaPuesta = true;
+    } catch (e) { /* sin imagen: queda el espacio para firmar a mano */ }
+  }
+  if (!firmaPuesta) { cuerpo.push(new Paragraph({ text: "" })); cuerpo.push(new Paragraph({ text: "" })); }
   cuerpo.push(new Paragraph({ children: [new TextRun({ text: datos.firmaNombre || "", bold: true, size: 21 })] }));
   if (datos.firmaCargo) cuerpo.push(new Paragraph({ children: [new TextRun({ text: datos.firmaCargo, size: 19 })] }));
   cuerpo.push(new Paragraph({ children: [new TextRun({ text: "Cinco S.A.S.", size: 19 })] }));

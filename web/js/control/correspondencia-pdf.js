@@ -13,7 +13,9 @@ const NAVY_HEX = "#1f2732";
 const AMBER = [254, 178, 9];
 const TEXT_MUTED = [92, 101, 112];
 const GRIS_CLARO = [245, 246, 248];
+import { firmaGuardada } from "./firma-local.js";
 const LOGO_URL = "../assets/img/logo.png";
+
 
 // Código y versión del formato en blanco (la plantilla), tal como quedó
 // registrado en el Listado Maestro de Documentos (documentos.html, área
@@ -314,6 +316,14 @@ export async function generarCartaPDF(datos) {
   doc.setFontSize(10.5);
   doc.setTextColor(20, 22, 26);
   doc.text("Cordialmente,", margenX, y);
+  const urlF = firmaGuardada();
+  if (urlF) {
+    try {
+      const f = await cargarImagenComoDataURL(urlF, "#ffffff", "PNG");
+      const alto = 19, ancho = alto * (f.ancho / f.alto);
+      doc.addImage(f.dataUrl, "PNG", margenX, y + 1.5, ancho, alto);
+    } catch (e) { /* sin imagen: queda el espacio para firmar a mano */ }
+  }
   y += 22;
   doc.setFont("helvetica", "bold");
   doc.text(datos.firmaNombre || "", margenX, y);

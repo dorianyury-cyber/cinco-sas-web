@@ -78,6 +78,14 @@
           <label for="firmaCargo">Cargo de quien firma</label>
           <input type="text" id="firmaCargo" maxlength="120">
 
+          <label for="firmaArchivo">Firma digitalizada (opcional)</label>
+          <div class="control-firma-img">
+            <img id="firmaVista" alt="Firma" hidden>
+            <input type="file" id="firmaArchivo" accept="image/*">
+            <button type="button" class="control-btn-mini" id="firmaQuitarBtn" hidden>Quitar firma</button>
+          </div>
+          <p class="text-muted control-informes-ayuda" id="firmaAyuda">Busca la imagen de tu firma o pégala con Ctrl+V sobre esta página. Queda guardada solo en este navegador (no se sube a la plataforma) y se usa en el PDF y el Word de todas las cartas.</p>
+
           <label class="control-check-inline">
             <input type="checkbox" id="parteSGI">
             Hace parte del Sistema de Gestión Integrado (queda también en el Listado Maestro de Documentos)

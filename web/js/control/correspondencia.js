@@ -5,6 +5,7 @@ import {
 import { ref, uploadBytes, getDownloadURL } from "https://www.gstatic.com/firebasejs/10.7.1/firebase-storage.js";
 import { auth, db, storage, requireAuth, obtenerPerfil } from "./firebase-control.js";
 import { generarCartaPDF } from "./correspondencia-pdf.js";
+import { firmaGuardada, guardarFirma, procesarArchivoFirma } from "./firma-local.js";
 import { descargarCartaDocx } from "./correspondencia-docx.js";
 import { truncar } from "./texto.js";
 import { registrarDocumentoSGC } from "./documentos-sgc.js";
@@ -262,6 +263,34 @@ document.getElementById("agregarTextoBtn").addEventListener("click", () => {
 });
 
 document.getElementById("agregarImagenBtn").addEventListener("click", () => inputImagen.click());
+// ---- Firma digitalizada (la busca el usuario o la pega; queda solo en este navegador) ----
+const firmaVista = document.getElementById("firmaVista");
+const firmaQuitarBtn = document.getElementById("firmaQuitarBtn");
+function pintarFirma() {
+  const f = firmaGuardada();
+  firmaVista.hidden = !f;
+  firmaQuitarBtn.hidden = !f;
+  if (f) firmaVista.src = f;
+}
+async function tomarFirma(archivo) {
+  if (!archivo || !archivo.type.startsWith("image/")) return;
+  try {
+    const url = await procesarArchivoFirma(archivo);
+    if (!guardarFirma(url)) mostrarAlerta("Este navegador no permite guardar la firma (modo privado o sin espacio).", "error");
+    else mostrarAlerta("Firma cargada: saldrá en el PDF y el Word de las cartas. Pulsa «Visualizar» para verla.", "ok");
+  } catch (e) {
+    mostrarAlerta("No se pudo leer esa imagen.", "error");
+  }
+  pintarFirma();
+}
+document.getElementById("firmaArchivo").addEventListener("change", (e) => { const a = e.target.files[0]; e.target.value = ""; tomarFirma(a); });
+firmaQuitarBtn.addEventListener("click", () => { guardarFirma(null); pintarFirma(); });
+document.addEventListener("paste", (e) => {
+  const item = [...(e.clipboardData?.items || [])].find((i) => i.type.startsWith("image/"));
+  if (item && !/^(INPUT|TEXTAREA)$/.test(document.activeElement?.tagName || "") && !document.activeElement?.isContentEditable) tomarFirma(item.getAsFile());
+});
+pintarFirma();
+
 document.getElementById("agregarTablaBtn").addEventListener("click", () => { bloques.push(nuevaTabla()); renderBloques(); });
 
 // ---- Importar una carta ya elaborada (JSON) ----
