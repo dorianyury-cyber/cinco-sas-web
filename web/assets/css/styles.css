@@ -2537,6 +2537,14 @@ body.app-control .ctl-main #contratoCliente { margin-top: 5px; font-size: 12.5px
 .control-firma-img img { height: 56px; background: #fff; border: 1px solid var(--border); border-radius: 6px; padding: 2px; }
 
 /* ---- Correspondencia: tipo de carta y marca de la firma en un documento propio ---- */
-.control-modo-carta { display: flex; flex-direction: column; gap: 4px; margin-bottom: 10px; padding: 10px 12px; border: 1px solid var(--border); border-radius: 8px; }
+/* Selector segmentado en una línea (mismo lenguaje que .ctl-chip: activo en ámbar). */
+.control-modo-fila { display: flex; align-items: center; flex-wrap: wrap; gap: 6px 12px; margin-bottom: 12px; }
+.control-modo-carta { display: inline-flex; padding: 3px; gap: 3px; border: 1px solid var(--border); border-radius: 999px; background: var(--card-bg); }
+.pqr-form .control-modo-carta label { display: inline-flex; align-items: center; margin: 0; padding: 6px 16px; border-radius: 999px; font-size: 13px; font-weight: 600; line-height: 1.3; color: var(--text); cursor: pointer; transition: background 0.15s, color 0.15s; }
+.pqr-form .control-modo-carta label:hover { color: var(--cinco-amber-dark); }
+.control-modo-carta input { position: absolute; opacity: 0; width: 1px; height: 1px; pointer-events: none; }
+.pqr-form .control-modo-carta label:has(input:checked) { background: var(--cinco-amber); color: #1b1b1b; box-shadow: 0 1px 3px rgba(0, 0, 0, 0.18); }
+.control-modo-carta label:has(input:focus-visible) { outline: 2px solid var(--cinco-amber-dark); outline-offset: 1px; }
+.control-modo-ayuda { font-size: 12px; }
 .control-bloque-firma { display: flex; align-items: center; gap: 12px; padding: 8px 10px; border: 1px dashed var(--border); border-radius: 6px; font-size: 12.5px; color: var(--text-muted, #5c6570); }
 .control-bloque-firma img { height: 44px; background: #fff; border-radius: 4px; }

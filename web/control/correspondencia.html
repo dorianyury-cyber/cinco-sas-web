@@ -46,9 +46,12 @@
       <details class="card control-nuevo" id="nuevaCartaDetails">
         <summary>+ Nueva carta</summary>
         <form class="pqr-form" id="nuevaCartaForm">
-          <div class="control-modo-carta">
-            <label class="control-check-inline"><input type="radio" name="modoCarta" value="carta" checked> Carta con el formato de Cinco (destinatario, asunto y cuerpo)</label>
-            <label class="control-check-inline"><input type="radio" name="modoCarta" value="documento"> Documento propio en Word, tal cual (solo se le pone el membrete, el radicado y la firma digital)</label>
+          <div class="control-modo-fila">
+            <div class="control-modo-carta" role="radiogroup" aria-label="Tipo de carta">
+              <label title="Destinatario, asunto, cuerpo y firma de cierre"><input type="radio" name="modoCarta" value="carta" checked><span>Carta con formato Cinco</span></label>
+              <label title="El Word tal cual: solo se le pone el membrete, el radicado y la firma digital"><input type="radio" name="modoCarta" value="documento"><span>Documento propio (Word)</span></label>
+            </div>
+            <span class="text-muted control-modo-ayuda" id="modoAyuda">Destinatario, asunto, cuerpo y firma de cierre.</span>
           </div>
 
           <div id="documentoPropioBox" class="oculto">

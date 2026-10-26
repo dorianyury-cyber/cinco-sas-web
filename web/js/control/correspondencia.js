@@ -223,6 +223,9 @@ function aplicarModo() {
   document.getElementById("firmaNombre").required = !esDocumento;
   document.getElementById("asuntoLabel").textContent = esDocumento ? "Nombre en el listado (se toma del título del documento)" : "Asunto";
   document.getElementById("cuerpoLabel").textContent = esDocumento ? "Contenido del documento" : "Cuerpo de la carta";
+  document.getElementById("modoAyuda").textContent = esDocumento
+    ? "Tu Word tal cual, con el membrete, el radicado y la firma digital."
+    : "Destinatario, asunto, cuerpo y firma de cierre.";
   renderBloques();
 }
 form.querySelectorAll('input[name="modoCarta"]').forEach((r) => r.addEventListener("change", aplicarModo));
