@@ -98,6 +98,12 @@
             <input type="file" id="firmaArchivo" accept="image/*">
             <button type="button" class="control-btn-mini" id="firmaQuitarBtn" hidden>Quitar firma</button>
           </div>
+          <div class="control-firma-ajustes oculto" id="firmaAjustes">
+            <label for="firmaAlto">Tamaño</label>
+            <input type="range" id="firmaAlto" min="12" max="45" step="1">
+            <span id="firmaAltoTexto" class="text-muted">19 mm</span>
+            <label class="control-check-inline"><input type="checkbox" id="firmaSobreLinea"> Montar la firma sobre la línea</label>
+          </div>
           <p class="text-muted control-informes-ayuda" id="firmaAyuda">Busca la imagen de tu firma o pégala con Ctrl+V sobre esta página. Queda guardada solo en este navegador (no se sube a la plataforma) y se usa en el PDF y el Word de todas las cartas.</p>
 
           <label class="control-check-inline">

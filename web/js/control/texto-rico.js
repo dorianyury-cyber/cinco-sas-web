@@ -96,6 +96,11 @@ export function crearCampoTextoRico({ valor, placeholder, onInput }) {
   editable.contentEditable = "true";
   editable.dataset.placeholder = placeholder || "";
   editable.innerHTML = htmlParaCampoRico(valor);
+  // Textos guardados con text-align en línea (que la CSP no deja ver): se pasan a la clase equivalente.
+  editable.querySelectorAll("[style]").forEach((el) => {
+    const a = alineacionDeNodo(el);
+    if (a && a !== "left") el.classList.add(`rt-al-${a}`);
+  });
 
   editable.addEventListener("input", () => onInput?.(editable.innerHTML));
 
@@ -135,11 +140,12 @@ export function crearCampoTextoRico({ valor, placeholder, onInput }) {
   // donde está el cursor ahora mismo — mismo criterio visual que Word/
   // Excel, para saber de un vistazo cómo quedó el párrafo actual.
   function actualizarEstadoBotones() {
-    botonesAlineacion.forEach((btn) => {
-      let activo = false;
-      try { activo = document.queryCommandState(btn.dataset.align); } catch (e) { activo = false; }
-      btn.classList.toggle("activo", activo);
-    });
+    const sel = window.getSelection();
+    let nodo = sel && sel.rangeCount ? sel.getRangeAt(0).startContainer : null;
+    while (nodo && nodo.parentNode !== editable) nodo = nodo.parentNode;
+    const actual = nodo && nodo.nodeType === Node.ELEMENT_NODE ? alineacionDeNodo(nodo) || "left" : "left";
+    const CMD = { left: "justifyLeft", center: "justifyCenter", right: "justifyRight", justify: "justifyFull" };
+    botonesAlineacion.forEach((btn) => btn.classList.toggle("activo", btn.dataset.align === CMD[actual]));
   }
 
   toolbar.addEventListener("mousedown", (e) => {
@@ -150,10 +156,49 @@ export function crearCampoTextoRico({ valor, placeholder, onInput }) {
     if (!btn) return;
     if (btn === btnTabulador) { sangrar(false); return; }
     editable.focus();
-    document.execCommand(btn.dataset.cmd || btn.dataset.align, false, null);
+    if (btn.dataset.align) alinear(btn.dataset.align);
+    else document.execCommand(btn.dataset.cmd, false, null);
     onInput?.(editable.innerHTML);
     actualizarEstadoBotones();
   });
+
+  // Alineación con clases (rt-al-*), no con execCommand("justify..."): ese deja style="text-align:..." y la
+  // política de seguridad del sitio (style-src 'self') bloquea los estilos en línea, así que en producción
+  // el centrado no se veía ni llegaba al PDF/Word.
+  function lineasSeleccionadas() {
+    // El texto suelto al nivel raíz (la primera línea que se teclea no va dentro de un <div>) se envuelve
+    // en un <div> para poder alinearlo por separado del resto.
+    let suelto = [];
+    const envolver = () => {
+      if (!suelto.length) return;
+      const div = document.createElement("div");
+      suelto[0].before(div);
+      suelto.forEach((n) => div.appendChild(n));
+      suelto = [];
+    };
+    Array.from(editable.childNodes).forEach((n) => {
+      const esBloque = n.nodeType === Node.ELEMENT_NODE && /^(DIV|P|UL|OL|H\d|BLOCKQUOTE)$/.test(n.tagName);
+      if (esBloque) { envolver(); return; }
+      suelto.push(n);
+      if (n.nodeType === Node.ELEMENT_NODE && n.tagName === "BR") envolver();
+    });
+    envolver();
+    const sel = window.getSelection();
+    const rango = sel && sel.rangeCount && editable.contains(sel.getRangeAt(0).commonAncestorContainer) ? sel.getRangeAt(0) : null;
+    const bloques = Array.from(editable.children);
+    if (!rango) return bloques.slice(-1);
+    const elegidos = bloques.filter((b) => rango.intersectsNode(b));
+    return elegidos.length ? elegidos : bloques.slice(-1);
+  }
+  function alinear(cmd) {
+    const clase = { justifyCenter: "rt-al-center", justifyRight: "rt-al-right", justifyFull: "rt-al-justify" }[cmd];
+    lineasSeleccionadas().forEach((b) => {
+      b.classList.remove("rt-al-center", "rt-al-right", "rt-al-justify");
+      b.removeAttribute("style");
+      if (clase) b.classList.add(clase);
+      if (!b.className) b.removeAttribute("class");
+    });
+  }
   inputColor.addEventListener("input", () => {
     editable.focus();
     if (ultimaSeleccion) {
@@ -218,17 +263,18 @@ export function parsearHtmlARuns(html) {
     // navegador lo deja como <font color="#rrggbb"> — un atributo HTML, no un
     // estilo — que nodo.style.color no ve. Sin este segundo intento, ese
     // color se perdía en silencio y el texto salía con el color por defecto.
-    const colorCss = (nodo.style && nodo.style.color) || nodo.getAttribute?.("color");
+    // También se lee el atributo style como texto: con la política de seguridad del sitio (style-src 'self')
+    // el navegador no aplica los estilos en línea y nodo.style queda vacío, aunque el atributo siga ahí.
+    const colorCss = (nodo.style && nodo.style.color) || nodo.getAttribute?.("color") ||
+      (/(?:^|;)\s*color\s*:\s*([^;]+)/i.exec(nodo.getAttribute?.("style") || "") || [])[1];
     if (colorCss) {
       const color = rgbDesdeCss(colorCss);
       if (color) nuevoEstilo.color = color;
     }
-    // Igual que el color: execCommand("justify...") deja el text-align en
-    // el bloque (DIV/P) donde estaba el cursor — se hereda hacia los runs
-    // de adentro (incluidos los <br> de esa misma línea/párrafo) vía
-    // estilo, el mismo mecanismo que ya usan negrita/cursiva/color.
-    const alineacionCss = nodo.style && nodo.style.textAlign;
-    if (alineacionCss) nuevoEstilo.alineacion = alineacionCss;
+    // La alineación del bloque (DIV/P) se hereda hacia los runs de adentro (incluidos los <br> de esa misma
+    // línea/párrafo) vía estilo, el mismo mecanismo que ya usan negrita/cursiva/color.
+    const alineacion = alineacionDeNodo(nodo);
+    if (alineacion) nuevoEstilo.alineacion = alineacion;
 
     nodo.childNodes.forEach((hijo) => caminar(hijo, nuevoEstilo, nivel));
     // Si el último hijo ya era un <br> (ej. "<div><br></div>", una línea en
@@ -276,6 +322,17 @@ export function parsearHtmlARuns(html) {
   // único ajuste ya está hecho arriba (evitar contar doble una misma línea
   // en blanco).
   return runs;
+}
+
+// Alineación de un bloque: la clase rt-al-* que pone la barra (ver alinear() en crearCampoTextoRico) o, en
+// textos guardados antes de eso, el text-align en línea (leído del atributo, que sigue ahí aunque la CSP no
+// lo aplique).
+export function alineacionDeNodo(nodo) {
+  const clase = /\brt-al-(center|right|justify)\b/.exec(nodo.className || "");
+  if (clase) return clase[1];
+  const enLinea = (nodo.style && nodo.style.textAlign) || (/text-align\s*:\s*([a-z]+)/i.exec(nodo.getAttribute?.("style") || "") || [])[1];
+  if (!enLinea) return "";
+  return { start: "left", end: "right" }[enLinea] || enLinea;
 }
 
 // "rgb(31, 39, 50)" o "#1f2732" → [31, 39, 50]. Los navegadores normalizan

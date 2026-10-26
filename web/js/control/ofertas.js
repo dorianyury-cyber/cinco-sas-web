@@ -127,7 +127,7 @@ function bloquesPorDefecto() {
     { tipo: "parrafo", texto: `Atendemos el ciclo completo de un proyecto eléctrico desde un solo aliado, con ${LINEAS_SERVICIO.length} líneas de servicio especializadas: ${listarConY(LINEAS_SERVICIO.map((l) => l.nombre.toLowerCase()))}.` },
     { tipo: "titulo1", texto: "3. Por qué elegir a Cinco S.A.S." },
     { tipo: "parrafo", texto: "Nuestra trayectoria nos permite acompañar a nuestros clientes con seriedad y respaldo técnico real, no solo con una propuesta económica. Contamos con procesos documentados, personal calificado en cada línea de servicio, y un compromiso directo de la gerencia con la calidad y los tiempos de entrega de cada proyecto." },
-    { tipo: "parrafo", texto: "Conoce más sobre nuestra trayectoria, los proyectos que hemos ejecutado y los clientes que ya confían en nosotros en cinco-sas.web.app." },
+    { tipo: "parrafo", texto: "Conoce más sobre nuestra trayectoria, los proyectos que hemos ejecutado y los clientes que ya confían en nosotros en cincosas.com.co." },
     { tipo: "titulo1", texto: "4. Alcance del servicio ofertado" },
     { tipo: "parrafo", texto: "Describe aquí el alcance específico de esta oferta: actividades incluidas, entregables, cronograma estimado y cualquier condición técnica particular." },
     { tipo: "titulo1", texto: "5. Valor de la oferta" },

@@ -5,7 +5,7 @@ import {
 import { ref, uploadBytes, getDownloadURL } from "https://www.gstatic.com/firebasejs/10.7.1/firebase-storage.js";
 import { auth, db, storage, requireAuth, obtenerPerfil } from "./firebase-control.js";
 import { generarCartaPDF } from "./correspondencia-pdf.js";
-import { firmaGuardada, guardarFirma, procesarArchivoFirma } from "./firma-local.js";
+import { firmaGuardada, guardarFirma, procesarArchivoFirma, ajustesFirma, guardarAjustesFirma } from "./firma-local.js";
 import { docxABloques } from "./docx-a-bloques.js";
 import { descargarCartaDocx } from "./correspondencia-docx.js";
 import { truncar } from "./texto.js";
@@ -338,8 +338,21 @@ function pintarFirma() {
   firmaVista.hidden = !f;
   firmaQuitarBtn.hidden = !f;
   if (f) firmaVista.src = f;
+  document.getElementById("firmaAjustes").classList.toggle("oculto", !f);
+  const { alto, sobreLinea } = ajustesFirma();
+  document.getElementById("firmaAlto").value = alto;
+  document.getElementById("firmaAltoTexto").textContent = `${alto} mm`;
+  document.getElementById("firmaSobreLinea").checked = sobreLinea;
   if (bloques.some((b) => b.tipo === "firma")) renderBloques();
 }
+// Tamaño y montaje de la firma: se guardan con ella (en este navegador) y se ven al «Visualizar».
+function guardarAjustesDeFormulario() {
+  const alto = Number(document.getElementById("firmaAlto").value);
+  guardarAjustesFirma({ alto, sobreLinea: document.getElementById("firmaSobreLinea").checked });
+  document.getElementById("firmaAltoTexto").textContent = `${alto} mm`;
+}
+document.getElementById("firmaAlto").addEventListener("input", guardarAjustesDeFormulario);
+document.getElementById("firmaSobreLinea").addEventListener("change", guardarAjustesDeFormulario);
 async function tomarFirma(archivo) {
   if (!archivo || !archivo.type.startsWith("image/")) return;
   try {

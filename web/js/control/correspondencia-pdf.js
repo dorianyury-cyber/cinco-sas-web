@@ -13,7 +13,7 @@ const NAVY_HEX = "#1f2732";
 const AMBER = [254, 178, 9];
 const TEXT_MUTED = [92, 101, 112];
 const GRIS_CLARO = [245, 246, 248];
-import { firmaGuardada } from "./firma-local.js";
+import { firmaGuardada, ajustesFirma, FIRMA_SOLAPE } from "./firma-local.js";
 const LOGO_URL = "../assets/img/logo.png";
 
 
@@ -47,8 +47,10 @@ function cargarImagenComoDataURL(url, colorFondo = "#ffffff", formato = "PNG") {
       canvas.width = img.naturalWidth;
       canvas.height = img.naturalHeight;
       const ctx = canvas.getContext("2d");
-      ctx.fillStyle = colorFondo;
-      ctx.fillRect(0, 0, canvas.width, canvas.height);
+      if (colorFondo) { // sin color de fondo (la firma) se conserva la transparencia
+        ctx.fillStyle = colorFondo;
+        ctx.fillRect(0, 0, canvas.width, canvas.height);
+      }
       ctx.drawImage(img, 0, 0);
       const dataUrl = formato === "JPEG" ? canvas.toDataURL("image/jpeg", 0.82) : canvas.toDataURL("image/png");
       resolve({ dataUrl, ancho: img.naturalWidth, alto: img.naturalHeight });
@@ -176,23 +178,24 @@ export async function generarCartaPDF(datos) {
   for (const bloque of bloques) {
     if (bloque.tipo === "firma") {
       // Firma digital (si quien genera la carta cargó la suya en este navegador) sobre la línea de firma.
-      const altoF = 19;
+      const { alto: altoF, sobreLinea } = ajustesFirma();
+      // Montada sobre la línea: la línea «____» que sigue se escribe encima de la parte baja de la firma.
+      const avance = sobreLinea ? altoF * (1 - FIRMA_SOLAPE) : altoF + 1;
       // La firma no se separa de su línea «____» ni del nombre que siguen: si no caben juntos, pasan juntos.
       const siguiente = bloques[bloques.indexOf(bloque) + 1];
       const lineasSiguiente = siguiente?.tipo === "texto" ? Math.min(4, parsearHtmlARuns(siguiente.texto).filter((r) => r.salto).length || 1) : 0;
-      if (y + altoF + 1 + lineasSiguiente * 7.2 > limiteInferior) { doc.addPage(); y = 20; }
+      if (y + avance + lineasSiguiente * 7.2 > limiteInferior) { doc.addPage(); y = 20; }
       const urlFirmaBloque = firmaGuardada();
       if (urlFirmaBloque) {
         try {
-          const f = await cargarImagenComoDataURL(urlFirmaBloque, "#ffffff", "PNG");
-          const anchoF = altoF * (f.ancho / f.alto);
+          const f = await cargarImagenComoDataURL(urlFirmaBloque, null, "PNG");
+          const anchoF = Math.min(anchoUtil, altoF * (f.ancho / f.alto));
           // Centrada si el documento centra la línea de firma que sigue; si no, al margen izquierdo.
-          const sig = bloques[bloques.indexOf(bloque) + 1];
-          const centrada = sig && sig.tipo === "texto" && /text-align:\s*center/.test(sig.texto || "");
+          const centrada = siguiente?.tipo === "texto" && /rt-al-center|text-align:\s*center/.test(siguiente.texto || "");
           doc.addImage(f.dataUrl, "PNG", centrada ? (anchoPagina - anchoF) / 2 : margenX, y, anchoF, altoF);
         } catch (e) { /* sin imagen: queda el espacio para firmar a mano */ }
       }
-      y += altoF + 1;
+      y += avance;
       continue;
     }
     if (bloque.tipo === "imagen") {
@@ -358,14 +361,16 @@ export async function generarCartaPDF(datos) {
   doc.setTextColor(20, 22, 26);
   doc.text("Cordialmente,", margenX, y);
   const urlF = firmaGuardada();
+  const { alto: altoFirma, sobreLinea } = ajustesFirma();
   if (urlF) {
     try {
-      const f = await cargarImagenComoDataURL(urlF, "#ffffff", "PNG");
-      const alto = 19, ancho = alto * (f.ancho / f.alto);
-      doc.addImage(f.dataUrl, "PNG", margenX, y + 1.5, ancho, alto);
+      const f = await cargarImagenComoDataURL(urlF, null, "PNG");
+      const ancho = Math.min(anchoUtil, altoFirma * (f.ancho / f.alto));
+      doc.addImage(f.dataUrl, "PNG", margenX, y + 1.5, ancho, altoFirma);
     } catch (e) { /* sin imagen: queda el espacio para firmar a mano */ }
   }
-  y += 22;
+  // Montada: el nombre se escribe sobre la parte baja de la firma, como al firmar encima del nombre.
+  y += sobreLinea ? 1.5 + altoFirma * (1 - FIRMA_SOLAPE) + 3 : altoFirma + 3;
   doc.setFont("helvetica", "bold");
   doc.text(datos.firmaNombre || "", margenX, y);
   y += 5;
@@ -398,7 +403,7 @@ export async function generarCartaPDF(datos) {
     doc.text("Calle 17 #47-21 B/Villa Café, Neiva (Huila) · gerencia.cincoltda@hotmail.com · Tel: 8768430", margenX, yPie + 11);
 
     doc.setFontSize(7.5);
-    doc.text("cinco-sas.web.app", anchoPagina - margenX, yPie + 6.5, { align: "right" });
+    doc.text("cincosas.com.co", anchoPagina - margenX, yPie + 6.5, { align: "right" });
     const piePagina2 = CODIGO_FORMATO
       ? `Formato ${CODIGO_FORMATO} · Versión ${VERSION_FORMATO} · Página ${p} de ${totalPaginas}`
       : `Página ${p} de ${totalPaginas}`;

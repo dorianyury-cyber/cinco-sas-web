@@ -549,7 +549,7 @@ function escapeHtml(texto) {
   return String(texto ?? "").replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;");
 }
 
-const URL_APP = "https://cinco-sas.web.app/control/ordenes-trabajo.html";
+const URL_APP = "https://cincosas.com.co/control/ordenes-trabajo.html";
 
 // Link de wa.me: abre WhatsApp con el número del responsable y un mensaje
 // listo, para que quien creó la orden lo mande desde SU PROPIO WhatsApp de

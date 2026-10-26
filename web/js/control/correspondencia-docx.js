@@ -9,7 +9,7 @@ import { parsearHtmlARuns } from "./texto-rico.js";
 
 const NAVY_HEX = "1F2732";
 const MUTED_HEX = "5C6570";
-import { firmaGuardada } from "./firma-local.js";
+import { firmaGuardada, ajustesFirma, FIRMA_SOLAPE } from "./firma-local.js";
 const LOGO_URL = "../assets/img/logo.png";
 
 // Código y versión del formato en blanco, tal como quedó registrado en el
@@ -70,8 +70,10 @@ function cargarImagenParaDocx(url, colorFondo, formatoSalida, type) {
       canvas.width = img.naturalWidth;
       canvas.height = img.naturalHeight;
       const ctx = canvas.getContext("2d");
-      ctx.fillStyle = colorFondo;
-      ctx.fillRect(0, 0, canvas.width, canvas.height);
+      if (colorFondo) { // sin color de fondo (la firma) se conserva la transparencia
+        ctx.fillStyle = colorFondo;
+        ctx.fillRect(0, 0, canvas.width, canvas.height);
+      }
       ctx.drawImage(img, 0, 0);
       canvas.toBlob((blob) => {
         if (!blob) { reject(new Error("No se pudo procesar la imagen")); return; }
@@ -86,6 +88,39 @@ function cargarImagenParaDocx(url, colorFondo, formatoSalida, type) {
 function formatearFechaLarga(fechaISO) {
   const fecha = fechaISO ? new Date(fechaISO + "T12:00:00") : new Date();
   return fecha.toLocaleDateString("es-CO", { day: "numeric", month: "long", year: "numeric" });
+}
+
+// Párrafo con la firma digital según los ajustes de quien la cargó (alto y si va montada). Montada: la imagen
+// flota detrás del texto en un párrafo más bajo que ella, así la línea «____» (o el nombre) que sigue queda
+// escrita encima de su parte inferior, como en el PDF.
+async function parrafoFirmaDocx(centrada) {
+  const {
+    Paragraph, ImageRun, AlignmentType, HorizontalPositionRelativeFrom, HorizontalPositionAlign,
+    VerticalPositionRelativeFrom, TextWrappingType
+  } = window.docx;
+  const url = firmaGuardada();
+  if (!url) return null;
+  const { alto, sobreLinea } = ajustesFirma();
+  const f = await cargarImagenParaDocx(url, null, "image/png", "png");
+  const altoPx = Math.round(alto * PX_POR_MM);
+  const anchoPx = Math.min(Math.round(ANCHO_UTIL_MM * PX_POR_MM), Math.round(altoPx * (f.ancho / f.alto)));
+  const transformation = { width: anchoPx, height: Math.round(anchoPx * (f.alto / f.ancho)) };
+  if (!sobreLinea) {
+    return new Paragraph({ alignment: centrada ? AlignmentType.CENTER : undefined, children: [new ImageRun({ data: f.buffer, transformation, type: "png" })] });
+  }
+  return new Paragraph({
+    spacing: { line: Math.round(alto * (1 - FIRMA_SOLAPE) * 56.7), lineRule: "exact", before: 0, after: 0 },
+    children: [new ImageRun({
+      data: f.buffer, transformation, type: "png",
+      floating: {
+        horizontalPosition: { relative: HorizontalPositionRelativeFrom.MARGIN, align: centrada ? HorizontalPositionAlign.CENTER : HorizontalPositionAlign.LEFT },
+        verticalPosition: { relative: VerticalPositionRelativeFrom.PARAGRAPH, offset: 0 },
+        wrap: { type: TextWrappingType.NONE },
+        behindDocument: true,
+        allowOverlap: true
+      }
+    })]
+  });
 }
 
 function sinBordes() {
@@ -158,7 +193,7 @@ export async function generarCartaDocxBlob(datos) {
             children: [
               new Paragraph({
                 alignment: AlignmentType.RIGHT,
-                children: [new TextRun({ text: `cinco-sas.web.app · Formato ${CODIGO_FORMATO} · Versión ${VERSION_FORMATO}`, color: MUTED_HEX, size: 13 })]
+                children: [new TextRun({ text: `cincosas.com.co · Formato ${CODIGO_FORMATO} · Versión ${VERSION_FORMATO}`, color: MUTED_HEX, size: 13 })]
               }),
               new Paragraph({
                 alignment: AlignmentType.RIGHT,
@@ -206,18 +241,11 @@ export async function generarCartaDocxBlob(datos) {
     if (bloque.tipo === "firma") {
       // Firma digital sobre la línea de firma del documento (centrada si esa línea lo está).
       const sig = bloques[iBloque + 1];
-      const centrada = sig && sig.tipo === "texto" && /text-align:\s*center/.test(sig.texto || "");
-      const urlFirmaBloque = firmaGuardada();
-      let puesta = false;
-      if (urlFirmaBloque) {
-        try {
-          const f = await cargarImagenParaDocx(urlFirmaBloque, "#ffffff", "image/png", "png");
-          const altoPx = Math.round(19 * PX_POR_MM), anchoPx = Math.round(altoPx * (f.ancho / f.alto));
-          cuerpo.push(new Paragraph({ alignment: centrada ? AlignmentType.CENTER : undefined, children: [new ImageRun({ data: f.buffer, transformation: { width: anchoPx, height: altoPx }, type: "png" })] }));
-          puesta = true;
-        } catch (e) { /* sin imagen: queda el espacio para firmar a mano */ }
-      }
-      if (!puesta) { cuerpo.push(new Paragraph({ text: "" })); cuerpo.push(new Paragraph({ text: "" })); }
+      const centrada = sig && sig.tipo === "texto" && /rt-al-center|text-align:\s*center/.test(sig.texto || "");
+      let parrafo = null;
+      try { parrafo = await parrafoFirmaDocx(centrada); } catch (e) { /* sin imagen: queda el espacio para firmar a mano */ }
+      if (parrafo) cuerpo.push(parrafo);
+      else { cuerpo.push(new Paragraph({ text: "" })); cuerpo.push(new Paragraph({ text: "" })); }
       continue;
     }
     if (bloque.tipo === "imagen") {
@@ -278,17 +306,10 @@ export async function generarCartaDocxBlob(datos) {
   // ---- cierre y firma ---- (un documento propio ya trae la suya: ver el bloque "firma")
   if (!esDocumento) {
   cuerpo.push(new Paragraph({ children: [new TextRun({ text: "Cordialmente,", size: 21 })] }));
-  const urlF = firmaGuardada();
-  let firmaPuesta = false;
-  if (urlF) {
-    try {
-      const f = await cargarImagenParaDocx(urlF, "#ffffff", "image/png", "png");
-      const altoPx = Math.round(19 * PX_POR_MM), anchoPx = Math.round(altoPx * (f.ancho / f.alto));
-      cuerpo.push(new Paragraph({ children: [new ImageRun({ data: f.buffer, transformation: { width: anchoPx, height: altoPx }, type: "png" })] }));
-      firmaPuesta = true;
-    } catch (e) { /* sin imagen: queda el espacio para firmar a mano */ }
-  }
-  if (!firmaPuesta) { cuerpo.push(new Paragraph({ text: "" })); cuerpo.push(new Paragraph({ text: "" })); }
+  let parrafoFirma = null;
+  try { parrafoFirma = await parrafoFirmaDocx(false); } catch (e) { /* sin imagen: queda el espacio para firmar a mano */ }
+  if (parrafoFirma) cuerpo.push(parrafoFirma);
+  else { cuerpo.push(new Paragraph({ text: "" })); cuerpo.push(new Paragraph({ text: "" })); }
   cuerpo.push(new Paragraph({ children: [new TextRun({ text: datos.firmaNombre || "", bold: true, size: 21 })] }));
   if (datos.firmaCargo) cuerpo.push(new Paragraph({ children: [new TextRun({ text: datos.firmaCargo, size: 19 })] }));
   cuerpo.push(new Paragraph({ children: [new TextRun({ text: "Cinco S.A.S.", size: 19 })] }));

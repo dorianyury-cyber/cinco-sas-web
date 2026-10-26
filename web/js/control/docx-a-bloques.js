@@ -88,7 +88,8 @@ function leerParrafo(p, rels) {
       }
     }
     if (!t) continue;
-    if (color && /^[0-9a-f]{6}$/i.test(color) && color.toUpperCase() !== "000000") t = `<span style="color:#${color}">${t}</span>`;
+    // <font color> y clases rt-al-* en vez de style="...": la CSP del sitio (style-src 'self') no aplica estilos en línea.
+    if (color && /^[0-9a-f]{6}$/i.test(color) && color.toUpperCase() !== "000000") t = `<font color="#${color}">${t}</font>`;
     if (i) t = `<i>${t}</i>`;
     if (b) t = `<b>${t}</b>`;
     html += t;
@@ -168,7 +169,7 @@ export async function docxABloques(archivo) {
       const vacio = !it.html.replace(/<br>/g, "").trim();
       if (vacio && !actual) continue;
       actual = actual || [];
-      actual.push(vacio ? "<div><br></div>" : `<div${it.alin ? ` style="text-align:${it.alin}"` : ""}>${it.html}</div>`);
+      actual.push(vacio ? "<div><br></div>" : `<div${it.alin ? ` class="rt-al-${it.alin}"` : ""}>${it.html}</div>`);
       // Párrafos con espacio después (≥ 6 pt) quedan como bloques separados; los seguidos se mantienen juntos.
       if (it.despues >= 120) cerrar();
     } else if (it.tipo === "tabla") {
