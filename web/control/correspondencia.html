@@ -46,7 +46,18 @@
       <details class="card control-nuevo" id="nuevaCartaDetails">
         <summary>+ Nueva carta</summary>
         <form class="pqr-form" id="nuevaCartaForm">
-          <details class="control-nuevo">
+          <div class="control-modo-carta">
+            <label class="control-check-inline"><input type="radio" name="modoCarta" value="carta" checked> Carta con el formato de Cinco (destinatario, asunto y cuerpo)</label>
+            <label class="control-check-inline"><input type="radio" name="modoCarta" value="documento"> Documento propio en Word, tal cual (solo se le pone el membrete, el radicado y la firma digital)</label>
+          </div>
+
+          <div id="documentoPropioBox" class="oculto">
+            <label for="documentoArchivo">Documento en Word (.docx)</label>
+            <input type="file" id="documentoArchivo" accept=".docx,application/vnd.openxmlformats-officedocument.wordprocessingml.document">
+            <p class="text-muted control-informes-ayuda">Se toma el contenido del documento como está (texto, negrillas, centrados, tablas e imágenes) y sale con el membrete, el radicado y el pie de Cinco, sin «Señores», «Asunto» ni «Cordialmente». Tu firma digital se pone encima de la línea de firma «______» del documento (o al final, si no la tiene). Puedes revisar o retocar el contenido abajo antes de guardar.</p>
+          </div>
+
+          <details class="control-nuevo solo-carta">
             <summary>Importar una carta ya elaborada desde un archivo JSON</summary>
             <p class="text-muted control-informes-ayuda">Carga el destinatario, el asunto, el cuerpo (texto e imágenes) y la firma. No guarda nada: revisas con «Visualizar» y pulsas «Guardar», que es lo que asigna el radicado.</p>
             <input type="file" id="importarCartaArchivo" accept=".json,application/json">
@@ -54,16 +65,16 @@
             <button type="button" class="control-btn-mini" id="importarCartaBtn">Cargar en el formulario</button>
           </details>
 
-          <label for="destinatario">Destinatario</label>
-          <textarea id="destinatario" rows="2" required maxlength="300" placeholder="Ej. Empresa / Nombre de contacto"></textarea>
+          <label for="destinatario" class="solo-carta">Destinatario</label>
+          <textarea id="destinatario" class="solo-carta" rows="2" required maxlength="300" placeholder="Ej. Empresa / Nombre de contacto"></textarea>
 
           <label for="ciudad">Ciudad</label>
           <input type="text" id="ciudad" maxlength="60" value="Neiva">
 
-          <label for="asunto">Asunto</label>
+          <label for="asunto" id="asuntoLabel">Asunto</label>
           <input type="text" id="asunto" required maxlength="200">
 
-          <label>Cuerpo de la carta</label>
+          <label id="cuerpoLabel">Cuerpo de la carta</label>
           <div id="bloquesEditor" class="control-bloques"></div>
           <div class="control-bloques-botones">
             <button type="button" class="control-btn-mini" id="agregarTextoBtn">+ Agregar texto</button>
@@ -72,11 +83,11 @@
             <input type="file" id="inputImagen" accept="image/*" multiple hidden>
           </div>
 
-          <label for="firmaNombre">Nombre de quien firma</label>
-          <input type="text" id="firmaNombre" required maxlength="120">
+          <label for="firmaNombre" class="solo-carta">Nombre de quien firma</label>
+          <input type="text" id="firmaNombre" class="solo-carta" required maxlength="120">
 
-          <label for="firmaCargo">Cargo de quien firma</label>
-          <input type="text" id="firmaCargo" maxlength="120">
+          <label for="firmaCargo" class="solo-carta">Cargo de quien firma</label>
+          <input type="text" id="firmaCargo" class="solo-carta" maxlength="120">
 
           <label for="firmaArchivo">Firma digitalizada (opcional)</label>
           <div class="control-firma-img">

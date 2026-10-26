@@ -2535,3 +2535,8 @@ body.app-control .ctl-main #contratoCliente { margin-top: 5px; font-size: 12.5px
 
 .control-firma-img { display: flex; align-items: center; gap: 10px; flex-wrap: wrap; }
 .control-firma-img img { height: 56px; background: #fff; border: 1px solid var(--border); border-radius: 6px; padding: 2px; }
+
+/* ---- Correspondencia: tipo de carta y marca de la firma en un documento propio ---- */
+.control-modo-carta { display: flex; flex-direction: column; gap: 4px; margin-bottom: 10px; padding: 10px 12px; border: 1px solid var(--border); border-radius: 8px; }
+.control-bloque-firma { display: flex; align-items: center; gap: 12px; padding: 8px 10px; border: 1px dashed var(--border); border-radius: 6px; font-size: 12.5px; color: var(--text-muted, #5c6570); }
+.control-bloque-firma img { height: 44px; background: #fff; border-radius: 4px; }

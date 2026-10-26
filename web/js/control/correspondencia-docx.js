@@ -24,21 +24,26 @@ function rgbAHexDocx(rgb) {
   return rgb.map((n) => n.toString(16).padStart(2, "0")).join("").toUpperCase();
 }
 
-// Convierte el HTML de un párrafo (ver web/js/control/texto-rico.js) a
-// TextRun de docx con negrilla/cursiva/color — a diferencia de
-// correspondencia-pdf.js no hace falta partir en palabras para ajustar
-// línea a mano: Word ya envuelve el texto solo. Recibe TextRun como
-// parámetro porque viene de window.docx, desestructurado dentro de
-// generarCartaDocxBlob (no hay import de módulo real de esa librería).
-function runsParaDocx(TextRun, html, tamano) {
-  const runs = parsearHtmlARuns(html);
-  const resultado = [];
-  runs.forEach((run) => {
-    if (run.salto) {
-      if (resultado.length) resultado[resultado.length - 1].break = (resultado[resultado.length - 1].break || 0) + 1;
-      return;
-    }
-    resultado.push({
+// Convierte el HTML de un bloque de texto (ver web/js/control/texto-rico.js) a párrafos de docx con
+// negrilla/cursiva/color, un párrafo por cada línea del HTML con su alineación (centrado, derecha,
+// justificado) — así un documento propio subido en Word conserva sus títulos centrados. A diferencia de
+// correspondencia-pdf.js no hace falta partir en palabras: Word envuelve el texto solo. Recibe window.docx
+// porque esa librería no es un módulo importable.
+function parrafosParaDocx(docx, html, tamano) {
+  const { Paragraph, TextRun, AlignmentType } = docx;
+  const ALINEAR = { center: AlignmentType.CENTER, right: AlignmentType.RIGHT, justify: AlignmentType.JUSTIFIED };
+  const parrafos = [];
+  let actual = [];
+  let alineacion = "";
+  const cerrar = () => {
+    parrafos.push(new Paragraph({ alignment: ALINEAR[alineacion], children: actual.map((o) => new TextRun(o)) }));
+    actual = [];
+    alineacion = "";
+  };
+  parsearHtmlARuns(html).forEach((run) => {
+    if (run.salto) { alineacion = alineacion || run.alineacion || ""; cerrar(); return; }
+    alineacion = alineacion || run.alineacion || "";
+    actual.push({
       text: run.texto,
       size: tamano,
       ...(run.negrita ? { bold: true } : {}),
@@ -46,7 +51,8 @@ function runsParaDocx(TextRun, html, tamano) {
       ...(run.color ? { color: rgbAHexDocx(run.color) } : {})
     });
   });
-  return resultado.map((opciones) => new TextRun(opciones));
+  if (actual.length) cerrar();
+  return parrafos;
 }
 
 const PX_POR_MM = 96 / 25.4;
@@ -171,13 +177,17 @@ export async function generarCartaDocxBlob(datos) {
   });
 
   // ---- cuerpo: radicado/fecha, destinatario, asunto ----
+  // Documento propio (Word subido tal cual): sin «Señores»/asunto/cierre — solo membrete, radicado y pie.
+  const esDocumento = datos.modo === "documento";
   const cuerpo = [
     new Paragraph({ children: [new TextRun({ text: `Radicado: ${datos.radicado}`, color: MUTED_HEX, size: 17 })] }),
     new Paragraph({
       alignment: AlignmentType.RIGHT,
       children: [new TextRun({ text: `${datos.ciudad || "Neiva"}, ${formatearFechaLarga(datos.fecha)}`, color: MUTED_HEX, size: 17 })]
     }),
-    new Paragraph({ text: "" }),
+    new Paragraph({ text: "" })
+  ];
+  if (!esDocumento) cuerpo.push(
     new Paragraph({ children: [new TextRun({ text: "Señores", bold: true, color: NAVY_HEX, size: 21 })] }),
     ...(datos.destinatario || "").split("\n").filter(Boolean).map(
       (linea) => new Paragraph({ children: [new TextRun({ text: linea, size: 21 })] })
@@ -185,14 +195,31 @@ export async function generarCartaDocxBlob(datos) {
     new Paragraph({ text: "" }),
     new Paragraph({ children: [new TextRun({ text: `Asunto: ${datos.asunto || ""}`, bold: true, color: NAVY_HEX, size: 20 })] }),
     new Paragraph({ text: "" })
-  ];
+  );
 
   // ---- bloques (texto/imagen), en el mismo orden que en el editor ----
   const bloques = datos.bloques && datos.bloques.length
     ? datos.bloques
     : [{ tipo: "texto", texto: datos.cuerpo || "" }];
 
-  for (const bloque of bloques) {
+  for (const [iBloque, bloque] of bloques.entries()) {
+    if (bloque.tipo === "firma") {
+      // Firma digital sobre la línea de firma del documento (centrada si esa línea lo está).
+      const sig = bloques[iBloque + 1];
+      const centrada = sig && sig.tipo === "texto" && /text-align:\s*center/.test(sig.texto || "");
+      const urlFirmaBloque = firmaGuardada();
+      let puesta = false;
+      if (urlFirmaBloque) {
+        try {
+          const f = await cargarImagenParaDocx(urlFirmaBloque, "#ffffff", "image/png", "png");
+          const altoPx = Math.round(19 * PX_POR_MM), anchoPx = Math.round(altoPx * (f.ancho / f.alto));
+          cuerpo.push(new Paragraph({ alignment: centrada ? AlignmentType.CENTER : undefined, children: [new ImageRun({ data: f.buffer, transformation: { width: anchoPx, height: altoPx }, type: "png" })] }));
+          puesta = true;
+        } catch (e) { /* sin imagen: queda el espacio para firmar a mano */ }
+      }
+      if (!puesta) { cuerpo.push(new Paragraph({ text: "" })); cuerpo.push(new Paragraph({ text: "" })); }
+      continue;
+    }
     if (bloque.tipo === "imagen") {
       try {
         const img = await cargarImagenParaDocx(bloque.url, "#ffffff", "image/jpeg", "jpg");
@@ -244,11 +271,12 @@ export async function generarCartaDocxBlob(datos) {
       }
       continue;
     }
-    cuerpo.push(new Paragraph({ children: runsParaDocx(TextRun, bloque.texto, 21) }));
+    cuerpo.push(...parrafosParaDocx(window.docx, bloque.texto, 21));
     cuerpo.push(new Paragraph({ text: "" }));
   }
 
-  // ---- cierre y firma ----
+  // ---- cierre y firma ---- (un documento propio ya trae la suya: ver el bloque "firma")
+  if (!esDocumento) {
   cuerpo.push(new Paragraph({ children: [new TextRun({ text: "Cordialmente,", size: 21 })] }));
   const urlF = firmaGuardada();
   let firmaPuesta = false;
@@ -264,6 +292,7 @@ export async function generarCartaDocxBlob(datos) {
   cuerpo.push(new Paragraph({ children: [new TextRun({ text: datos.firmaNombre || "", bold: true, size: 21 })] }));
   if (datos.firmaCargo) cuerpo.push(new Paragraph({ children: [new TextRun({ text: datos.firmaCargo, size: 19 })] }));
   cuerpo.push(new Paragraph({ children: [new TextRun({ text: "Cinco S.A.S.", size: 19 })] }));
+  }
 
   const documento = new Document({
     sections: [{

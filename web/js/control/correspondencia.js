@@ -6,6 +6,7 @@ import { ref, uploadBytes, getDownloadURL } from "https://www.gstatic.com/fireba
 import { auth, db, storage, requireAuth, obtenerPerfil } from "./firebase-control.js";
 import { generarCartaPDF } from "./correspondencia-pdf.js";
 import { firmaGuardada, guardarFirma, procesarArchivoFirma } from "./firma-local.js";
+import { docxABloques } from "./docx-a-bloques.js";
 import { descargarCartaDocx } from "./correspondencia-docx.js";
 import { truncar } from "./texto.js";
 import { registrarDocumentoSGC } from "./documentos-sgc.js";
@@ -122,6 +123,11 @@ function insertarBloqueEn(indice, tipo) {
     renderBloques();
     return;
   }
+  if (tipo === "firma") {
+    bloques.splice(indice, 0, { tipo: "firma" });
+    renderBloques();
+    return;
+  }
   bloques.splice(indice, 0, { tipo: "texto", texto: "" });
   renderBloques();
 }
@@ -132,7 +138,10 @@ function insertarBloqueEn(indice, tipo) {
 function renderHueco(indice) {
   const hueco = document.createElement("div");
   hueco.className = "control-bloque-gap";
-  [{ tipo: "texto", etiqueta: "Párrafo" }, { tipo: "imagen", etiqueta: "Gráfico / imagen" }, { tipo: "tabla", etiqueta: "Tabla" }].forEach(({ tipo, etiqueta }) => {
+  // «Firma» solo en un documento propio: en una carta normal la firma ya va en el cierre.
+  const tipos = [{ tipo: "texto", etiqueta: "Párrafo" }, { tipo: "imagen", etiqueta: "Gráfico / imagen" }, { tipo: "tabla", etiqueta: "Tabla" }];
+  if (modoActual() === "documento" && !bloques.some((b) => b.tipo === "firma")) tipos.push({ tipo: "firma", etiqueta: "Firma" });
+  tipos.forEach(({ tipo, etiqueta }) => {
     const btn = document.createElement("button");
     btn.type = "button";
     btn.className = "control-btn-mini";
@@ -204,6 +213,47 @@ function renderTablaCarta(bloque) {
   return cont;
 }
 
+// ---- Tipo de carta: con el formato de Cinco, o un documento propio en Word tal cual ----
+const modoActual = () => form.querySelector('input[name="modoCarta"]:checked')?.value || "carta";
+function aplicarModo() {
+  const esDocumento = modoActual() === "documento";
+  document.querySelectorAll(".solo-carta").forEach((el) => el.classList.toggle("oculto", esDocumento));
+  document.getElementById("documentoPropioBox").classList.toggle("oculto", !esDocumento);
+  document.getElementById("destinatario").required = !esDocumento;
+  document.getElementById("firmaNombre").required = !esDocumento;
+  document.getElementById("asuntoLabel").textContent = esDocumento ? "Nombre en el listado (se toma del título del documento)" : "Asunto";
+  document.getElementById("cuerpoLabel").textContent = esDocumento ? "Contenido del documento" : "Cuerpo de la carta";
+  renderBloques();
+}
+form.querySelectorAll('input[name="modoCarta"]').forEach((r) => r.addEventListener("change", aplicarModo));
+
+document.getElementById("documentoArchivo").addEventListener("change", async (e) => {
+  const archivo = e.target.files[0];
+  e.target.value = "";
+  if (!archivo) return;
+  try {
+    const { bloques: leidos, titulo } = await docxABloques(archivo);
+    const nuevos = [];
+    for (const b of leidos) {
+      if (b.tipo === "imagen") {
+        try {
+          const { blob, previewUrl } = await redimensionarImagen(b.blob);
+          nuevos.push({ tipo: "imagen", blob, previewUrl });
+        } catch (err) { /* formato de imagen que el navegador no lee (ej. EMF): se omite */ }
+      } else {
+        nuevos.push(b);
+      }
+    }
+    bloques = nuevos;
+    const nombre = titulo || archivo.name.replace(/\.docx$/i, "");
+    document.getElementById("asunto").value = nombre.length > 200 ? nombre.slice(0, 197) + "..." : nombre;
+    renderBloques();
+    mostrarAlerta(`Documento «${archivo.name}» cargado (${nuevos.length} bloques). Revísalo con «Visualizar» y pulsa «Guardar» para asignar el radicado.`, "ok");
+  } catch (err) {
+    mostrarAlerta(err.message || "No se pudo leer el documento.", "error");
+  }
+});
+
 function renderBloques() {
   bloquesEditor.innerHTML = "";
   bloquesEditor.appendChild(renderHueco(0));
@@ -221,6 +271,20 @@ function renderBloques() {
       }));
     } else if (bloque.tipo === "tabla") {
       contenido.appendChild(renderTablaCarta(bloque));
+    } else if (bloque.tipo === "firma") {
+      const marca = document.createElement("div");
+      marca.className = "control-bloque-firma";
+      const f = firmaGuardada();
+      if (f) {
+        const img = document.createElement("img");
+        img.src = f;
+        img.alt = "Firma digital";
+        marca.appendChild(img);
+      }
+      marca.appendChild(document.createTextNode(f
+        ? "Aquí va tu firma digital (muévela con las flechas si hace falta)."
+        : "Aquí va la firma digital: cárgala más abajo en «Firma digitalizada»; si no, queda el espacio para firmar a mano."));
+      contenido.appendChild(marca);
     } else {
       const img = document.createElement("img");
       img.src = bloque.previewUrl;
@@ -271,6 +335,7 @@ function pintarFirma() {
   firmaVista.hidden = !f;
   firmaQuitarBtn.hidden = !f;
   if (f) firmaVista.src = f;
+  if (bloques.some((b) => b.tipo === "firma")) renderBloques();
 }
 async function tomarFirma(archivo) {
   if (!archivo || !archivo.type.startsWith("image/")) return;
@@ -403,8 +468,9 @@ document.getElementById("vistaPreviaBtn").addEventListener("click", async () => 
   try {
     const bloquesPreview = bloques.map((b) => b.tipo === "imagen"
       ? { tipo: "imagen", url: URL.createObjectURL(b.blob) }
-      : b.tipo === "tabla" ? { tipo: "tabla", filas: b.filas } : { tipo: "texto", texto: b.texto });
+      : b.tipo === "tabla" ? { tipo: "tabla", filas: b.filas } : b.tipo === "firma" ? { tipo: "firma" } : { tipo: "texto", texto: b.texto });
     const datosPreview = {
+      modo: modoActual(),
       destinatario: document.getElementById("destinatario").value,
       ciudad: document.getElementById("ciudad").value || "Neiva",
       asunto: document.getElementById("asunto").value,
@@ -497,7 +563,7 @@ function aplicarFiltroCorrespondencia() {
     fila.dataset.id = c.id;
     fila.appendChild(celda(c.radicado));
     fila.appendChild(celda(c.fecha || ""));
-    fila.appendChild(celda(c.destinatario || ""));
+    fila.appendChild(celda(c.destinatario || (c.modo === "documento" ? "(documento propio)" : "")));
     fila.appendChild(celda(c.asunto || ""));
     fila.addEventListener("click", () => {
       cartaSeleccionadaId = c.id;
@@ -703,12 +769,15 @@ requireAuth(async (user) => {
     alertBox.className = "form-alert";
 
     const anio = new Date().getFullYear();
+    // Un documento propio no lleva destinatario ni firma de cierre (los trae el mismo documento).
+    const esDocumento = modoActual() === "documento";
     const datosBase = {
-      destinatario: document.getElementById("destinatario").value,
+      modo: esDocumento ? "documento" : "carta",
+      destinatario: esDocumento ? "" : document.getElementById("destinatario").value,
       ciudad: document.getElementById("ciudad").value || "Neiva",
       asunto: document.getElementById("asunto").value,
-      firmaNombre: document.getElementById("firmaNombre").value,
-      firmaCargo: document.getElementById("firmaCargo").value,
+      firmaNombre: esDocumento ? "" : document.getElementById("firmaNombre").value,
+      firmaCargo: esDocumento ? "" : document.getElementById("firmaCargo").value,
       fecha: hoyISO()
     };
 
@@ -723,6 +792,8 @@ requireAuth(async (user) => {
           bloquesFinal.push({ tipo: "texto", texto: bloque.texto });
         } else if (bloque.tipo === "tabla") {
           bloquesFinal.push({ tipo: "tabla", filas: bloque.filas.map((celdas) => ({ celdas })) });
+        } else if (bloque.tipo === "firma") {
+          bloquesFinal.push({ tipo: "firma" });
         } else {
           n += 1;
           const archivoRef = ref(storage, `correspondencia/${cartaRef.id}/${n}.jpg`);
@@ -821,7 +892,7 @@ requireAuth(async (user) => {
     form.reset();
     document.getElementById("ciudad").value = "Neiva";
     bloques = [{ tipo: "texto", texto: "" }];
-    renderBloques();
+    aplicarModo();
     cartaGuardadaActual = null;
     actualizarDescargarBtn();
     nuevaCartaBtn.classList.add("oculto");

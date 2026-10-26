@@ -137,7 +137,16 @@ export async function generarCartaPDF(datos) {
   const fechaTexto = `${datos.ciudad || "Neiva"}, ${formatearFechaLarga(datos.fecha)}`;
   doc.text(fechaTexto, anchoPagina - margenX, y, { align: "right" });
 
+  // Documento propio (Word subido tal cual): sin «Señores»/asunto/cierre — el documento ya trae su propio
+  // encabezado y su línea de firma; la carta solo le pone el membrete, el radicado y el pie de Cinco.
+  const esDocumento = datos.modo === "documento";
+  if (esDocumento) y += 12;
+  // Hasta dónde se escribe en cada página. Un documento propio aprovecha hasta cerca del pie (está a 16 mm
+  // del borde) para no mandar a otra hoja la firma de un documento de una página; la carta normal conserva
+  // su margen de siempre.
+  const limiteInferior = altoPagina - (esDocumento ? 28 : 45);
   // ---- destinatario ----
+  if (!esDocumento) {
   y += 14;
   doc.setFont("helvetica", "bold");
   doc.setFontSize(11);
@@ -155,6 +164,7 @@ export async function generarCartaPDF(datos) {
   const asuntoLineas = doc.splitTextToSize(`Asunto: ${datos.asunto || ""}`, anchoUtil);
   doc.text(asuntoLineas, margenX, y);
   y += asuntoLineas.length * 5.5 + 8;
+  }
 
   // ---- cuerpo: lista de bloques (texto/imagen) en el orden elegido en el
   // editor. Cartas creadas antes de esto no tienen "bloques" — se arma uno
@@ -164,6 +174,27 @@ export async function generarCartaPDF(datos) {
     : [{ tipo: "texto", texto: datos.cuerpo || "" }];
 
   for (const bloque of bloques) {
+    if (bloque.tipo === "firma") {
+      // Firma digital (si quien genera la carta cargó la suya en este navegador) sobre la línea de firma.
+      const altoF = 19;
+      // La firma no se separa de su línea «____» ni del nombre que siguen: si no caben juntos, pasan juntos.
+      const siguiente = bloques[bloques.indexOf(bloque) + 1];
+      const lineasSiguiente = siguiente?.tipo === "texto" ? Math.min(4, parsearHtmlARuns(siguiente.texto).filter((r) => r.salto).length || 1) : 0;
+      if (y + altoF + 1 + lineasSiguiente * 7.2 > limiteInferior) { doc.addPage(); y = 20; }
+      const urlFirmaBloque = firmaGuardada();
+      if (urlFirmaBloque) {
+        try {
+          const f = await cargarImagenComoDataURL(urlFirmaBloque, "#ffffff", "PNG");
+          const anchoF = altoF * (f.ancho / f.alto);
+          // Centrada si el documento centra la línea de firma que sigue; si no, al margen izquierdo.
+          const sig = bloques[bloques.indexOf(bloque) + 1];
+          const centrada = sig && sig.tipo === "texto" && /text-align:\s*center/.test(sig.texto || "");
+          doc.addImage(f.dataUrl, "PNG", centrada ? (anchoPagina - anchoF) / 2 : margenX, y, anchoF, altoF);
+        } catch (e) { /* sin imagen: queda el espacio para firmar a mano */ }
+      }
+      y += altoF + 1;
+      continue;
+    }
     if (bloque.tipo === "imagen") {
       try {
         const img = await cargarImagenComoDataURL(bloque.url, "#ffffff", "JPEG");
@@ -171,7 +202,7 @@ export async function generarCartaPDF(datos) {
         let altoImg = anchoImg * (img.alto / img.ancho);
         const altoMaximo = 90;
         if (altoImg > altoMaximo) { altoImg = altoMaximo; anchoImg = altoImg * (img.ancho / img.alto); }
-        if (y + altoImg > altoPagina - 45) { doc.addPage(); y = 20; }
+        if (y + altoImg > limiteInferior) { doc.addPage(); y = 20; }
         doc.addImage(img.dataUrl, "JPEG", margenX, y, anchoImg, altoImg);
         y += altoImg + 6;
       } catch (e) {
@@ -179,7 +210,7 @@ export async function generarCartaPDF(datos) {
         // aunque faltara una foto — ahora se deja visible que algo no
         // cargó, en vez de desaparecer sin aviso.
         const altoAviso = 14;
-        if (y + altoAviso > altoPagina - 45) { doc.addPage(); y = 20; }
+        if (y + altoAviso > limiteInferior) { doc.addPage(); y = 20; }
         doc.setDrawColor(214, 69, 69);
         doc.setLineWidth(0.4);
         doc.rect(margenX, y, anchoUtil, altoAviso);
@@ -201,7 +232,7 @@ export async function generarCartaPDF(datos) {
       // Se reduce la letra (hasta 6,5 pt) si ni así caben sin partir las palabras más largas en el ancho útil.
       let tam = 8.5;
       let anchos = anchosColumnasTabla(doc, filasT, anchoUtil, tam);
-      const sinPartir = (a, t) => filasT.every((f) => f.every((txt, c) => String(txt ?? "").split(/s+/).every((p) => { doc.setFont("helvetica", f === filasT[0] ? "bold" : "normal"); doc.setFontSize(t); return doc.getTextWidth(p) * 1.08 + 4.6 <= a[c] + 0.01; })));
+      const sinPartir = (a, t) => filasT.every((f) => f.every((txt, c) => String(txt ?? "").split(/\s+/).every((p) => { doc.setFont("helvetica", f === filasT[0] ? "bold" : "normal"); doc.setFontSize(t); return doc.getTextWidth(p) * 1.08 + 4.6 <= a[c] + 0.01; })));
       while (!sinPartir(anchos, tam) && tam > 6.5) { tam -= 0.5; anchos = anchosColumnasTabla(doc, filasT, anchoUtil, tam); }
       const pad = 2.2, interlinea = tam * 0.3528 * 1.18;
       const nCols = anchos.length;
@@ -237,7 +268,7 @@ export async function generarCartaPDF(datos) {
       };
       for (let r = 0; r < filasT.length; r++) {
         const { alto } = dibujarFila(filasT[r], r, y);
-        if (y + alto > altoPagina - 45) {
+        if (y + alto > limiteInferior) {
           doc.addPage(); y = 20;
           if (r > 0) y += pintarFila(filasT[0], 0, y); // se repite el encabezado en la página nueva
         }
@@ -268,21 +299,29 @@ export async function generarCartaPDF(datos) {
       runsParrafo.forEach((run) => {
         if (run.salto) { tokens.push({ salto: true }); return; }
         run.texto.split(/(\s+)/).filter((p) => p !== "").forEach((palabra) => {
-          tokens.push({ texto: palabra, negrita: run.negrita, cursiva: run.cursiva, color: run.color });
+          tokens.push({ texto: palabra, negrita: run.negrita, cursiva: run.cursiva, color: run.color, alineacion: run.alineacion });
         });
       });
 
       let linea = [];
       let anchoLinea = 0;
-      const trazarLinea = () => {
+      // porAjuste: la línea se corta por ancho (no es la última del párrafo) — solo esas se justifican.
+      const trazarLinea = (porAjuste = false) => {
         if (!linea.length) { y += 5.5; return; }
-        if (y + 5.5 > altoPagina - 45) { doc.addPage(); y = 20; }
+        if (y + 5.5 > limiteInferior) { doc.addPage(); y = 20; }
+        while (linea.length > 1 && /^\s+$/.test(linea[linea.length - 1].texto)) anchoLinea -= medirToken(linea.pop());
+        const alineacion = linea.find((tk) => tk.alineacion)?.alineacion || "";
+        const espacios = linea.filter((tk) => /^\s+$/.test(tk.texto)).length;
+        const sobra = Math.max(0, anchoUtil - anchoLinea);
         let x = margenX;
+        if (alineacion === "center") x += sobra / 2;
+        else if (alineacion === "right") x += sobra;
+        const extra = alineacion === "justify" && porAjuste && espacios ? sobra / espacios : 0;
         linea.forEach((token) => {
           doc.setFont("helvetica", estiloFuente(token.negrita, token.cursiva));
           doc.setTextColor(...(token.color || COLOR_PARRAFO));
           doc.text(token.texto, x, y);
-          x += medirToken(token);
+          x += medirToken(token) + (/^\s+$/.test(token.texto) ? extra : 0);
         });
         y += 5.5;
         linea = [];
@@ -299,17 +338,19 @@ export async function generarCartaPDF(datos) {
         const ancho = medirToken(token);
         const esEspacio = /^\s+$/.test(token.texto);
         if (esEspacio && !linea.length && !lineaNueva) return;
-        if (!esEspacio && anchoLinea + ancho > anchoUtil && linea.length) trazarLinea();
+        if (!esEspacio && anchoLinea + ancho > anchoUtil && linea.length) trazarLinea(true);
         linea.push(token);
         anchoLinea += ancho;
         lineaNueva = false;
       });
-      trazarLinea();
+      // En un documento propio el bloque ya terminó en su salto: sin esto quedaba una línea en blanco de más.
+      if (!(esDocumento && !linea.length)) trazarLinea();
       y += 5;
     }
   }
 
-  // ---- cierre y firma ----
+  // ---- cierre y firma ---- (un documento propio ya trae la suya: ver el bloque "firma")
+  if (!esDocumento) {
   y += 8;
   if (y > altoPagina - 55) { doc.addPage(); y = 20; }
   doc.setFont("helvetica", "normal");
@@ -332,6 +373,7 @@ export async function generarCartaPDF(datos) {
   doc.setFontSize(9.5);
   if (datos.firmaCargo) { doc.text(datos.firmaCargo, margenX, y); y += 5; }
   doc.text("Cinco S.A.S.", margenX, y);
+  }
 
   // ---- pie de página (todas las páginas): franja gris clara con
   // dirección a la izquierda y radicado/página a la derecha, en vez de
