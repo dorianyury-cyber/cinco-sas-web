@@ -112,3 +112,9 @@ export function capitalizarNombrePropio(texto) {
     })
     .join(" ");
 }
+
+// Fecha AAAA-MM-DD en la hora de Colombia (la del equipo), no en UTC: con toISOString() desde las 7:00 p. m.
+// la fecha ya salía con el día siguiente (ej. una carta del 26 de octubre radicada «27 de octubre»).
+export function fechaLocalISO(d = new Date()) {
+  return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}-${String(d.getDate()).padStart(2, "0")}`;
+}

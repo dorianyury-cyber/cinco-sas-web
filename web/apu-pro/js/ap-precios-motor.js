@@ -7,6 +7,9 @@
 import { normalizar, mesesDesde, variacionIPP } from "./ap-calculos.js";
 import { aNumero, detectarColumnas, extraerItems, indiceApus, sugerirApus, AZUL, AMBAR, AMBAR_SUAVE, GRIS, GRIS_TXT, BORDES, fx, relleno, altoPara } from "./ap-revision-motor.js";
 
+// Fecha AAAA-MM-DD en la hora local (Colombia), no en UTC: toISOString() desde las 7:00 p. m. da el día siguiente.
+const fechaLocalISO = (d = new Date()) => `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}-${String(d.getDate()).padStart(2, "0")}`;
+
 export const SALTO_ALERTA = 0.3; // variación (±30 %) a partir de la cual se pide revisar
 export const IVA = 0.19;
 export const UMBRAL_COINCIDENCIA = 0.35; // parecido mínimo para proponer (sin marcar) el insumo más parecido
@@ -252,7 +255,7 @@ export function emparejar(fila, indice) {
 
 // ---------------------------------------------------------------- propuesta
 // nivel: "error" (no se puede aplicar), "revisar" (queda sin marcar) o "info".
-export function propuesta(ins, datos, { hoy = new Date().toISOString().slice(0, 10) } = {}) {
+export function propuesta(ins, datos, { hoy = fechaLocalISO() } = {}) {
   const alertas = [];
   const aviso = (nivel, texto) => alertas.push({ nivel, texto });
   let valor = Number(datos.valor);
@@ -327,7 +330,7 @@ export function factorIPP(puntos, desde, hasta) {
 export const factorManual = (tasaAnual, desde, hasta) => Math.pow(1 + (Number(tasaAnual) || 0), Math.max(0, mesesEntre(desde, hasta)) / 12);
 
 // Reajusta por IPP (o por una tasa anual si se da) los precios con al menos `minMeses` de antigüedad.
-export function proponerIPP(insumos, puntos, { hasta, tipos = ["MA"], minMeses = 7, tasaAnual = null, hoy = new Date().toISOString().slice(0, 10) } = {}) {
+export function proponerIPP(insumos, puntos, { hasta, tipos = ["MA"], minMeses = 7, tasaAnual = null, hoy = fechaLocalISO() } = {}) {
   const propuestas = [], sinIndice = [];
   for (const x of insumos) {
     if (!tipos.includes(x.tipo) || x.tipo === "MO") continue;

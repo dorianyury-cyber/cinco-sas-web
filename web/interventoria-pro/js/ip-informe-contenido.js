@@ -23,6 +23,9 @@ import {
   activoEnMes, avanceReal, inicioActividad, frentesDeActividades, actividadesConItems, valorItem, ejecutadoItem, periodosActuacion, cumplimientoPeriodica, validarActuacion, curvaPlan, nivelRiesgo
 } from "./ip-modulos.js";
 
+// Fecha AAAA-MM-DD en la hora local (Colombia), no en UTC: toISOString() desde las 7:00 p. m. da el día siguiente.
+const fechaLocalISO = (d = new Date()) => `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}-${String(d.getDate()).padStart(2, "0")}`;
+
 // Día siguiente (los vencimientos del día de corte cuentan como debidos).
 function sumarDia(iso) {
   const d = new Date(`${iso}T12:00:00`);
@@ -50,7 +53,7 @@ export function fotosDelContrato(datos) {
     (datos[m.coleccion] || []).forEach((r) => {
       const lista = r[campoFotos.key] || [];
       if (!lista.length) return;
-      const creado = r.creadoEn?.toDate ? r.creadoEn.toDate().toISOString().slice(0, 10) : "";
+      const creado = r.creadoEn?.toDate ? fechaLocalISO(r.creadoEn.toDate()) : "";
       const f = (campoFecha && r[campoFecha.key]) || r.registradoEnCampo?.slice(0, 10) || creado;
       const fechaReg = /^\d{4}-\d{2}$/.test(f) ? `${f}-01` : f;
       const texto = r.observacion || r.descripcion || r.tema || r.actividad || r.hallazgos || r.texto || r.requisito || "";

@@ -5,6 +5,7 @@ import {
 } from "https://www.gstatic.com/firebasejs/10.7.1/firebase-firestore.js";
 import { auth, db, requireAuth, obtenerPerfil } from "./firebase-control.js";
 import { AREAS, TIPOS, nombreArea, nombreTipo } from "./documentos-plantillas.js";
+import { fechaLocalISO } from "./texto.js";
 
 const ESTADO_LABEL = { vigente: "Vigente", obsoleto: "Obsoleto" };
 
@@ -190,7 +191,7 @@ requireAuth(async (user) => {
         });
         tx.set(cambioRef, {
           version: 1,
-          fecha: new Date().toISOString().slice(0, 10),
+          fecha: fechaLocalISO(),
           motivo: codigoAnterior ? `Recodificación desde ${codigoAnterior}` : "Alta inicial",
           hechoPor: user.email,
           en: serverTimestamp()

@@ -6,6 +6,7 @@
 import {
   collection, doc, runTransaction, serverTimestamp
 } from "https://www.gstatic.com/firebasejs/10.7.1/firebase-firestore.js";
+import { fechaLocalISO } from "./texto.js";
 
 export async function registrarDocumentoSGC(db, { area, tipo, nombre, enlace = "", origen, refId, user }) {
   const contadorRef = doc(db, "contadores", `${area}_${tipo}`);
@@ -28,7 +29,7 @@ export async function registrarDocumentoSGC(db, { area, tipo, nombre, enlace = "
     });
     tx.set(cambioRef, {
       version: 1,
-      fecha: new Date().toISOString().slice(0, 10),
+      fecha: fechaLocalISO(),
       motivo: "Alta inicial",
       hechoPor: user.email,
       en: serverTimestamp()

@@ -4,6 +4,7 @@ import {
 } from "https://www.gstatic.com/firebasejs/10.7.1/firebase-firestore.js";
 import { auth, db, requireAuth, obtenerPerfil } from "./firebase-control.js";
 import { AREAS, TIPOS, nombreArea, nombreTipo } from "./documentos-plantillas.js";
+import { fechaLocalISO } from "./texto.js";
 
 const id = new URLSearchParams(window.location.search).get("id");
 if (!id) window.location.href = "documentos.html";
@@ -19,7 +20,7 @@ function celda(texto) {
 }
 
 function hoyISO() {
-  return new Date().toISOString().slice(0, 10);
+  return fechaLocalISO();
 }
 
 requireAuth(async (user) => {

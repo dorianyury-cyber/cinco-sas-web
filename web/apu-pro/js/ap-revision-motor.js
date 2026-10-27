@@ -9,6 +9,9 @@
 // }
 import { normalizar } from "./ap-calculos.js";
 
+// Fecha AAAA-MM-DD en la hora local (Colombia), no en UTC: toISOString() desde las 7:00 p. m. da el día siguiente.
+const fechaLocalISO = (d = new Date()) => `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}-${String(d.getDate()).padStart(2, "0")}`;
+
 export const BASES = {
   cd: "Costo directo (el AIU y el IVA se suman al final)",
   conAiu: "Incluyen el AIU (el IVA se suma al final)",
@@ -800,7 +803,7 @@ export function informeRD(rev, res, hallazgos, { firmaNombre = "", firmaCargo = 
   ];
   return {
     titulo: textoSeguro(`Revisión de presupuesto - ${rev.nombre || rev.codigo}${rev.fechaOferta ? ` (${rev.fechaOferta.split("-").reverse().join("-")})` : ""}`),
-    tipoInforme: "revisionDisenos", portada: "oscura", mes: (rev.fechaRevision || new Date().toISOString()).slice(0, 7),
+    tipoInforme: "revisionDisenos", portada: "oscura", mes: (rev.fechaRevision || fechaLocalISO()).slice(0, 7),
     firmaNombre: textoSeguro(firmaNombre), firmaCargo: textoSeguro(firmaCargo), bloques
   };
 }
@@ -852,7 +855,7 @@ function hojaCinco(wb, nombre, { logo, rev, titulo, anchos, horizontal = true })
   Object.assign(ws.getCell(3, c0), { value: `${rev.codigo ? rev.codigo + " · " : ""}${rev.nombre || ""}`, font: fx({ size: 11, bold: true, color: { argb: GRIS_TXT } }), alignment: { vertical: "middle", wrapText: true } });
   for (let c = 1; c <= n; c++) ws.getCell(4, c).border = { bottom: { style: "medium", color: { argb: AMBAR } } };
   ws.mergeCells(5, 1, 5, n);
-  const datos = [rev.oferente && `Oferente: ${rev.oferente}`, rev.cliente && `Contratante: ${rev.cliente}`, rev.fechaOferta && `Oferta del ${fechaLarga(rev.fechaOferta)}`, `Revisión: ${fechaLarga(rev.fechaRevision || new Date().toISOString().slice(0, 10))}`].filter(Boolean).join("   ·   ");
+  const datos = [rev.oferente && `Oferente: ${rev.oferente}`, rev.cliente && `Contratante: ${rev.cliente}`, rev.fechaOferta && `Oferta del ${fechaLarga(rev.fechaOferta)}`, `Revisión: ${fechaLarga(rev.fechaRevision || fechaLocalISO())}`].filter(Boolean).join("   ·   ");
   Object.assign(ws.getCell(5, 1), { value: datos, font: fx({ size: 9, color: { argb: GRIS_TXT } }), alignment: { vertical: "middle" } });
   ws.getRow(5).height = 18;
   ws.__fila = 7;

@@ -8,7 +8,7 @@ import { generarCartaPDF } from "./correspondencia-pdf.js";
 import { firmaGuardada, guardarFirma, procesarArchivoFirma, ajustesFirma, guardarAjustesFirma } from "./firma-local.js";
 import { docxABloques } from "./docx-a-bloques.js";
 import { descargarCartaDocx } from "./correspondencia-docx.js";
-import { truncar } from "./texto.js";
+import { truncar, fechaLocalISO } from "./texto.js";
 import { registrarDocumentoSGC } from "./documentos-sgc.js";
 import { crearCampoTextoRico } from "./texto-rico.js";
 import { escucharOfertas, botonOfertas } from "./visor-ofertas.js";
@@ -53,7 +53,7 @@ function mostrarAlerta(texto, tipo) {
 }
 
 function hoyISO() {
-  return new Date().toISOString().slice(0, 10);
+  return fechaLocalISO();
 }
 
 // ---- editor de bloques (texto / imagen, reordenables) ----
@@ -760,7 +760,12 @@ requireAuth(async (user) => {
 
   const q = query(collection(db, "correspondencia"), orderBy("creadoEn", "desc"));
   onSnapshot(q, (snapshot) => {
-    renderTabla(snapshot.docs.map((d) => ({ id: d.id, ...d.data() })), esGestor);
+    // La fecha de la carta es la del momento en que se radicó, en hora de Colombia: las guardadas antes de
+    // corregir hoyISO() pudieron quedar con el día siguiente si se crearon después de las 7:00 p. m.
+    renderTabla(snapshot.docs.map((d) => {
+      const c = d.data();
+      return { id: d.id, ...c, fecha: c.creadoEn?.toDate ? fechaLocalISO(c.creadoEn.toDate()) : c.fecha };
+    }), esGestor);
   });
 
   // orderBy("creadoEn") y no "codigo": los contratos de antes de esta

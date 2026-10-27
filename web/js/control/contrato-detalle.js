@@ -6,7 +6,7 @@ import {
 import { ref, uploadBytes, getDownloadURL } from "https://www.gstatic.com/firebasejs/10.7.1/firebase-storage.js";
 import { auth, db, storage, requireAuth, obtenerPerfil } from "./firebase-control.js";
 import { CAMPOS, FASES, COLUMNAS_ITEM } from "./plantillas.js";
-import { capitalizarOracion, capitalizarNombrePropio } from "./texto.js";
+import { capitalizarOracion, capitalizarNombrePropio, fechaLocalISO } from "./texto.js";
 import { iniciarBitacora, registrarActividad, alCambiarActividad } from "./actividad.js";
 import { crearCeldaDocumentos } from "./adjuntos.js";
 import { TIPOS_ACTIVIDAD, detalleCambio, personasDe, seccionesDe, filtrarActividad } from "./actividad-motor.js";
@@ -473,7 +473,7 @@ function cargarAprobaciones(contratoRef, contrato, empleados, user) {
 function rangoMeses(fechaInicio, fechaFin) {
   if (!fechaInicio) return [];
   const [anioIni, mesIni] = fechaInicio.split("-").map(Number);
-  const limite = fechaFin || new Date().toISOString().slice(0, 10);
+  const limite = fechaFin || fechaLocalISO();
   const [anioFin, mesFin] = limite.split("-").map(Number);
   const meses = [];
   let anio = anioIni;

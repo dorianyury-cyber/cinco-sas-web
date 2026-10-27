@@ -9,7 +9,7 @@ import { generarInformePDF } from "./informes-pdf.js";
 import { descargarInformeDocx } from "./informes-docx.js";
 import { registrarDocumentoSGC } from "./documentos-sgc.js";
 import { escucharOfertas, botonOfertas } from "./visor-ofertas.js";
-import { truncar } from "./texto.js";
+import { truncar, fechaLocalISO } from "./texto.js";
 import { crearCampoTextoRico } from "./texto-rico.js";
 import {
   normalizarMerges, celdaCombinada, expandirRangoConMerges, quitarMergesQueIntersectan,
@@ -95,7 +95,7 @@ function mostrarAlerta(texto, tipo) {
 }
 
 function hoyISO() {
-  return new Date().toISOString().slice(0, 10);
+  return fechaLocalISO();
 }
 
 // Firestore no permite arrays anidados (un array dentro de otro array) —
