@@ -127,10 +127,15 @@ function crearFilaItem(item, user, onEstadoChange, contenedor, todosLosItems, pe
   fila.appendChild(pResponsable.visible ? responsable : celdaOculta());
 
   // Documentos adjuntos (varios archivos o enlaces); la columna conserva el permiso «enlace».
+  // Cada documento va en su propia subfila debajo del ítem, con estado, fecha, responsable y notas propios.
   const pEnlace = permisos.permisoColumna("enlace");
   const seccionItem = nombreSeccion(item);
+  const filasDocs = campo("div", { class: "control-item-docs" });
   fila.appendChild(pEnlace.visible
-    ? crearCeldaDocumentos({ item, contratoId: id, user, editable: pEnlace.editable, seccion: seccionItem })
+    ? crearCeldaDocumentos({
+      item, contratoId: id, user, editable: pEnlace.editable, seccion: seccionItem,
+      filas: filasDocs, estados: ESTADOS, permisoColumna: permisos.permisoColumna
+    })
     : celdaOculta());
 
   const pNotas = permisos.permisoColumna("notas");
@@ -293,6 +298,7 @@ function crearFilaItem(item, user, onEstadoChange, contenedor, todosLosItems, pe
   fechaVerificacion.addEventListener("change", () => guardar("fechaVerificacion", fechaVerificacion.value));
 
   contenedor.appendChild(fila);
+  contenedor.appendChild(filasDocs);
   contenedor.appendChild(panel);
 }
 

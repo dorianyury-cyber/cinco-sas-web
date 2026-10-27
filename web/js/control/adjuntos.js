@@ -5,7 +5,7 @@ import { updateDoc, serverTimestamp } from "https://www.gstatic.com/firebasejs/1
 import { ref, uploadBytes, getDownloadURL, deleteObject, getBlob } from "https://www.gstatic.com/firebasejs/10.7.1/firebase-storage.js";
 import { storage } from "./firebase-control.js";
 import { registrarActividad } from "./actividad.js";
-import { documentosDeItem, validarArchivo, tipoVisor, esUrlSegura, nombreDeEnlace, extensionDe } from "./actividad-motor.js";
+import { documentosDeItem, validarArchivo, tipoVisor, esUrlSegura, nombreDeEnlace, extensionDe, detalleCambio } from "./actividad-motor.js";
 
 function el(tag, clase, texto) {
   const e = document.createElement(tag);
@@ -109,8 +109,12 @@ function tamanoLegible(n) {
   return n >= 1048576 ? `${(n / 1048576).toFixed(1)} MB` : `${Math.max(1, Math.round(n / 1024))} KB`;
 }
 
-// Celda "Documentos" de un ítem. `editable` = puede adjuntar, reemplazar y eliminar.
-export function crearCeldaDocumentos({ item, contratoId, user, editable, seccion }) {
+// Celda "Documentos" de un ítem. `editable` = puede adjuntar, reemplazar, eliminar y llenar los datos de cada
+// documento. Si llega `filas` (un contenedor que el llamador pone justo debajo de la fila del ítem), cada
+// documento se dibuja ahí como una subfila con su propio estado, fecha, responsable y notas, alineada con las
+// columnas del ítem; si no, se listan dentro de la celda como antes.
+// `estados`: [{valor, label}] del checklist; `permisoColumna(clave)` → {visible} para ocultar lo mismo que en el ítem.
+export function crearCeldaDocumentos({ item, contratoId, user, editable, seccion, filas = null, estados = [], permisoColumna = () => ({ visible: true }) }) {
   const celda = el("div", "control-docs");
   const entrada = el("input");
   entrada.type = "file";
@@ -166,7 +170,9 @@ export function crearCeldaDocumentos({ item, contratoId, user, editable, seccion
       const actuales = Array.isArray(item.documentos) ? [...item.documentos] : [];
       if (destino) {
         const idx = actuales.findIndex((x) => x.id === destino.id);
-        if (idx >= 0) actuales[idx] = nuevos[0]; else actuales.push(nuevos[0]);
+        // El archivo nuevo conserva los datos que ya tenía el documento (estado, fecha, responsable, notas).
+        const datos = Object.fromEntries(["estado", "fecha", "responsable", "notas"].filter((k) => destino[k]).map((k) => [k, destino[k]]));
+        if (idx >= 0) actuales[idx] = { ...datos, ...nuevos[0] }; else actuales.push({ ...datos, ...nuevos[0] });
         await guardar({ documentos: actuales });
         item.documentos = actuales;
         await borrarDeAlmacen(destino);
@@ -239,6 +245,70 @@ export function crearCeldaDocumentos({ item, contratoId, user, editable, seccion
     });
   }
 
+  // Datos propios de un documento (estado, fecha, responsable, notas). Se guardan sin volver a pintar, para no
+  // perder el foco al pasar de un campo a otro. El enlace heredado del ítem no tiene dónde guardarlos: al
+  // llenarle un dato se convierte en un documento más (y se vacía `enlace`).
+  const ETIQUETA = { estado: "Estado", fecha: "Fecha", responsable: "Responsable", notas: "Notas" };
+  async function actualizarDoc(d, clave, valor) {
+    const antes = d[clave];
+    try {
+      if (d.heredado) {
+        const nuevo = { id: nuevoId(), tipo: "enlace", nombre: d.nombre, url: d.url, subidoPor: user.email, subidoEn: new Date().toISOString(), [clave]: valor };
+        const todos = [...(Array.isArray(item.documentos) ? item.documentos : []), nuevo];
+        await guardar({ documentos: todos, enlace: "" });
+        item.documentos = todos;
+        item.enlace = "";
+        pintar();
+      } else {
+        const todos = item.documentos.map((x) => (x.id === d.id ? { ...x, [clave]: valor } : x));
+        await guardar({ documentos: todos });
+        item.documentos = todos;
+        d[clave] = valor;
+      }
+      const etiquetaEstado = (v) => estados.find((e) => e.valor === v)?.label || v;
+      const ver = clave === "estado" ? etiquetaEstado : (v) => v;
+      await reg("doc_dato", `«${d.nombre}» — ${detalleCambio(ETIQUETA[clave], ver(antes), ver(valor))}`);
+    } catch (err) {
+      avisar(err.message || "No se pudo guardar el dato del documento.");
+    }
+  }
+
+  function campoDoc(d, clave) {
+    if (!permisoColumna(clave === "estado" ? "estado" : clave).visible) return el("span", "control-item-oculto", "—");
+    let c;
+    if (clave === "estado") {
+      c = document.createElement("select");
+      c.appendChild(new Option("—", ""));
+      estados.forEach((e) => c.appendChild(new Option(e.label, e.valor)));
+      c.value = d.estado || "";
+    } else {
+      c = document.createElement("input");
+      c.type = clave === "fecha" ? "date" : "text";
+      if (clave !== "fecha") { c.maxLength = clave === "notas" ? 200 : 80; c.placeholder = ETIQUETA[clave]; }
+      c.value = d[clave] || "";
+    }
+    c.className = `control-item-${clave}`;
+    c.disabled = !editable;
+    c.addEventListener("change", () => actualizarDoc(d, clave, c.value));
+    return c;
+  }
+
+  function nombreDoc(d) {
+    const nombre = boton("control-doc-nombre", `${d.tipo === "enlace" ? "🔗" : "📄"} ${d.nombre}`, `Ver «${d.nombre}»${d.tamano ? " — " + tamanoLegible(d.tamano) : ""}${d.subidoPor ? `\nAdjuntado por ${d.subidoPor}` : ""}`, () => verDocumento(d));
+    nombre.dataset.tipo = d.tipo === "enlace" ? "enlace" : extensionDe(d.nombre);
+    return nombre;
+  }
+
+  function accionesDoc(d) {
+    const caja = el("div", "control-doc-acciones");
+    if (!editable) return caja;
+    const r = boton("icon-btn", "↻", "Reemplazar", () => reemplazar(d));
+    const x = boton("icon-btn danger", "🗑️", "Eliminar", () => eliminar(d));
+    r.disabled = x.disabled = ocupado;
+    caja.append(r, x);
+    return caja;
+  }
+
   function pintar() {
     celda.replaceChildren(entrada);
     const docs = documentosDeItem(item);
@@ -249,9 +319,22 @@ export function crearCeldaDocumentos({ item, contratoId, user, editable, seccion
       const enlace = boton("icon-btn", "🔗", "Pegar un enlace (por ejemplo, de OneDrive)", agregarEnlace);
       enlace.disabled = ocupado;
       barra.append(adjuntar, enlace);
+      if (filas && docs.length) barra.appendChild(el("span", "control-docs-cuenta", `${docs.length} doc.`));
       celda.appendChild(barra);
     } else if (!docs.length) {
       celda.appendChild(el("span", "control-item-oculto", "—"));
+    } else if (filas) {
+      celda.appendChild(el("span", "control-docs-cuenta", `${docs.length} documento${docs.length === 1 ? "" : "s"}`));
+    }
+
+    if (filas) {
+      // Una subfila por documento, con las mismas columnas del ítem: Documento | Estado | Fecha | Responsable | acciones | Notas.
+      filas.replaceChildren(...docs.map((d) => {
+        const fila = el("div", "control-item control-item-doc");
+        fila.append(nombreDoc(d), campoDoc(d, "estado"), campoDoc(d, "fecha"), campoDoc(d, "responsable"), accionesDoc(d), campoDoc(d, "notas"));
+        return fila;
+      }));
+      return;
     }
     docs.forEach((d) => {
       const fila = el("div", "control-doc");

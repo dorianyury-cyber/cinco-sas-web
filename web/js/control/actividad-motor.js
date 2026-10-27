@@ -12,6 +12,7 @@ export const TIPOS_ACTIVIDAD = {
   doc_adjunto: "Documento adjuntado",
   doc_reemplazo: "Documento reemplazado",
   doc_eliminado: "Documento eliminado",
+  doc_dato: "Dato de documento",
   aprobacion: "Aprobación",
   equipo: "Equipo",
   item: "Ítem",

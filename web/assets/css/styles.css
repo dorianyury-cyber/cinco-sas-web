@@ -2555,3 +2555,18 @@ body.app-control .ctl-main #contratoCliente { margin-top: 5px; font-size: 12.5px
 .control-rich-editable .rt-al-center { text-align: center; }
 .control-rich-editable .rt-al-right { text-align: right; }
 .control-rich-editable .rt-al-justify { text-align: justify; }
+
+/* ---- Documentos de un ítem del checklist como subfilas (cada uno con estado, fecha, responsable y notas) ---- */
+.control-item-docs:empty { display: none; }
+.control-item.control-item-doc { padding: 3px 4px; border-bottom: 1px dashed var(--border); font-size: 12px; background: rgba(254, 178, 9, 0.03); }
+.control-item.control-item-doc:last-child { border-bottom: 1px solid var(--border); }
+.control-item.control-item-doc input,
+.control-item.control-item-doc select { padding: 3px 7px; font-size: 12px; border-radius: 6px; }
+.control-item-doc .control-doc-nombre { padding-left: 18px; }
+.control-item-doc .control-doc-nombre::before { content: "↳"; margin-right: 4px; color: var(--text-muted); }
+.control-doc-acciones { display: flex; gap: 2px; }
+.control-docs-cuenta { font-size: 11px; color: var(--text-muted); white-space: nowrap; }
+@media (max-width: 760px) {
+  .control-item.control-item-doc { padding-left: 4px; }
+  .control-item-doc .control-doc-nombre { grid-column: 1 / -1; }
+}
