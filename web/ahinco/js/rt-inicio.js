@@ -80,7 +80,8 @@ if (ctx) {
     if (!f) return;
     try {
       const json = JSON.parse(await f.text());
-      if (!confirm(`¿Importar el proyecto «${json?.proyecto?.nombre || f.name}» con ${Object.keys(json?.calculos || {}).length} cálculos? Se crea como un proyecto nuevo a tu nombre.`)) return;
+      const nCalc = Object.keys(json?.calculos || {}).length, nHall = (json?.proyecto?.hallazgosManuales || []).length;
+      if (!confirm(`¿Importar el proyecto «${json?.proyecto?.nombre || f.name}» con ${nCalc} cálculos${nHall ? ` y ${nHall} hallazgos de revisión` : ""}? Se crea como un proyecto nuevo a tu nombre.`)) return;
       const { id } = await importarProyecto(json, ctx.user);
       window.location.href = `proyecto.html?id=${encodeURIComponent(id)}#resumen`;
     } catch (err) {
