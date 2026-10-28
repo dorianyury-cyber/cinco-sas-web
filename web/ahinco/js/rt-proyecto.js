@@ -173,7 +173,9 @@ function iniciar(proyecto, guardados) {
   const pendientesSinJustificar = () => LITERALES.filter((l) => literales[l.l]?.aplica === "No" && !(literales[l.l]?.texto || "").trim()).map((l) => `${l.l})`);
   async function generar(tipo, btn) {
     limpiarAlerta(alerta);
-    if (!Object.keys(resultados).length && tipo !== "excel" && tipo !== "verExcel") { mostrarAlerta(alerta, "Todavía no hay cálculos guardados en este proyecto."); return; }
+    // Una verificación solo documental (hallazgos de revisión y literales escritos, sin cálculos) también genera informe.
+    const soloDocumental = (proyecto.hallazgosManuales || []).length || LITERALES.some((l) => (literales[l.l]?.texto || "").trim());
+    if (!Object.keys(resultados).length && !soloDocumental && tipo !== "excel" && tipo !== "verExcel") { mostrarAlerta(alerta, "Todavía no hay cálculos guardados en este proyecto."); return; }
     const sinJust = pendientesSinJustificar();
     if (tipo !== "verMemoria" && tipo !== "verExcel" && sinJust.length && !confirm(`Los literales ${sinJust.join(", ")} están marcados «No aplica» sin justificación (el RETIE exige mencionarla). ¿Generar de todas formas?`)) return;
     btn.disabled = true; btn.classList.add("generando");

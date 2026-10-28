@@ -65,10 +65,11 @@ export function calculosDe(lit, resultados) {
 export async function construirMemoria({ proyecto, resultados, guardados }) {
   const lits = proyecto.literales || {};
   const verif = esVerificacion(proyecto);
+  const conCalculos = Object.keys(resultados).length > 0;
   const b = [];
   // ---- Generalidades
   b.push(T(1, "Generalidades"));
-  if (verif) b.push(P(`El presente informe contiene la <b>verificación de la interventoría</b> sobre la memoria de cálculo y los planos del proyecto <b>${esc(proyecto.nombre)}</b>${proyecto.descripcion ? `: ${esc(proyecto.descripcion)}` : ""}. Los cálculos se rehicieron con los datos del diseño revisado y se compararon con los criterios del RETIE y de las normas técnicas citadas; cada criterio que no cumple se reporta como un hallazgo numerado. Se organiza según los literales del ${esc(FUENTE_LITERALES)}.`));
+  if (verif) b.push(P(`El presente informe contiene la <b>verificación de la interventoría</b> sobre la memoria de cálculo y los planos del proyecto <b>${esc(proyecto.nombre)}</b>${proyecto.descripcion ? `: ${esc(proyecto.descripcion)}` : ""}. ${conCalculos ? "Los cálculos se rehicieron con los datos del diseño revisado y se compararon" : "La memoria y los planos se revisaron y se compararon"} con los criterios del RETIE y de las normas técnicas citadas; cada criterio que no cumple se reporta como un hallazgo numerado. Se organiza según los literales del ${esc(FUENTE_LITERALES)}.`));
   else b.push(P(`La presente memoria de cálculo corresponde al ${esc(normalizarTipoDiseno(proyecto.tipoDiseno).toLowerCase())} de la instalación eléctrica del proyecto <b>${esc(proyecto.nombre)}</b>${proyecto.descripcion ? `: ${esc(proyecto.descripcion)}` : ""}. Se organiza según los literales del ${esc(FUENTE_LITERALES)}; los literales que no aplican a la instalación se mencionan expresamente con su justificación, como lo exige el parágrafo 1 del mismo artículo.`));
   b.push(tabla("Datos generales del proyecto", ["Dato", "Valor"], [
     ["Proyecto", proyecto.nombre], ["Cliente", proyecto.cliente || "—"], ["Ubicación", proyecto.ubicacion || "—"],
@@ -122,9 +123,9 @@ export async function construirMemoria({ proyecto, resultados, guardados }) {
     const fallan = (r.verificaciones || []).filter((v) => v.cumple === false).length;
     return [tituloCalculo(r), r.sinDatos ? "Sin datos" : fallan ? (verif ? `Con hallazgos (${fallan})` : `No cumple (${fallan})`) : "Cumple", r.conclusion || ""];
   });
-  b.push(tabla("Resumen de resultados", ["Cálculo", "Estado", "Conclusión"], filasConc));
+  if (filasConc.length) b.push(tabla("Resumen de resultados", ["Cálculo", "Estado", "Conclusión"], filasConc));
   b.push(P(verif
-    ? "La interventoría verificó los cálculos con base en el RETIE y las normas técnicas citadas, a partir de los documentos revisados. Este informe no reemplaza la memoria de cálculo del diseñador: los hallazgos deben resolverse en el diseño y los supuestos confirmarse con el contratista."
+    ? `La interventoría verificó ${conCalculos ? "los cálculos" : "la memoria y los planos"} con base en el RETIE y las normas técnicas citadas, a partir de los documentos revisados. Este informe no reemplaza la memoria de cálculo del diseñador: los hallazgos deben resolverse en el diseño y los supuestos confirmarse con el contratista.`
     : "El diseñador declara que los cálculos se realizaron con base en el RETIE y las normas técnicas citadas, y que los supuestos adoptados se indican en cada literal."));
   b.push({ tipo: "firma", etiqueta: verif ? "Verificó" : "Elaboró", firmantes: [{ nombre: proyecto.disenador || "", cargo: `${verif ? "Interventoría" : "Ingeniero electricista"}${proyecto.matricula ? `\nMatrícula profesional ${proyecto.matricula}` : ""}\nCinco S.A.S.`, firmaUrl: null }] });
   return b;
