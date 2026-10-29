@@ -10,6 +10,7 @@ import { descargarInformeDocx } from "./informes-docx.js";
 import { registrarDocumentoSGC } from "./documentos-sgc.js";
 import { escucharOfertas, botonOfertas } from "./visor-ofertas.js";
 import { truncar, fechaLocalISO } from "./texto.js";
+import { mejorarSelectorContrato } from "./selector-contrato.js";
 import { crearCampoTextoRico } from "./texto-rico.js";
 import {
   normalizarMerges, celdaCombinada, expandirRangoConMerges, quitarMergesQueIntersectan,
@@ -1561,6 +1562,7 @@ requireAuth(async (user) => {
     opt.textContent = `${c.codigo || "(sin código)"} — ${truncar(c.nombre)}`;
     selectContrato.appendChild(opt);
   });
+  mejorarSelectorContrato(selectContrato, contratosPorId);
 
   renderBloques();
 

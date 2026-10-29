@@ -8,6 +8,7 @@ import { auth, db, storage, requireAuth, obtenerPerfil } from "./firebase-contro
 import { generarOfertaPDF } from "./ofertas-pdf.js";
 import { registrarDocumentoSGC } from "./documentos-sgc.js";
 import { truncar } from "./texto.js";
+import { mejorarSelectorContrato } from "./selector-contrato.js";
 import { LINEAS_SERVICIO } from "./lineas-servicio.js";
 import { crearCampoTextoRico } from "./texto-rico.js";
 import {
@@ -1372,6 +1373,7 @@ requireAuth(async (user) => {
     selectContrato.appendChild(opt);
     filtroOfertaContratoSelect.appendChild(new Option(etiqueta, docSnap.id));
   });
+  mejorarSelectorContrato(selectContrato, contratosPorId);
   selectContrato.addEventListener("change", () => {
     const c = contratosPorId[selectContrato.value];
     if (!c) return;

@@ -9,6 +9,7 @@ import { firmaGuardada, guardarFirma, procesarArchivoFirma, ajustesFirma, guarda
 import { docxABloques } from "./docx-a-bloques.js";
 import { descargarCartaDocx } from "./correspondencia-docx.js";
 import { truncar, fechaLocalISO } from "./texto.js";
+import { mejorarSelectorContrato } from "./selector-contrato.js";
 import { registrarDocumentoSGC } from "./documentos-sgc.js";
 import { crearCampoTextoRico } from "./texto-rico.js";
 import { escucharOfertas, botonOfertas } from "./visor-ofertas.js";
@@ -782,6 +783,7 @@ requireAuth(async (user) => {
     selectContrato.appendChild(opt);
     filtroContratoSelect.appendChild(new Option(etiqueta, docSnap.id));
   });
+  mejorarSelectorContrato(selectContrato, contratosPorId);
 
   form.addEventListener("submit", async (e) => {
     e.preventDefault();

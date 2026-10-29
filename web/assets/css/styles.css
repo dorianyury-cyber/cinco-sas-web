@@ -1752,6 +1752,42 @@ tr.control-fila-doc td:first-child { font-weight: 700; color: var(--cinco-amber-
   .visor-ofertas-encabezado { flex-wrap: wrap; }
 }
 
+/* Selector de "Contrato relacionado" (js/control/selector-contrato.js): un botón con
+   aspecto de campo que muestra número, nombre completo y cliente del contrato elegido,
+   y un modal con buscador y la lista de contratos sin recortar el nombre. */
+.selector-contrato-boton {
+  display: flex; flex-direction: column; align-items: flex-start; gap: 1px;
+  width: 100%; padding: 9px 12px; text-align: left; cursor: pointer;
+  font: inherit; font-size: 13.5px; line-height: 1.35; color: var(--text);
+  background: var(--card-bg); border: 1px solid var(--border); border-radius: 10px;
+}
+.selector-contrato-boton:hover { border-color: var(--cinco-amber-dark); }
+.selector-contrato-boton:focus-visible { outline: none; border-color: var(--cinco-amber-dark); box-shadow: 0 0 0 3px rgba(254, 178, 9, 0.2); }
+.selector-contrato-boton .text-muted { font-size: 12.5px; }
+.selector-contrato-codigo { font-weight: 700; color: var(--cinco-amber-dark); letter-spacing: 0.01em; }
+.selector-contrato-nombre { font-weight: 600; color: var(--text); overflow-wrap: anywhere; }
+.modal.selector-contrato-modal { max-width: 760px; height: 80vh; display: flex; flex-direction: column; gap: 10px; padding: 18px 20px; overflow: hidden; }
+.selector-contrato-encabezado { display: flex; align-items: center; justify-content: space-between; gap: 12px; }
+.selector-contrato-encabezado h2 { margin: 0; }
+.selector-contrato-modal input[data-s="buscar"] {
+  width: 100%; padding: 9px 12px; font-size: 14px; color: var(--text);
+  background: var(--bg); border: 1px solid var(--border); border-radius: 10px;
+}
+.selector-contrato-modal input[data-s="buscar"]:focus { outline: none; border-color: var(--cinco-amber-dark); box-shadow: 0 0 0 3px rgba(254, 178, 9, 0.2); }
+.selector-contrato-lista { list-style: none; margin: 0; padding: 0 4px 0 0; flex: 1; min-height: 0; overflow-y: auto; display: flex; flex-direction: column; gap: 6px; }
+.selector-contrato-lista li[data-id] {
+  cursor: pointer; display: flex; flex-direction: column; gap: 2px;
+  padding: 8px 12px; font-size: 13px; line-height: 1.4;
+  background: var(--card-bg); border: 1px solid var(--border); border-left: 5px solid var(--cinco-amber-dark); border-radius: 10px;
+}
+.selector-contrato-lista li[data-id]:hover { border-color: var(--cinco-amber-dark); }
+.selector-contrato-lista li.activa { outline: 2px solid var(--cinco-amber); background: rgba(254, 178, 9, 0.10); }
+.selector-contrato-lista li.selector-contrato-ninguno { border-left-color: var(--border); }
+.selector-contrato-lista .text-muted { font-size: 12px; }
+.selector-contrato-fila { display: flex; align-items: center; gap: 8px; }
+.selector-contrato-estado { font-size: 10.5px; font-weight: 600; padding: 1px 7px; border-radius: 999px; color: var(--text-muted); border: 1px solid var(--border); }
+.selector-contrato-vacio { padding: 8px; font-size: 13px; }
+
 /* Barra de filtros sobre una lista fila+panel (Contratos/Correspondencia/
    Órdenes de Trabajo) — texto libre y/o desplegables/fechas, en una sola
    fila que se envuelve si no cabe. Filtra en el cliente sobre lo que ya
@@ -2449,6 +2485,12 @@ body.app-control.ctl-con-menu .control-btn-danger { padding: 3px 11px; font-size
 }
 :root[data-theme="light"] { --bg: #f4f5f7; --card-bg: #ffffff; --text: #1c1c1c; --text-muted: #6b7280; --border: #e5e7eb; --shadow: 0 4px 16px rgba(0, 0, 0, 0.08); --shadow-lg: 0 12px 32px rgba(0, 0, 0, 0.12); }
 :root[data-theme="dark"] { --bg: #16171a; --card-bg: #1f2023; --text: #f0f1f3; --text-muted: #9aa0aa; --border: #34363b; --shadow: 0 4px 16px rgba(0, 0, 0, 0.35); --shadow-lg: 0 12px 32px rgba(0, 0, 0, 0.5); }
+/* Controles nativos (lista desplegable de <select>, calendario de los campos de fecha, barras de desplazamiento):
+   sin color-scheme el navegador los pinta en claro aunque la página esté en oscuro, y las opciones quedan con
+   texto claro sobre fondo claro. Las <option> se fijan aparte porque en Windows la lista no hereda el fondo del <select>. */
+:root[data-theme="light"] { color-scheme: light; }
+:root[data-theme="dark"] { color-scheme: dark; }
+:root[data-theme] select option { background: var(--card-bg); color: var(--text); }
 body.ctl-con-menu { font-family: "Segoe UI", Roboto, Helvetica, Arial, sans-serif; background: var(--bg); color: var(--text); }
 /* Encabezado de página como el de los aplicativos: título grande y la descripción debajo. */
 body.app-control .ctl-main .page-banner .container { display: block; }
