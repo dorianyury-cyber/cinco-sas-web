@@ -1177,6 +1177,11 @@ document.getElementById("importarJsonBtn").addEventListener("click", () => {
     }
   }
 
+  // Importar siempre arranca un informe nuevo: después de guardar, el
+  // formulario se queda en edición sobre el informe recién guardado, y si
+  // no se sale de ahí el "Guardar" pisaba ese informe (mismo radicado) con
+  // el contenido importado — pasó en producción con dos RD seguidos.
+  limpiarFormulario();
   if (datos.titulo) document.getElementById("titulo").value = datos.titulo;
   if (datos.tipoInforme) document.getElementById("tipoInforme").value = datos.tipoInforme;
   if (datos.portada) document.getElementById("portada").value = datos.portada;
