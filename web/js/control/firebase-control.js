@@ -23,10 +23,15 @@ export async function obtenerPerfil(email) {
 
 // Guardia de acceso compartida por las páginas protegidas: si no hay sesión
 // redirige a login.html, si la hay invoca el callback con el usuario.
+// Lleva "?next=" con la página y los parámetros actuales, para que al
+// iniciar sesión vuelva justo ahí — si no, el enlace de WhatsApp de una
+// Orden de Trabajo (…ordenes-trabajo.html?id=…) abierto en un celular sin
+// sesión terminaba en inicio.html y se perdía la orden asignada.
 export function requireAuth(onUser) {
   onAuthStateChanged(auth, (user) => {
     if (!user) {
-      window.location.href = "login.html";
+      const pagina = window.location.pathname.split("/").pop() + window.location.search;
+      window.location.href = `login.html?next=${encodeURIComponent(pagina)}`;
       return;
     }
     onUser(user);

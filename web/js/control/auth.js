@@ -7,9 +7,15 @@ const functions = getFunctions(app);
 
 agregarToggleClave(document.getElementById("clave"));
 
+// Página a la que volver tras iniciar sesión (la pone requireAuth en
+// "?next="). Solo se acepta una página .html de esta misma carpeta, para
+// que el parámetro no sirva para mandar a nadie a otro sitio.
+const nextParam = new URLSearchParams(window.location.search).get("next") || "";
+const destino = /^[\w-]+\.html(\?[^#]*)?$/.test(nextParam) && !nextParam.startsWith("login.html") ? nextParam : "inicio.html";
+
 // Si ya hay sesión activa, saltar directo a la lista de contratos.
 onAuthStateChanged(auth, (user) => {
-  if (user) window.location.href = "inicio.html";
+  if (user) window.location.href = destino;
 });
 
 const form = document.getElementById("loginForm");
@@ -32,7 +38,7 @@ form.addEventListener("submit", async (e) => {
 
   try {
     await signInWithEmailAndPassword(auth, email, clave);
-    window.location.href = "inicio.html";
+    window.location.href = destino;
     return;
   } catch (err) {
     // Sin cuenta propia en Cinco SAS control (o clave distinta a la de acá)
@@ -47,7 +53,7 @@ form.addEventListener("submit", async (e) => {
     try {
       const { data } = await httpsCallable(functions, "iniciarSesionConConecta")({ email, password: clave });
       await signInWithCustomToken(auth, data.customToken);
-      window.location.href = "inicio.html";
+      window.location.href = destino;
     } catch (err2) {
       mostrarAlerta("Correo o clave incorrectos.", "error");
       submitBtn.disabled = false;

@@ -166,10 +166,28 @@ const idDesdeUrl = new URLSearchParams(window.location.search).get("id");
 let ordenDesdeUrlYaAbierta = false;
 function abrirOrdenDesdeUrlSiHaceFalta(ordenes, abrir) {
   if (ordenDesdeUrlYaAbierta || !idDesdeUrl) return;
-  const orden = ordenes.find((o) => o.id === idDesdeUrl);
-  if (!orden) return;
   ordenDesdeUrlYaAbierta = true;
+  const orden = ordenes.find((o) => o.id === idDesdeUrl);
+  // Antes, si la orden no aparecía (se reasignó, se borró, o la cuenta con
+  // la que entró no es la del responsable) no pasaba nada y parecía que el
+  // enlace "no llegaba" — ahora se dice por qué.
+  if (!orden) {
+    const aviso = document.getElementById("otAvisoEnlace");
+    aviso.textContent = `La orden del enlace no está asignada a la cuenta ${usuarioActual?.email || ""}. Verifica que iniciaste sesión con tu propio correo, o pide que te reenvíen el enlace.`;
+    aviso.classList.add("show");
+    return;
+  }
   abrir(orden);
+}
+
+// Quien abre el enlace de WhatsApp es el responsable/personal de la orden
+// — aunque además tenga permiso de gerencia (o sea admin), lo que le toca
+// es su parte (Paso 3/4), no el formulario completo del jefe. Por eso el
+// enlace abre abrirModalCompletar si está en personalEmails y la orden no
+// está cerrada; solo si no participa se abre la edición completa.
+function esParticipante(orden) {
+  const correo = (usuarioActual?.email || "").toLowerCase();
+  return (orden.personalEmails || []).some((e) => String(e).toLowerCase() === correo);
 }
 
 const VALOR_VEHICULO_OTRO = "__otro__";
@@ -357,6 +375,9 @@ function mostrarPaso({ jefe = false, alistamiento = false, cierre = false }) {
   CAMPOS_REQUERIDOS_JEFE.forEach((id) => { document.getElementById(id).required = jefe; });
   form.classList.remove("oculto");
   confirmacionCreada.classList.add("oculto");
+  // El modal conserva el scroll de la última vez que se abrió — en el
+  // celular eso dejaba al responsable a mitad de otra sección.
+  nuevaOrdenBackdrop.querySelector(".modal").scrollTop = 0;
 }
 
 function habilitarCamposCierre(habilitado) {
@@ -521,6 +542,7 @@ function abrirModalCompletar(orden) {
   if (modoFormulario === "riesgos") {
     // Paso 3: alto riesgo + PESV + preoperacionales, todavía nada de cierre.
     mostrarPaso({ alistamiento: true });
+    habilitarCamposCierre(true); // vuelve a mostrar "Guardar" si antes se vio una orden cerrada
     tituloModal.textContent = `Orden ${orden.numero} — Paso 3 de 4: antes de iniciar`;
     guardarBtn.textContent = "Guardar";
   } else {
@@ -537,6 +559,70 @@ function abrirModalCompletar(orden) {
 
   alertBox.className = "form-alert";
   nuevaOrdenBackdrop.classList.add("open");
+}
+
+// Paso 3 (alistamientoCompletado:true la primera vez) o Paso 4 (cierre
+// + firma) según en qué fase haya abierto abrirModalCompletar — nunca
+// se manda contrato/responsable/vehículo, que son del jefe y acá ni
+// siquiera están rellenos (los <select> quedan en su opción vacía). Lo
+// usan los dos submit (participante sin permiso, y jefe/admin que además
+// es responsable de la orden y entró por el enlace de WhatsApp).
+async function guardarPasoParticipante() {
+  alertBox.className = "form-alert";
+
+  if (modoFormulario === "cierre") {
+    if (!document.getElementById("otFechaCierre").value) {
+      mostrarAlerta("Escribe la fecha y hora de cierre.", "error");
+      return;
+    }
+    if (!firmaCierre.tieneTrazoNuevo) {
+      mostrarAlerta("Falta la firma de quien ejecutó los trabajos — dibújala en el recuadro señalado abajo.", "error");
+      resaltarFirmaFaltante();
+      return;
+    }
+  }
+
+  guardarBtn.disabled = true;
+  guardarBtn.textContent = "Guardando...";
+  try {
+    if (modoFormulario === "riesgos") {
+      await updateDoc(doc(db, "ordenesTrabajo", ordenIdEnEdicion), {
+        altoRiesgo: leerChecklist(riesgosLista),
+        pesv: {
+          origen: document.getElementById("otOrigen").value.trim(),
+          destino: document.getElementById("otDestino").value.trim(),
+          descripcionRuta: document.getElementById("otDescripcionRuta").value.trim(),
+          descripcionPausasActivas: document.getElementById("otPausasActivas").value.trim()
+        },
+        preoperacionales: leerChecklist(preoperacionalesLista),
+        alistamientoCompletado: true,
+        actualizadoEn: serverTimestamp(),
+        actualizadoPor: usuarioActual.email
+      });
+      mostrarAlerta("Guardado. Cuando termines el trabajo, vuelve a entrar a esta orden para cerrarla con tu firma.", "ok");
+    } else {
+      await updateDoc(doc(db, "ordenesTrabajo", ordenIdEnEdicion), {
+        cierre: {
+          observaciones: document.getElementById("otObservaciones").value.trim(),
+          fechaHoraCierre: document.getElementById("otFechaCierre").value,
+          horasAdicionales: document.getElementById("otHorasAdicionales").value.trim(),
+          valesAlimentacion: document.getElementById("otValesAlimentacion").value.trim(),
+          pernoctada: document.getElementById("otPernoctada").value,
+          firmaDataUrl: firmaCierre.dataUrl()
+        },
+        estado: "CERRADA",
+        actualizadoEn: serverTimestamp(),
+        actualizadoPor: usuarioActual.email
+      });
+      mostrarAlerta("Orden cerrada.", "ok");
+    }
+    nuevaOrdenBackdrop.classList.remove("open");
+  } catch (err) {
+    mostrarAlerta(err.message || "No se pudo guardar.", "error");
+  } finally {
+    guardarBtn.disabled = false;
+    guardarBtn.textContent = modoFormulario === "riesgos" ? "Guardar" : "Cerrar orden";
+  }
 }
 
 function celda(texto) {
@@ -741,6 +827,18 @@ function pintarVistaPreviaOrden() {
 
   if (!autorizadoListaActual) return;
 
+  // Jefe/admin que además es responsable o personal de esta orden: acceso
+  // directo a su parte (Paso 3/4), sin tener que pasar por "Editar".
+  const faseParticipante = faseDeOrden(o);
+  if (esParticipante(o) && faseParticipante !== "cerrada") {
+    const btnCompletar = document.createElement("button");
+    btnCompletar.type = "button";
+    btnCompletar.className = "control-btn-mini";
+    btnCompletar.textContent = faseParticipante === "riesgos" ? "Completar mi parte" : "Cerrar orden";
+    btnCompletar.addEventListener("click", () => abrirModalCompletar(o));
+    accionesEl.appendChild(btnCompletar);
+  }
+
   const btnEditar = document.createElement("button");
   btnEditar.type = "button";
   btnEditar.className = "control-btn-mini";
@@ -833,67 +931,9 @@ requireAuth(async (user) => {
     // renderChecklist no depende de más datos). Los desplegables de
     // contrato/responsable/vehículo del jefe quedan vacíos, pero están
     // ocultos (#otSeccionesJefe) así que no importa.
-    // Paso 3 (alistamientoCompletado:true la primera vez) o Paso 4 (cierre
-    // + firma) según en qué fase haya abierto abrirModalCompletar — nunca
-    // se manda contrato/responsable/vehículo, que son del jefe y acá ni
-    // siquiera están rellenos (los <select> quedan en su opción vacía).
-    form.addEventListener("submit", async (e) => {
+    form.addEventListener("submit", (e) => {
       e.preventDefault();
-      alertBox.className = "form-alert";
-
-      if (modoFormulario === "cierre") {
-        if (!document.getElementById("otFechaCierre").value) {
-          mostrarAlerta("Escribe la fecha y hora de cierre.", "error");
-          return;
-        }
-        if (!firmaCierre.tieneTrazoNuevo) {
-          mostrarAlerta("Falta la firma de quien ejecutó los trabajos — dibújala en el recuadro señalado abajo.", "error");
-          resaltarFirmaFaltante();
-          return;
-        }
-      }
-
-      guardarBtn.disabled = true;
-      guardarBtn.textContent = "Guardando...";
-      try {
-        if (modoFormulario === "riesgos") {
-          await updateDoc(doc(db, "ordenesTrabajo", ordenIdEnEdicion), {
-            altoRiesgo: leerChecklist(riesgosLista),
-            pesv: {
-              origen: document.getElementById("otOrigen").value.trim(),
-              destino: document.getElementById("otDestino").value.trim(),
-              descripcionRuta: document.getElementById("otDescripcionRuta").value.trim(),
-              descripcionPausasActivas: document.getElementById("otPausasActivas").value.trim()
-            },
-            preoperacionales: leerChecklist(preoperacionalesLista),
-            alistamientoCompletado: true,
-            actualizadoEn: serverTimestamp(),
-            actualizadoPor: user.email
-          });
-          mostrarAlerta("Guardado. Cuando termines el trabajo, vuelve a entrar a esta orden para cerrarla con tu firma.", "ok");
-        } else {
-          await updateDoc(doc(db, "ordenesTrabajo", ordenIdEnEdicion), {
-            cierre: {
-              observaciones: document.getElementById("otObservaciones").value.trim(),
-              fechaHoraCierre: document.getElementById("otFechaCierre").value,
-              horasAdicionales: document.getElementById("otHorasAdicionales").value.trim(),
-              valesAlimentacion: document.getElementById("otValesAlimentacion").value.trim(),
-              pernoctada: document.getElementById("otPernoctada").value,
-              firmaDataUrl: firmaCierre.dataUrl()
-            },
-            estado: "CERRADA",
-            actualizadoEn: serverTimestamp(),
-            actualizadoPor: user.email
-          });
-          mostrarAlerta("Orden cerrada.", "ok");
-        }
-        nuevaOrdenBackdrop.classList.remove("open");
-      } catch (err) {
-        mostrarAlerta(err.message || "No se pudo guardar.", "error");
-      } finally {
-        guardarBtn.disabled = false;
-        guardarBtn.textContent = modoFormulario === "riesgos" ? "Guardar" : "Cerrar orden";
-      }
+      guardarPasoParticipante();
     });
     document.getElementById("cancelarOrdenBtn").addEventListener("click", () => nuevaOrdenBackdrop.classList.remove("open"));
     return;
@@ -966,8 +1006,10 @@ requireAuth(async (user) => {
   const q = query(collection(db, "ordenesTrabajo"), orderBy("numero", "desc"));
   onSnapshot(q, (snapshot) => {
     const listaOrdenes = snapshot.docs.map((d) => ({ id: d.id, ...d.data() }));
+    if (idDesdeUrl && !ordenDesdeUrlYaAbierta) ordenSeleccionadaId = idDesdeUrl;
     renderTabla(listaOrdenes, autorizado);
-    abrirOrdenDesdeUrlSiHaceFalta(listaOrdenes, abrirModalEditar);
+    abrirOrdenDesdeUrlSiHaceFalta(listaOrdenes, (o) =>
+      (esParticipante(o) && faseDeOrden(o) !== "cerrada" ? abrirModalCompletar(o) : abrirModalEditar(o)));
   });
 
   // Vehículos de la empresa — en vivo, para que uno agregado por otra
@@ -981,6 +1023,10 @@ requireAuth(async (user) => {
 
   form.addEventListener("submit", async (e) => {
     e.preventDefault();
+    if (modoFormulario !== "jefe") {
+      guardarPasoParticipante();
+      return;
+    }
     guardarBtn.disabled = true;
     guardarBtn.textContent = "Guardando...";
     alertBox.className = "form-alert";
@@ -1025,7 +1071,10 @@ requireAuth(async (user) => {
       // "es participante de esta orden" (ver firestore.rules) pueda usar
       // un hasAny/in directo. Se recalcula completo en cada guardado, no
       // hay que mantenerla a mano.
-      personalEmails: [responsable.email, ...personalAdicional.map((p) => p.email)],
+      // En minúscula: el correo de la sesión (request.auth.token.email) siempre
+      // llega en minúscula, y si el empleado estaba registrado con alguna
+      // mayúscula la orden nunca le aparecía al responsable en su celular.
+      personalEmails: [responsable.email, ...personalAdicional.map((p) => p.email)].map((c) => String(c).toLowerCase()),
       descripcion: descripcionEl.value.trim(),
       vehiculo: selectVehiculo.value && selectVehiculo.value !== VALOR_VEHICULO_OTRO
         ? { vehiculoId: selectVehiculo.value, tipo: vehiculosPorId[selectVehiculo.value]?.tipo || "", placa: vehiculosPorId[selectVehiculo.value]?.placa || "" }

@@ -1002,7 +1002,8 @@ form.modal-form-grid label {
   margin: 10px 0 4px;
 }
 form.modal-form-grid input:not([type="checkbox"]),
-form.modal-form-grid select {
+form.modal-form-grid select,
+form.modal-form-grid textarea {
   width: 100%;
   padding: 7px 10px;
   border: 1px solid var(--border);
@@ -1206,7 +1207,9 @@ button.control-mes-pill.pendiente:hover { border-color: var(--cinco-amber-dark);
    mismo del árbol de layout sin sacar a sus hijos, que si no dejarían de
    participar en el grid de 2 columnas del formulario (quedarían todos
    amontonados en una sola celda). Se apaga solo cuando trae .oculto. */
-#otSeccionesJefe:not(.oculto) { display: contents; }
+#otSeccionesJefe:not(.oculto),
+#otSeccionAlistamiento:not(.oculto),
+#otSeccionCierre:not(.oculto) { display: contents; }
 
 /* Orden de Trabajo: separador de sección dentro del formulario largo (Datos
    generales/Recursos/Riesgos/PESV/...) — una línea ámbar + título en el
@@ -1257,7 +1260,8 @@ button.control-mes-pill.pendiente:hover { border-color: var(--cinco-amber-dark);
   25% { transform: translateX(-6px); }
   75% { transform: translateX(6px); }
 }
-#otFirmaCanvas {
+#otFirmaCanvas,
+#otFirmaElaboraCanvas {
   display: block;
   width: 100%;
   height: 110px;
@@ -1322,6 +1326,21 @@ button.control-mes-pill.pendiente:hover { border-color: var(--cinco-amber-dark);
 }
 .control-ot-vehiculo-nuevo input { flex: 1; padding: 6px 8px; border: 1px solid var(--border); border-radius: 6px; font-size: 12.5px; }
 .control-ot-vehiculo-nuevo button { width: auto; flex: none; }
+
+/* Orden de Trabajo en el celular (es donde la diligencia el responsable):
+   una sola columna, menos margen alrededor del modal y nada que pueda
+   empujar el ancho más allá de la pantalla (antes el lienzo de firma de
+   600px y la fila de "agregar vehículo" sacaban una barra horizontal). */
+@media (max-width: 600px) {
+  .modal-backdrop { padding: 8px; }
+  .modal-ancho { padding: 16px 14px; max-height: 96vh; max-height: 96dvh; }
+  #ordenForm { grid-template-columns: minmax(0, 1fr); }
+  #ordenForm > *, #ordenForm .control-ot-vehiculo-otro > * { min-width: 0; }
+  .control-ot-vehiculo-otro { grid-template-columns: minmax(0, 1fr); }
+  .control-ot-vehiculo-nuevo { flex-wrap: wrap; }
+  .control-ot-vehiculo-nuevo input { min-width: 0; flex: 1 1 120px; }
+  .control-ot-riesgos, .control-ot-preoperacionales { grid-template-columns: minmax(0, 1fr); }
+}
 
 /* Filas dinámicas de "Personal adicional" (código/nombre/cédula por
    persona, "+ agregar persona" en vez de las 4 filas fijas del papel). */
