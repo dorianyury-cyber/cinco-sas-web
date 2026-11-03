@@ -63,10 +63,41 @@ export function calculosDe(lit, resultados) {
 }
 
 // Texto libre escrito por el usuario: párrafos separados por una línea en
-// blanco; las líneas que empiezan con «-» salen como viñetas.
-function parrafos(texto) {
-  return String(texto || "").trim().split(/\n\s*\n/).filter((x) => x.trim())
-    .map((p) => P(esc(p.trim()).split("\n").map((l) => l.replace(/^\s*[-•]\s+/, "• ")).join("<br>")));
+// blanco; las líneas que empiezan con «-» salen como viñetas. Un grupo de
+// líneas que empiezan con «|» es una tabla (la primera fila es el
+// encabezado), con un título opcional en una línea «Tabla: …» justo antes;
+// las filas separadoras tipo «|---|---|» se ignoran.
+const esFilaTabla = (l) => /^\s*\|/.test(l);
+const celdasDe = (l) => l.trim().replace(/^\|/, "").replace(/\|\s*$/, "").split("|").map((c) => c.trim());
+const parrafo = (lineas) => P(esc(lineas.join("\n").trim()).split("\n").map((l) => l.replace(/^\s*[-•]\s+/, "• ")).join("<br>"));
+export function parrafos(texto) {
+  const bloques = [];
+  String(texto || "").replace(/\r/g, "").trim().split(/\n\s*\n/).filter((x) => x.trim()).forEach((grupo) => {
+    let texto = [], titulo = "", filas = [];
+    const cerrarTabla = () => {
+      if (!filas.length) return;
+      const ancho = Math.max(...filas.map((f) => f.length));
+      const [enc, ...resto] = filas.map((f) => [...f, ...Array(ancho - f.length).fill("")]);
+      bloques.push(tabla(titulo || "Detalle", enc, resto));
+      filas = []; titulo = "";
+    };
+    grupo.split("\n").forEach((l) => {
+      if (esFilaTabla(l)) {
+        if (texto.length) { bloques.push(parrafo(texto)); texto = []; }
+        if (!/^\s*\|[\s:|-]*$/.test(l)) filas.push(celdasDe(l));
+      } else if (/^\s*Tabla\s*:/i.test(l)) {
+        cerrarTabla();
+        if (texto.length) { bloques.push(parrafo(texto)); texto = []; }
+        titulo = l.replace(/^\s*Tabla\s*:\s*/i, "").trim();
+      } else {
+        cerrarTabla();
+        texto.push(l);
+      }
+    });
+    cerrarTabla();
+    if (texto.join("").trim()) bloques.push(parrafo(texto));
+  });
+  return bloques;
 }
 
 export async function construirMemoria({ proyecto, resultados, guardados }) {
