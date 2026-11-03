@@ -238,6 +238,25 @@ function calcularAnchosColumna(doc, filas, anchoUtil, merges = []) {
   return { anchos: repartirConMinimos(anchoMinPorColumna, deseados, anchoUtil), cabe: sumaMin <= anchoUtil };
 }
 
+// Anchos de columna (mm) y tamaño de letra (pt) de una tabla con el mismo
+// cálculo que usa dibujarTabla: arranca en 8 pt y baja de a 0,5 hasta 6 pt
+// si ni las palabras más largas caben. Lo usa informes-docx.js para que las
+// tablas del Word salgan con las mismas columnas y la misma letra que el PDF.
+export function medidasTablaPDF(filas, merges = [], anchoUtil) {
+  const { jsPDF } = window.jspdf;
+  const doc = new jsPDF({ unit: "mm", format: "letter" });
+  let fontSize = 8;
+  let resultado;
+  for (;;) {
+    doc.setFont("helvetica", "normal");
+    doc.setFontSize(fontSize);
+    resultado = calcularAnchosColumna(doc, filas, anchoUtil, merges);
+    if (resultado.cabe || fontSize <= 6) break;
+    fontSize -= 0.5;
+  }
+  return { anchosMm: resultado.anchos, fontSize };
+}
+
 // Suma "cantidad" valores consecutivos de un arreglo desde "inicio" — para
 // juntar el ancho de varias columnas o el alto de varias filas que abarca
 // una celda combinada.
