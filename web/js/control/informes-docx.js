@@ -189,8 +189,12 @@ export async function generarInformeDocxBlob(informe) {
   const {
     Document, Packer, Paragraph, TextRun, ImageRun, Table, TableRow, TableCell,
     ShadingType, WidthType, Header, Footer, AlignmentType, PageNumber, VerticalAlign, HeadingLevel, LevelFormat,
-    VerticalMergeType, BorderStyle, TableOfContents, HeightRule
+    VerticalMergeType, BorderStyle, TableOfContents, HeightRule, TableLayoutType
   } = window.docx;
+  // Toda tabla lleva su cuadrícula de columnas (columnWidths) en DXA y
+  // layout fijo: sin ella docx.js escribe columnas de 100 DXA (~2 mm) que
+  // contradicen el ancho de las celdas, y Word desacomoda tablas y márgenes.
+  const fija = { layout: TableLayoutType.FIXED };
 
   const portadaClara = informe.portada === "clara";
 
@@ -226,6 +230,7 @@ export async function generarInformeDocxBlob(informe) {
 
   const headerTable = new Table({
     width: { size: 100, type: WidthType.PERCENTAGE },
+    columnWidths: [Math.round(ANCHO_UTIL_DXA / 2), ANCHO_UTIL_DXA - Math.round(ANCHO_UTIL_DXA / 2)], ...fija,
     borders: sinBordes(),
     rows: [new TableRow({
       children: [
@@ -253,6 +258,7 @@ export async function generarInformeDocxBlob(informe) {
   // ---- pie de página: código/versión a la izquierda, radicado/página a la derecha ----
   const footerTable = new Table({
     width: { size: 100, type: WidthType.PERCENTAGE },
+    columnWidths: [Math.round(ANCHO_UTIL_DXA * 0.6), ANCHO_UTIL_DXA - Math.round(ANCHO_UTIL_DXA * 0.6)], ...fija,
     borders: sinBordes(),
     rows: [new TableRow({
       children: [
@@ -388,12 +394,15 @@ export async function generarInformeDocxBlob(informe) {
   const celdaPortada = new TableCell({
     width: { size: ANCHO_PAGINA_DXA, type: WidthType.DXA },
     shading: portadaClara ? undefined : { type: ShadingType.CLEAR, fill: NAVY_HEX, color: "auto" },
-    margins: { top: 0, bottom: 0, left: 0, right: 0 },
+    // El fondo va de borde a borde, pero el texto guarda los 2 cm del margen
+    // del cuerpo: antes un objeto largo tocaba los bordes de la hoja.
+    margins: { top: 0, bottom: 0, left: mmATw(MARGEN_MM), right: mmATw(MARGEN_MM) },
     borders: sinBordes(),
     children: contenidoPortada
   });
   const tablaPortada = new Table({
     width: { size: ANCHO_PAGINA_DXA, type: WidthType.DXA },
+    columnWidths: [ANCHO_PAGINA_DXA], ...fija,
     indent: { size: 0, type: WidthType.DXA },
     borders: sinBordes(),
     rows: [new TableRow({ height: { value: ALTO_PAGINA_DXA, rule: HeightRule.ATLEAST }, children: [celdaPortada] })]
@@ -502,7 +511,7 @@ export async function generarInformeDocxBlob(informe) {
         // tabla, solo hay que marcar todas las filas que correspondan.
         return new TableRow({ children: celdas, tableHeader: fi < filasEncabezado || undefined });
       });
-      cuerpo.push(new Table({ width: { size: ANCHO_UTIL_DXA, type: WidthType.DXA }, rows: filasDocx }));
+      cuerpo.push(new Table({ width: { size: ANCHO_UTIL_DXA, type: WidthType.DXA }, columnWidths: anchos, ...fija, rows: filasDocx }));
 
       if (bloque.nota) {
         cuerpo.push(new Paragraph({ alignment: AlignmentType.RIGHT, children: [new TextRun({ text: bloque.nota, italics: true, color: MUTED_HEX, size: 17 })] }));
@@ -600,6 +609,7 @@ export async function generarInformeDocxBlob(informe) {
       });
       cuerpo.push(new Table({
         width: { size: ANCHO_UTIL_DXA, type: WidthType.DXA },
+        columnWidths: firmantes.map(() => anchoColumnaDxa), ...fija,
         borders: sinBordes(),
         rows: [
           new TableRow({ children: celdasEspacio }),
