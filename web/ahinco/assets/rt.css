@@ -445,3 +445,20 @@ body.rt-verificacion .rt-solo-verif { display: block; }
 .rt-guia-opciones dt { font-weight: 600; }
 .rt-guia-opciones dd { color: var(--text-muted); }
 @media (max-width: 640px) { .rt-guia-opciones { grid-template-columns: 1fr; } .rt-guia-opciones dd { border-top: 0; padding-top: 0; } }
+/* Literal con hallazgos solo de severidad media o baja: naranja, distinto del
+   amarillo de «Pendiente» y del rojo de un hallazgo alto. */
+.rt-chip-obs { background: #e2761b; }
+.rt-punto-obs { background: #e2761b; }
+.badge.obs { background: rgba(226, 118, 27, 0.15); color: #b8570a; }
+:root[data-theme="dark"] .badge.obs { color: #f4a25a; }
+/* Resumen: una línea por hallazgo con su severidad. */
+.rt-hall-lineas { list-style: none; margin: 0; padding: 0; }
+.rt-hall-lineas li { display: flex; align-items: center; gap: 8px; padding: 5px 0; border-bottom: 1px solid var(--border); font-size: 12.5px; min-width: 0; }
+.rt-hall-lineas li:last-child { border-bottom: 0; }
+.rt-hall-lineas .rt-hall-cod { padding: 1px 6px; font-size: 11px; }
+.rt-hall-titulo { flex: 1; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; font-weight: 600; }
+.rt-hall-lit { flex: none; color: var(--text-muted); font-size: 11.5px; white-space: nowrap; }
+.rt-sev-chip { flex: none; width: 46px; text-align: center; font-size: 10.5px; font-weight: 700; border-radius: 999px; padding: 1px 0; background: #b8bec7; color: #fff; }
+.rt-sev-chip-Alta { background: var(--danger); }
+.rt-sev-chip-Media { background: #e2761b; }
+.rt-sev-chip-Baja { background: #8a929c; }

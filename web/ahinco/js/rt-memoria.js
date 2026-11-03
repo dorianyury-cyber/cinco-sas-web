@@ -6,7 +6,7 @@
 import { generarInformePDF } from "../../js/control/informes-pdf.js";
 import { generarInformeDocxBlob } from "../../js/control/informes-docx.js";
 import { MODULOS, NORMAS_GENERALES } from "./rt-modulos.js";
-import { LITERALES, FUENTE_LITERALES, exigido, tipoDisenoDe, normalizarTipoDiseno, textosDe, letrasLiteral } from "./rt-literales.js";
+import { LITERALES, FUENTE_LITERALES, exigido, tipoDisenoDe, normalizarTipoDiseno, textosDe, letrasLiteral, estadoLiteral } from "./rt-literales.js";
 import { svgTCC, svgAPng, svgUnifilar } from "./rt-grafico.js";
 import { esc, hoyISO, tituloCalculo, ORDEN_MODULOS } from "./rt-core.js";
 import { hallazgos, supuestos, esVerificacion, resumenSeveridad } from "./rt-hallazgos.js";
@@ -98,8 +98,8 @@ export async function construirMemoria({ proyecto, resultados, guardados }) {
     const calc = calculosDe(l, resultados).map(tituloCalculo);
     if (!exigido(proyecto.tipoDiseno, l.l) && !calc.length && !d.texto) return [`${l.l})`, l.texto, "—", "No exigido en el diseño básico (RETIE 2024 3.3.1.2)"];
     const desarrollo = d.aplica === "No" ? `No aplica: ${d.texto || "sin justificación"}` : calc.length ? `Cálculo: ${calc.join("; ")}` : d.texto ? "Desarrollo escrito" : "Pendiente";
-    const citan = d.aplica === "No" ? [] : citanLit(l.l);
-    return [`${l.l})`, l.texto, d.aplica === "No" ? "No" : "Sí", citan.length ? `${desarrollo}. Con hallazgos: ${citan.join(", ")}` : desarrollo];
+    const e = estadoLiteral(l, d, resultados, proyecto.tipoDiseno, hall);
+    return [`${l.l})`, l.texto, d.aplica === "No" ? "No" : "Sí", e.hallazgos ? `${desarrollo}. ${e.texto}` : desarrollo];
   })));
   // ---- verificación: hallazgos y supuestos al inicio, listos para el oficio
   if (verif) {

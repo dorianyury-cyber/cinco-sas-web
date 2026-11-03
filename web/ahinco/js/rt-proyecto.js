@@ -61,12 +61,17 @@ function iniciar(proyecto, guardados) {
     const listos = estados.filter((e) => e.clase !== "warn" && e.texto !== "No aplica sin justificación").length;
     const kpi = (valor, etiqueta, clase = "") => `<div class="rt-kpi ${clase}"><div class="valor">${valor}</div><div class="etiqueta">${esc(etiqueta)}</div></div>`;
     pintarPasos(hall, calcs, listos);
-    document.getElementById("kpis").innerHTML = kpi(calcs.length, "Cálculos") + kpi(cumplen, "Cumplen", "ok") + kpi(hall.length, modo.hallazgos, hall.length ? "mal" : "ok") + kpi(`${listos}/${LITERALES.length}`, "Literales desarrollados", listos === LITERALES.length ? "ok" : "");
+    const conAlto = estados.filter((e) => e.clase === "danger" && e.hallazgos).length, conObs = estados.filter((e) => e.clase === "obs").length;
+    const detalleLit = conAlto + conObs ? `${conAlto + conObs} con hallazgos${conAlto ? ` (${conAlto} alto${conAlto === 1 ? "" : "s"})` : ""}` : "";
+    document.getElementById("kpis").innerHTML = kpi(calcs.length, "Cálculos") + kpi(cumplen, "Cumplen", "ok") + kpi(hall.length, modo.hallazgos, hall.length ? "mal" : "ok") + kpi(`${listos}/${LITERALES.length}`, `Literales desarrollados${detalleLit ? ` · ${detalleLit}` : ""}`, listos === LITERALES.length && !conAlto ? "ok" : "");
     document.getElementById("tituloHallResumen").textContent = `${modo.hallazgos} principales`;
     document.getElementById("accesoHallTitulo").textContent = modo.hallazgos;
     document.getElementById("accesoHall").textContent = hall.length ? `${hall.length} por resolver` : "Sin incumplimientos";
+    // Una línea por hallazgo, los más graves primero; el detalle completo está en Hallazgos.
+    const peso = (h) => ({ Alta: 0, Media: 1, Baja: 2 }[h.severidad] ?? (h.manual ? 3 : 0));
+    const ordenHall = [...hall].sort((a, b) => peso(a) - peso(b));
     document.getElementById("hallResumen").innerHTML = hall.length
-      ? `<ul class="rt-hall-lista">${hall.slice(0, 6).map((h) => `<li><span class="rt-hall-cod">${h.codigo}</span><span><strong>${esc(h.criterio)}</strong><small>${esc(h.valor)} frente a ${esc(h.limite)} · ${esc(h.calculo)} · lit. ${esc(h.literales)}</small></span></li>`).join("")}</ul>${hall.length > 6 ? `<p class="rt-nota">y ${hall.length - 6} más.</p>` : ""}`
+      ? `<ul class="rt-hall-lineas">${ordenHall.map((h) => `<li title="${esc(`${h.criterio} — ${h.valor} frente a ${h.limite}`)}"><span class="rt-hall-cod">${h.codigo}</span><span class="rt-sev-chip rt-sev-chip-${esc(h.severidad || "na")}">${esc(h.severidad || "—")}</span><span class="rt-hall-titulo">${esc(h.criterio)}</span><span class="rt-hall-lit">lit. ${esc(h.literales || "—")}</span></li>`).join("")}</ul>`
       : `<p class="rt-vacio">✔ Todos los criterios verificados cumplen.</p>`;
     document.getElementById("chipsLit").innerHTML = LITERALES.map((l, i) => `<a href="#literales" class="rt-chip rt-chip-${estados[i].clase}" title="${l.l}) ${esc(l.texto)} — ${esc(estados[i].texto)}">${l.l}</a>`).join("");
     const orden = Object.values(resultados).sort((a, b) => ORDEN_MODULOS.indexOf(a.modulo) - ORDEN_MODULOS.indexOf(b.modulo));
@@ -150,7 +155,7 @@ function iniciar(proyecto, guardados) {
       <tbody>${LITERALES.map((lit) => {
         const d = literales[lit.l] || {};
         const e = estadoLiteral(lit, d, resultados, proyecto.tipoDiseno, hallLit);
-        return `<tr><td><strong>${lit.l})</strong><br><span class="rt-punto rt-punto-${e.clase === "ok" ? "ok" : e.clase === "danger" ? "mal" : e.clase === "warn" ? "pend" : "nulo"}" title="${esc(e.texto)}"></span></td>
+        return `<tr><td><strong>${lit.l})</strong><br><span class="rt-punto rt-punto-${e.clase === "ok" ? "ok" : e.clase === "danger" ? "mal" : e.clase === "obs" ? "obs" : e.clase === "warn" ? "pend" : "nulo"}" title="${esc(e.texto)}"></span></td>
           <td>${esc(lit.texto)}${lit.guia ? `<span class="rt-nota">${esc(lit.guia)}</span>` : ""}</td>
           <td>${lit.modulos.length ? lit.modulos.map(badgeMod).join("") : '<span class="text-muted">Desarrollo escrito</span>'}<span class="badge ${e.clase}">${esc(e.texto)}</span></td>
           <td><select data-l="${lit.l}" data-c="aplica"><option${d.aplica !== "No" ? " selected" : ""}>Sí</option><option${d.aplica === "No" ? " selected" : ""}>No</option></select></td>

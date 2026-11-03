@@ -83,8 +83,15 @@ export function estadoLiteral(lit, dato, resultados, tipoDiseno, hall = []) {
   if (!aplica) return texto ? { texto: "No aplica (justificado)", clase: "muted" } : { texto: "No aplica sin justificación", clase: "danger" };
   if (lit.modulos.length && !mods.length && !texto) return { texto: "Pendiente", clase: "warn" };
   if (!lit.modulos.length && !texto) return { texto: "Pendiente", clase: "warn" };
-  const citan = hall.filter((h) => letrasLiteral(h.literales).includes(lit.l)).map((h) => h.codigo);
-  if (citan.length) return { texto: `Con hallazgos (${citan.join(", ")})`, clase: "danger", hallazgos: citan };
+  // Color según el hallazgo más grave: rojo si alguno es de severidad alta (o no
+  // la tiene, como los que detectan los cálculos); ámbar si solo hay medias o bajas.
+  const citan = hall.filter((h) => letrasLiteral(h.literales).includes(lit.l));
+  if (citan.length) {
+    const codigos = citan.map((h) => h.codigo).join(", ");
+    return citan.some((h) => !["Media", "Baja"].includes(h.severidad))
+      ? { texto: `Con hallazgo alto (${codigos})`, clase: "danger", hallazgos: citan.map((h) => h.codigo) }
+      : { texto: `Con observaciones (${codigos})`, clase: "obs", hallazgos: citan.map((h) => h.codigo) };
+  }
   const fallan = mods.some((r) => (r.verificaciones || []).some((v) => v.cumple === false));
   return fallan ? { texto: "Con incumplimientos", clase: "danger" } : { texto: "Desarrollado", clase: "ok" };
 }
