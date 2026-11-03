@@ -25,6 +25,9 @@ export function compararVersiones(a, b, { hallazgosDe } = {}) {
     if (!igual(x.aplica || "Sí", y.aplica || "Sí")) res.literales.push({ literal: l, cambio: `Aplica: ${x.aplica || "Sí"} → ${y.aplica || "Sí"}` });
     if (!igual((x.texto || "").trim(), (y.texto || "").trim())) res.literales.push({ literal: l, cambio: "Texto del desarrollo modificado" });
   }
+  // Textos libres del informe (objeto, concepto, etc.): se muestran recortados.
+  const ta = a.proyecto?.textos || {}, tb = b.proyecto?.textos || {}, corto = (v) => (vacio((v || "").trim()) ? "—" : String(v).trim().slice(0, 90) + (String(v).trim().length > 90 ? "…" : ""));
+  for (const k of [...new Set([...Object.keys(ta), ...Object.keys(tb)])].sort()) if (!igual((ta[k] || "").trim(), (tb[k] || "").trim())) res.proyecto.push({ campo: `Texto del informe: ${k}`, antes: corto(ta[k]), despues: corto(tb[k]) });
   const ca = a.calculos || {}, cb = b.calculos || {};
   for (const k of Object.keys(cb)) if (!ca[k]) res.agregados.push(tituloDe(k, cb[k]));
   for (const k of Object.keys(ca)) if (!cb[k]) res.quitados.push(tituloDe(k, ca[k]));

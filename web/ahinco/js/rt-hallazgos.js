@@ -12,6 +12,14 @@ export const MODOS = {
   verificacion: { nombre: "Verificación", hallazgos: "Hallazgos", prefijo: "H" }
 };
 export const modoDe = (p) => MODOS[esVerificacion(p) ? "verificacion" : "diseno"];
+export const SEVERIDADES = ["Alta", "Media", "Baja"];
+// «2 de severidad alta, 1 media y 3 bajas» (vacío si ninguno la tiene).
+export function resumenSeveridad(hall) {
+  const n = SEVERIDADES.map((s) => [s, hall.filter((h) => h.severidad === s).length]).filter(([, c]) => c);
+  if (!n.length) return "";
+  const txt = n.map(([s, c]) => `${c} ${s.toLowerCase()}${c === 1 ? "" : "s"}`);
+  return txt.length > 1 ? `${txt.slice(0, -1).join(", ")} y ${txt.at(-1)}` : txt[0];
+}
 
 const titulo = (r) => `${MODULOS[r.modulo].titulo}${r.etiqueta ? ` — ${r.etiqueta}` : ""}`;
 const literalesDe = (modulo) => LITERALES.filter((l) => l.modulos.includes(modulo)).map((l) => `${l.l})`);

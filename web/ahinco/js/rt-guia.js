@@ -6,7 +6,7 @@ import { AYUDA } from "./rt-ayuda.js";
 
 const GRUPOS = [
   ["En la lista de proyectos", [["📁 Todos", "todos"], ["📐 Diseño", "diseno"], ["🔎 Verificación", "verificacion"], ["＋ Nuevo proyecto", "nuevo"], ["⚡ Cálculo rápido", "rapido"], ["⬆ Cargar archivo .ahinco.json", "importar"], ["ℹ Alcance y validación", "acerca"]]],
-  ["Dentro de un proyecto", [["◎ Resumen", "resumen"], ["🗂 Datos del proyecto", "datos"], ["📋 Literales a) a x)", "literales"], ["Cálculos y ＋ Agregar cálculo", "calculos"], ["🔎 Hallazgos (verificación)", "hallazgosVerificacion"], ["🛠 Pendientes por corregir (diseño)", "hallazgosDiseno"], ["📄 Documentos", "documentos"], ["🕓 Versiones", "versiones"]]]
+  ["Dentro de un proyecto", [["◎ Resumen", "resumen"], ["🗂 Datos del proyecto", "datos"], ["📋 Literales a) a x)", "literales"], ["📝 Textos del informe", "textos"],["Cálculos y ＋ Agregar cálculo", "calculos"], ["🔎 Hallazgos (verificación)", "hallazgosVerificacion"], ["🛠 Pendientes por corregir (diseño)", "hallazgosDiseno"], ["📄 Documentos", "documentos"], ["🕓 Versiones", "versiones"]]]
 ];
 
 const ctx = await iniciarPagina();

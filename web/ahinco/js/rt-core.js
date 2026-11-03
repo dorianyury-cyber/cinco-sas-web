@@ -10,7 +10,7 @@
 // La barrera real está en firestore.rules (match /rtProyectos).
 
 import { signOut, onAuthStateChanged } from "https://www.gstatic.com/firebasejs/10.7.1/firebase-auth.js";
-import { collection, doc, getDoc, getDocs, addDoc, setDoc, updateDoc, deleteDoc, serverTimestamp, query, orderBy } from "https://www.gstatic.com/firebasejs/10.7.1/firebase-firestore.js";
+import { collection, doc, getDoc, getDocs, addDoc, setDoc, updateDoc, deleteDoc, serverTimestamp, query, orderBy, runTransaction } from "https://www.gstatic.com/firebasejs/10.7.1/firebase-firestore.js";
 import { auth, db, obtenerPerfil } from "../../js/control/firebase-control.js";
 import { CALCULOS } from "./rt-calculos.js";
 import { MODULOS, entradasPorDefecto, tablasFaltantes } from "./rt-modulos.js";
@@ -175,7 +175,7 @@ export async function restaurarVersion(id, version, guardadosActuales, user) {
 // Archivo JSON con los datos del proyecto y todos sus cálculos, para pasar
 // un proyecto entre personas o cargar uno preparado por fuera.
 const FORMATO = "ahinco-proyecto";
-const CAMPOS_PROYECTO = ["nombre", "modo", "cliente", "ubicacion", "altitud", "tempAmbiente", "tipoDiseno", "descripcion", "autorDiseno", "documentosRevisados", "disenador", "matricula", "radicado", "literales", "notasHallazgos", "hallazgosManuales"];
+const CAMPOS_PROYECTO = ["nombre", "modo", "cliente", "ubicacion", "altitud", "tempAmbiente", "tipoDiseno", "descripcion", "autorDiseno", "documentosRevisados", "disenador", "matricula", "radicado", "literales", "textos", "notasHallazgos", "hallazgosManuales"];
 export function exportarProyecto(proyecto, guardados) {
   const datos = Object.fromEntries(CAMPOS_PROYECTO.filter((k) => proyecto[k] !== undefined).map((k) => [k, proyecto[k]]));
   const calculos = Object.fromEntries(Object.entries(guardados).map(([k, v]) => [k, { entradas: v.entradas, etiqueta: v.etiqueta || "" }]));
@@ -201,6 +201,57 @@ export async function importarProyecto(json, user) {
     await setDoc(doc(db, "rtProyectos", id, "calculos", k), { entradas: v.entradas, etiqueta: String(v.etiqueta || ""), actualizadoPor: user.email, actualizadoEn: serverTimestamp() });
   }
   return { id, n: Object.keys(calculos).length };
+}
+
+// ---------------------------------------------------------------- radicar en Informes (SGC)
+// El informe de verificación queda en la colección «informes» con radicado
+// RD-año-NNN, tomado del MISMO contador que usa el módulo Informes
+// (contadores/informe_RD_{año}, ver PREFIJO_TIPO en js/control/informes.js),
+// así no se repiten radicados entre las dos herramientas. Firestore no admite
+// arreglos anidados: las filas de tabla se guardan como {celdas: [...]}, igual
+// que Informes. Los gráficos generados en el momento (data:) no se guardan.
+const PREFIJO_RD = "RD";
+function bloquesParaGuardar(bloques) {
+  return bloques.map((b) => {
+    if (b.tipo === "tabla") return { ...b, filas: b.filas.map((f) => ({ celdas: f })) };
+    if (b.tipo === "imagen" && String(b.url || "").startsWith("data:")) return { tipo: "parrafo", texto: `<i>[${esc(b.nombre || "Gráfico")}: ver la memoria generada en AHÍNCO]</i>` };
+    return b;
+  });
+}
+// informe: { titulo, portada, mes, fecha, firmaNombre, firmaCargo, bloques }.
+// Con informeId actualiza ese informe (mismo radicado); sin él toma un radicado nuevo.
+export async function radicarInforme(proyectoId, informe, user, { informeId = null } = {}) {
+  const bloques = bloquesParaGuardar(informe.bloques);
+  if (JSON.stringify(bloques).length > 900000) throw new Error("El informe es demasiado grande para guardarlo en Informes (límite de Firestore). Descárguelo en PDF desde AHÍNCO.");
+  const datos = {
+    titulo: informe.titulo, tipoInforme: "revisionDisenos", portada: informe.portada || "oscura",
+    mes: informe.mes || null, fecha: informe.fecha || null,
+    firmaNombre: informe.firmaNombre || "", firmaCargo: informe.firmaCargo || "", bloques,
+    contratoId: null, contratoCodigo: null, contratoNombre: null, contratoCliente: informe.contratoCliente || null,
+    contratoNumero: null, contratoSupervisor: null, contratoFechaInicio: null, contratoFechaFin: null,
+    origen: "ahinco", proyectoId,
+    actualizadoEn: serverTimestamp(), actualizadoPor: user.email
+  };
+  if (informeId) {
+    const ref = doc(db, "informes", informeId);
+    const snap = await getDoc(ref);
+    if (!snap.exists()) throw new Error("El informe radicado ya no existe en Informes; radique uno nuevo.");
+    await updateDoc(ref, datos);
+    return { radicado: snap.data().radicado, informeId };
+  }
+  const anio = new Date().getFullYear();
+  const contadorRef = doc(db, "contadores", `informe_${PREFIJO_RD}_${anio}`);
+  const informeRef = doc(collection(db, "informes"));
+  let radicado;
+  await runTransaction(db, async (tx) => {
+    const c = await tx.get(contadorRef);
+    const siguiente = c.exists() ? c.data().siguiente : 1;
+    radicado = `${PREFIJO_RD}-${anio}-${String(siguiente).padStart(3, "0")}`;
+    tx.set(contadorRef, { siguiente: siguiente + 1 });
+    tx.set(informeRef, { ...datos, radicado, anio, consecutivo: siguiente, creadoPor: user.email, creadoEn: serverTimestamp() });
+    tx.update(doc(db, "rtProyectos", proyectoId), { radicado, informeId: informeRef.id, actualizadoPor: user.email, actualizadoEn: serverTimestamp() });
+  });
+  return { radicado, informeId: informeRef.id };
 }
 
 export async function eliminarCalculo(id, clave, user) {

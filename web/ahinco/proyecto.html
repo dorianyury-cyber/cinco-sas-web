@@ -94,6 +94,16 @@
         </div>
       </section>
 
+      <!-- Textos del informe -->
+      <section class="rt-seccion" data-seccion="textos">
+        <div class="card">
+          <div class="rt-card-cabeza"><h2>Textos del informe</h2><span class="rt-estado-guardado" id="estadoTextos"></span></div>
+          <p class="text-muted">Secciones que no salen de los cálculos ni de los literales. Las que deje vacías no aparecen en el documento. Separe párrafos con una línea en blanco; una línea que empieza con «-» sale como viñeta.</p>
+          <div id="textosInforme" class="rt-textos"></div>
+          <div class="rt-acciones"><button type="button" class="btn" id="guardarTextosBtn">Guardar textos</button></div>
+        </div>
+      </section>
+
       <!-- Hallazgos -->
       <section class="rt-seccion" data-seccion="hallazgos">
         <div class="card">
@@ -110,6 +120,7 @@
             <div><label for="hmLimite">Lo que corresponde</label><input id="hmLimite" maxlength="120" placeholder="Ej. 76,0 kVA (101 %)"></div>
             <div><label for="hmNorma">Norma o referencia</label><input id="hmNorma" maxlength="160" placeholder="Ej. NTC 2050 220.44"></div>
             <div><label for="hmLit">Literal(es)</label><input id="hmLit" maxlength="40" placeholder="Ej. c), h)"></div>
+            <div><label for="hmSev">Severidad</label><select id="hmSev"><option value="">Sin clasificar</option><option>Alta</option><option>Media</option><option>Baja</option></select></div>
             <div class="rt-ancho"><label for="hmDetalle">Detalle y acción requerida</label><textarea id="hmDetalle" rows="3" maxlength="1200"></textarea></div>
             <div class="rt-acciones"><button type="submit" class="btn">Agregar hallazgo</button></div>
           </form>
@@ -158,6 +169,14 @@
           <button type="button" class="rt-doc" id="wordBtn"><span class="rt-doc-icono">📝</span><strong>Word</strong><small>El mismo documento en formato editable.</small></button>
           <button type="button" class="rt-doc" id="excelBtn"><span class="rt-doc-icono">📊</span><strong>Excel formulado</strong><small>Un solo libro con una hoja por cálculo y fórmulas vivas: cambie un dato y Excel recalcula.</small></button>
           <button type="button" class="rt-doc" id="exportarBtn"><span class="rt-doc-icono">⬇</span><strong>Exportar proyecto</strong><small>Archivo .ahinco.json para respaldo o para importarlo en otra cuenta.</small></button>
+        </div>
+        <div class="card rt-solo-verif rt-radicar">
+          <h2>Radicar en Informes (SGC)</h2>
+          <p class="text-muted" id="estadoRadicado"></p>
+          <div class="rt-barra">
+            <button type="button" class="rt-barra-btn rt-barra-principal" id="radicarBtn">🏷 Radicar informe nuevo</button>
+            <button type="button" class="rt-barra-btn hidden" id="actualizarRadicadoBtn">↻ Actualizar el informe radicado</button>
+          </div>
         </div>
       </section>
     </main>

@@ -47,9 +47,35 @@ export const LITERALES = [
   { l: "x", texto: "Selección, cálculo y especificación de equipos de generación de energía convencionales y no convencionales.", modulos: ["fvArreglo", "fvProduccion", "fvConexion"], guia: "Para sistemas fotovoltaicos (AGPE o GD) use los cálculos del área «Generación solar fotovoltaica». Para plantas diésel o de otro tipo, desarrolle la selección como texto." }
 ];
 
-// Estado de un literal con los cálculos (resultados por clave, con r.modulo)
-// y lo que escribió el diseñador.
-export function estadoLiteral(lit, dato, resultados, tipoDiseno) {
+// Textos libres del informe (proyecto.textos[clave]): secciones que no salen
+// de los cálculos ni de los literales. Las vacías no aparecen en el documento.
+// lugar: dónde van en el documento (inicio, normas, hallazgos, cierre).
+export const TEXTOS_INFORME = {
+  verificacion: [
+    { clave: "objeto", titulo: "Objeto y alcance de la revisión", lugar: "inicio", guia: "Qué se revisó, para quién y con qué propósito; qué queda por fuera del alcance." },
+    { clave: "metodologia", titulo: "Metodología", lugar: "normas", guia: "Cómo se revisó: lectura de memoria y planos, recálculo de cifras, cruce memoria-planos, visita, etc." },
+    { clave: "marco", titulo: "Marco normativo adicional", lugar: "normas", guia: "Normas propias de este proyecto que no están en la tabla general (RETILAP, normas del operador de red, NTC específicas)." },
+    { clave: "conformes", titulo: "Aspectos conformes", lugar: "hallazgos", guia: "Lo que el diseño resuelve bien: así el diseñador sabe qué no tocar." },
+    { clave: "concepto", titulo: "Concepto de la revisión", lugar: "cierre", guia: "Conclusión de la interventoría: aprobado, aprobado con observaciones o no aprobado, y qué se requiere para cerrar." },
+    { clave: "limitaciones", titulo: "Limitaciones", lugar: "cierre", guia: "Supuestos de la revisión, documentos que no se recibieron, información verbal, etc." }
+  ],
+  diseno: [
+    { clave: "objeto", titulo: "Objeto y alcance", lugar: "inicio", guia: "Qué cubre el diseño y qué queda por fuera." },
+    { clave: "metodologia", titulo: "Criterios de diseño", lugar: "normas", guia: "Criterios generales adoptados (cargabilidad, regulación, reservas, etc.)." },
+    { clave: "marco", titulo: "Marco normativo adicional", lugar: "normas", guia: "Normas propias de este proyecto que no están en la tabla general." },
+    { clave: "concepto", titulo: "Conclusiones del diseñador", lugar: "cierre", guia: "Conclusiones generales del diseño." },
+    { clave: "limitaciones", titulo: "Limitaciones y supuestos", lugar: "cierre", guia: "Información pendiente, supuestos y condiciones para la construcción." }
+  ]
+};
+export const textosDe = (verif) => TEXTOS_INFORME[verif ? "verificacion" : "diseno"];
+
+// Letras de literal citadas en un texto como «e), h), m)».
+export const letrasLiteral = (t) => [...new Set([...String(t || "").matchAll(/\b([a-x])\)/g)].map((m) => m[1]))];
+
+// Estado de un literal con los cálculos (resultados por clave, con r.modulo),
+// lo que escribió el diseñador y los hallazgos que lo citan: un literal con
+// hallazgos no sale «Desarrollado» aunque tenga texto.
+export function estadoLiteral(lit, dato, resultados, tipoDiseno, hall = []) {
   const aplica = dato?.aplica !== "No";
   const texto = (dato?.texto || "").trim();
   const mods = Object.values(resultados).filter((r) => lit.modulos.includes(r.modulo) && !r.sinDatos); // un cálculo sin datos no desarrolla el literal
@@ -57,6 +83,8 @@ export function estadoLiteral(lit, dato, resultados, tipoDiseno) {
   if (!aplica) return texto ? { texto: "No aplica (justificado)", clase: "muted" } : { texto: "No aplica sin justificación", clase: "danger" };
   if (lit.modulos.length && !mods.length && !texto) return { texto: "Pendiente", clase: "warn" };
   if (!lit.modulos.length && !texto) return { texto: "Pendiente", clase: "warn" };
+  const citan = hall.filter((h) => letrasLiteral(h.literales).includes(lit.l)).map((h) => h.codigo);
+  if (citan.length) return { texto: `Con hallazgos (${citan.join(", ")})`, clase: "danger", hallazgos: citan };
   const fallan = mods.some((r) => (r.verificaciones || []).some((v) => v.cumple === false));
   return fallan ? { texto: "Con incumplimientos", clase: "danger" } : { texto: "Desarrollado", clase: "ok" };
 }

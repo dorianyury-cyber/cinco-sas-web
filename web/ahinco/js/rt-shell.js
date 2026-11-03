@@ -94,6 +94,7 @@ export function menuProyecto(ctx, { proyecto, guardados, resultados, activo }) {
       ${sec("resumen", "◎", "Resumen")}
       ${sec("datos", "🗂", "Datos del proyecto")}
       ${sec("literales", "📋", "Literales a) a x)")}
+      ${sec("textos", "📝", "Textos del informe")}
       <div class="rt-nav-titulo" title="${esc(AYUDA.calculos)}">Cálculos</div>
       ${areas || '<p class="rt-nav-vacio">Todavía no hay cálculos.</p>'}
       <a href="#" class="rt-nav-agregar" id="rtAgregarCalc" title="${esc(AYUDA.calculos)}">＋ Agregar cálculo</a>

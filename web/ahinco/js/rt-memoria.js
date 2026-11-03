@@ -6,10 +6,10 @@
 import { generarInformePDF } from "../../js/control/informes-pdf.js";
 import { generarInformeDocxBlob } from "../../js/control/informes-docx.js";
 import { MODULOS, NORMAS_GENERALES } from "./rt-modulos.js";
-import { LITERALES, FUENTE_LITERALES, exigido, tipoDisenoDe, normalizarTipoDiseno } from "./rt-literales.js";
+import { LITERALES, FUENTE_LITERALES, exigido, tipoDisenoDe, normalizarTipoDiseno, textosDe, letrasLiteral } from "./rt-literales.js";
 import { svgTCC, svgAPng, svgUnifilar } from "./rt-grafico.js";
 import { esc, hoyISO, tituloCalculo, ORDEN_MODULOS } from "./rt-core.js";
-import { hallazgos, supuestos, esVerificacion } from "./rt-hallazgos.js";
+import { hallazgos, supuestos, esVerificacion, resumenSeveridad } from "./rt-hallazgos.js";
 import { ALCANCE } from "./rt-alcance.js";
 
 const P = (html) => ({ tipo: "parrafo", texto: html });
@@ -62,15 +62,28 @@ export function calculosDe(lit, resultados) {
     .sort((a, b) => lit.modulos.indexOf(a.modulo) - lit.modulos.indexOf(b.modulo) || ORDEN_MODULOS.indexOf(a.modulo) - ORDEN_MODULOS.indexOf(b.modulo));
 }
 
+// Texto libre escrito por el usuario: párrafos separados por una línea en
+// blanco; las líneas que empiezan con «-» salen como viñetas.
+function parrafos(texto) {
+  return String(texto || "").trim().split(/\n\s*\n/).filter((x) => x.trim())
+    .map((p) => P(esc(p.trim()).split("\n").map((l) => l.replace(/^\s*[-•]\s+/, "• ")).join("<br>")));
+}
+
 export async function construirMemoria({ proyecto, resultados, guardados }) {
   const lits = proyecto.literales || {};
   const verif = esVerificacion(proyecto);
   const conCalculos = Object.keys(resultados).length > 0;
+  const hall = hallazgos(proyecto, resultados);
+  const citanLit = (l) => hall.filter((h) => letrasLiteral(h.literales).includes(l)).map((h) => h.codigo);
+  // Secciones de texto libre del lugar indicado, como títulos del nivel dado.
+  const textos = (lugar, nivel) => textosDe(verif).filter((t) => t.lugar === lugar && (proyecto.textos?.[t.clave] || "").trim())
+    .flatMap((t) => [T(nivel, t.titulo), ...parrafos(proyecto.textos[t.clave])]);
   const b = [];
   // ---- Generalidades
   b.push(T(1, "Generalidades"));
   if (verif) b.push(P(`El presente informe contiene la <b>verificación de la interventoría</b> sobre la memoria de cálculo y los planos del proyecto <b>${esc(proyecto.nombre)}</b>${proyecto.descripcion ? `: ${esc(proyecto.descripcion)}` : ""}. ${conCalculos ? "Los cálculos se rehicieron con los datos del diseño revisado y se compararon" : "La memoria y los planos se revisaron y se compararon"} con los criterios del RETIE y de las normas técnicas citadas; cada criterio que no cumple se reporta como un hallazgo numerado. Se organiza según los literales del ${esc(FUENTE_LITERALES)}.`));
   else b.push(P(`La presente memoria de cálculo corresponde al ${esc(normalizarTipoDiseno(proyecto.tipoDiseno).toLowerCase())} de la instalación eléctrica del proyecto <b>${esc(proyecto.nombre)}</b>${proyecto.descripcion ? `: ${esc(proyecto.descripcion)}` : ""}. Se organiza según los literales del ${esc(FUENTE_LITERALES)}; los literales que no aplican a la instalación se mencionan expresamente con su justificación, como lo exige el parágrafo 1 del mismo artículo.`));
+  b.push(...textos("inicio", 2));
   b.push(tabla("Datos generales del proyecto", ["Dato", "Valor"], [
     ["Proyecto", proyecto.nombre], ["Cliente", proyecto.cliente || "—"], ["Ubicación", proyecto.ubicacion || "—"],
     ["Altitud", `${proyecto.altitud ?? "—"} m s. n. m.`], ["Temperatura ambiente de diseño", `${proyecto.tempAmbiente ?? "—"} °C`],
@@ -79,23 +92,28 @@ export async function construirMemoria({ proyecto, resultados, guardados }) {
     [verif ? "Interventor que verifica" : "Diseñador", `${proyecto.disenador || "—"}${proyecto.matricula ? ` — M.P. ${proyecto.matricula}` : ""}`]
   ]));
   b.push(tabla("Normas y reglamentos aplicados", ["Documento", "Título"], NORMAS_GENERALES));
+  b.push(...textos("normas", 2));
   b.push(tabla("Alcance de la memoria por literal del RETIE", ["Lit.", "Contenido exigido", "Aplica", "Desarrollo"], LITERALES.map((l) => {
     const d = lits[l.l] || {};
     const calc = calculosDe(l, resultados).map(tituloCalculo);
     if (!exigido(proyecto.tipoDiseno, l.l) && !calc.length && !d.texto) return [`${l.l})`, l.texto, "—", "No exigido en el diseño básico (RETIE 2024 3.3.1.2)"];
-    return [`${l.l})`, l.texto, d.aplica === "No" ? "No" : "Sí", d.aplica === "No" ? `No aplica: ${d.texto || "sin justificación"}` : calc.length ? `Cálculo: ${calc.join("; ")}` : d.texto ? "Desarrollo escrito" : "Pendiente"];
+    const desarrollo = d.aplica === "No" ? `No aplica: ${d.texto || "sin justificación"}` : calc.length ? `Cálculo: ${calc.join("; ")}` : d.texto ? "Desarrollo escrito" : "Pendiente";
+    const citan = d.aplica === "No" ? [] : citanLit(l.l);
+    return [`${l.l})`, l.texto, d.aplica === "No" ? "No" : "Sí", citan.length ? `${desarrollo}. Con hallazgos: ${citan.join(", ")}` : desarrollo];
   })));
   // ---- verificación: hallazgos y supuestos al inicio, listos para el oficio
   if (verif) {
-    const hall = hallazgos(proyecto, resultados), sup = supuestos(proyecto, guardados);
+    const sup = supuestos(proyecto, guardados);
+    const sev = resumenSeveridad(hall);
     b.push(T(1, "Resumen de hallazgos de la interventoría"));
-    b.push(P(hall.length ? `La verificación encontró <b>${hall.length} hallazgo${hall.length === 1 ? "" : "s"}</b> que el contratista debe aclarar o corregir antes de construir. El detalle de cada cálculo está en el literal indicado.` : "La verificación no encontró incumplimientos en los criterios evaluados."));
-    const conNota = hall.some((h) => h.nota);
-    if (hall.length) b.push(tabla("Hallazgos de la interventoría", ["N.º", "Cálculo", "Criterio", "Valor", "Límite", "Norma o referencia", "Lit.", ...(conNota ? ["Nota del revisor"] : [])], hall.map((h) => [h.codigo, h.calculo, h.criterio, h.valor, h.limite, h.norma, h.literales, ...(conNota ? [h.nota] : [])])));
+    b.push(P(hall.length ? `La verificación encontró <b>${hall.length} hallazgo${hall.length === 1 ? "" : "s"}</b>${sev ? ` (${sev})` : ""} que el contratista debe aclarar o corregir antes de construir. El detalle de cada cálculo está en el literal indicado.` : "La verificación no encontró incumplimientos en los criterios evaluados."));
+    const conNota = hall.some((h) => h.nota), conSev = hall.some((h) => h.severidad);
+    if (hall.length) b.push(tabla("Hallazgos de la interventoría", ["N.º", ...(conSev ? ["Severidad"] : []), "Cálculo", "Criterio", "Valor", "Límite", "Norma o referencia", "Lit.", ...(conNota ? ["Nota del revisor"] : [])], hall.map((h) => [h.codigo, ...(conSev ? [h.severidad || "—"] : []), h.calculo, h.criterio, h.valor, h.limite, h.norma, h.literales, ...(conNota ? [h.nota] : [])])));
     if (sup.length) {
       b.push(P("Los siguientes valores son supuestos de la interventoría (marcados «(S)» en este informe), adoptados porque el dato no está en los documentos revisados. El contratista o el operador de red deben confirmarlos; si cambian, los resultados deben recalcularse."));
       b.push(tabla("Supuestos y datos pendientes", ["Origen", "Supuesto"], sup.map((s) => [s.origen, s.texto])));
     }
+    b.push(...textos("hallazgos", 2));
   }
   // ---- un capítulo con una sección por literal (sin salto de página entre literales)
   b.push(T(1, "Desarrollo según los literales a) a x) del RETIE 2024 (numeral 3.3.1.1)"));
@@ -106,6 +124,7 @@ export async function construirMemoria({ proyecto, resultados, guardados }) {
     if (!exigido(proyecto.tipoDiseno, l.l) && !d.texto && !calculosDe(l, resultados).length) { b.push(P("No exigido en el diseño básico (RETIE 2024, numeral 3.3.1.2).")); continue; }
     if (d.aplica === "No") { b.push(P(`<b>No aplica.</b> ${esc(d.texto || "El diseñador no registró la justificación.")}`)); continue; }
     if (d.texto) b.push(P(esc(d.texto).replace(/\n/g, "<br>")));
+    if (verif && citanLit(l.l).length) b.push(P(`<b>Hallazgos de este literal:</b> ${citanLit(l.l).join(", ")} (ver el resumen de hallazgos).`));
     const mods = calculosDe(l, resultados);
     for (const r of mods) {
       // Un cálculo con literal principal se desarrolla allí; los demás literales remiten a él.
@@ -127,6 +146,7 @@ export async function construirMemoria({ proyecto, resultados, guardados }) {
   b.push(P(verif
     ? `La interventoría verificó ${conCalculos ? "los cálculos" : "la memoria y los planos"} con base en el RETIE y las normas técnicas citadas, a partir de los documentos revisados. Este informe no reemplaza la memoria de cálculo del diseñador: los hallazgos deben resolverse en el diseño y los supuestos confirmarse con el contratista.`
     : "El diseñador declara que los cálculos se realizaron con base en el RETIE y las normas técnicas citadas, y que los supuestos adoptados se indican en cada literal."));
+  b.push(...textos("cierre", 2));
   b.push({ tipo: "firma", etiqueta: verif ? "Verificó" : "Elaboró", firmantes: [{ nombre: proyecto.disenador || "", cargo: `${verif ? "Interventoría" : "Ingeniero electricista"}${proyecto.matricula ? `\nMatrícula profesional ${proyecto.matricula}` : ""}\nCinco S.A.S.`, firmaUrl: null }] });
   return b;
 }
@@ -175,6 +195,11 @@ export const nombreMemoria = (datos, ext = "pdf") => (datos.rapido ? `${nombreCa
 // Documento de jsPDF de la memoria completa o de un cálculo rápido, sin descargarlo.
 export async function pdfMemoria(datos) {
   return generarInformePDF(sanearPDF(datos.rapido ? await informeCalculo(datos) : datosInforme(datos.proyecto, await construirMemoria(datos))));
+}
+// Informe listo para radicar en el módulo Informes: los mismos bloques, ya
+// saneados para las fuentes del PDF, que es lo que Informes descarga.
+export async function informeParaRadicar(datos) {
+  return sanearPDF(datosInforme(datos.proyecto, await construirMemoria(datos)));
 }
 export async function descargarMemoria(datos, tipo) {
   if (datos.rapido) return descargarCalculo(datos, tipo);
