@@ -182,7 +182,9 @@ export function exportarProyecto(proyecto, guardados) {
   return { formato: FORMATO, version: 1, exportado: new Date().toISOString(), proyecto: datos, calculos };
 }
 export function validarImportacion(json) {
-  if (!json || json.formato !== FORMATO) throw new Error("El archivo no es un proyecto de AHÍNCO.");
+  // Los informes del módulo Informes también son .json: decirlo claro, porque se confunden fácil.
+  if (json && !json.formato && (json.tipoInforme || Array.isArray(json.bloques))) throw new Error("Ese archivo es un informe para el módulo Informes de Cinco SAS, no un proyecto de AHÍNCO. En AHÍNCO se cargan los archivos que terminan en «.ahinco.json».");
+  if (!json || json.formato !== FORMATO) throw new Error("El archivo no es un proyecto de AHÍNCO. En AHÍNCO se cargan los archivos que terminan en «.ahinco.json».");
   if (!json.proyecto?.nombre) throw new Error("El proyecto del archivo no tiene nombre.");
   const calculos = json.calculos || {};
   for (const [k, v] of Object.entries(calculos)) {

@@ -15,12 +15,32 @@
     <main class="main rt-main">
       <div class="rt-encabezado">
         <h1 id="tituloLista">Proyectos</h1>
-        <p class="text-muted">Cada proyecto reúne los cálculos de una instalación y genera la memoria organizada por los literales a) a x) del diseño detallado del RETIE: como <strong>diseño</strong> propio o como <strong>verificación de interventoría</strong> del diseño de otro.</p>
+        <p class="text-muted">¿Qué quiere hacer? Elija un camino; adentro del proyecto AHÍNCO le muestra los pasos que siguen.</p>
       </div>
       <input type="file" id="importarArchivo" accept=".json,application/json" class="hidden">
 
+      <div class="rt-rutas" id="rutas">
+        <div class="rt-ruta rt-ruta-diseno">
+          <h2>📐 Diseñar una instalación</h2>
+          <p>Cinco hace el diseño y firma la memoria de cálculo.</p>
+          <ol><li>Datos del proyecto</li><li>Agregar los cálculos</li><li>Escribir los literales a) a x)</li><li>Descargar la memoria (PDF, Word, Excel)</li></ol>
+          <div class="rt-ruta-acciones"><button type="button" class="btn" data-ruta="diseno">Empezar un diseño</button></div>
+        </div>
+        <div class="rt-ruta rt-ruta-verificacion">
+          <h2>🔎 Verificar el diseño de otro</h2>
+          <p>Cinco revisa la memoria y los planos de otro diseñador y emite un informe con hallazgos.</p>
+          <ol><li>Datos del diseño revisado</li><li>Registrar los hallazgos</li><li>Comentar los literales a) a x)</li><li>Descargar el informe de verificación</li></ol>
+          <div class="rt-ruta-acciones"><button type="button" class="btn" data-ruta="verificacion">Empezar en blanco</button><button type="button" class="btn secondary" data-ruta="importar">⬆ Cargar archivo .ahinco.json</button></div>
+        </div>
+        <div class="rt-ruta">
+          <h2>⚡ Cálculo rápido</h2>
+          <p>Un cálculo suelto (regulación, cortocircuito, puesta a tierra…) sin crear un proyecto. Después puede guardarlo en uno.</p>
+          <div class="rt-ruta-acciones"><a class="btn secondary" href="rapido.html">Hacer un cálculo</a></div>
+        </div>
+      </div>
+
       <div class="card hidden" id="nuevoCard">
-        <h2>Nuevo proyecto</h2>
+        <h2 id="nuevoTitulo">Nuevo proyecto</h2>
         <div class="rt-modo-selector">
           <label class="rt-modo-op activo"><input type="radio" name="pModo" value="diseno" checked><span><strong>📐 Diseño</strong><small>Cinco diseña y firma la memoria de cálculo.</small></span></label>
           <label class="rt-modo-op"><input type="radio" name="pModo" value="verificacion"><span><strong>🔎 Verificación de interventoría</strong><small>Cinco revisa el diseño de otro: los incumplimientos son hallazgos.</small></span></label>
@@ -28,12 +48,15 @@
         <form id="nuevoForm" class="rt-form-grid">
           <div class="rt-ancho"><label for="pNombre">Nombre del proyecto *</label><input id="pNombre" required placeholder="Ej. Subestación 13,2 kV / 208 V edificio administrativo"></div>
           <div><label for="pCliente">Cliente</label><input id="pCliente"></div>
+          <div class="rt-solo-verif"><label for="pAutor">Diseño revisado: autor y matrícula</label><input id="pAutor" placeholder="Ej. Ing. N. N., M.P. CN205-000000"></div>
+          <div class="rt-solo-verif"><label for="pDocs">Documentos revisados</label><input id="pDocs" placeholder="Ej. Memoria rev. 2 y planos versión 01"></div>
           <div><label for="pUbicacion">Ubicación (municipio, departamento)</label><input id="pUbicacion" placeholder="Ej. Neiva, Huila"></div>
           <div><label for="pAltitud">Altitud (m s. n. m.)</label><input id="pAltitud" type="number" step="any" value="442"></div>
           <div><label for="pTemp">Temperatura ambiente de diseño (°C)</label><input id="pTemp" type="number" step="any" value="32"></div>
           <div><label for="pTipo">Tipo de diseño</label><select id="pTipo"><option>Diseño detallado</option><option>Diseño básico (vivienda, pequeño comercio o pequeña industria)</option><option>Diseño básico (ramal aéreo rural ≤ 50 kVA y 13,2 kV)</option></select></div>
           <div class="rt-ancho"><label for="pDescripcion">Descripción de la instalación</label><input id="pDescripcion" placeholder="Alcance, nivel de tensión y uso"></div>
         </form>
+        <p class="rt-nota" id="nuevoSiguiente"></p>
         <div class="alert" id="nuevoAlerta"></div>
         <div class="rt-acciones"><button type="button" class="btn" id="crearBtn">Crear proyecto</button><button type="button" class="btn secondary" id="cancelarBtn">Cancelar</button></div>
       </div>

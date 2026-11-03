@@ -7,6 +7,7 @@ import { MODULOS, AREAS } from "./rt-modulos.js";
 import { LITERALES, FUENTE_LITERALES, estadoLiteral, normalizarTipoDiseno } from "./rt-literales.js";
 import { hallazgos, supuestos, modoDe, esVerificacion } from "./rt-hallazgos.js";
 import { menuProyecto, marcarSeccion, urlCalculo } from "./rt-shell.js";
+import { AYUDA, ayudaHallazgos } from "./rt-ayuda.js";
 
 const ctx = await iniciarPagina();
 const id = new URLSearchParams(location.search).get("id");
@@ -32,6 +33,8 @@ function iniciar(proyecto, guardados) {
   function mostrar() {
     const s = SECCIONES.includes(location.hash.slice(1)) ? location.hash.slice(1) : "resumen";
     document.querySelectorAll(".rt-seccion").forEach((el) => el.classList.toggle("visible", el.dataset.seccion === s));
+    const nombres = { resumen: "Resumen", datos: "Datos del proyecto", literales: "Literales a) a x)", hallazgos: modoDe(proyecto).hallazgos, documentos: "Documentos", versiones: "Versiones" };
+    document.getElementById("ayudaSeccion").innerHTML = `<strong>${esc(nombres[s])}:</strong> ${esc(s === "hallazgos" ? ayudaHallazgos(esVerificacion(proyecto)) : AYUDA[s])} <a href="guia.html">Cómo usar AHÍNCO →</a>`;
     marcarSeccion(s);
     aside.classList.remove("ip-menu-abierto");
     window.scrollTo(0, 0);
@@ -57,6 +60,7 @@ function iniciar(proyecto, guardados) {
     const estados = LITERALES.map((l) => estadoLiteral(l, literales[l.l], resultados, proyecto.tipoDiseno));
     const listos = estados.filter((e) => e.clase !== "warn" && e.texto !== "No aplica sin justificación").length;
     const kpi = (valor, etiqueta, clase = "") => `<div class="rt-kpi ${clase}"><div class="valor">${valor}</div><div class="etiqueta">${esc(etiqueta)}</div></div>`;
+    pintarPasos(hall, calcs, listos);
     document.getElementById("kpis").innerHTML = kpi(calcs.length, "Cálculos") + kpi(cumplen, "Cumplen", "ok") + kpi(hall.length, modo.hallazgos, hall.length ? "mal" : "ok") + kpi(`${listos}/${LITERALES.length}`, "Literales desarrollados", listos === LITERALES.length ? "ok" : "");
     document.getElementById("tituloHallResumen").textContent = `${modo.hallazgos} principales`;
     document.getElementById("accesoHallTitulo").textContent = modo.hallazgos;
@@ -71,6 +75,33 @@ function iniciar(proyecto, guardados) {
       return `<a class="rt-calc-item ${AREAS[MODULOS[r.modulo].area].clase}" href="${urlCalculo(proyecto.id, r.clave)}"><span class="rt-modulo-icono">${MODULOS[r.modulo].icono}</span><span class="rt-calc-texto"><strong>${esc(MODULOS[r.modulo].titulo)}</strong><small>${esc(r.etiqueta || AREAS[MODULOS[r.modulo].area].nombre)}</small></span><span class="badge ${e.clase}">${esc(e.texto)}</span></a>`;
     }).join("") : `<p class="rt-vacio">Este proyecto todavía no tiene cálculos. Use «＋ Agregar cálculo».</p>`;
   }
+  // Guía «Cómo avanzar»: los pasos del tipo de proyecto, marcados según lo que ya está hecho.
+  function pintarPasos(hall, calcs, listos) {
+    const verif = esVerificacion(proyecto), n = LITERALES.length;
+    const lit = { titulo: verif ? "Comentar los literales a) a x)" : "Escribir los literales a) a x)", hecho: listos === n, estado: `${listos} de ${n} desarrollados`, href: "#literales" };
+    const pasos = verif ? [
+      { titulo: "Datos del diseño revisado", hecho: !!(proyecto.autorDiseno && proyecto.documentosRevisados), estado: proyecto.autorDiseno && proyecto.documentosRevisados ? "Autor y documentos registrados" : "Falta el autor del diseño o los documentos revisados", href: "#datos" },
+      { titulo: "Registrar los hallazgos", hecho: hall.length > 0, estado: hall.length ? `${hall.length} registrados` : "Agréguelos a mano en Hallazgos, o cargue los cálculos del diseñador con «Agregar cálculo» y AHÍNCO marca los que no cumplen", href: "#hallazgos" },
+      lit,
+      { titulo: "Descargar el informe de verificación", hecho: false, estado: "Véalo en pantalla y descárguelo en PDF o Word", href: "#documentos" },
+      { titulo: "Cuando llegue otra revisión del diseñador", hecho: false, estado: "Guarde una versión y actualice; luego compare qué hallazgos se cerraron", href: "#versiones", opcional: true }
+    ] : [
+      { titulo: "Datos del proyecto", hecho: !!(proyecto.disenador && proyecto.matricula), estado: proyecto.disenador && proyecto.matricula ? "Diseñador y matrícula registrados" : "Falta el diseñador o la matrícula", href: "#datos" },
+      { titulo: "Agregar los cálculos", hecho: calcs.length > 0, estado: calcs.length ? `${calcs.length} cálculos en el proyecto` : "Todavía no hay cálculos", accion: "calc" },
+      lit,
+      { titulo: "Corregir los pendientes", hecho: calcs.length > 0 && hall.length === 0, estado: !calcs.length ? "Aparecen cuando haya cálculos" : hall.length ? `${hall.length} criterios no cumplen` : "Todos los criterios cumplen", href: "#hallazgos" },
+      { titulo: "Descargar la memoria", hecho: false, estado: "PDF y Word para radicar, Excel formulado", href: "#documentos" }
+    ];
+    const obligatorios = pasos.filter((p) => !p.opcional && p.href !== "#documentos");
+    document.getElementById("pasosAvance").textContent = `${obligatorios.filter((p) => p.hecho).length} de ${obligatorios.length} listos`;
+    const siguiente = pasos.find((p) => !p.hecho);
+    document.getElementById("pasos").innerHTML = pasos.map((p, i) => `<li class="${p.hecho ? "hecho" : ""}${p === siguiente ? " siguiente" : ""}${p.opcional ? " opcional" : ""}">
+        <a href="${p.href || "#"}"${p.accion ? ` data-accion="${p.accion}"` : ""}><span class="rt-paso-marca">${p.hecho ? "✓" : i + 1}</span><span><strong>${esc(p.titulo)}</strong><small>${esc(p.estado)}</small></span></a></li>`).join("");
+  }
+  document.getElementById("pasos").addEventListener("click", (e) => {
+    if (!e.target.closest('[data-accion="calc"]')) return;
+    e.preventDefault(); document.getElementById("rtSelector").showModal();
+  });
   document.getElementById("agregarDesdeResumen").addEventListener("click", (e) => { e.preventDefault(); document.getElementById("rtSelector").showModal(); });
 
   // ---- datos del proyecto
@@ -151,7 +182,7 @@ function iniciar(proyecto, guardados) {
     const hall = hallazgos(proyecto, resultados), sup = supuestos({ ...proyecto, literales }, guardados);
     document.getElementById("tituloHall").textContent = modo.hallazgos;
     document.getElementById("introHall").textContent = verif
-      ? "Cada criterio que no cumple en los cálculos es un hallazgo de la interventoría sobre el diseño revisado. La tabla sale también al inicio del informe PDF y Word, lista para el oficio al contratista."
+      ? "Los hallazgos salen de dos fuentes: los que usted agrega a mano (formulario de abajo) y los criterios que no cumplen en los cálculos cargados. La tabla sale también al inicio del informe PDF y Word, lista para el oficio al contratista."
       : "Criterios que todavía no cumplen. Corríjalos en cada cálculo antes de entregar la memoria.";
     document.getElementById("tablaHall").innerHTML = hall.length
       ? tablaHtml(["N.º", "Cálculo", "Criterio", "Valor", "Límite", "Norma", "Lit.", "Nota del revisor"], hall.map((h) => [`<strong>${h.codigo}</strong>`, h.clave ? `<a href="${urlCalculo(proyecto.id, h.clave)}">${esc(h.calculo)}</a>` : esc(h.calculo), esc(h.criterio), esc(h.valor), esc(h.limite), esc(h.norma), esc(h.literales), `<textarea class="rt-nota-hall" data-llave="${esc(h.llave)}" rows="5" maxlength="1200" placeholder="Contexto o acción requerida (sale en el informe)">${esc(h.nota)}</textarea>${h.manual ? `<button type="button" class="rt-quitar-hall" data-quitar="${esc(h.llave)}">Quitar</button>` : ""}`]), "rt-tabla-hall")

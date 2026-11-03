@@ -5,6 +5,7 @@
 import { esc, cerrarSesion, clavesDe, tituloCalculo, estadoModulo, modulosPorArea } from "./rt-core.js";
 import { MODULOS, AREAS } from "./rt-modulos.js";
 import { hallazgos, modoDe, esVerificacion } from "./rt-hallazgos.js";
+import { AYUDA, ayudaHallazgos } from "./rt-ayuda.js";
 
 const urlProyecto = (id, seccion = "resumen") => `proyecto.html?id=${encodeURIComponent(id)}#${seccion}`;
 export const urlCalculo = (id, clave) => `calculo.html?id=${encodeURIComponent(id)}&k=${encodeURIComponent(clave)}`;
@@ -42,7 +43,7 @@ const punto = (clase) => `<span class="rt-punto rt-punto-${clase}" aria-hidden="
 // ---------------------------------------------------------------- lista de proyectos
 export function menuInicio(ctx, { filtro = "todos", conteos = {}, activo = "" } = {}) {
   const aside = document.getElementById("sidebar");
-  const item = (f, icono, texto) => `<a href="inicio.html#${f}" data-filtro="${f}" class="${!activo && filtro === f ? "active" : ""}"><span class="rt-nav-icono">${icono}</span>${esc(texto)}${conteos[f] !== undefined ? `<span class="rt-nav-cuenta">${conteos[f]}</span>` : ""}</a>`;
+  const item = (f, icono, texto) => `<a href="inicio.html#${f}" data-filtro="${f}" title="${esc(AYUDA[f])}" class="${!activo && filtro === f ? "active" : ""}"><span class="rt-nav-icono">${icono}</span>${esc(texto)}${conteos[f] !== undefined ? `<span class="rt-nav-cuenta">${conteos[f]}</span>` : ""}</a>`;
   aside.innerHTML = `${cabeza()}
     <nav>
       <div class="rt-nav-titulo">Proyectos</div>
@@ -50,11 +51,12 @@ export function menuInicio(ctx, { filtro = "todos", conteos = {}, activo = "" } 
       ${item("diseno", "📐", "Diseño")}
       ${item("verificacion", "🔎", "Verificación")}
       <div class="rt-nav-titulo">Acciones</div>
-      <a href="inicio.html#nuevo" id="rtNuevo"><span class="rt-nav-icono">＋</span>Nuevo proyecto</a>
-      <a href="rapido.html" class="${activo === "rapido" ? "active" : ""}"><span class="rt-nav-icono">⚡</span>Cálculo rápido</a>
-      ${activo ? "" : '<a href="#" id="rtImportar"><span class="rt-nav-icono">⬆</span>Importar proyecto</a>'}
+      <a href="inicio.html#nuevo" id="rtNuevo" title="${esc(AYUDA.nuevo)}"><span class="rt-nav-icono">＋</span>Nuevo proyecto</a>
+      <a href="rapido.html" title="${esc(AYUDA.rapido)}" class="${activo === "rapido" ? "active" : ""}"><span class="rt-nav-icono">⚡</span>Cálculo rápido</a>
+      ${activo ? "" : `<a href="#" id="rtImportar" title="${esc(AYUDA.importar)}"><span class="rt-nav-icono">⬆</span>Cargar archivo .ahinco.json</a>`}
       <div class="rt-nav-titulo">Ayuda</div>
-      <a href="acerca.html" class="${activo === "acerca" ? "active" : ""}"><span class="rt-nav-icono">ℹ</span>Alcance y validación</a>
+      <a href="guia.html" title="${esc(AYUDA.guia)}" class="${activo === "guia" ? "active" : ""}"><span class="rt-nav-icono">?</span>Cómo usar AHÍNCO</a>
+      <a href="acerca.html" title="${esc(AYUDA.acerca)}" class="${activo === "acerca" ? "active" : ""}"><span class="rt-nav-icono">ℹ</span>Alcance y validación</a>
     </nav>${caja(ctx)}`;
   conectar(aside);
   return aside;
@@ -66,7 +68,8 @@ export function menuProyecto(ctx, { proyecto, guardados, resultados, activo }) {
   const aside = document.getElementById("sidebar");
   const modo = modoDe(proyecto);
   const nHall = hallazgos(proyecto, resultados).length;
-  const sec = (s, icono, texto, extra = "") => `<a href="${urlProyecto(proyecto.id, s)}" data-seccion="${s}" class="${activo === s ? "active" : ""}"><span class="rt-nav-icono">${icono}</span>${esc(texto)}${extra}</a>`;
+  const ayuda = (s) => (s === "hallazgos" ? ayudaHallazgos(esVerificacion(proyecto)) : AYUDA[s]);
+  const sec = (s, icono, texto, extra = "") => `<a href="${urlProyecto(proyecto.id, s)}" data-seccion="${s}" title="${esc(ayuda(s))}" class="${activo === s ? "active" : ""}"><span class="rt-nav-icono">${icono}</span>${esc(texto)}${extra}</a>`;
   const areas = Object.entries(AREAS).map(([a, info]) => {
     const claves = modulosPorArea(a).flatMap((m) => clavesDe(m, guardados));
     if (!claves.length) return "";
@@ -91,15 +94,16 @@ export function menuProyecto(ctx, { proyecto, guardados, resultados, activo }) {
       ${sec("resumen", "◎", "Resumen")}
       ${sec("datos", "🗂", "Datos del proyecto")}
       ${sec("literales", "📋", "Literales a) a x)")}
-      <div class="rt-nav-titulo">Cálculos</div>
+      <div class="rt-nav-titulo" title="${esc(AYUDA.calculos)}">Cálculos</div>
       ${areas || '<p class="rt-nav-vacio">Todavía no hay cálculos.</p>'}
-      <a href="#" class="rt-nav-agregar" id="rtAgregarCalc">＋ Agregar cálculo</a>
+      <a href="#" class="rt-nav-agregar" id="rtAgregarCalc" title="${esc(AYUDA.calculos)}">＋ Agregar cálculo</a>
       <div class="rt-nav-titulo">Entregables</div>
       ${sec("hallazgos", esVerificacion(proyecto) ? "🔎" : "🛠", modo.hallazgos, nHall ? `<span class="rt-nav-cuenta rt-nav-cuenta-mal">${nHall}</span>` : "")}
       ${sec("documentos", "📄", "Documentos")}
       ${sec("versiones", "🕓", "Versiones")}
       <div class="rt-nav-titulo">Ayuda</div>
-      <a href="acerca.html"><span class="rt-nav-icono">ℹ</span>Alcance y validación</a>
+      <a href="guia.html" title="${esc(AYUDA.guia)}"><span class="rt-nav-icono">?</span>Cómo usar AHÍNCO</a>
+      <a href="acerca.html" title="${esc(AYUDA.acerca)}"><span class="rt-nav-icono">ℹ</span>Alcance y validación</a>
     </nav>${caja(ctx)}
     <dialog class="rt-dialogo rt-dialogo-ancho" id="rtSelector">
       <div class="rt-dialogo-cabeza"><h2>Agregar cálculo</h2><button type="button" class="rt-icono-btn" id="rtSelectorCerrar" title="Cerrar">✕</button></div>
