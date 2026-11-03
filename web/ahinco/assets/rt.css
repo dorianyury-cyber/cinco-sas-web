@@ -170,7 +170,7 @@ body.rt-verificacion .rt-solo-verif { display: block; }
 
 /* Encabezado y secciones */
 .rt-encabezado { margin-bottom: 18px; }
-.rt-encabezado h1 { margin: 4px 0 4px; font-size: 25px; line-height: 1.2; }
+.rt-encabezado h1 { margin: 4px 0 4px; font-size: 21px; line-height: 1.2; }
 .rt-encabezado p { margin: 0; }
 .rt-encabezado-calc { display: flex; justify-content: space-between; align-items: flex-end; gap: 16px; flex-wrap: wrap; }
 .rt-migas { font-size: 13px; color: var(--text-muted); display: flex; align-items: center; gap: 8px; flex-wrap: wrap; }
@@ -371,17 +371,48 @@ body.rt-verificacion .rt-solo-verif { display: block; }
 
 .rt-quitar-hall { margin-top: 4px; font-size: 11px; background: none; border: 1px solid var(--border); border-radius: 6px; padding: 1px 8px; color: var(--danger); cursor: pointer; }
 
-/* Inicio: los tres caminos (diseñar, verificar, cálculo rápido) con sus pasos. */
-.rt-rutas { display: grid; grid-template-columns: repeat(auto-fit, minmax(260px, 1fr)); gap: 16px; margin-bottom: 22px; }
-.rt-ruta { display: flex; flex-direction: column; gap: 6px; background: var(--card-bg); border: 1px solid var(--border); border-top: 3px solid var(--border); border-radius: var(--radius); padding: 16px 18px; }
-.rt-ruta-diseno { border-top-color: #2f7dd1; }
-.rt-ruta-verificacion { border-top-color: var(--cinco-orange); }
-.rt-ruta h2 { margin: 0; font-size: 16px; }
-.rt-ruta p { margin: 0; font-size: 13px; color: var(--text-muted); }
-.rt-ruta ol { margin: 4px 0 0; padding-left: 20px; font-size: 12.5px; line-height: 1.6; }
-.rt-ruta-acciones { display: flex; flex-wrap: wrap; gap: 8px; margin-top: auto; padding-top: 10px; }
-.rt-ruta-acciones .btn { font-size: 13px; }
+/* Inicio: título y barra delgada de acciones en la misma franja. */
+.rt-lista-cabeza { display: flex; align-items: center; justify-content: space-between; flex-wrap: wrap; gap: 10px 16px; margin-bottom: 12px; }
+.rt-lista-cabeza h1 { margin: 0; font-size: 20px; line-height: 1.2; }
+.rt-barra, .rt-vp-acciones { display: flex; flex-wrap: wrap; gap: 6px; }
+.rt-barra-btn { display: inline-flex; align-items: center; gap: 5px; padding: 5px 11px; border: 1px solid var(--border); border-radius: 7px; background: var(--card-bg); color: var(--text); font: inherit; font-size: 12.5px; font-weight: 600; line-height: 1.3; cursor: pointer; white-space: nowrap; text-decoration: none; }
+.rt-barra-btn:hover { border-color: var(--cinco-orange); background: var(--sidebar-hover); text-decoration: none; }
+.rt-barra-diseno { border-left: 3px solid #2f7dd1; }
+.rt-barra-verif { border-left: 3px solid var(--cinco-orange); }
+.rt-barra-ayuda { color: var(--text-muted); }
+.rt-barra-principal { background: var(--cinco-orange-dark); border-color: var(--cinco-orange-dark); color: #fff; }
+.rt-barra-principal:hover { background: var(--cinco-orange); color: #fff; }
 
+/* Panel de detalle del proyecto seleccionado (arriba de la lista). */
+.rt-vp { display: flex; flex-direction: column; gap: 8px; padding: 12px 14px; margin-bottom: 10px; background: var(--card-bg); border: 1px solid var(--border); border-radius: var(--radius); }
+.rt-vp > p { margin: 0; }
+.rt-vp-cabeza { display: flex; align-items: center; justify-content: space-between; flex-wrap: wrap; gap: 8px 14px; }
+.rt-vp-titulo { display: flex; align-items: center; gap: 8px; min-width: 0; flex: 1 1 320px; }
+.rt-vp-titulo strong { font-size: 15px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.rt-vp-grupos { display: flex; flex-wrap: wrap; gap: 8px; }
+.rt-vp-grupo { --pc: #1f5fbf; flex: 1 1 230px; min-width: 200px; padding: 6px 10px 7px; border: 1px solid var(--border); border-left: 4px solid var(--pc); border-radius: 8px; }
+.rt-vp-grupo:nth-child(3n + 2) { --pc: #e0a800; }
+.rt-vp-grupo:nth-child(3n + 3) { --pc: #1e9e57; }
+.rt-vp-grupo-titulo { font-size: 10px; font-weight: 800; text-transform: uppercase; letter-spacing: 0.4px; color: var(--pc); margin-bottom: 3px; }
+.rt-vp-campo { display: flex; gap: 6px; padding: 2px 0; font-size: 12.5px; border-top: 1px solid var(--border); }
+.rt-vp-campo:first-of-type { border-top: 0; }
+.rt-vp-etiqueta { flex: none; color: var(--text-muted); white-space: nowrap; }
+.rt-vp-etiqueta::after { content: ":"; }
+.rt-vp-valor { font-weight: 600; min-width: 0; word-break: break-word; }
+.rt-vp-desc { margin: 0; font-size: 12px; color: var(--text-muted); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+
+/* Lista de proyectos: una línea por fila, texto largo con «…». */
+.rt-lista-filtros { margin-bottom: 6px; }
+.rt-lista-filtros input { max-width: 340px; padding: 5px 10px; font-size: 12.5px; margin: 0; }
+.rt-tabla-lista { width: 100%; table-layout: fixed; border-collapse: collapse; background: var(--card-bg); border: 1px solid var(--border); border-radius: var(--radius); }
+.rt-tabla-lista th { text-align: left; font-size: 11px; font-weight: 700; text-transform: uppercase; letter-spacing: 0.3px; color: var(--text-muted); padding: 6px 10px; border-bottom: 1px solid var(--border); }
+.rt-tabla-lista td { padding: 5px 10px; font-size: 12.5px; border-bottom: 1px solid var(--border); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.rt-tabla-lista tbody tr[data-id] { cursor: pointer; }
+.rt-tabla-lista tbody tr[data-id]:hover { background: rgba(245, 166, 35, 0.07); }
+.rt-tabla-lista tr.rt-fila-sel { background: rgba(245, 166, 35, 0.16); }
+.rt-tabla-lista tr.rt-fila-sel td:nth-child(2) { font-weight: 700; }
+.rt-c-tipo { width: 11%; } .rt-c-nombre { width: 43%; } .rt-c-cliente { width: 21%; } .rt-c-ubic { width: 14%; } .rt-c-fecha { width: 11%; }
+@media (max-width: 760px) { .rt-tabla-lista { min-width: 640px; } }
 /* Proyecto: guía «Cómo avanzar». */
 .rt-pasos { list-style: none; margin: 4px 0 0; padding: 0; display: grid; grid-template-columns: repeat(auto-fit, minmax(190px, 1fr)); gap: 8px; }
 .rt-pasos a { display: flex; gap: 10px; align-items: flex-start; height: 100%; padding: 10px 12px; border: 1px solid var(--border); border-radius: 10px; color: var(--text); }

@@ -13,31 +13,17 @@
   <div class="app-shell">
     <aside class="sidebar rt-sidebar" id="sidebar"></aside>
     <main class="main rt-main">
-      <div class="rt-encabezado">
+      <div class="rt-lista-cabeza">
         <h1 id="tituloLista">Proyectos</h1>
-        <p class="text-muted">¿Qué quiere hacer? Elija un camino; adentro del proyecto AHÍNCO le muestra los pasos que siguen.</p>
+        <div class="rt-barra" id="rutas">
+          <button type="button" class="rt-barra-btn rt-barra-diseno" data-ruta="diseno" title="Cinco diseña y firma la memoria de cálculo: datos, cálculos, literales y memoria.">📐 Nuevo diseño</button>
+          <button type="button" class="rt-barra-btn rt-barra-verif" data-ruta="verificacion" title="Cinco revisa el diseño de otro y emite un informe con hallazgos.">🔎 Nueva verificación</button>
+          <button type="button" class="rt-barra-btn" data-ruta="importar" title="Crea un proyecto desde un archivo .ahinco.json (no sirve para los .json del módulo Informes).">⬆ Cargar .ahinco.json</button>
+          <a class="rt-barra-btn" href="rapido.html" title="Un cálculo suelto sin crear proyecto.">⚡ Cálculo rápido</a>
+          <a class="rt-barra-btn rt-barra-ayuda" href="guia.html" title="Qué hace cada opción y el paso a paso para diseñar o verificar.">? Cómo usar</a>
+        </div>
       </div>
       <input type="file" id="importarArchivo" accept=".json,application/json" class="hidden">
-
-      <div class="rt-rutas" id="rutas">
-        <div class="rt-ruta rt-ruta-diseno">
-          <h2>📐 Diseñar una instalación</h2>
-          <p>Cinco hace el diseño y firma la memoria de cálculo.</p>
-          <ol><li>Datos del proyecto</li><li>Agregar los cálculos</li><li>Escribir los literales a) a x)</li><li>Descargar la memoria (PDF, Word, Excel)</li></ol>
-          <div class="rt-ruta-acciones"><button type="button" class="btn" data-ruta="diseno">Empezar un diseño</button></div>
-        </div>
-        <div class="rt-ruta rt-ruta-verificacion">
-          <h2>🔎 Verificar el diseño de otro</h2>
-          <p>Cinco revisa la memoria y los planos de otro diseñador y emite un informe con hallazgos.</p>
-          <ol><li>Datos del diseño revisado</li><li>Registrar los hallazgos</li><li>Comentar los literales a) a x)</li><li>Descargar el informe de verificación</li></ol>
-          <div class="rt-ruta-acciones"><button type="button" class="btn" data-ruta="verificacion">Empezar en blanco</button><button type="button" class="btn secondary" data-ruta="importar">⬆ Cargar archivo .ahinco.json</button></div>
-        </div>
-        <div class="rt-ruta">
-          <h2>⚡ Cálculo rápido</h2>
-          <p>Un cálculo suelto (regulación, cortocircuito, puesta a tierra…) sin crear un proyecto. Después puede guardarlo en uno.</p>
-          <div class="rt-ruta-acciones"><a class="btn secondary" href="rapido.html">Hacer un cálculo</a></div>
-        </div>
-      </div>
 
       <div class="card hidden" id="nuevoCard">
         <h2 id="nuevoTitulo">Nuevo proyecto</h2>
@@ -62,7 +48,13 @@
       </div>
 
       <div class="alert" id="listaAlerta"></div>
-      <div class="rt-proyectos" id="proyectos"><p class="text-muted">Cargando…</p></div>
+      <div class="rt-vp" id="vistaPrevia"><p class="text-muted">Cargando…</p></div>
+      <div class="rt-lista-filtros"><input type="search" id="buscar" placeholder="Buscar por nombre, cliente o ubicación"></div>
+      <div class="tabla-scroll"><table class="rt-tabla-lista" id="proyectos">
+        <colgroup><col class="rt-c-tipo"><col class="rt-c-nombre"><col class="rt-c-cliente"><col class="rt-c-ubic"><col class="rt-c-fecha"></colgroup>
+        <thead><tr><th>Tipo</th><th>Proyecto</th><th>Cliente</th><th>Ubicación</th><th>Actualizado</th></tr></thead>
+        <tbody></tbody>
+      </table></div>
     </main>
   </div>
   <script type="module" src="js/rt-inicio.js"></script>

@@ -42,22 +42,67 @@ if (ctx) {
     aside.querySelector("#rtImportar").addEventListener("click", (e) => { e.preventDefault(); archivo.click(); });
   }
 
+  // Lista de una línea por proyecto y panel de detalle arriba; arranca con la fila 1 seleccionada.
+  let seleccionado = null;
+  const buscar = document.getElementById("buscar");
+  const visibles = () => {
+    const f = filtroActual(), q = buscar.value.trim().toLowerCase();
+    return proyectos.filter((p) => (f === "todos" || (f === "verificacion") === esVerificacion(p))
+      && (!q || [p.nombre, p.cliente, p.ubicacion].some((t) => (t || "").toLowerCase().includes(q))));
+  };
+  const campo = (etiqueta, valor) => (valor ? `<div class="rt-vp-campo"><span class="rt-vp-etiqueta">${esc(etiqueta)}</span><span class="rt-vp-valor">${esc(valor)}</span></div>` : "");
+  const grupo = (titulo, campos) => (campos.join("") ? `<div class="rt-vp-grupo"><div class="rt-vp-grupo-titulo">${esc(titulo)}</div>${campos.join("")}</div>` : "");
+  function pintarDetalle(p) {
+    const vp = document.getElementById("vistaPrevia");
+    if (!p) { vp.innerHTML = `<p class="text-muted">${proyectos.length ? "No hay proyectos con este filtro." : "Todavía no hay proyectos. Use «Nuevo diseño», «Nueva verificación» o «Cargar .ahinco.json»."}</p>`; return; }
+    const verif = esVerificacion(p), url = (s) => `proyecto.html?id=${encodeURIComponent(p.id)}#${s}`;
+    const nHall = (p.hallazgosManuales || []).length;
+    vp.innerHTML = `<div class="rt-vp-cabeza">
+        <div class="rt-vp-titulo"><span class="rt-modo rt-modo-${verif ? "verificacion" : "diseno"}">${esc(MODOS[verif ? "verificacion" : "diseno"].nombre)}</span><strong title="${esc(p.nombre)}">${esc(p.nombre)}</strong></div>
+        <div class="rt-vp-acciones">
+          <a class="rt-barra-btn rt-barra-principal" href="${url("resumen")}">Abrir</a>
+          <a class="rt-barra-btn" href="${url("hallazgos")}">${verif ? "Hallazgos" : "Pendientes"}</a>
+          <a class="rt-barra-btn" href="${url("documentos")}">${verif ? "Informe" : "Memoria"}</a>
+          <a class="rt-barra-btn" href="${url("versiones")}">Versiones</a>
+        </div>
+      </div>
+      <div class="rt-vp-grupos">
+        ${grupo("Proyecto", [campo("Cliente", p.cliente), campo("Ubicación", p.ubicacion), campo("Tipo", p.tipoDiseno)])}
+        ${verif
+          ? grupo("Diseño revisado", [campo("Autor", p.autorDiseno), campo("Documentos", p.documentosRevisados), campo("Hallazgos de revisión", nHall ? String(nHall) : "")])
+          : grupo("Firma", [campo("Diseñador", p.disenador), campo("Matrícula", p.matricula)])}
+        ${grupo("Registro", [campo("Radicado", p.radicado), campo(verif ? "Interventor" : "Creado por", verif ? p.disenador : p.creadoPor), campo("Actualizado", fechaCorta(p.actualizadoEn))])}
+      </div>
+      ${p.descripcion ? `<p class="rt-vp-desc" title="${esc(p.descripcion)}">${esc(p.descripcion)}</p>` : ""}`;
+  }
   function pintarLista() {
     const f = filtroActual();
-    const vis = proyectos.filter((p) => f === "todos" || (f === "verificacion") === esVerificacion(p));
+    const vis = visibles();
     document.getElementById("tituloLista").textContent = f === "todos" ? "Proyectos" : f === "diseno" ? "Proyectos de diseño" : "Verificaciones de interventoría";
-    lista.innerHTML = vis.length
+    if (!vis.some((p) => p.id === seleccionado)) seleccionado = vis[0]?.id || null;
+    lista.querySelector("tbody").innerHTML = vis.length
       ? vis.map((p) => {
         const verif = esVerificacion(p);
-        return `<a class="rt-proyecto-card" href="proyecto.html?id=${encodeURIComponent(p.id)}#resumen">
-            <span class="rt-modo rt-modo-${verif ? "verificacion" : "diseno"}">${esc(MODOS[verif ? "verificacion" : "diseno"].nombre)}</span>
-            <strong>${esc(p.nombre)}</strong>
-            <span class="text-muted">${esc([p.cliente, p.ubicacion].filter(Boolean).join(" · ") || "Sin cliente ni ubicación")}</span>
-            <span class="rt-proyecto-pie">Actualizado ${esc(fechaCorta(p.actualizadoEn))}</span>
-          </a>`;
+        const t = (v) => `<td title="${esc(v || "")}">${esc(v || "—")}</td>`;
+        return `<tr data-id="${esc(p.id)}" class="${p.id === seleccionado ? "rt-fila-sel" : ""}">
+            <td><span class="rt-modo rt-modo-${verif ? "verificacion" : "diseno"}">${esc(MODOS[verif ? "verificacion" : "diseno"].nombre)}</span></td>
+            ${t(p.nombre)}${t(p.cliente)}${t(p.ubicacion)}<td>${esc(fechaCorta(p.actualizadoEn))}</td></tr>`;
       }).join("")
-      : `<div class="card rt-vacio-card"><p>${proyectos.length ? "No hay proyectos de este tipo." : "Todavía no hay proyectos. Elija uno de los caminos de arriba."}</p></div>`;
+      : `<tr><td colspan="5" class="text-muted">Sin proyectos.</td></tr>`;
+    pintarDetalle(vis.find((p) => p.id === seleccionado));
   }
+  lista.addEventListener("click", (e) => {
+    const tr = e.target.closest("tr[data-id]");
+    if (!tr) return;
+    seleccionado = tr.dataset.id;
+    lista.querySelectorAll("tr[data-id]").forEach((x) => x.classList.toggle("rt-fila-sel", x === tr));
+    pintarDetalle(proyectos.find((p) => p.id === seleccionado));
+  });
+  lista.addEventListener("dblclick", (e) => {
+    const tr = e.target.closest("tr[data-id]");
+    if (tr) location.href = `proyecto.html?id=${encodeURIComponent(tr.dataset.id)}#resumen`;
+  });
+  buscar.addEventListener("input", pintarLista);
 
   async function cargar() {
     try { proyectos = await listarProyectos(); } catch (err) { mostrarAlerta(alerta, errorAmigable(err)); proyectos = []; }
