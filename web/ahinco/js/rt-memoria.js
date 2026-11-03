@@ -6,7 +6,7 @@
 import { generarInformePDF } from "../../js/control/informes-pdf.js";
 import { generarInformeDocxBlob } from "../../js/control/informes-docx.js";
 import { MODULOS, NORMAS_GENERALES } from "./rt-modulos.js";
-import { LITERALES, FUENTE_LITERALES, exigido, tipoDisenoDe, normalizarTipoDiseno, textosDe, letrasLiteral, estadoLiteral } from "./rt-literales.js";
+import { exigido, tipoDisenoDe, normalizarTipoDiseno, textosDe, letrasLiteral, estadoLiteral, esquemaDe, esRetilap } from "./rt-literales.js";
 import { svgTCC, svgAPng, svgUnifilar } from "./rt-grafico.js";
 import { esc, hoyISO, tituloCalculo, ORDEN_MODULOS } from "./rt-core.js";
 import { hallazgos, supuestos, esVerificacion, resumenSeveridad } from "./rt-hallazgos.js";
@@ -74,6 +74,8 @@ export async function construirMemoria({ proyecto, resultados, guardados }) {
   const verif = esVerificacion(proyecto);
   const conCalculos = Object.keys(resultados).length > 0;
   const hall = hallazgos(proyecto, resultados);
+  // Literales del RETIE o, en una revisión de solo iluminación, capítulos del RETILAP.
+  const esq = esquemaDe(proyecto), retilap = esRetilap(proyecto);
   const citanLit = (l) => hall.filter((h) => letrasLiteral(h.literales).includes(l)).map((h) => h.codigo);
   // Secciones de texto libre del lugar indicado, como títulos del nivel dado.
   const textos = (lugar, nivel) => textosDe(verif).filter((t) => t.lugar === lugar && (proyecto.textos?.[t.clave] || "").trim())
@@ -81,34 +83,35 @@ export async function construirMemoria({ proyecto, resultados, guardados }) {
   const b = [];
   // ---- Generalidades
   b.push(T(1, "Generalidades"));
-  if (verif) b.push(P(`El presente informe contiene la <b>verificación de la interventoría</b> sobre la memoria de cálculo y los planos del proyecto <b>${esc(proyecto.nombre)}</b>${proyecto.descripcion ? `: ${esc(proyecto.descripcion)}` : ""}. ${conCalculos ? "Los cálculos se rehicieron con los datos del diseño revisado y se compararon" : "La memoria y los planos se revisaron y se compararon"} con los criterios del RETIE y de las normas técnicas citadas; cada criterio que no cumple se reporta como un hallazgo numerado. Se organiza según los literales del ${esc(FUENTE_LITERALES)}.`));
-  else b.push(P(`La presente memoria de cálculo corresponde al ${esc(normalizarTipoDiseno(proyecto.tipoDiseno).toLowerCase())} de la instalación eléctrica del proyecto <b>${esc(proyecto.nombre)}</b>${proyecto.descripcion ? `: ${esc(proyecto.descripcion)}` : ""}. Se organiza según los literales del ${esc(FUENTE_LITERALES)}; los literales que no aplican a la instalación se mencionan expresamente con su justificación, como lo exige el parágrafo 1 del mismo artículo.`));
+  if (verif) b.push(P(`El presente informe contiene la <b>verificación de la interventoría</b> sobre la memoria de cálculo y los planos del proyecto <b>${esc(proyecto.nombre)}</b>${proyecto.descripcion ? `: ${esc(proyecto.descripcion)}` : ""}. ${conCalculos ? "Los cálculos se rehicieron con los datos del diseño revisado y se compararon" : "La memoria y los planos se revisaron y se compararon"} con los criterios ${retilap ? "del RETILAP" : "del RETIE y de las normas técnicas citadas"}; cada criterio que no cumple se reporta como un hallazgo numerado. Se organiza según los ${esq.plural} del ${esc(esq.fuente)}.`));
+  else b.push(P(`La presente memoria de cálculo corresponde al ${esc(normalizarTipoDiseno(proyecto.tipoDiseno).toLowerCase())} de la instalación eléctrica del proyecto <b>${esc(proyecto.nombre)}</b>${proyecto.descripcion ? `: ${esc(proyecto.descripcion)}` : ""}. Se organiza según los ${esq.plural} del ${esc(esq.fuente)}; los ${esq.plural} que no aplican a la instalación se mencionan expresamente con su justificación, como lo exige el parágrafo 1 del mismo artículo.`));
   b.push(...textos("inicio", 2));
   b.push(tabla("Datos generales del proyecto", ["Dato", "Valor"], [
     ["Proyecto", proyecto.nombre], ["Cliente", proyecto.cliente || "—"], ["Ubicación", proyecto.ubicacion || "—"],
     ["Altitud", `${proyecto.altitud ?? "—"} m s. n. m.`], ["Temperatura ambiente de diseño", `${proyecto.tempAmbiente ?? "—"} °C`],
-    ["Tipo de diseño", `${normalizarTipoDiseno(proyecto.tipoDiseno)}${tipoDisenoDe(proyecto.tipoDiseno)?.ref ? ` (RETIE 2024 ${tipoDisenoDe(proyecto.tipoDiseno).ref})` : ""}`],
+    retilap ? ["Alcance", "Solo diseño de iluminación (RETILAP)"] : ["Tipo de diseño", `${normalizarTipoDiseno(proyecto.tipoDiseno)}${tipoDisenoDe(proyecto.tipoDiseno)?.ref ? ` (RETIE 2024 ${tipoDisenoDe(proyecto.tipoDiseno).ref})` : ""}`],
     ...(verif ? [["Diseño revisado", proyecto.autorDiseno || "—"], ["Documentos revisados", proyecto.documentosRevisados || "—"]] : []),
     [verif ? "Interventor que verifica" : "Diseñador", `${proyecto.disenador || "—"}${proyecto.matricula ? ` — M.P. ${proyecto.matricula}` : ""}`]
   ]));
-  b.push(tabla("Normas y reglamentos aplicados", ["Documento", "Título"], NORMAS_GENERALES));
+  // En una revisión de solo iluminación, solo los reglamentos que aplican (no las normas de MT, rayos, SPT…).
+  b.push(tabla("Normas y reglamentos aplicados", ["Documento", "Título"], retilap ? NORMAS_GENERALES.filter(([d]) => /RETILAP|RETIE|NTC 2050 \(/.test(d)) : NORMAS_GENERALES));
   b.push(...textos("normas", 2));
-  b.push(tabla("Alcance de la memoria por literal del RETIE", ["Lit.", "Contenido exigido", "Aplica", "Desarrollo"], LITERALES.map((l) => {
+  b.push(tabla(esq.tituloTabla, [esq.col, "Contenido exigido", "Aplica", "Desarrollo"], esq.items.map((l) => {
     const d = lits[l.l] || {};
     const calc = calculosDe(l, resultados).map(tituloCalculo);
-    if (!exigido(proyecto.tipoDiseno, l.l) && !calc.length && !d.texto) return [`${l.l})`, l.texto, "—", "No exigido en el diseño básico (RETIE 2024 3.3.1.2)"];
+    if (!exigido(proyecto.tipoDiseno, l.l) && !calc.length && !d.texto) return [esq.cod(l), l.texto, "—", "No exigido en el diseño básico (RETIE 2024 3.3.1.2)"];
     const desarrollo = d.aplica === "No" ? `No aplica: ${d.texto || "sin justificación"}` : calc.length ? `Cálculo: ${calc.join("; ")}` : d.texto ? "Desarrollo escrito" : "Pendiente";
     const e = estadoLiteral(l, d, resultados, proyecto.tipoDiseno, hall);
-    return [`${l.l})`, l.texto, d.aplica === "No" ? "No" : "Sí", e.hallazgos ? `${desarrollo}. ${e.texto}` : desarrollo];
+    return [esq.cod(l), l.ref ? `${l.texto.replace(/\.$/, "")} (${l.ref})` : l.texto, d.aplica === "No" ? "No" : "Sí", e.hallazgos ? `${desarrollo}. ${e.texto}` : desarrollo];
   })));
   // ---- verificación: hallazgos y supuestos al inicio, listos para el oficio
   if (verif) {
     const sup = supuestos(proyecto, guardados);
     const sev = resumenSeveridad(hall);
     b.push(T(1, "Resumen de hallazgos de la interventoría"));
-    b.push(P(hall.length ? `La verificación encontró <b>${hall.length} hallazgo${hall.length === 1 ? "" : "s"}</b>${sev ? ` (${sev})` : ""} que el contratista debe aclarar o corregir antes de construir. El detalle de cada cálculo está en el literal indicado.` : "La verificación no encontró incumplimientos en los criterios evaluados."));
+    b.push(P(hall.length ? `La verificación encontró <b>${hall.length} hallazgo${hall.length === 1 ? "" : "s"}</b>${sev ? ` (${sev})` : ""} que el contratista debe aclarar o corregir antes de construir. El detalle está en el ${esq.singular} indicado.` : "La verificación no encontró incumplimientos en los criterios evaluados."));
     const conNota = hall.some((h) => h.nota), conSev = hall.some((h) => h.severidad);
-    if (hall.length) b.push(tabla("Hallazgos de la interventoría", ["N.º", ...(conSev ? ["Severidad"] : []), "Cálculo", "Criterio", "Valor", "Límite", "Norma o referencia", "Lit.", ...(conNota ? ["Nota del revisor"] : [])], hall.map((h) => [h.codigo, ...(conSev ? [h.severidad || "—"] : []), h.calculo, h.criterio, h.valor, h.limite, h.norma, h.literales, ...(conNota ? [h.nota] : [])])));
+    if (hall.length) b.push(tabla("Hallazgos de la interventoría", ["N.º", ...(conSev ? ["Severidad"] : []), "Cálculo", "Criterio", "Valor", "Límite", "Norma o referencia", esq.col, ...(conNota ? ["Nota del revisor"] : [])], hall.map((h) => [h.codigo, ...(conSev ? [h.severidad || "—"] : []), h.calculo, h.criterio, h.valor, h.limite, h.norma, h.literales, ...(conNota ? [h.nota] : [])])));
     if (sup.length) {
       b.push(P("Los siguientes valores son supuestos de la interventoría (marcados «(S)» en este informe), adoptados porque el dato no está en los documentos revisados. El contratista o el operador de red deben confirmarlos; si cambian, los resultados deben recalcularse."));
       b.push(tabla("Supuestos y datos pendientes", ["Origen", "Supuesto"], sup.map((s) => [s.origen, s.texto])));
@@ -116,19 +119,19 @@ export async function construirMemoria({ proyecto, resultados, guardados }) {
     b.push(...textos("hallazgos", 2));
   }
   // ---- un capítulo con una sección por literal (sin salto de página entre literales)
-  b.push(T(1, "Desarrollo según los literales a) a x) del RETIE 2024 (numeral 3.3.1.1)"));
+  b.push(T(1, esq.titulo));
   const yaIncluido = {};
-  for (const l of LITERALES) {
+  for (const l of esq.items) {
     const d = lits[l.l] || {};
-    b.push(T(2, `Literal ${l.l}) ${l.texto.replace(/\.$/, "")}`));
+    b.push(T(2, retilap ? `${l.l}. ${l.texto.replace(/\.$/, "")}` : `Literal ${l.l}) ${l.texto.replace(/\.$/, "")}`));
     if (!exigido(proyecto.tipoDiseno, l.l) && !d.texto && !calculosDe(l, resultados).length) { b.push(P("No exigido en el diseño básico (RETIE 2024, numeral 3.3.1.2).")); continue; }
     if (d.aplica === "No") { b.push(P(`<b>No aplica.</b> ${esc(d.texto || "El diseñador no registró la justificación.")}`)); continue; }
-    if (d.texto) b.push(P(esc(d.texto).replace(/\n/g, "<br>")));
-    if (verif && citanLit(l.l).length) b.push(P(`<b>Hallazgos de este literal:</b> ${citanLit(l.l).join(", ")} (ver el resumen de hallazgos).`));
+    if (d.texto) b.push(...parrafos(d.texto));
+    if (verif && citanLit(l.l).length) b.push(P(`<b>Hallazgos de este ${esq.singular}:</b> ${citanLit(l.l).join(", ")} (ver el resumen de hallazgos).`));
     const mods = calculosDe(l, resultados);
     for (const r of mods) {
       // Un cálculo con literal principal se desarrolla allí; los demás literales remiten a él.
-      const principal = MODULOS[r.modulo].literalPrincipal;
+      const principal = retilap ? null : MODULOS[r.modulo].literalPrincipal;
       const donde = yaIncluido[r.clave] || (principal && principal !== l.l ? principal : null);
       if (donde) { b.push(P(`El cálculo de <b>${esc(tituloCalculo(r))}</b> se presenta en el literal ${donde}) de esta memoria.`)); continue; }
       yaIncluido[r.clave] = l.l;

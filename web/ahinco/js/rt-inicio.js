@@ -126,6 +126,7 @@ if (ctx) {
         altitud: Number(document.getElementById("pAltitud").value) || 0,
         tempAmbiente: Number(document.getElementById("pTemp").value) || 30,
         tipoDiseno: document.getElementById("pTipo").value,
+        alcance: document.getElementById("pAlcance").value,
         descripcion: document.getElementById("pDescripcion").value.trim(),
         ...(modo === "verificacion" ? { autorDiseno: document.getElementById("pAutor").value.trim(), documentosRevisados: document.getElementById("pDocs").value.trim() } : {}),
         disenador: modo === "verificacion" ? "Interventoría Cinco S.A.S." : ctx.perfil.nombre || ctx.user.email,

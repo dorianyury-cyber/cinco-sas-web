@@ -6,6 +6,7 @@ import { esc, cerrarSesion, clavesDe, tituloCalculo, estadoModulo, modulosPorAre
 import { MODULOS, AREAS } from "./rt-modulos.js";
 import { hallazgos, modoDe, esVerificacion } from "./rt-hallazgos.js";
 import { AYUDA, ayudaHallazgos } from "./rt-ayuda.js";
+import { esquemaDe } from "./rt-literales.js";
 
 const urlProyecto = (id, seccion = "resumen") => `proyecto.html?id=${encodeURIComponent(id)}#${seccion}`;
 export const urlCalculo = (id, clave) => `calculo.html?id=${encodeURIComponent(id)}&k=${encodeURIComponent(clave)}`;
@@ -93,7 +94,7 @@ export function menuProyecto(ctx, { proyecto, guardados, resultados, activo }) {
       </div>
       ${sec("resumen", "◎", "Resumen")}
       ${sec("datos", "🗂", "Datos del proyecto")}
-      ${sec("literales", "📋", "Literales a) a x)")}
+      ${sec("literales", "📋", esquemaDe(proyecto).nombre)}
       ${sec("textos", "📝", "Textos del informe")}
       <div class="rt-nav-titulo" title="${esc(AYUDA.calculos)}">Cálculos</div>
       ${areas || '<p class="rt-nav-vacio">Todavía no hay cálculos.</p>'}

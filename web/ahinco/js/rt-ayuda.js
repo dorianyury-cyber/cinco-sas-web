@@ -13,8 +13,8 @@ export const AYUDA = {
   acerca: "Qué calcula AHÍNCO, cómo se comprobó y hasta dónde llega cada cálculo. Léalo antes de firmar.",
   // Dentro de un proyecto
   resumen: "El estado del proyecto de un vistazo: los pasos que faltan, los hallazgos principales, el avance por literal y los cálculos.",
-  datos: "Nombre, cliente, ubicación, tipo de proyecto (diseño o verificación) y quién firma. Encabezan el documento.",
-  literales: "El contenido que exige el RETIE para el diseño detallado. Cada literal se cubre con cálculos, con texto escrito o se marca «No aplica» con la razón.",
+  datos: "Nombre, cliente, ubicación, tipo de proyecto (diseño o verificación), alcance (diseño eléctrico completo o solo iluminación) y quién firma. Encabezan el documento.",
+  literales: "El contenido que exige el RETIE para el diseño detallado (literales a) a x)) o, en una revisión de solo iluminación, los capítulos del RETILAP. Cada uno se cubre con cálculos, con texto escrito o se marca «No aplica» con la razón.",
   calculos: "Cada cálculo (regulación, cortocircuito, puesta a tierra, etc.) con sus datos y su verificación contra la norma. «＋ Agregar cálculo» abre el catálogo.",
   textos: "Secciones libres del informe: objeto y alcance, metodología, marco normativo adicional, aspectos conformes, concepto y limitaciones. Las vacías no salen.",
   hallazgosVerificacion: "Lo que no cumple en el diseño revisado: lo que detectan los cálculos y lo que usted agrega a mano. Sale numerado al inicio del informe.",

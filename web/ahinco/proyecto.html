@@ -72,6 +72,7 @@
             <div><label for="dAltitud">Altitud (m s. n. m.)</label><input id="dAltitud" data-p="altitud" type="number" step="any"></div>
             <div><label for="dTemp">Temperatura ambiente de diseño (°C)</label><input id="dTemp" data-p="tempAmbiente" type="number" step="any"></div>
             <div><label for="dTipo">Tipo de diseño</label><select id="dTipo" data-p="tipoDiseno"><option>Diseño detallado</option><option>Diseño básico (vivienda, pequeño comercio o pequeña industria)</option><option>Diseño básico (ramal aéreo rural ≤ 50 kVA y 13,2 kV)</option></select></div>
+            <div><label for="dAlcance">Alcance</label><select id="dAlcance" data-p="alcance"><option value="retie">Diseño eléctrico completo (literales a) a x) del RETIE)</option><option value="retilap">Solo iluminación (capítulos del RETILAP)</option></select></div>
             <div><label for="dRadicado">Código o radicado del documento</label><input id="dRadicado" data-p="radicado"></div>
             <div class="rt-solo-verif"><label for="dAutor">Diseño revisado: autor y matrícula</label><input id="dAutor" data-p="autorDiseno" placeholder="Ej. Ing. N. N., M.P. CN205-000000"></div>
             <div><label for="dDisenador" id="lblFirma">Diseñador (ingeniero responsable)</label><input id="dDisenador" data-p="disenador"></div>
@@ -86,7 +87,7 @@
       <!-- Literales -->
       <section class="rt-seccion" data-seccion="literales">
         <div class="card">
-          <div class="rt-card-cabeza"><h2>Diseño detallado según el RETIE: literales a) a x)</h2><span class="rt-estado-guardado" id="estadoLit"></span></div>
+          <div class="rt-card-cabeza"><h2 id="tituloLiterales">Diseño detallado según el RETIE: literales a) a x)</h2><span class="rt-estado-guardado" id="estadoLit"></span></div>
           <p class="text-muted" id="fuenteLiterales"></p>
           <p class="rt-nota">Cada literal se cubre con los cálculos y/o con el desarrollo escrito. Si un literal no aplica, márquelo «No» y escriba la razón: el RETIE exige mencionarlo expresamente (parágrafo 1). Marque con «(S)» los valores supuestos: quedan listados como datos pendientes.</p>
           <div class="tabla-scroll"><table class="rt-tabla-edit rt-literales" id="literales"></table></div>
@@ -119,7 +120,7 @@
             <div><label for="hmValor">Lo que dice el diseño</label><input id="hmValor" maxlength="120" placeholder="Ej. 65,5 kVA (87,4 %)"></div>
             <div><label for="hmLimite">Lo que corresponde</label><input id="hmLimite" maxlength="120" placeholder="Ej. 76,0 kVA (101 %)"></div>
             <div><label for="hmNorma">Norma o referencia</label><input id="hmNorma" maxlength="160" placeholder="Ej. NTC 2050 220.44"></div>
-            <div><label for="hmLit">Literal(es)</label><input id="hmLit" maxlength="40" placeholder="Ej. c), h)"></div>
+            <div><label for="hmLit" id="lblHmLit">Literal(es)</label><input id="hmLit" maxlength="40" placeholder="Ej. c), h)"></div>
             <div><label for="hmSev">Severidad</label><select id="hmSev"><option value="">Sin clasificar</option><option>Alta</option><option>Media</option><option>Baja</option></select></div>
             <div class="rt-ancho"><label for="hmDetalle">Detalle y acción requerida</label><textarea id="hmDetalle" rows="3" maxlength="1200"></textarea></div>
             <div class="rt-acciones"><button type="submit" class="btn">Agregar hallazgo</button></div>

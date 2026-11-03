@@ -13,7 +13,7 @@ const conDatos = (f) => f && Object.values(f).some((v) => !vacio(v));
 // Valor legible de un campo con opciones.
 const ver = (c, v) => (c?.opciones ? c.opciones.find((o) => String(o.valor) === String(v ?? ""))?.texto ?? texto(v) : texto(v));
 
-const CAMPOS_P = { nombre: "Nombre", modo: "Tipo de proyecto", cliente: "Cliente", ubicacion: "Ubicación", altitud: "Altitud", tempAmbiente: "Temperatura ambiente", tipoDiseno: "Tipo de diseño", descripcion: "Descripción", autorDiseno: "Diseño revisado", documentosRevisados: "Documentos revisados", disenador: "Diseñador", matricula: "Matrícula", radicado: "Radicado" };
+const CAMPOS_P = { nombre: "Nombre", modo: "Tipo de proyecto", cliente: "Cliente", ubicacion: "Ubicación", altitud: "Altitud", tempAmbiente: "Temperatura ambiente", tipoDiseno: "Tipo de diseño", alcance: "Alcance", descripcion: "Descripción", autorDiseno: "Diseño revisado", documentosRevisados: "Documentos revisados", disenador: "Diseñador", matricula: "Matrícula", radicado: "Radicado" };
 
 // a y b: { proyecto, calculos: { clave: { entradas, etiqueta } } }. hallazgosDe(proyecto, calculos) → [{ calculo, criterio, valor, ... }]
 export function compararVersiones(a, b, { hallazgosDe } = {}) {

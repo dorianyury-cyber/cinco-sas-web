@@ -6,7 +6,7 @@
 // explicación en palabras; al final, un resumen de la selección.
 import * as N from "./rt-normas.js";
 import { MODULOS } from "./rt-modulos.js";
-import { LITERALES, FUENTE_LITERALES, exigido } from "./rt-literales.js";
+import { exigido, esquemaDe, esRetilap } from "./rt-literales.js";
 import { SISTEMAS_BT, fmt, impedanciaConductor, factorResistenciaTemp, factoresRayos, evaluarRayos, ajusteDosCapas, ampacidadTablaMT, esTierra, paresCoordinacion, puntosPerfil, espectroGrupo } from "./rt-calculos.js";
 import { hallazgos, supuestos, esVerificacion } from "./rt-hallazgos.js";
 
@@ -1693,16 +1693,18 @@ export async function construirLibro({ proyecto, resultados, guardados, rapido =
 
   // ---- literales (no en un cálculo rápido, que no tiene proyecto)
   if (!rapido) {
-  const lit = wb.addWorksheet("Literales RETIE", { properties: { tabColor: { argb: C_NAVY } }, pageSetup: { orientation: "landscape", fitToPage: true, fitToWidth: 1, fitToHeight: 0, paperSize: 9 } });
+  // Literales del RETIE o, en una revisión de solo iluminación, capítulos del RETILAP.
+  const esqX = esquemaDe(proyecto);
+  const lit = wb.addWorksheet(esRetilap(proyecto) ? "Capítulos RETILAP" : "Literales RETIE", { properties: { tabColor: { argb: C_NAVY } }, pageSetup: { orientation: "landscape", fitToPage: true, fitToWidth: 1, fitToHeight: 0, paperSize: 9 } });
   lit.columns = [{ width: 6 }, { width: 62 }, { width: 9 }, { width: 80 }];
-  bandaTitulo(lit, "Memoria según los literales a) a x) del RETIE 2024 (numeral 3.3.1.1)", FUENTE_LITERALES, 4);
-  ["Lit.", "Contenido exigido", "Aplica", "Desarrollo / cálculo / justificación"].forEach((h, i) => { const c = lit.getCell(4, i + 1); c.value = h; c.font = { bold: true, color: { argb: "FFFFFFFF" }, size: 10 }; c.fill = relleno(C_NAVY); c.border = BORDES; c.alignment = { vertical: "middle" }; });
-  LITERALES.forEach((l, i) => {
+  bandaTitulo(lit, esqX.titulo, esqX.fuente, 4);
+  [esqX.col, "Contenido exigido", "Aplica", "Desarrollo / cálculo / justificación"].forEach((h, i) => { const c = lit.getCell(4, i + 1); c.value = h; c.font = { bold: true, color: { argb: "FFFFFFFF" }, size: 10 }; c.fill = relleno(C_NAVY); c.border = BORDES; c.alignment = { vertical: "middle" }; });
+  esqX.items.forEach((l, i) => {
     const d = proyecto.literales?.[l.l] || {};
     const mods = Object.entries(resultados).filter(([k, r]) => l.modulos.includes(r.modulo ?? k)).map(([k, r]) => `${MODULOS[r.modulo ?? k].titulo}${r.etiqueta ? ` — ${r.etiqueta}` : ""}`);
     const fila = lit.getRow(5 + i);
     const texto = d.aplica === "No" ? `No aplica: ${d.texto || ""}` : [mods.length ? `Ver hoja: ${mods.join("; ")}` : "", d.texto || ""].filter(Boolean).join(" — ") || (exigido(proyecto.tipoDiseno, l.l) ? "Pendiente" : "No exigido en el diseño básico (RETIE 2024 3.3.1.2)");
-    fila.values = [`${l.l})`, l.texto, d.aplica === "No" ? "No" : "Sí", texto];
+    fila.values = [esqX.cod(l), l.texto, d.aplica === "No" ? "No" : "Sí", texto];
     fila.alignment = { wrapText: true, vertical: "top" };
     fila.eachCell((c) => { c.border = BORDES; c.font = { size: 9.5 }; });
     lit.getCell(5 + i, 1).font = { bold: true, size: 10 };
@@ -1723,7 +1725,7 @@ export async function construirLibro({ proyecto, resultados, guardados, rapido =
     bandaTitulo(hs, verif ? "Hallazgos de la interventoría" : "Pendientes por corregir", verif ? "Criterios que no cumplen en el diseño revisado: el contratista debe aclararlos o corregirlos." : "Criterios que todavía no cumplen: corríjalos antes de entregar la memoria.", 7);
     const enc = (fila, textos) => textos.forEach((t, i) => { const c = hs.getCell(fila, i + 1); c.value = t; c.font = { bold: true, color: { argb: "FFFFFFFF" }, size: 9 }; c.fill = relleno(C_NAVY); c.border = BORDES; c.alignment = { wrapText: true, vertical: "middle" }; });
     let f = 4;
-    enc(f++, ["N.º", "Cálculo", "Criterio", "Valor", "Límite", "Norma o referencia", "Lit.", ...(conNota ? ["Nota del revisor"] : [])]);
+    enc(f++, ["N.º", "Cálculo", "Criterio", "Valor", "Límite", "Norma o referencia", esquemaDe(proyecto).col, ...(conNota ? ["Nota del revisor"] : [])]);
     hall.forEach((h) => {
       hs.getRow(f).values = [h.codigo, h.calculo, h.criterio, h.valor, h.limite, h.norma, h.literales, ...(conNota ? [h.nota] : [])];
       hs.getRow(f).alignment = { wrapText: true, vertical: "top" };
@@ -1778,7 +1780,7 @@ export async function construirLibro({ proyecto, resultados, guardados, rapido =
   ir++;
   ["Hoja", "Cálculo", "Qué contiene"].forEach((t, i) => { const c = port.getCell(ir, i + 1); c.value = t; c.font = { bold: true, size: 9, color: { argb: "FFFFFFFF" } }; c.fill = relleno(C_NAVY); c.border = BORDES; });
   ir++;
-  const fijas = rapido ? [] : [{ hoja: "Literales RETIE", texto: "Literales a) a x)", desc: "Qué exige el RETIE en cada literal y dónde se desarrolla" }, ...(hall.length || sup.length ? [{ hoja: verif ? "Hallazgos" : "Pendientes", texto: verif ? "Hallazgos" : "Pendientes", desc: "Criterios que no cumplen y supuestos por confirmar" }] : [])];
+  const fijas = rapido ? [] : [esRetilap(proyecto) ? { hoja: "Capítulos RETILAP", texto: "Capítulos RETILAP", desc: "Qué exige el RETILAP en cada capítulo y qué se revisó" } : { hoja: "Literales RETIE", texto: "Literales a) a x)", desc: "Qué exige el RETIE en cada literal y dónde se desarrolla" }, ...(hall.length || sup.length ? [{ hoja: verif ? "Hallazgos" : "Pendientes", texto: verif ? "Hallazgos" : "Pendientes", desc: "Criterios que no cumplen y supuestos por confirmar" }] : [])];
   [...fijas, ...indice, { hoja: "Tablas", texto: "Tablas normativas", desc: "Tablas que consultan las fórmulas" }].forEach((x) => {
     const a = port.getCell(`A${ir}`); a.value = { text: x.hoja, hyperlink: `#'${x.hoja}'!A1` }; a.font = { size: 10, color: { argb: C_AZUL }, underline: true };
     port.getCell(`B${ir}`).value = x.texto; port.getCell(`C${ir}`).value = x.desc;
