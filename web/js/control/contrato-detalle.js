@@ -1047,7 +1047,9 @@ requireAuth(async (user) => {
   CAMPOS.forEach((c) => {
     const detalle = campo("details", { class: "card control-campo" });
     const resumen = document.createElement("summary");
-    resumen.appendChild(campo("span", { text: `${NUMERO_CAMPO[c.clave]}. ${c.nombre}` }));
+    const titulo = campo("span");
+    titulo.append(campo("b", { class: "control-campo-num", text: NUMERO_CAMPO[c.clave] }), c.nombre);
+    resumen.appendChild(titulo);
     const badge = campo("span", { class: "control-badge" });
     badges[c.clave] = badge;
     resumen.appendChild(badge);

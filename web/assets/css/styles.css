@@ -1480,6 +1480,54 @@ button.control-mes-pill.pendiente:hover { border-color: var(--cinco-amber-dark);
 }
 .control-campo[open] summary { margin-bottom: 16px; }
 
+/* Encabezado de cada sección del contrato (1. Servicio al Cliente,
+   2. Talento Humano...) — pedido del usuario 2026-11-06: título a la
+   izquierda, en mayúscula, con número en ficha de marca, acento ámbar a
+   la izquierda, flecha en círculo y el contador al extremo derecho. */
+.card.control-campo { padding-top: 0; }
+.card.control-campo:not([open]) { padding-bottom: 0; }
+.card.control-campo > summary {
+  justify-content: flex-start;
+  margin: 0 -28px;
+  padding: 16px 28px;
+  border-radius: var(--radius);
+  background: linear-gradient(90deg, rgba(254, 178, 9, 0.10) 0%, rgba(254, 178, 9, 0) 55%);
+  box-shadow: inset 4px 0 0 var(--cinco-amber);
+  transition: background-color 0.15s ease;
+}
+.card.control-campo > summary:hover { background-color: rgba(254, 178, 9, 0.06); }
+.card.control-campo[open] > summary {
+  margin-bottom: 14px;
+  border-radius: var(--radius) var(--radius) 0 0;
+  border-bottom: 1px solid var(--border);
+}
+.card.control-campo > summary::before {
+  content: "\203A";
+  display: inline-flex; align-items: center; justify-content: center;
+  flex: none; width: 26px; height: 26px; margin-right: 2px;
+  border-radius: 50%; border: 1px solid var(--border); background: var(--card-bg);
+  font-size: 18px; line-height: 1; color: var(--cinco-amber-dark);
+  transition: transform 0.2s ease;
+}
+.card.control-campo > summary > span:first-child {
+  flex: 1 1 auto; min-width: 0;
+  display: flex; align-items: center; gap: 12px;
+  font-size: 14.5px; font-weight: 800; letter-spacing: 0.08em; text-transform: uppercase;
+}
+.card.control-campo > summary > .control-badge { flex: none; margin-left: auto; }
+.control-campo-num {
+  display: inline-flex; align-items: center; justify-content: center;
+  flex: none; min-width: 30px; height: 30px; padding: 0 6px;
+  border-radius: 9px;
+  background: linear-gradient(135deg, var(--cinco-amber) 0%, var(--cinco-amber-dark) 100%);
+  color: #1f2732; font-size: 14px; font-weight: 800; letter-spacing: 0;
+  box-shadow: 0 3px 8px rgba(217, 148, 0, 0.35);
+}
+/* Fases de Actividades (4.1, 4.2...): mismo lenguaje, más discreto. */
+.control-fase > summary > span:first-child { text-transform: uppercase; letter-spacing: 0.06em; font-size: 12.5px; font-weight: 700; }
+.control-fase > summary { justify-content: flex-start; }
+.control-fase > summary > span:first-child { flex: 1 1 auto; }
+
 .control-fase { border-top: 1px solid var(--border); padding: 14px 0 0; margin-top: 14px; }
 .control-fase summary span:first-child { font-weight: 600; font-size: 14px; }
 .control-fase[open] summary { margin-bottom: 12px; }
