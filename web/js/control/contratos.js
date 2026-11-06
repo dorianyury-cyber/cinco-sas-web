@@ -11,6 +11,7 @@ import { capitalizarOracion, capitalizarNombrePropio } from "./texto.js";
 import { escucharOfertas, botonOfertas } from "./visor-ofertas.js";
 
 const TIPO_LABEL = { obra: "Obra", servicio: "Servicio" };
+const ESTADO_LABEL = { activo: "Activo", suspendido: "Suspendido", cerrado: "Cerrado" };
 
 const formatoMoneda = new Intl.NumberFormat("es-CO", { style: "currency", currency: "COP", maximumFractionDigits: 0 });
 
@@ -128,7 +129,7 @@ function aplicarFiltroContratos() {
     fila.appendChild(celda(c.nombre || "—"));
     fila.appendChild(celda(c.cliente || "—"));
     fila.appendChild(celda(TIPO_LABEL[c.tipo] || c.tipo || "—"));
-    const tdEstado = celda(c.estado === "cerrado" ? "Cerrado" : "Activo");
+    const tdEstado = celda(ESTADO_LABEL[c.estado] || "Activo");
     tdEstado.className = c.estado === "cerrado" ? "text-muted" : "";
     fila.appendChild(tdEstado);
     fila.addEventListener("click", () => {
@@ -186,7 +187,7 @@ function pintarVistaPreviaContrato() {
         ${campo("Tipo", TIPO_LABEL[c.tipo] || c.tipo)}
         ${campo("Línea de servicio", c.lineaServicio)}
         ${campo("Número", c.numero)}
-        ${campo("Estado", c.estado === "cerrado" ? "Cerrado" : "Activo")}
+        ${campo("Estado", ESTADO_LABEL[c.estado] || "Activo")}
       `)}
       ${grupo("Cliente", `
         ${campo("Cliente", c.cliente)}
@@ -194,7 +195,7 @@ function pintarVistaPreviaContrato() {
       `)}
       ${grupo("Fechas y valor", `
         ${campo("Inicio", c.fechaInicio)}
-        ${campo("Finalización", c.fechaFin)}
+        ${campo("Finalización", c.fechaFinOriginal && c.fechaFinOriginal !== c.fechaFin ? `${c.fechaFin} (inicial ${c.fechaFinOriginal})` : c.fechaFin)}
         ${campo("Valor", c.valorContrato ? formatoMoneda.format(c.valorContrato) : "")}
       `)}
       ${aprobacionHtml}

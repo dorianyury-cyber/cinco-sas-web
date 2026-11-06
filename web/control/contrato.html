@@ -49,16 +49,18 @@
         </div>
         <div class="control-cabecera-datos">
           <label>Inicio: <span id="contratoFechaInicio"></span></label>
-          <label>Fin: <span id="contratoFechaFin"></span></label>
+          <label>Fin: <span id="contratoFechaFin"></span> <span class="control-nov-nota oculto" id="contratoFinNota"></span></label>
           <label>Valor: <span id="contratoValor"></span></label>
           <label class="oculto">Supervisor/Interventor: <span id="contratoSupervisor"></span></label>
           <label>Estado:
             <select id="contratoEstado">
               <option value="activo">Activo</option>
+              <option value="suspendido">Suspendido</option>
               <option value="cerrado">Cerrado</option>
             </select>
           </label>
           <span class="control-badge control-badge-lg" id="avanceGeneral"></span>
+          <button id="novedadesBtn" class="control-btn-mini" type="button">Prórrogas y suspensiones</button>
           <button id="editarContratoBtn" class="control-btn-mini oculto">Editar</button>
           <button id="borrarContratoBtn" class="control-btn-danger oculto">Borrar contrato</button>
         </div>
@@ -190,6 +192,81 @@
             </div>
             <div class="form-alert campo-ancho" id="nuevoDocumentoManualAlert"></div>
           </form>
+        </div>
+      </div>
+
+      <!-- Novedades contractuales: otrosí/prórroga, acta de suspensión y
+           acta de reinicio — recalculan solas la fecha de fin y el valor
+           vigentes del contrato (ver novedades-contrato.js). -->
+      <div class="modal-backdrop" id="novedadesBackdrop">
+        <div class="modal modal-ancho modal-novedades">
+          <h2>Prórrogas, suspensiones y otrosí</h2>
+          <div class="control-nov-resumen" id="novResumen"></div>
+
+          <div class="control-tabla-wrap">
+            <table class="control-tabla-documentos control-nov-tabla">
+              <colgroup>
+                <col class="w-90">
+                <col class="w-120">
+                <col class="w-130">
+                <col>
+                <col class="w-120">
+                <col class="w-70">
+              </colgroup>
+              <thead>
+                <tr><th>Fecha</th><th>Tipo</th><th>Documento</th><th>Efecto</th><th>Observaciones</th><th></th></tr>
+              </thead>
+              <tbody id="novLista"></tbody>
+            </table>
+          </div>
+          <p class="text-muted oculto" id="novSinNovedades">Sin novedades registradas: el contrato va con su plazo y valor iniciales.</p>
+
+          <form class="modal-form-grid" id="novedadForm">
+            <div class="campo-ancho control-ot-seccion"><strong>Registrar novedad</strong></div>
+            <div>
+              <label for="novTipo">Tipo</label>
+              <select id="novTipo">
+                <option value="otrosi">Otrosí / prórroga (plazo y/o valor)</option>
+                <option value="suspension">Acta de suspensión</option>
+                <option value="reinicio">Acta de reinicio</option>
+              </select>
+            </div>
+            <div>
+              <label for="novFecha" id="novFechaLabel">Fecha del otrosí</label>
+              <input type="date" id="novFecha" required>
+            </div>
+            <div>
+              <label for="novDocumento">Documento</label>
+              <input type="text" id="novDocumento" maxlength="80">
+            </div>
+            <div data-nov-tipos="otrosi">
+              <label for="novDias">Prórroga (días)</label>
+              <input type="number" id="novDias" min="0" step="1" placeholder="Ej. 60">
+            </div>
+            <div data-nov-tipos="otrosi reinicio">
+              <label for="novFechaFin">Nueva fecha de finalización</label>
+              <input type="date" id="novFechaFin">
+            </div>
+            <div data-nov-tipos="otrosi">
+              <label for="novValor">Valor adicional (opcional)</label>
+              <div class="control-input-unidad">
+                <span>$</span>
+                <input type="number" id="novValor" min="0">
+              </div>
+            </div>
+            <p class="text-muted campo-ancho control-nov-ayuda" data-nov-tipos="reinicio" id="novAyudaReinicio"></p>
+            <div class="campo-ancho">
+              <label for="novObservaciones">Observaciones (opcional)</label>
+              <input type="text" id="novObservaciones" maxlength="300" placeholder="Ej. Suspensión por lluvias, a solicitud del supervisor">
+            </div>
+            <div class="campo-ancho control-edicion-botones">
+              <button type="submit" class="btn" id="novGuardarBtn">Registrar</button>
+            </div>
+            <div class="form-alert campo-ancho" id="novAlert"></div>
+          </form>
+          <div class="control-edicion-botones">
+            <button type="button" class="control-btn-mini" id="novCerrarBtn">Cerrar</button>
+          </div>
         </div>
       </div>
 

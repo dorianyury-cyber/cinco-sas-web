@@ -9,6 +9,7 @@ import { CAMPOS, FASES, COLUMNAS_ITEM } from "./plantillas.js";
 import { capitalizarOracion, capitalizarNombrePropio, fechaLocalISO } from "./texto.js";
 import { iniciarBitacora, registrarActividad, alCambiarActividad } from "./actividad.js";
 import { crearCeldaDocumentos } from "./adjuntos.js";
+import { iniciarNovedades, calcularVigencia, diasEntre } from "./novedades-contrato.js";
 import { TIPOS_ACTIVIDAD, detalleCambio, personasDe, seccionesDe, filtrarActividad } from "./actividad-motor.js";
 
 const TIPO_DOC_LABEL = { contrato: "Contrato", interno: "Interno", externo: "Externo" };
@@ -842,14 +843,32 @@ requireAuth(async (user) => {
     document.getElementById("contratoNumero").textContent = contrato.numero ? `N.º ${contrato.numero}` : "";
     document.getElementById("contratoFechaInicio").textContent = contrato.fechaInicio || "—";
     document.getElementById("contratoFechaFin").textContent = contrato.fechaFin || "—";
+    // Nota junto al Fin según las novedades registradas: suspendido (plazo
+    // detenido) o prorrogado (fin vigente distinto del inicial).
+    const finNota = document.getElementById("contratoFinNota");
+    const vigencia = calcularVigencia(contrato);
+    const finInicial = contrato.fechaFinOriginal;
+    finNota.className = "control-nov-nota";
+    finNota.title = "";
+    if (vigencia.suspendidoDesde) {
+      finNota.textContent = `· suspendido desde ${vigencia.suspendidoDesde}`;
+      finNota.classList.add("suspendido");
+    } else if (finInicial && contrato.fechaFin && finInicial !== contrato.fechaFin) {
+      finNota.textContent = `· prorrogado ${diasEntre(finInicial, contrato.fechaFin)} días`;
+      finNota.title = `Fin inicial: ${finInicial}`;
+    } else {
+      finNota.classList.add("oculto");
+    }
+    const totalNovedades = (contrato.novedades || []).length;
+    document.getElementById("novedadesBtn").textContent = totalNovedades ? `Prórrogas y suspensiones (${totalNovedades})` : "Prórrogas y suspensiones";
+    selectContratoEstado.value = contrato.estado || "activo";
     document.getElementById("contratoValor").textContent = contrato.valorContrato ? formatoMoneda.format(contrato.valorContrato) : "—";
     const supervisorEl = document.getElementById("contratoSupervisor");
     supervisorEl.textContent = contrato.supervisor || "—";
     supervisorEl.closest("label").classList.toggle("oculto", !contrato.supervisor);
   }
-  pintarCabecera();
   const selectContratoEstado = document.getElementById("contratoEstado");
-  selectContratoEstado.value = contrato.estado || "activo";
+  pintarCabecera();
   selectContratoEstado.disabled = !esGestor;
   selectContratoEstado.addEventListener("change", (e) => {
     registrarActividad({ tipo: "contrato", seccion: "Contrato", detalle: detalleCambio("Estado del contrato", contrato.estado || "activo", e.target.value) });
@@ -864,16 +883,27 @@ requireAuth(async (user) => {
   const editarAlert = document.getElementById("editarContratoAlert");
   const guardarEdicionBtn = document.getElementById("guardarEdicionBtn");
 
+  const abrirNovedades = iniciarNovedades({ contrato, contratoRef, puedeEditar: esGestor, alCambiar: pintarCabecera });
+  document.getElementById("novedadesBtn").addEventListener("click", abrirNovedades);
+
+  // Con novedades registradas, "Fecha de finalización" y "Valor" de este
+  // formulario pasan a ser los INICIALES (los vigentes salen de las
+  // novedades) — si no, corregir aquí el valor pisaría el efecto de los otrosí.
+  const conNovedades = () => contrato.fechaFinOriginal !== undefined || contrato.valorOriginal !== undefined;
+
   if (esGestor) {
     editarBtn.classList.remove("oculto");
     editarBtn.addEventListener("click", () => {
+      const base = conNovedades();
       document.getElementById("editNombre").value = contrato.nombre || "";
       document.getElementById("editCliente").value = contrato.cliente || "";
       document.getElementById("editTipo").value = contrato.tipo || "obra";
       document.getElementById("editNumero").value = contrato.numero || "";
-      document.getElementById("editValorContrato").value = contrato.valorContrato || "";
+      document.getElementById("editValorContrato").value = (base ? contrato.valorOriginal : contrato.valorContrato) || "";
       document.getElementById("editFechaInicio").value = contrato.fechaInicio || "";
-      document.getElementById("editFechaFin").value = contrato.fechaFin || "";
+      document.getElementById("editFechaFin").value = (base ? contrato.fechaFinOriginal : contrato.fechaFin) || "";
+      document.querySelector('label[for="editFechaFin"]').textContent = base ? "Fecha de finalización inicial (las prórrogas van en «Prórrogas y suspensiones»)" : "Fecha de finalización";
+      document.querySelector('label[for="editValorContrato"]').textContent = base ? "Valor inicial del contrato (las adiciones van en los otrosí)" : "Valor del contrato";
       document.getElementById("editSupervisor").value = contrato.supervisor || "";
       editarAlert.className = "form-alert";
       cabeceraVista.classList.add("oculto");
@@ -901,6 +931,13 @@ requireAuth(async (user) => {
           supervisor: capitalizarNombrePropio(document.getElementById("editSupervisor").value),
           actualizadoEn: serverTimestamp()
         };
+        if (conNovedades()) {
+          cambios.fechaFinOriginal = cambios.fechaFin;
+          cambios.valorOriginal = cambios.valorContrato;
+          const v = calcularVigencia({ ...contrato, ...cambios });
+          cambios.fechaFin = v.fechaFin;
+          cambios.valorContrato = v.valor;
+        }
         await updateDoc(contratoRef, cambios);
         const modificados = ["nombre", "cliente", "tipo", "numero", "valorContrato", "fechaInicio", "fechaFin", "supervisor"].filter((k) => (contrato[k] ?? "") !== (cambios[k] ?? ""));
         if (modificados.length) registrarActividad({ tipo: "contrato", seccion: "Contrato", detalle: `Editó los datos del contrato (${modificados.join(", ")})` });
