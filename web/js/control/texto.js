@@ -1,8 +1,9 @@
 // Normalización de texto para formularios de Control de Contratos.
-// El usuario puede escribir en cualquier combinación de mayúsculas/
-// minúsculas (incluido todo en mayúscula sostenida); al guardar se
-// homogeniza a formato "oración" (primera letra en mayúscula, resto en
-// minúscula) o a formato "nombre propio" (título), respetando:
+// Se respetan las mayúsculas que la persona escribe (nombres propios,
+// siglas, "No.", códigos); solo se asegura la mayúscula al inicio de cada
+// oración (o de cada palabra, en nombres). Únicamente si el texto entero
+// viene en MAYÚSCULA SOSTENIDA se rehace a formato "oración" o "nombre
+// propio". En ambos casos se corrigen siempre:
 // - siglas de una lista fija (SAS, GGC, NIT...) que siempre quedan en
 //   mayúscula sin importar cómo se escribieron
 // - nombres propios/ciudades de uso frecuente en la operación (lista fija,
@@ -13,7 +14,8 @@ const SIGLAS = ["SAS", "LTDA", "IPS", "ESE", "EPS", "ESP", "ONG", "NIT", "GGC", 
 const PROPIOS = [
   "Neiva", "Huila", "Colombia", "Pitalito", "Garzón", "Campoalegre",
   "Rivera", "Palermo", "Aipe", "Baraya", "Gigante", "Tesalia", "Íquira",
-  "Yaguará", "Hobo", "Bogotá", "Medellín", "Cali", "Barranquilla"
+  "Yaguará", "Hobo", "Bogotá", "Medellín", "Cali", "Barranquilla",
+  "Electrohuila", "Utrahuilca"
 ];
 
 const CONECTORES = new Set([
@@ -37,18 +39,6 @@ function valorFijo(nucleo) {
   return PROPIOS.find((p) => p.toLowerCase() === nucleo.toLowerCase()) || null;
 }
 
-// Una sigla que no está en la lista fija (ej. RETIE, ANROER, o cualquier
-// otra que aparezca en un contrato futuro) se perdía en minúscula sin
-// avisar, porque solo se respetaban SIGLAS/PROPIOS. En vez de tener que
-// mantener esa lista al día con cada sigla nueva, se respeta tal cual
-// cualquier palabra de 2+ letras que el usuario ya haya escrito TODA en
-// mayúscula — se toma como señal de que es una sigla a propósito, no un
-// descuido de digitación (que normalmente no produce una palabra entera en
-// mayúscula sostenida).
-function pareceSiglaEscrita(nucleo) {
-  return nucleo.length >= 2 && nucleo === nucleo.toUpperCase() && nucleo !== nucleo.toLowerCase();
-}
-
 // Reconoce una sigla escrita con un punto entre cada letra (ej. "S.A.S.",
 // "s.a.s", "E.S.P."), un patrón muy común en razones sociales que
 // dividirPalabra() no captura por sí solo (esa función solo separa
@@ -62,22 +52,61 @@ function siglaPunteada(palabra) {
   return sigla ? sigla.split("").join(".") + "." : null;
 }
 
+// ¿El texto viene en mayúscula sostenida (pegado de un documento en
+// MAYÚSCULAS, o escrito con Bloq Mayús)? Solo en ese caso se rehace el uso
+// de mayúsculas; si no, se respeta lo que la persona escribió — antes se
+// pasaba a minúscula cualquier palabra con mayúscula inicial en medio del
+// texto (Electrohuila, Utrahuilca, No., Infrared...) y no había forma de
+// dejarla bien (pedido del usuario 2026-11-06).
+function esMayusculaSostenida(texto) {
+  const letras = texto.replace(new RegExp(`[^${LETRA}]`, "g"), "");
+  if (letras.length < 8) return false;
+  const mayusculas = letras.replace(/[^A-ZÁ-ÚÑÜ]/g, "").length;
+  return mayusculas / letras.length > 0.8;
+}
+
+// Palabra con dígitos (CE-06-2025..., 176-2026, N.°3): es un código, se deja tal cual.
+const tieneDigito = (palabra) => /\d/.test(palabra);
+const mayusculaInicial = (s) => s.charAt(0).toUpperCase() + s.slice(1);
+
+// Normaliza una palabra cuando el texto venía todo en mayúscula: siglas
+// de la lista, sigla punteada (J.C.S.) y códigos quedan; el resto pasa a
+// minúscula (con la inicial en mayúscula si "inicial" es true).
+function palabraDesdeMayusculas(palabra, inicial) {
+  if (tieneDigito(palabra) || PATRON_SIGLA_PUNTEADA.test(palabra)) return palabra;
+  const { pre, nucleo, post } = dividirPalabra(palabra);
+  if (!nucleo) return palabra;
+  const fijo = valorFijo(nucleo);
+  if (fijo) return pre + fijo + post;
+  const base = nucleo.toLowerCase();
+  return pre + (inicial ? mayusculaInicial(base) : base) + post;
+}
+
+// Respeta la palabra como se escribió; solo corrige las siglas y nombres
+// propios de la lista fija (ej. "sas" → "SAS", "neiva" → "Neiva").
+function palabraRespetada(palabra) {
+  const sigla = siglaPunteada(palabra);
+  if (sigla) return sigla;
+  const { pre, nucleo, post } = dividirPalabra(palabra);
+  const fijo = nucleo && valorFijo(nucleo);
+  return fijo ? pre + fijo + post : palabra;
+}
+
 export function capitalizarOracion(texto) {
   const limpio = (texto || "").trim().replace(/\s+/g, " ");
   if (!limpio) return "";
-  return limpio
-    .split(" ")
+  const sostenida = esMayusculaSostenida(limpio);
+  const palabras = limpio.split(" ");
+  return palabras
     .map((palabra, i) => {
-      const sigla = siglaPunteada(palabra);
-      if (sigla) return sigla;
-      const { pre, nucleo, post } = dividirPalabra(palabra);
-      if (!nucleo) return palabra;
-      const fijo = valorFijo(nucleo);
-      if (fijo) return pre + fijo + post;
-      if (pareceSiglaEscrita(nucleo)) return pre + nucleo + post;
-      const base = nucleo.toLowerCase();
-      const cuerpo = i === 0 ? base.charAt(0).toUpperCase() + base.slice(1) : base;
-      return pre + cuerpo + post;
+      // Inicio del texto o de una oración nueva (después de ". "), salvo
+      // abreviaturas cortas tipo "No." / "N.°" que no cierran oración.
+      const anterior = palabras[i - 1] || "";
+      const inicioOracion = i === 0 || (/[.!?]$/.test(anterior)
+        && !/^(no|n\.?°?|nro|art|num)\.$/i.test(anterior)
+        && !PATRON_SIGLA_PUNTEADA.test(anterior));
+      const resultado = sostenida ? palabraDesdeMayusculas(palabra, inicioOracion) : palabraRespetada(palabra);
+      return inicioOracion && !sostenida ? mayusculaInicial(resultado) : resultado;
     })
     .join(" ");
 }
@@ -93,22 +122,28 @@ export function truncar(texto, maximo = 90) {
   return limpio.slice(0, maximo - 1).trim() + "…";
 }
 
+// Nombres (cliente, supervisor): cada palabra con inicial mayúscula salvo
+// los conectores (de, del, y...). Lo que ya venga con mayúsculas por dentro
+// (siglas como INFRARED o J.C.S., "McDonald") se respeta; solo si el nombre
+// entero venía en mayúscula sostenida se rehace a "Nombre Propio".
 export function capitalizarNombrePropio(texto) {
   const limpio = (texto || "").trim().replace(/\s+/g, " ");
   if (!limpio) return "";
+  const sostenida = esMayusculaSostenida(limpio);
   return limpio
     .split(" ")
     .map((palabra, i) => {
       const sigla = siglaPunteada(palabra);
       if (sigla) return sigla;
+      if (tieneDigito(palabra)) return palabra;
       const { pre, nucleo, post } = dividirPalabra(palabra);
       if (!nucleo) return palabra;
       const fijo = valorFijo(nucleo);
       if (fijo) return pre + fijo + post;
-      if (pareceSiglaEscrita(nucleo)) return pre + nucleo + post;
-      const base = nucleo.toLowerCase();
-      const cuerpo = i > 0 && CONECTORES.has(base) ? base : base.charAt(0).toUpperCase() + base.slice(1);
-      return pre + cuerpo + post;
+      if (sostenida && PATRON_SIGLA_PUNTEADA.test(palabra)) return palabra;
+      const base = sostenida ? nucleo.toLowerCase() : nucleo;
+      if (i > 0 && CONECTORES.has(nucleo.toLowerCase())) return pre + nucleo.toLowerCase() + post;
+      return pre + mayusculaInicial(base) + post;
     })
     .join(" ");
 }
