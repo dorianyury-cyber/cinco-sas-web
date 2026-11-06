@@ -170,7 +170,7 @@ body.rt-verificacion .rt-solo-verif { display: block; }
 
 /* Encabezado y secciones */
 .rt-encabezado { margin-bottom: 18px; }
-.rt-encabezado h1 { margin: 4px 0 4px; font-size: 25px; line-height: 1.2; }
+.rt-encabezado h1 { margin: 4px 0 4px; font-size: 21px; line-height: 1.2; }
 .rt-encabezado p { margin: 0; }
 .rt-encabezado-calc { display: flex; justify-content: space-between; align-items: flex-end; gap: 16px; flex-wrap: wrap; }
 .rt-migas { font-size: 13px; color: var(--text-muted); display: flex; align-items: center; gap: 8px; flex-wrap: wrap; }
@@ -227,8 +227,17 @@ body.rt-verificacion .rt-solo-verif { display: block; }
 /* Hallazgos */
 .rt-tabla-hall td:first-child { white-space: nowrap; color: var(--danger); }
 .rt-tabla-hall, .rt-tabla-sup, .rt-tabla-versiones { table-layout: fixed; width: 100%; }
-.rt-tabla-hall th:nth-child(1) { width: 4%; } .rt-tabla-hall th:nth-child(2) { width: 13%; } .rt-tabla-hall th:nth-child(3) { width: 21%; }
-.rt-tabla-hall th:nth-child(4) { width: 8%; } .rt-tabla-hall th:nth-child(5) { width: 9%; } .rt-tabla-hall th:nth-child(6) { width: 14%; } .rt-tabla-hall th:nth-child(7) { width: 4%; } .rt-tabla-hall th:nth-child(8) { width: 27%; }
+/* N.º, Sev., Cálculo, Criterio, Valor, Límite, Norma, Lit., Nota. */
+.rt-tabla-hall th:nth-child(1) { width: 4%; } .rt-tabla-hall th:nth-child(2) { width: 7%; } .rt-tabla-hall th:nth-child(3) { width: 11%; } .rt-tabla-hall th:nth-child(4) { width: 20%; }
+.rt-tabla-hall th:nth-child(5) { width: 8%; } .rt-tabla-hall th:nth-child(6) { width: 8%; } .rt-tabla-hall th:nth-child(7) { width: 12%; } .rt-tabla-hall th:nth-child(8) { width: 4%; } .rt-tabla-hall th:nth-child(9) { width: 26%; }
+.rt-sev { width: 100%; padding: 2px 4px; font-size: 11.5px; margin: 0; }
+.rt-sev-Alta { color: var(--danger); font-weight: 700; } .rt-sev-Media { color: #b8860b; font-weight: 700; }
+.rt-textos { display: grid; gap: 12px; margin-top: 8px; }
+.rt-textos label { font-weight: 700; font-size: 13px; }
+.rt-textos small { display: block; color: var(--text-muted); font-size: 11.5px; margin-bottom: 4px; }
+.rt-textos textarea { width: 100%; font: inherit; font-size: 13px; resize: vertical; }
+.rt-radicar { margin-top: 14px; }
+.rt-radicar .rt-barra { margin-top: 6px; }
 .rt-nota-hall { width: 100%; min-height: 96px; font: inherit; font-size: 12px; resize: vertical; }
 .rt-tabla-sup th:first-child { width: 19%; }
 .rt-tabla-versiones th:nth-child(1) { width: 5%; } .rt-tabla-versiones th:nth-child(2) { width: 11%; } .rt-tabla-versiones th:nth-child(3) { width: 17%; } .rt-tabla-versiones th:nth-child(4) { width: 26%; }
@@ -370,3 +379,86 @@ body.rt-verificacion .rt-solo-verif { display: block; }
 .rt-tabla-res.rt-tabla-ancha { min-width: 780px; }
 
 .rt-quitar-hall { margin-top: 4px; font-size: 11px; background: none; border: 1px solid var(--border); border-radius: 6px; padding: 1px 8px; color: var(--danger); cursor: pointer; }
+
+/* Inicio: título y barra delgada de acciones en la misma franja. */
+.rt-lista-cabeza { display: flex; align-items: center; justify-content: space-between; flex-wrap: wrap; gap: 10px 16px; margin-bottom: 12px; }
+.rt-lista-cabeza h1 { margin: 0; font-size: 20px; line-height: 1.2; }
+.rt-barra, .rt-vp-acciones { display: flex; flex-wrap: wrap; gap: 6px; }
+.rt-barra-btn { display: inline-flex; align-items: center; gap: 5px; padding: 5px 11px; border: 1px solid var(--border); border-radius: 7px; background: var(--card-bg); color: var(--text); font: inherit; font-size: 12.5px; font-weight: 600; line-height: 1.3; cursor: pointer; white-space: nowrap; text-decoration: none; }
+.rt-barra-btn:hover { border-color: var(--cinco-orange); background: var(--sidebar-hover); text-decoration: none; }
+.rt-barra-diseno { border-left: 3px solid #2f7dd1; }
+.rt-barra-verif { border-left: 3px solid var(--cinco-orange); }
+.rt-barra-ayuda { color: var(--text-muted); }
+.rt-barra-principal { background: var(--cinco-orange-dark); border-color: var(--cinco-orange-dark); color: #fff; }
+.rt-barra-principal:hover { background: var(--cinco-orange); color: #fff; }
+
+/* Panel de detalle del proyecto seleccionado (arriba de la lista). */
+.rt-vp { display: flex; flex-direction: column; gap: 8px; padding: 12px 14px; margin-bottom: 10px; background: var(--card-bg); border: 1px solid var(--border); border-radius: var(--radius); }
+.rt-vp > p { margin: 0; }
+.rt-vp-cabeza { display: flex; align-items: center; justify-content: space-between; flex-wrap: wrap; gap: 8px 14px; }
+.rt-vp-titulo { display: flex; align-items: center; gap: 8px; min-width: 0; flex: 1 1 320px; }
+.rt-vp-titulo strong { font-size: 15px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.rt-vp-grupos { display: flex; flex-wrap: wrap; gap: 8px; }
+.rt-vp-grupo { --pc: #1f5fbf; flex: 1 1 230px; min-width: 200px; padding: 6px 10px 7px; border: 1px solid var(--border); border-left: 4px solid var(--pc); border-radius: 8px; }
+.rt-vp-grupo:nth-child(3n + 2) { --pc: #e0a800; }
+.rt-vp-grupo:nth-child(3n + 3) { --pc: #1e9e57; }
+.rt-vp-grupo-titulo { font-size: 10px; font-weight: 800; text-transform: uppercase; letter-spacing: 0.4px; color: var(--pc); margin-bottom: 3px; }
+.rt-vp-campo { display: flex; gap: 6px; padding: 2px 0; font-size: 12.5px; border-top: 1px solid var(--border); }
+.rt-vp-campo:first-of-type { border-top: 0; }
+.rt-vp-etiqueta { flex: none; color: var(--text-muted); white-space: nowrap; }
+.rt-vp-etiqueta::after { content: ":"; }
+.rt-vp-valor { font-weight: 600; min-width: 0; word-break: break-word; }
+.rt-vp-desc { margin: 0; font-size: 12px; color: var(--text-muted); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+
+/* Lista de proyectos: una línea por fila, texto largo con «…». */
+.rt-lista-filtros { margin-bottom: 6px; }
+.rt-lista-filtros input { max-width: 340px; padding: 5px 10px; font-size: 12.5px; margin: 0; }
+.rt-tabla-lista { width: 100%; table-layout: fixed; border-collapse: collapse; background: var(--card-bg); border: 1px solid var(--border); border-radius: var(--radius); }
+.rt-tabla-lista th { text-align: left; font-size: 11px; font-weight: 700; text-transform: uppercase; letter-spacing: 0.3px; color: var(--text-muted); padding: 6px 10px; border-bottom: 1px solid var(--border); }
+.rt-tabla-lista td { padding: 5px 10px; font-size: 12.5px; border-bottom: 1px solid var(--border); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.rt-tabla-lista tbody tr[data-id] { cursor: pointer; }
+.rt-tabla-lista tbody tr[data-id]:hover { background: rgba(245, 166, 35, 0.07); }
+.rt-tabla-lista tr.rt-fila-sel { background: rgba(245, 166, 35, 0.16); }
+.rt-tabla-lista tr.rt-fila-sel td:nth-child(2) { font-weight: 700; }
+.rt-c-tipo { width: 11%; } .rt-c-nombre { width: 43%; } .rt-c-cliente { width: 21%; } .rt-c-ubic { width: 14%; } .rt-c-fecha { width: 11%; }
+@media (max-width: 760px) { .rt-tabla-lista { min-width: 640px; } }
+/* Proyecto: guía «Cómo avanzar». */
+.rt-pasos { list-style: none; margin: 4px 0 0; padding: 0; display: grid; grid-template-columns: repeat(auto-fit, minmax(190px, 1fr)); gap: 8px; }
+.rt-pasos a { display: flex; gap: 10px; align-items: flex-start; height: 100%; padding: 10px 12px; border: 1px solid var(--border); border-radius: 10px; color: var(--text); }
+.rt-pasos a:hover { border-color: var(--cinco-orange); background: var(--sidebar-hover); text-decoration: none; }
+.rt-pasos strong { display: block; font-size: 13px; }
+.rt-pasos small { display: block; font-size: 11.5px; color: var(--text-muted); line-height: 1.4; margin-top: 2px; }
+.rt-paso-marca { flex: none; width: 24px; height: 24px; border-radius: 50%; display: inline-flex; align-items: center; justify-content: center; font-size: 12px; font-weight: 700; border: 1.5px solid var(--border); color: var(--text-muted); }
+.rt-pasos li.hecho .rt-paso-marca { background: #2e9b57; border-color: #2e9b57; color: #fff; }
+.rt-pasos li.siguiente a { border-color: var(--cinco-orange); background: rgba(245, 166, 35, 0.07); }
+.rt-pasos li.siguiente .rt-paso-marca { border-color: var(--cinco-orange); color: var(--cinco-orange-dark); }
+.rt-pasos li.opcional a { border-style: dashed; }
+/* «Para qué sirve» de cada sección del proyecto y página «Cómo usar AHÍNCO». */
+.rt-ayuda-seccion { margin: 8px 0 0 !important; padding: 8px 12px; border-left: 3px solid var(--cinco-orange); background: rgba(245, 166, 35, 0.07); border-radius: 0 8px 8px 0; font-size: 13px; color: var(--text); }
+.rt-ayuda-seccion:empty { display: none; }
+.rt-ayuda-seccion a { white-space: nowrap; margin-left: 4px; }
+.rt-guia-pasos { margin: 0; padding-left: 22px; font-size: 13.5px; line-height: 1.55; }
+.rt-guia-pasos li { margin-bottom: 6px; }
+.rt-guia-grupo { font-size: 14px; margin: 14px 0 6px; }
+.rt-guia-opciones { display: grid; grid-template-columns: minmax(170px, 240px) 1fr; gap: 0; margin: 0; font-size: 13px; }
+.rt-guia-opciones dt, .rt-guia-opciones dd { margin: 0; padding: 7px 10px; border-top: 1px solid var(--border); }
+.rt-guia-opciones dt { font-weight: 600; }
+.rt-guia-opciones dd { color: var(--text-muted); }
+@media (max-width: 640px) { .rt-guia-opciones { grid-template-columns: 1fr; } .rt-guia-opciones dd { border-top: 0; padding-top: 0; } }
+/* Literal con hallazgos solo de severidad media o baja: naranja, distinto del
+   amarillo de «Pendiente» y del rojo de un hallazgo alto. */
+.rt-chip-obs { background: #e2761b; }
+.rt-punto-obs { background: #e2761b; }
+.badge.obs { background: rgba(226, 118, 27, 0.15); color: #b8570a; }
+:root[data-theme="dark"] .badge.obs { color: #f4a25a; }
+/* Resumen: una línea por hallazgo con su severidad. */
+.rt-hall-lineas { list-style: none; margin: 0; padding: 0; }
+.rt-hall-lineas li { display: flex; align-items: center; gap: 8px; padding: 5px 0; border-bottom: 1px solid var(--border); font-size: 12.5px; min-width: 0; }
+.rt-hall-lineas li:last-child { border-bottom: 0; }
+.rt-hall-lineas .rt-hall-cod { padding: 1px 6px; font-size: 11px; }
+.rt-hall-titulo { flex: 1; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; font-weight: 600; }
+.rt-hall-lit { flex: none; color: var(--text-muted); font-size: 11.5px; white-space: nowrap; }
+.rt-sev-chip { flex: none; width: 46px; text-align: center; font-size: 10.5px; font-weight: 700; border-radius: 999px; padding: 1px 0; background: #b8bec7; color: #fff; }
+.rt-sev-chip-Alta { background: var(--danger); }
+.rt-sev-chip-Media { background: #e2761b; }
+.rt-sev-chip-Baja { background: #8a929c; }

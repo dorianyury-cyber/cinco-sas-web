@@ -13,14 +13,20 @@
   <div class="app-shell">
     <aside class="sidebar rt-sidebar" id="sidebar"></aside>
     <main class="main rt-main">
-      <div class="rt-encabezado">
+      <div class="rt-lista-cabeza">
         <h1 id="tituloLista">Proyectos</h1>
-        <p class="text-muted">Cada proyecto reúne los cálculos de una instalación y genera la memoria organizada por los literales a) a x) del diseño detallado del RETIE: como <strong>diseño</strong> propio o como <strong>verificación de interventoría</strong> del diseño de otro.</p>
+        <div class="rt-barra" id="rutas">
+          <button type="button" class="rt-barra-btn rt-barra-diseno" data-ruta="diseno" title="Cinco diseña y firma la memoria de cálculo: datos, cálculos, literales y memoria.">📐 Nuevo diseño</button>
+          <button type="button" class="rt-barra-btn rt-barra-verif" data-ruta="verificacion" title="Cinco revisa el diseño de otro y emite un informe con hallazgos.">🔎 Nueva verificación</button>
+          <button type="button" class="rt-barra-btn" data-ruta="importar" title="Crea un proyecto desde un archivo .ahinco.json (no sirve para los .json del módulo Informes).">⬆ Cargar .ahinco.json</button>
+          <a class="rt-barra-btn" href="rapido.html" title="Un cálculo suelto sin crear proyecto.">⚡ Cálculo rápido</a>
+          <a class="rt-barra-btn rt-barra-ayuda" href="guia.html" title="Qué hace cada opción y el paso a paso para diseñar o verificar.">? Cómo usar</a>
+        </div>
       </div>
       <input type="file" id="importarArchivo" accept=".json,application/json" class="hidden">
 
       <div class="card hidden" id="nuevoCard">
-        <h2>Nuevo proyecto</h2>
+        <h2 id="nuevoTitulo">Nuevo proyecto</h2>
         <div class="rt-modo-selector">
           <label class="rt-modo-op activo"><input type="radio" name="pModo" value="diseno" checked><span><strong>📐 Diseño</strong><small>Cinco diseña y firma la memoria de cálculo.</small></span></label>
           <label class="rt-modo-op"><input type="radio" name="pModo" value="verificacion"><span><strong>🔎 Verificación de interventoría</strong><small>Cinco revisa el diseño de otro: los incumplimientos son hallazgos.</small></span></label>
@@ -28,18 +34,28 @@
         <form id="nuevoForm" class="rt-form-grid">
           <div class="rt-ancho"><label for="pNombre">Nombre del proyecto *</label><input id="pNombre" required placeholder="Ej. Subestación 13,2 kV / 208 V edificio administrativo"></div>
           <div><label for="pCliente">Cliente</label><input id="pCliente"></div>
+          <div class="rt-solo-verif"><label for="pAutor">Diseño revisado: autor y matrícula</label><input id="pAutor" placeholder="Ej. Ing. N. N., M.P. CN205-000000"></div>
+          <div class="rt-solo-verif"><label for="pDocs">Documentos revisados</label><input id="pDocs" placeholder="Ej. Memoria rev. 2 y planos versión 01"></div>
           <div><label for="pUbicacion">Ubicación (municipio, departamento)</label><input id="pUbicacion" placeholder="Ej. Neiva, Huila"></div>
           <div><label for="pAltitud">Altitud (m s. n. m.)</label><input id="pAltitud" type="number" step="any" value="442"></div>
           <div><label for="pTemp">Temperatura ambiente de diseño (°C)</label><input id="pTemp" type="number" step="any" value="32"></div>
+          <div><label for="pAlcance">Alcance</label><select id="pAlcance"><option value="retie">Diseño eléctrico completo (literales a) a x) del RETIE)</option><option value="retilap">Solo iluminación (capítulos del RETILAP)</option></select></div>
           <div><label for="pTipo">Tipo de diseño</label><select id="pTipo"><option>Diseño detallado</option><option>Diseño básico (vivienda, pequeño comercio o pequeña industria)</option><option>Diseño básico (ramal aéreo rural ≤ 50 kVA y 13,2 kV)</option></select></div>
           <div class="rt-ancho"><label for="pDescripcion">Descripción de la instalación</label><input id="pDescripcion" placeholder="Alcance, nivel de tensión y uso"></div>
         </form>
+        <p class="rt-nota" id="nuevoSiguiente"></p>
         <div class="alert" id="nuevoAlerta"></div>
         <div class="rt-acciones"><button type="button" class="btn" id="crearBtn">Crear proyecto</button><button type="button" class="btn secondary" id="cancelarBtn">Cancelar</button></div>
       </div>
 
       <div class="alert" id="listaAlerta"></div>
-      <div class="rt-proyectos" id="proyectos"><p class="text-muted">Cargando…</p></div>
+      <div class="rt-vp" id="vistaPrevia"><p class="text-muted">Cargando…</p></div>
+      <div class="rt-lista-filtros"><input type="search" id="buscar" placeholder="Buscar por nombre, cliente o ubicación"></div>
+      <div class="tabla-scroll"><table class="rt-tabla-lista" id="proyectos">
+        <colgroup><col class="rt-c-tipo"><col class="rt-c-nombre"><col class="rt-c-cliente"><col class="rt-c-ubic"><col class="rt-c-fecha"></colgroup>
+        <thead><tr><th>Tipo</th><th>Proyecto</th><th>Cliente</th><th>Ubicación</th><th>Actualizado</th></tr></thead>
+        <tbody></tbody>
+      </table></div>
     </main>
   </div>
   <script type="module" src="js/rt-inicio.js"></script>

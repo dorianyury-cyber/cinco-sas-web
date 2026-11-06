@@ -23,6 +23,7 @@
 // web/js/vendor/docx.iife.js, script clásico -> window.docx).
 
 import { parsearHtmlARuns } from "./texto-rico.js";
+import { medidasTablaPDF } from "./informes-pdf.js";
 import {
   normalizarMerges, celdaCombinada, normalizarCentrados, celdaCentrada,
   normalizarNegritas, celdaNegrita, normalizarColoresCelda, colorCelda,
@@ -36,6 +37,12 @@ const MUTED_HEX = "5C6570";
 const MUTED_CLARO_HEX = "C7CCD3";
 const VALOR_OSCURO_HEX = "DCE0E5";
 const GRIS_CLARO_HEX = "F5F6F8";
+// Mismo aspecto que el PDF (informes-pdf.js): letra sin serifa (Helvetica en
+// el PDF; Arial es su equivalente en Word), texto casi negro y bordes de
+// tabla gris claro.
+const FUENTE = "Arial";
+const TEXTO_HEX = "14161A";
+const BORDE_TABLA_HEX = "D2D6DB";
 const LOGO_URL = "../assets/img/logo.png";
 // El logo.png normal trae el texto "CINCO S.A.S." en blanco (pensado para
 // fondo navy) — sobre la portada clara quedaría invisible, así que ahí se
@@ -186,11 +193,20 @@ function sumaRango(valores, inicio, cantidad) {
 }
 
 export async function generarInformeDocxBlob(informe) {
+  // Margen de encuadernación (mm extra a la izquierda), igual que el PDF:
+  // AHÍNCO usa 10 mm, así que el ancho útil es el mismo en los dos formatos.
+  const margenIzqMm = MARGEN_MM + (Number(informe.margenEncuadernacion) || 0);
+  const anchoUtilMm = ANCHO_PAGINA_MM - margenIzqMm - MARGEN_MM;
+  const anchoUtilDxa = Math.round(anchoUtilMm * DXA_POR_MM);
   const {
     Document, Packer, Paragraph, TextRun, ImageRun, Table, TableRow, TableCell,
     ShadingType, WidthType, Header, Footer, AlignmentType, PageNumber, VerticalAlign, HeadingLevel, LevelFormat,
-    VerticalMergeType, BorderStyle, TableOfContents, HeightRule
+    VerticalMergeType, BorderStyle, TableOfContents, HeightRule, TableLayoutType, LevelSuffix
   } = window.docx;
+  // Toda tabla lleva su cuadrícula de columnas (columnWidths) en DXA y
+  // layout fijo: sin ella docx.js escribe columnas de 100 DXA (~2 mm) que
+  // contradicen el ancho de las celdas, y Word desacomoda tablas y márgenes.
+  const fija = { layout: TableLayoutType.FIXED };
 
   const portadaClara = informe.portada === "clara";
 
@@ -208,7 +224,9 @@ export async function generarInformeDocxBlob(informe) {
       format: LevelFormat.DECIMAL,
       text: Array.from({ length: nivel + 1 }, (_, i) => `%${i + 1}`).join(".") + ".",
       alignment: AlignmentType.START,
-      style: { paragraph: { indent: { left: nivel * 360, hanging: 360 } } }
+      // Como el PDF: «1.1. Texto» pegado al margen, sin tabulación ni sangría.
+      suffix: LevelSuffix.SPACE,
+      style: { paragraph: { indent: { left: 0, hanging: 0 } } }
     }))
   };
 
@@ -217,33 +235,37 @@ export async function generarInformeDocxBlob(informe) {
   let celdaLogo = [new Paragraph({ children: [] })];
   try {
     const logo = await cargarImagenParaDocx(LOGO_URL, `#${NAVY_HEX}`, "image/png", "png");
-    const altoLogoPx = Math.round(14 * PX_POR_MM);
+    const altoLogoPx = Math.round(8 * PX_POR_MM);
     const anchoLogoPx = Math.round(altoLogoPx * (logo.ancho / logo.alto));
     celdaLogo = [new Paragraph({ children: [new ImageRun({ data: logo.buffer, transformation: { width: anchoLogoPx, height: altoLogoPx }, type: "png" })] })];
   } catch (e) {
     // Sin logo si no carga — el documento se genera igual.
   }
 
+  // Como el PDF: sin banda de color, solo una línea ámbar bajo logo y título.
+  const nadaH = { style: BorderStyle.NONE, size: 0, color: "FFFFFF" };
+  const lineaAmbar = { top: nadaH, left: nadaH, right: nadaH, bottom: { style: BorderStyle.SINGLE, size: 12, color: AMBER_HEX } };
   const headerTable = new Table({
     width: { size: 100, type: WidthType.PERCENTAGE },
+    // Logo angosto a la izquierda; el título usa el resto, como en el PDF.
+    columnWidths: [Math.round(anchoUtilDxa * 0.2), anchoUtilDxa - Math.round(anchoUtilDxa * 0.2)], ...fija,
     borders: sinBordes(),
     rows: [new TableRow({
       children: [
         new TableCell({
-          width: { size: 50, type: WidthType.PERCENTAGE },
-          shading: { type: ShadingType.CLEAR, fill: NAVY_HEX, color: "auto" },
+          width: { size: 20, type: WidthType.PERCENTAGE },
+          borders: lineaAmbar,
           verticalAlign: VerticalAlign.CENTER,
-          margins: { top: 150, bottom: 150, left: 200, right: 200 },
+          margins: { top: 0, bottom: 80, left: 0, right: 0 },
           children: celdaLogo
         }),
         new TableCell({
-          width: { size: 50, type: WidthType.PERCENTAGE },
-          shading: { type: ShadingType.CLEAR, fill: NAVY_HEX, color: "auto" },
+          width: { size: 80, type: WidthType.PERCENTAGE },
+          borders: lineaAmbar,
           verticalAlign: VerticalAlign.CENTER,
-          margins: { top: 150, bottom: 150, left: 200, right: 200 },
+          margins: { top: 0, bottom: 80, left: 0, right: 0 },
           children: [
-            new Paragraph({ alignment: AlignmentType.RIGHT, children: [new TextRun({ text: informe.titulo || "", bold: true, color: "FFFFFF", size: 16 })] }),
-            new Paragraph({ alignment: AlignmentType.RIGHT, children: [new TextRun({ text: TIPO_LABEL[informe.tipoInforme] || "Informe", color: MUTED_CLARO_HEX, size: 15 })] })
+            new Paragraph({ alignment: AlignmentType.RIGHT, spacing: { line: 220 }, children: [new TextRun({ text: informe.titulo || "", color: MUTED_HEX, size: 16 })] })
           ]
         })
       ]
@@ -253,22 +275,27 @@ export async function generarInformeDocxBlob(informe) {
   // ---- pie de página: código/versión a la izquierda, radicado/página a la derecha ----
   const footerTable = new Table({
     width: { size: 100, type: WidthType.PERCENTAGE },
+    columnWidths: [Math.round(anchoUtilDxa * 0.6), anchoUtilDxa - Math.round(anchoUtilDxa * 0.6)], ...fija,
     borders: sinBordes(),
     rows: [new TableRow({
       children: [
         new TableCell({
           width: { size: 60, type: WidthType.PERCENTAGE },
-          children: [new Paragraph({ children: [new TextRun({ text: `Código: ${CODIGO_FORMATO} · Versión: ${VERSION_FORMATO}`, color: MUTED_HEX, size: 13 })] })]
+          shading: { type: ShadingType.CLEAR, fill: GRIS_CLARO_HEX, color: "auto" },
+          margins: { top: 100, bottom: 100, left: 120, right: 120 },
+          children: [new Paragraph({ children: [new TextRun({ text: `Código: ${CODIGO_FORMATO} · Versión: ${VERSION_FORMATO}`, color: MUTED_HEX, size: 15 })] })]
         }),
         new TableCell({
           width: { size: 40, type: WidthType.PERCENTAGE },
+          shading: { type: ShadingType.CLEAR, fill: GRIS_CLARO_HEX, color: "auto" },
+          margins: { top: 100, bottom: 100, left: 120, right: 120 },
           children: [new Paragraph({
             alignment: AlignmentType.RIGHT,
             children: [
-              new TextRun({ text: `Radicado ${informe.radicado || ""} · Página `, color: MUTED_HEX, size: 13 }),
-              new TextRun({ children: [PageNumber.CURRENT], color: MUTED_HEX, size: 13 }),
-              new TextRun({ text: " de ", color: MUTED_HEX, size: 13 }),
-              new TextRun({ children: [PageNumber.TOTAL_PAGES], color: MUTED_HEX, size: 13 })
+              new TextRun({ text: `Radicado ${informe.radicado || ""} · Página `, color: MUTED_HEX, size: 15 }),
+              new TextRun({ children: [PageNumber.CURRENT], color: MUTED_HEX, size: 15 }),
+              new TextRun({ text: " de ", color: MUTED_HEX, size: 15 }),
+              new TextRun({ children: [PageNumber.TOTAL_PAGES], color: MUTED_HEX, size: 15 })
             ]
           })]
         })
@@ -388,12 +415,15 @@ export async function generarInformeDocxBlob(informe) {
   const celdaPortada = new TableCell({
     width: { size: ANCHO_PAGINA_DXA, type: WidthType.DXA },
     shading: portadaClara ? undefined : { type: ShadingType.CLEAR, fill: NAVY_HEX, color: "auto" },
-    margins: { top: 0, bottom: 0, left: 0, right: 0 },
+    // El fondo va de borde a borde, pero el texto guarda los 2 cm del margen
+    // del cuerpo: antes un objeto largo tocaba los bordes de la hoja.
+    margins: { top: 0, bottom: 0, left: mmATw(MARGEN_MM), right: mmATw(MARGEN_MM) },
     borders: sinBordes(),
     children: contenidoPortada
   });
   const tablaPortada = new Table({
     width: { size: ANCHO_PAGINA_DXA, type: WidthType.DXA },
+    columnWidths: [ANCHO_PAGINA_DXA], ...fija,
     indent: { size: 0, type: WidthType.DXA },
     borders: sinBordes(),
     rows: [new TableRow({ height: { value: ALTO_PAGINA_DXA, rule: HeightRule.ATLEAST }, children: [celdaPortada] })]
@@ -410,6 +440,8 @@ export async function generarInformeDocxBlob(informe) {
   const tablasEntradas = [];
   const cuerpo = [];
   let esPrimerBloqueDeCuerpo = true;
+  const lineaTabla = { style: BorderStyle.SINGLE, size: 4, color: BORDE_TABLA_HEX };
+  const bordesTabla = { top: lineaTabla, bottom: lineaTabla, left: lineaTabla, right: lineaTabla, insideHorizontal: lineaTabla, insideVertical: lineaTabla };
 
   for (const bloque of informe.bloques || []) {
     const primerBloque = esPrimerBloqueDeCuerpo;
@@ -418,9 +450,9 @@ export async function generarInformeDocxBlob(informe) {
     if (bloque.tipo in HEADING_POR_NIVEL) {
       cuerpo.push(new Paragraph({
         heading: HEADING_POR_NIVEL[bloque.tipo],
-        pageBreakBefore: primerBloque || undefined,
         numbering: { reference: REF_NUMERACION_TITULOS, level: NIVEL_NUMERACION[bloque.tipo] },
-        children: [new TextRun({ text: bloque.texto || "", bold: true, color: NAVY_HEX })]
+        // Sin el número que traiga el texto: la numeración automática ya lo pone.
+        children: [new TextRun(String(bloque.texto || "").replace(/^\s*(?:\d+(?:\.\d+)*\s*[.)\-–]|\d+(?:\.\d+)+)\s+/, ""))]
       }));
       continue;
     }
@@ -434,6 +466,8 @@ export async function generarInformeDocxBlob(informe) {
       cuerpo.push(new Paragraph({
         alignment: AlignmentType.CENTER,
         pageBreakBefore: primerBloque || undefined,
+        keepNext: true,
+        spacing: { before: 160, after: 100 },
         children: [new TextRun({ text: tituloTexto, bold: true, color: NAVY_HEX, size: 19 })]
       }));
 
@@ -453,8 +487,19 @@ export async function generarInformeDocxBlob(informe) {
       const centrados = normalizarCentrados(bloque.centrados || [], numFilasTabla, numColsTabla);
       const negritas = normalizarNegritas(bloque.negritas || [], numFilasTabla, numColsTabla);
       const coloresCelda = normalizarColoresCelda(bloque.coloresCelda || [], numFilasTabla, numColsTabla);
-      const anchos = anchosColumnaDocx(filas, merges);
-      const margenesCelda = { top: 60, bottom: 60, left: 100, right: 100 };
+      // Mismas columnas y misma letra que el PDF (medidasTablaPDF); si jsPDF no
+      // está cargado en la página, el reparto propio por caracteres a 8 pt.
+      let anchos, tamTabla = 16;
+      try {
+        const medidas = medidasTablaPDF(filas, merges, anchoUtilMm);
+        anchos = medidas.anchosMm.map(mmATw);
+        tamTabla = Math.round(medidas.fontSize * 2);
+      } catch (e) {
+        anchos = anchosColumnaDocx(filas, merges).map((a) => Math.round(a * anchoUtilDxa / ANCHO_UTIL_DXA));
+      }
+      anchos[anchos.length - 1] += anchoUtilDxa - anchos.reduce((s, a) => s + a, 0); // que sumen justo el ancho útil
+      // Relleno de 1,8 mm por lado, como el PDF.
+      const margenesCelda = { top: mmATw(1.8), bottom: mmATw(1.8), left: mmATw(1.8), right: mmATw(1.8) };
 
       const filasDocx = filas.map((fila, fi) => {
         const celdas = [];
@@ -488,7 +533,7 @@ export async function generarInformeDocxBlob(informe) {
             children: [new Paragraph({
               alignment: celdaCentrada(centrados, fi, ci) ? AlignmentType.CENTER : undefined,
               children: [new TextRun({
-                text: String(fila[ci] || ""), size: 17,
+                text: String(fila[ci] || ""), size: tamTabla,
                 bold: fi === 0 || celdaNegrita(negritas, fi, ci),
                 color: colorTexto ? colorTexto.replace("#", "") : undefined
               })]
@@ -500,14 +545,15 @@ export async function generarInformeDocxBlob(informe) {
         // tabla — a diferencia del PDF (que arma sus páginas a mano), acá
         // no hace falta dibujar nada de más, es una propiedad nativa de la
         // tabla, solo hay que marcar todas las filas que correspondan.
-        return new TableRow({ children: celdas, tableHeader: fi < filasEncabezado || undefined });
+        // cantSplit: como el PDF, una fila no se parte entre dos páginas.
+        return new TableRow({ children: celdas, cantSplit: true, tableHeader: fi < filasEncabezado || undefined });
       });
-      cuerpo.push(new Table({ width: { size: ANCHO_UTIL_DXA, type: WidthType.DXA }, rows: filasDocx }));
+      cuerpo.push(new Table({ width: { size: anchoUtilDxa, type: WidthType.DXA }, columnWidths: anchos, ...fija, borders: bordesTabla, rows: filasDocx }));
 
       if (bloque.nota) {
         cuerpo.push(new Paragraph({ alignment: AlignmentType.RIGHT, children: [new TextRun({ text: bloque.nota, italics: true, color: MUTED_HEX, size: 17 })] }));
       }
-      cuerpo.push(new Paragraph({ text: "" }));
+      cuerpo.push(new Paragraph({ spacing: { after: 120 }, children: [] }));
       continue;
     }
 
@@ -526,7 +572,7 @@ export async function generarInformeDocxBlob(informe) {
         // (ver dibujarImagen en informes-pdf.js) — 85% si el bloque es de
         // antes de que existiera el control.
         const escalaImagen = Math.min(100, Math.max(30, bloque.tamano || 85)) / 100;
-        let anchoPx = Math.round(ANCHO_UTIL_MM * PX_POR_MM * escalaImagen);
+        let anchoPx = Math.round(anchoUtilMm * PX_POR_MM * escalaImagen);
         let altoPx = Math.round(anchoPx * (img.alto / img.ancho));
         const altoMaximoPx = Math.round(200 * PX_POR_MM);
         if (altoPx > altoMaximoPx) { altoPx = altoMaximoPx; anchoPx = Math.round(altoPx * (img.ancho / img.alto)); }
@@ -554,7 +600,7 @@ export async function generarInformeDocxBlob(informe) {
           children: [new TextRun({ text: bloque.etiqueta.toUpperCase(), bold: true, color: NAVY_HEX, size: 19 })]
         }));
       }
-      const anchoColumnaDxa = Math.round(ANCHO_UTIL_DXA / firmantes.length);
+      const anchoColumnaDxa = Math.round(anchoUtilDxa / firmantes.length);
       // Fila 1: firma digital (imagen subida en el editor) si el firmante
       // tiene una, o el espacio en blanco de siempre para firmar a mano si
       // no; fila 2: línea de firma (borde superior de la celda) con el
@@ -563,7 +609,7 @@ export async function generarInformeDocxBlob(informe) {
       // firma no la monta sobre el contenido de arriba — solo hace la
       // imagen más grande dentro de su celda, con la fila creciendo si hace
       // falta.
-      const anchoColumnaMmMenosPadding = ANCHO_UTIL_MM / firmantes.length - 6;
+      const anchoColumnaMmMenosPadding = anchoUtilMm / firmantes.length - 6;
       const celdasEspacio = await Promise.all(firmantes.map(async (f) => {
         if (f.firmaUrl) {
           try {
@@ -599,7 +645,8 @@ export async function generarInformeDocxBlob(informe) {
         ]
       });
       cuerpo.push(new Table({
-        width: { size: ANCHO_UTIL_DXA, type: WidthType.DXA },
+        width: { size: anchoUtilDxa, type: WidthType.DXA },
+        columnWidths: firmantes.map(() => anchoColumnaDxa), ...fija,
         borders: sinBordes(),
         rows: [
           new TableRow({ children: celdasEspacio }),
@@ -613,9 +660,9 @@ export async function generarInformeDocxBlob(informe) {
     // párrafo
     cuerpo.push(new Paragraph({
       pageBreakBefore: primerBloque || undefined,
+      spacing: { after: 150 },
       children: runsParaDocx(TextRun, bloque.texto, 21)
     }));
-    cuerpo.push(new Paragraph({ text: "" }));
   }
 
   // ---- índice (con número de página real de Word, campo TOC nativo —
@@ -625,34 +672,46 @@ export async function generarInformeDocxBlob(informe) {
   // igual que el índice, pero ese campo no se actualiza de forma confiable
   // en Word (a diferencia del TOC nativo) — mejor una lista simple que
   // siempre se ve bien que un número que se queda pegado o en blanco.
-  const listaSimple = (entradas) => entradas.map((texto) => new Paragraph({ children: [new TextRun({ text: texto, size: 21 })] }));
+  const listaSimple = (entradas) => entradas.map((texto) => new Paragraph({ style: "TOC1", children: [new TextRun(texto)] }));
+  // Títulos del índice y de las listas con un estilo propio, no de título:
+  // así no aparecen dentro del mismo índice (antes salía «Contenido» y
+  // «Lista de tablas» como entradas).
+  const tituloLista = (texto, antes = 0) => new Paragraph({ style: "TituloIndice", spacing: { before: antes }, children: [new TextRun(texto)] });
 
   const indiceYListas = [
-    new Paragraph({
-      pageBreakBefore: true,
-      heading: HeadingLevel.HEADING_1,
-      children: [new TextRun({ text: "Contenido", bold: true, color: NAVY_HEX })]
-    }),
+    tituloLista("Contenido"),
     new TableOfContents("Contenido", { hyperlink: true, headingStyleRange: "1-4" })
   ];
   if (graficosEntradas.length) {
-    indiceYListas.push(new Paragraph({
-      pageBreakBefore: true,
-      heading: HeadingLevel.HEADING_1,
-      children: [new TextRun({ text: "Lista de gráficos", bold: true, color: NAVY_HEX })]
-    }));
+    indiceYListas.push(tituloLista("Lista de gráficos", 480));
     indiceYListas.push(...listaSimple(graficosEntradas));
   }
   if (tablasEntradas.length) {
-    indiceYListas.push(new Paragraph({
-      pageBreakBefore: true,
-      heading: HeadingLevel.HEADING_1,
-      children: [new TextRun({ text: "Lista de tablas", bold: true, color: NAVY_HEX })]
-    }));
+    indiceYListas.push(tituloLista("Lista de tablas", 480));
     indiceYListas.push(...listaSimple(tablasEntradas));
   }
+  // Estilos del documento con las medidas del PDF: cuerpo 10,5 pt; Título 1
+  // a 15 pt en página nueva; Título 2 a 12,5 pt; Título 3 a 11 pt; Título 4
+  // a 10 pt en cursiva gris; índice sin negrita, con sangría por nivel.
+  const estiloTitulo = (tam, color, extra = {}) => ({ run: { font: FUENTE, size: tam, bold: true, color, ...extra.run }, paragraph: { keepNext: true, keepLines: true, ...extra.paragraph } });
+  const estiloIndice = (id, nivel) => ({ id, name: `toc ${nivel}`, basedOn: "Normal", next: "Normal", run: { font: FUENTE, size: nivel === 1 ? 21 : 19, color: TEXTO_HEX }, paragraph: { indent: { left: (nivel - 1) * 340 }, spacing: { before: 40, after: 40 } } });
+  const estilos = {
+    default: {
+      document: { run: { font: FUENTE, size: 21, color: TEXTO_HEX }, paragraph: { spacing: { line: 290 } } },
+      heading1: estiloTitulo(30, NAVY_HEX, { paragraph: { pageBreakBefore: true, spacing: { before: 0, after: 240 } } }),
+      heading2: estiloTitulo(25, NAVY_HEX, { paragraph: { spacing: { before: 240, after: 120 } } }),
+      heading3: estiloTitulo(22, "1E2228", { paragraph: { spacing: { before: 200, after: 100 } } }),
+      heading4: estiloTitulo(20, MUTED_HEX, { run: { italics: true }, paragraph: { spacing: { before: 160, after: 80 } } })
+    },
+    paragraphStyles: [
+      estiloIndice("TOC1", 1), estiloIndice("TOC2", 2), estiloIndice("TOC3", 3), estiloIndice("TOC4", 4),
+      { id: "TituloIndice", name: "Título de índice", basedOn: "Normal", next: "Normal", run: { font: FUENTE, size: 30, bold: true, color: NAVY_HEX }, paragraph: { spacing: { after: 240 } } }
+    ]
+  };
+
   const documento = new Document({
     features: { updateFields: true },
+    styles: estilos,
     numbering: { config: [numeracionTitulos] },
     sections: [
       {
@@ -671,7 +730,9 @@ export async function generarInformeDocxBlob(informe) {
         properties: {
           page: {
             size: { width: ANCHO_PAGINA_DXA, height: ALTO_PAGINA_DXA },
-            margin: { top: 1134, bottom: 1134, left: 1134, right: 1134, header: 340, footer: 340 }
+            // Como el PDF: el texto arranca a 26 mm y termina a 22 mm del borde; el
+            // encabezado va a 6 mm del borde y el pie pegado abajo.
+            margin: { top: mmATw(26), bottom: mmATw(22), left: mmATw(margenIzqMm), right: mmATw(MARGEN_MM), header: mmATw(6), footer: 0 }
           }
         },
         headers: { default: new Header({ children: [headerTable] }) },

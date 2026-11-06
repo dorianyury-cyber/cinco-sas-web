@@ -74,7 +74,9 @@ export function iniciarNovedades({ contrato, contratoRef, puedeEditar, alCambiar
   const tipoSel = document.getElementById("novTipo");
   const fechaEl = document.getElementById("novFecha");
   const fechaLabel = document.getElementById("novFechaLabel");
+  const documentoSel = document.getElementById("novDocumentoSel");
   const documentoEl = document.getElementById("novDocumento");
+  const ayudaProrroga = document.getElementById("novAyudaProrroga");
   const diasEl = document.getElementById("novDias");
   const fechaFinEl = document.getElementById("novFechaFin");
   const valorEl = document.getElementById("novValor");
@@ -82,7 +84,36 @@ export function iniciarNovedades({ contrato, contratoRef, puedeEditar, alCambiar
   const guardarBtn = document.getElementById("novGuardarBtn");
 
   form.classList.toggle("oculto", !puedeEditar);
-  document.getElementById("novCerrarBtn").addEventListener("click", () => backdrop.classList.remove("open"));
+  // Cerrar: botón del pie, la × de arriba (siempre visible, también para
+  // quien solo puede ver), Esc, o clic en el fondo oscuro fuera de la ventana.
+  const cerrar = () => backdrop.classList.remove("open");
+  document.getElementById("novCerrarBtn").addEventListener("click", cerrar);
+  document.getElementById("novCerrarX").addEventListener("click", cerrar);
+  backdrop.addEventListener("click", (e) => { if (e.target === backdrop) cerrar(); });
+  document.addEventListener("keydown", (e) => { if (e.key === "Escape" && backdrop.classList.contains("open")) cerrar(); });
+
+  // Documento: lista con los nombres usuales y el consecutivo siguiente ya
+  // puesto (Otrosí N.° 2 si ya hay uno), más "Otro…" para escribirlo a mano.
+  const VALOR_OTRO = "__otro__";
+  const NOMBRES_DOCUMENTO = {
+    otrosi: ["Otrosí", "Otrosí modificatorio", "Otrosí de prórroga", "Otrosí de adición", "Otrosí de adición y prórroga", "Acta de modificación"],
+    suspension: ["Acta de suspensión", "Acta de ampliación de suspensión"],
+    reinicio: ["Acta de reinicio"]
+  };
+  function poblarDocumentos(tipo) {
+    const siguiente = (contrato.novedades || []).filter((n) => n.tipo === tipo).length + 1;
+    documentoSel.innerHTML = "";
+    NOMBRES_DOCUMENTO[tipo].forEach((nombre) => documentoSel.appendChild(new Option(`${nombre} N.° ${siguiente}`)));
+    documentoSel.appendChild(new Option("Otro (escribirlo)…", VALOR_OTRO));
+    documentoEl.value = "";
+    documentoEl.classList.add("oculto");
+  }
+  documentoSel.addEventListener("change", () => {
+    const otro = documentoSel.value === VALOR_OTRO;
+    documentoEl.classList.toggle("oculto", !otro);
+    if (otro) documentoEl.focus();
+  });
+  const leerDocumento = () => (documentoSel.value === VALOR_OTRO ? documentoEl.value.trim() : documentoSel.value);
 
   function mostrarAlerta(texto, tipo) {
     alertBox.textContent = texto;
@@ -107,8 +138,25 @@ export function iniciarNovedades({ contrato, contratoRef, puedeEditar, alCambiar
       el.classList.toggle("oculto", !el.dataset.novTipos.split(" ").includes(tipo));
     });
     fechaLabel.textContent = { otrosi: "Fecha del otrosí", suspension: "Suspendido desde", reinicio: "Fecha de reinicio" }[tipo];
-    documentoEl.placeholder = { otrosi: "Ej. Otrosí N.° 1", suspension: "Ej. Acta de suspensión N.° 1", reinicio: "Ej. Acta de reinicio N.° 1" }[tipo];
+    poblarDocumentos(tipo);
+    diasEl.value = "";
+    fechaFinEl.value = "";
     if (tipo === "reinicio") proponerFinReinicio();
+    if (tipo === "otrosi") pintarAyudaProrroga();
+  }
+
+  // Línea visible bajo los campos: "Fin vigente + N días = nueva fecha",
+  // para que se vea de inmediato el resultado al escribir los días.
+  function pintarAyudaProrroga() {
+    const { fechaFin } = calcularVigencia(contrato);
+    if (!fechaFin) {
+      ayudaProrroga.textContent = "El contrato no tiene fecha de finalización: escribe directamente la nueva fecha.";
+    } else if (fechaFinEl.value) {
+      const total = diasEntre(fechaFin, fechaFinEl.value);
+      ayudaProrroga.innerHTML = `Fin vigente <strong>${fechaFin}</strong> + <strong>${total} días</strong> → nueva fecha de finalización <strong>${fechaFinEl.value}</strong>`;
+    } else {
+      ayudaProrroga.innerHTML = `Fin vigente: <strong>${fechaFin}</strong>. Escribe los días de prórroga y se calcula la nueva fecha.`;
+    }
   }
 
   function proponerFinReinicio() {
@@ -120,14 +168,21 @@ export function iniciarNovedades({ contrato, contratoRef, puedeEditar, alCambiar
   }
 
   // Prórroga: días ↔ nueva fecha, el que se escriba calcula el otro.
-  diasEl.addEventListener("input", () => {
+  function alCambiarDias() {
     const { fechaFin } = calcularVigencia(contrato);
     const dias = Number(diasEl.value);
-    if (fechaFin && dias) fechaFinEl.value = sumarDias(fechaFin, dias);
-  });
-  fechaFinEl.addEventListener("input", () => {
+    if (fechaFin) fechaFinEl.value = dias > 0 ? sumarDias(fechaFin, dias) : "";
+    pintarAyudaProrroga();
+  }
+  function alCambiarFechaFin() {
+    if (tipoSel.value !== "otrosi") return;
     const { fechaFin } = calcularVigencia(contrato);
-    if (tipoSel.value === "otrosi" && fechaFin && fechaFinEl.value) diasEl.value = diasEntre(fechaFin, fechaFinEl.value);
+    if (fechaFin && fechaFinEl.value) diasEl.value = diasEntre(fechaFin, fechaFinEl.value);
+    pintarAyudaProrroga();
+  }
+  ["input", "change"].forEach((ev) => {
+    diasEl.addEventListener(ev, alCambiarDias);
+    fechaFinEl.addEventListener(ev, alCambiarFechaFin);
   });
   tipoSel.addEventListener("change", actualizarFormulario);
   fechaEl.addEventListener("input", () => { if (tipoSel.value === "reinicio") proponerFinReinicio(); });
@@ -205,12 +260,17 @@ export function iniciarNovedades({ contrato, contratoRef, puedeEditar, alCambiar
     const novedad = {
       tipo,
       fecha: fechaEl.value,
-      documento: documentoEl.value.trim(),
+      documento: leerDocumento(),
       observaciones: document.getElementById("novObservaciones").value.trim(),
       creadoEn: new Date().toISOString()
     };
     if (tipo === "otrosi" || tipo === "reinicio") novedad.fechaFinNueva = fechaFinEl.value || null;
     if (tipo === "otrosi") novedad.valorAdicional = Number(valorEl.value) || null;
+    if (!novedad.documento) {
+      mostrarAlerta("Escribe el nombre del documento.", "error");
+      documentoEl.focus();
+      return;
+    }
     if (tipo === "otrosi" && !novedad.fechaFinNueva && !novedad.valorAdicional) {
       mostrarAlerta("Indica la prórroga (días o nueva fecha de finalización) o el valor adicional.", "error");
       return;

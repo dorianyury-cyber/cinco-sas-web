@@ -17,11 +17,16 @@
         <p class="rt-migas" id="migas"></p>
         <h1 id="titulo">Proyecto</h1>
         <p class="text-muted" id="subtitulo"></p>
+        <p class="rt-ayuda-seccion" id="ayudaSeccion"></p>
       </div>
       <div class="alert" id="alerta"></div>
 
       <!-- Resumen -->
       <section class="rt-seccion" data-seccion="resumen">
+        <div class="card">
+          <div class="rt-card-cabeza"><h2>Cómo avanzar</h2><span class="text-muted" id="pasosAvance"></span></div>
+          <ol class="rt-pasos" id="pasos"></ol>
+        </div>
         <div class="rt-kpis" id="kpis"></div>
         <div class="rt-dos">
           <div class="card">
@@ -32,7 +37,7 @@
             <div class="card">
               <div class="rt-card-cabeza"><h2>Avance por literal del RETIE</h2><a href="#literales" class="rt-link">Ir a literales →</a></div>
               <div class="rt-chips" id="chipsLit"></div>
-              <div class="rt-leyenda"><span><i class="rt-chip-ok"></i>Desarrollado</span><span><i class="rt-chip-danger"></i>Con incumplimientos</span><span><i class="rt-chip-warn"></i>Pendiente</span><span><i class="rt-chip-muted"></i>No aplica</span></div>
+              <div class="rt-leyenda"><span><i class="rt-chip-ok"></i>Desarrollado</span><span><i class="rt-chip-danger"></i>Con hallazgo alto o incumplimiento</span><span><i class="rt-chip-obs"></i>Con observaciones (media o baja)</span><span><i class="rt-chip-warn"></i>Pendiente</span><span><i class="rt-chip-muted"></i>No aplica</span></div>
             </div>
             <div class="card">
               <div class="rt-card-cabeza"><h2>Entregables</h2><a href="#documentos" class="rt-link">Ir a documentos →</a></div>
@@ -67,6 +72,7 @@
             <div><label for="dAltitud">Altitud (m s. n. m.)</label><input id="dAltitud" data-p="altitud" type="number" step="any"></div>
             <div><label for="dTemp">Temperatura ambiente de diseño (°C)</label><input id="dTemp" data-p="tempAmbiente" type="number" step="any"></div>
             <div><label for="dTipo">Tipo de diseño</label><select id="dTipo" data-p="tipoDiseno"><option>Diseño detallado</option><option>Diseño básico (vivienda, pequeño comercio o pequeña industria)</option><option>Diseño básico (ramal aéreo rural ≤ 50 kVA y 13,2 kV)</option></select></div>
+            <div><label for="dAlcance">Alcance</label><select id="dAlcance" data-p="alcance"><option value="retie">Diseño eléctrico completo (literales a) a x) del RETIE)</option><option value="retilap">Solo iluminación (capítulos del RETILAP)</option></select></div>
             <div><label for="dRadicado">Código o radicado del documento</label><input id="dRadicado" data-p="radicado"></div>
             <div class="rt-solo-verif"><label for="dAutor">Diseño revisado: autor y matrícula</label><input id="dAutor" data-p="autorDiseno" placeholder="Ej. Ing. N. N., M.P. CN205-000000"></div>
             <div><label for="dDisenador" id="lblFirma">Diseñador (ingeniero responsable)</label><input id="dDisenador" data-p="disenador"></div>
@@ -81,11 +87,21 @@
       <!-- Literales -->
       <section class="rt-seccion" data-seccion="literales">
         <div class="card">
-          <div class="rt-card-cabeza"><h2>Diseño detallado según el RETIE: literales a) a x)</h2><span class="rt-estado-guardado" id="estadoLit"></span></div>
+          <div class="rt-card-cabeza"><h2 id="tituloLiterales">Diseño detallado según el RETIE: literales a) a x)</h2><span class="rt-estado-guardado" id="estadoLit"></span></div>
           <p class="text-muted" id="fuenteLiterales"></p>
-          <p class="rt-nota">Cada literal se cubre con los cálculos y/o con el desarrollo escrito. Si un literal no aplica, márquelo «No» y escriba la razón: el RETIE exige mencionarlo expresamente (parágrafo 1). Marque con «(S)» los valores supuestos: quedan listados como datos pendientes.</p>
+          <p class="rt-nota">Cada literal se cubre con los cálculos y/o con el desarrollo escrito. Si un literal no aplica, márquelo «No» y escriba la razón: el RETIE exige mencionarlo expresamente (parágrafo 1). Marque con «(S)» los valores supuestos: quedan listados como datos pendientes. Para incluir una tabla, escriba una línea «Tabla: título» y debajo una línea por fila con las celdas separadas por «|» (la primera fila es el encabezado), por ejemplo «| Zona | VEEI | Límite |».</p>
           <div class="tabla-scroll"><table class="rt-tabla-edit rt-literales" id="literales"></table></div>
           <div class="rt-acciones"><button type="button" class="btn" id="guardarLitBtn">Guardar literales</button></div>
+        </div>
+      </section>
+
+      <!-- Textos del informe -->
+      <section class="rt-seccion" data-seccion="textos">
+        <div class="card">
+          <div class="rt-card-cabeza"><h2>Textos del informe</h2><span class="rt-estado-guardado" id="estadoTextos"></span></div>
+          <p class="text-muted">Secciones que no salen de los cálculos ni de los literales. Las que deje vacías no aparecen en el documento. Separe párrafos con una línea en blanco; una línea que empieza con «-» sale como viñeta. Para una tabla: una línea «Tabla: título» y debajo una línea por fila con las celdas separadas por «|» (la primera fila es el encabezado).</p>
+          <div id="textosInforme" class="rt-textos"></div>
+          <div class="rt-acciones"><button type="button" class="btn" id="guardarTextosBtn">Guardar textos</button></div>
         </div>
       </section>
 
@@ -104,7 +120,8 @@
             <div><label for="hmValor">Lo que dice el diseño</label><input id="hmValor" maxlength="120" placeholder="Ej. 65,5 kVA (87,4 %)"></div>
             <div><label for="hmLimite">Lo que corresponde</label><input id="hmLimite" maxlength="120" placeholder="Ej. 76,0 kVA (101 %)"></div>
             <div><label for="hmNorma">Norma o referencia</label><input id="hmNorma" maxlength="160" placeholder="Ej. NTC 2050 220.44"></div>
-            <div><label for="hmLit">Literal(es)</label><input id="hmLit" maxlength="40" placeholder="Ej. c), h)"></div>
+            <div><label for="hmLit" id="lblHmLit">Literal(es)</label><input id="hmLit" maxlength="40" placeholder="Ej. c), h)"></div>
+            <div><label for="hmSev">Severidad</label><select id="hmSev"><option value="">Sin clasificar</option><option>Alta</option><option>Media</option><option>Baja</option></select></div>
             <div class="rt-ancho"><label for="hmDetalle">Detalle y acción requerida</label><textarea id="hmDetalle" rows="3" maxlength="1200"></textarea></div>
             <div class="rt-acciones"><button type="submit" class="btn">Agregar hallazgo</button></div>
           </form>
@@ -153,6 +170,14 @@
           <button type="button" class="rt-doc" id="wordBtn"><span class="rt-doc-icono">📝</span><strong>Word</strong><small>El mismo documento en formato editable.</small></button>
           <button type="button" class="rt-doc" id="excelBtn"><span class="rt-doc-icono">📊</span><strong>Excel formulado</strong><small>Un solo libro con una hoja por cálculo y fórmulas vivas: cambie un dato y Excel recalcula.</small></button>
           <button type="button" class="rt-doc" id="exportarBtn"><span class="rt-doc-icono">⬇</span><strong>Exportar proyecto</strong><small>Archivo .ahinco.json para respaldo o para importarlo en otra cuenta.</small></button>
+        </div>
+        <div class="card rt-solo-verif rt-radicar">
+          <h2>Radicar en Informes (SGC)</h2>
+          <p class="text-muted" id="estadoRadicado"></p>
+          <div class="rt-barra">
+            <button type="button" class="rt-barra-btn rt-barra-principal" id="radicarBtn">🏷 Radicar informe nuevo</button>
+            <button type="button" class="rt-barra-btn hidden" id="actualizarRadicadoBtn">↻ Actualizar el informe radicado</button>
+          </div>
         </div>
       </section>
     </main>

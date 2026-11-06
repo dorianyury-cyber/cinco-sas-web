@@ -723,7 +723,9 @@ function renderTablaEditor(bloque) {
         celdaInput.addEventListener("change", () => { bloque.filas[fi][ci] = celdaInput.value; });
       } else {
         celdaInput.rows = 1;
-        celdaInput.maxLength = 300;
+        // 300 caracteres no alcanzaban para una celda de hallazgo o de acción
+        // requerida (las importadas ya traían más, y al editarlas se cortaban).
+        celdaInput.maxLength = 1500;
         celdaInput.value = celda;
         celdaInput.placeholder = fi === 0 ? `Columna ${ci + 1}` : "";
         const autoAltura = () => { celdaInput.style.height = "auto"; celdaInput.style.height = `${celdaInput.scrollHeight}px`; };

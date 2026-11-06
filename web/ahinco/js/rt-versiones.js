@@ -13,7 +13,7 @@ const conDatos = (f) => f && Object.values(f).some((v) => !vacio(v));
 // Valor legible de un campo con opciones.
 const ver = (c, v) => (c?.opciones ? c.opciones.find((o) => String(o.valor) === String(v ?? ""))?.texto ?? texto(v) : texto(v));
 
-const CAMPOS_P = { nombre: "Nombre", modo: "Tipo de proyecto", cliente: "Cliente", ubicacion: "Ubicación", altitud: "Altitud", tempAmbiente: "Temperatura ambiente", tipoDiseno: "Tipo de diseño", descripcion: "Descripción", autorDiseno: "Diseño revisado", documentosRevisados: "Documentos revisados", disenador: "Diseñador", matricula: "Matrícula", radicado: "Radicado" };
+const CAMPOS_P = { nombre: "Nombre", modo: "Tipo de proyecto", cliente: "Cliente", ubicacion: "Ubicación", altitud: "Altitud", tempAmbiente: "Temperatura ambiente", tipoDiseno: "Tipo de diseño", alcance: "Alcance", descripcion: "Descripción", autorDiseno: "Diseño revisado", documentosRevisados: "Documentos revisados", disenador: "Diseñador", matricula: "Matrícula", radicado: "Radicado" };
 
 // a y b: { proyecto, calculos: { clave: { entradas, etiqueta } } }. hallazgosDe(proyecto, calculos) → [{ calculo, criterio, valor, ... }]
 export function compararVersiones(a, b, { hallazgosDe } = {}) {
@@ -25,6 +25,9 @@ export function compararVersiones(a, b, { hallazgosDe } = {}) {
     if (!igual(x.aplica || "Sí", y.aplica || "Sí")) res.literales.push({ literal: l, cambio: `Aplica: ${x.aplica || "Sí"} → ${y.aplica || "Sí"}` });
     if (!igual((x.texto || "").trim(), (y.texto || "").trim())) res.literales.push({ literal: l, cambio: "Texto del desarrollo modificado" });
   }
+  // Textos libres del informe (objeto, concepto, etc.): se muestran recortados.
+  const ta = a.proyecto?.textos || {}, tb = b.proyecto?.textos || {}, corto = (v) => (vacio((v || "").trim()) ? "—" : String(v).trim().slice(0, 90) + (String(v).trim().length > 90 ? "…" : ""));
+  for (const k of [...new Set([...Object.keys(ta), ...Object.keys(tb)])].sort()) if (!igual((ta[k] || "").trim(), (tb[k] || "").trim())) res.proyecto.push({ campo: `Texto del informe: ${k}`, antes: corto(ta[k]), despues: corto(tb[k]) });
   const ca = a.calculos || {}, cb = b.calculos || {};
   for (const k of Object.keys(cb)) if (!ca[k]) res.agregados.push(tituloDe(k, cb[k]));
   for (const k of Object.keys(ca)) if (!cb[k]) res.quitados.push(tituloDe(k, ca[k]));

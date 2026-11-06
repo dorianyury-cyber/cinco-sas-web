@@ -1,0 +1,52 @@
+<!doctype html>
+<html lang="es" class="rt-preparando">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<meta name="robots" content="noindex, nofollow">
+<title>Cómo usar AHÍNCO</title>
+<link rel="icon" type="image/png" sizes="32x32" href="../assets/img/favicon-32.png">
+<link rel="stylesheet" href="../interventoria-pro/assets/ip.css">
+<link rel="stylesheet" href="assets/rt.css">
+</head>
+<body>
+  <div class="app-shell">
+    <aside class="sidebar rt-sidebar" id="sidebar"></aside>
+    <main class="main rt-main">
+      <div class="rt-encabezado">
+        <h1>Cómo usar AHÍNCO</h1>
+        <p class="text-muted">AHÍNCO sirve para dos trabajos distintos: <strong>diseñar</strong> una instalación (Cinco firma la memoria) o <strong>verificar</strong> el diseño de otro (Cinco emite un informe con hallazgos). Abajo está el paso a paso de cada uno y qué hace cada opción.</p>
+      </div>
+      <div class="rt-dos rt-dos-igual">
+        <div class="card">
+          <h2>📐 Para diseñar</h2>
+          <ol class="rt-guia-pasos">
+            <li><strong>Nuevo proyecto → Diseño.</strong> Escriba el nombre, el cliente y la ubicación.</li>
+            <li><strong>Datos del proyecto.</strong> Complete el diseñador y la matrícula: firman la memoria.</li>
+            <li><strong>＋ Agregar cálculo.</strong> Elija cada cálculo del catálogo y llene sus datos; AHÍNCO verifica contra la norma.</li>
+            <li><strong>Literales a) a x).</strong> Escriba lo que los cálculos no cubren; si un literal no aplica, márquelo «No» y diga por qué.</li>
+            <li><strong>Pendientes por corregir.</strong> Ajuste los cálculos hasta que no quede ninguno.</li>
+            <li><strong>Documentos.</strong> Vea la memoria y descárguela en PDF, Word y Excel.</li>
+          </ol>
+        </div>
+        <div class="card">
+          <h2>🔎 Para verificar el diseño de otro</h2>
+          <ol class="rt-guia-pasos">
+            <li><strong>Nuevo proyecto → Verificación</strong>, o <strong>Cargar archivo .ahinco.json</strong> si la verificación ya viene armada.</li>
+            <li><strong>Datos del proyecto.</strong> Autor y matrícula del diseño revisado, documentos revisados (memoria, planos, versión) e interventor que firma.</li>
+            <li><strong>Hallazgos.</strong> Agregue a mano lo que encuentre en la memoria y los planos. Si quiere que AHÍNCO revise las cifras, cargue los cálculos del diseñador con «＋ Agregar cálculo»: lo que no cumpla aparece solo.</li>
+            <li><strong>Literales a) a x).</strong> Comente cada literal: qué presentó el diseñador y qué falta.</li>
+            <li><strong>Documentos.</strong> Descargue el informe de verificación en PDF o Word y envíelo al diseñador.</li>
+            <li><strong>Nueva entrega del diseñador.</strong> En Versiones, guarde una versión, actualice el proyecto y compare qué hallazgos se cerraron.</li>
+          </ol>
+        </div>
+      </div>
+      <div class="card">
+        <h2>Qué hace cada opción</h2>
+        <div id="opciones"></div>
+      </div>
+    </main>
+  </div>
+  <script type="module" src="js/rt-guia.js"></script>
+</body>
+</html>

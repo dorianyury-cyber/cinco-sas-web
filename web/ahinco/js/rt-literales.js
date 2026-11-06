@@ -18,7 +18,7 @@ export const TIPOS_DISENO = [
 // «Diseño simplificado» (RETIE 2013) se lee como el diseño básico del caso a.
 export const normalizarTipoDiseno = (t) => (/simplificado/i.test(t || "") ? TIPOS_DISENO[1].valor : t || "Diseño detallado");
 export const tipoDisenoDe = (t) => TIPOS_DISENO.find((x) => x.valor === normalizarTipoDiseno(t));
-export const exigido = (tipo, l) => { const x = tipoDisenoDe(tipo); return !x?.exigidos || x.exigidos.includes(l); };
+export const exigido = (tipo, l) => { if (/^R\d/.test(l)) return true; const x = tipoDisenoDe(tipo); return !x?.exigidos || x.exigidos.includes(l); };
 
 export const LITERALES = [
   { l: "a", texto: "Análisis de riesgos de origen eléctrico y medidas para mitigarlos.", modulos: ["riesgoElectrico"], guia: "Describa los factores de riesgo potenciales o presentes (contacto directo e indirecto, arco, sobretensiones, incendio) y las medidas adoptadas para minimizarlos (parágrafo 3)." },
@@ -47,9 +47,65 @@ export const LITERALES = [
   { l: "x", texto: "Selección, cálculo y especificación de equipos de generación de energía convencionales y no convencionales.", modulos: ["fvArreglo", "fvProduccion", "fvConexion"], guia: "Para sistemas fotovoltaicos (AGPE o GD) use los cálculos del área «Generación solar fotovoltaica». Para plantas diésel o de otro tipo, desarrolle la selección como texto." }
 ];
 
-// Estado de un literal con los cálculos (resultados por clave, con r.modulo)
-// y lo que escribió el diseñador.
-export function estadoLiteral(lit, dato, resultados, tipoDiseno) {
+// Revisión de solo iluminación (proyecto.alcance = "retilap"): en vez de los
+// 24 literales del RETIE, el proyecto se organiza por capítulos del RETILAP
+// (Libro 3 de la Res. 40286 de 2026). Los hallazgos los citan como «R7» o
+// «R2, R10», igual que citan «e), h)» en una revisión RETIE.
+export const FUENTE_RETILAP = "RETILAP 2024 (Anexo General de la Res. 40150 de 2024, modificado por las Res. 40318 de 2025 y 40286 de 2026), Libro 3";
+export const CAPITULOS_RETILAP = [
+  { l: "R1", texto: "Análisis del proyecto y contenido documental del diseño.", ref: "3.1.4.1 a 3.1.4.3", modulos: [], guia: "Análisis del proyecto, memoria con resultados de software, plano con mallas, valores, alturas y cuadro de cantidades, declaración de cumplimiento y coherencia del expediente." },
+  { l: "R2", texto: "Fuentes, luminarias y fichas técnicas.", ref: "3.1.3.1 y 3.1.3.2", modulos: [], guia: "Fichas y fotometrías del fabricante, flujo nominal usado en el cálculo, tensión, IP, IK, vida útil y certificados." },
+  { l: "R3", texto: "Reflectancias y modelo de cálculo.", ref: "3.2.1.1 a 3.2.1.3", modulos: [], guia: "Reflectancias documentadas de techo, paredes y piso; alturas del plano de trabajo y mallas." },
+  { l: "R4", texto: "Niveles de iluminación y uniformidad por recinto.", ref: "3.2.2 y Tabla 3.2.2.6.a", modulos: ["iluminacion"], guia: "Em y Uo de cada recinto frente a la Tabla 3.2.2.6.a, con su referencia." },
+  { l: "R5", texto: "Deslumbramiento (UGR) y luminancias.", ref: "3.2.1.4 y 3.2.1.8", modulos: [], guia: "UGR en cada puesto o posición crítica y límites de luminancia para pantallas." },
+  { l: "R6", texto: "Eficiencia energética (VEEI).", ref: "Art. 3.2.5 y Tabla 3.2.5.a", modulos: [], guia: "VEEI de cada recinto con toda la potencia instalada frente a la Tabla 3.2.5.a." },
+  { l: "R7", texto: "Iluminación de emergencia.", ref: "Art. 3.2.4 y Tabla 3.2.4.5.a", modulos: [], guia: "Rutas, zonas de énfasis, antipánico, baños, tableros, autonomía, mallas y alimentación de los equipos." },
+  { l: "R8", texto: "Factor y programa de mantenimiento.", ref: "3.2.1.10 (ISO/CIE TS 22012)", modulos: [], guia: "Factor de mantenimiento por equipo y entorno, y programa de mantenimiento." },
+  { l: "R9", texto: "Control del alumbrado.", ref: "Art. 3.2.6 y 3.2.2.7", modulos: [], guia: "Sensores, temporización, grupos y zonas de control." },
+  { l: "R10", texto: "Coordinación con el diseño eléctrico.", ref: "3.1.4.3 num. 3; NTC 2050", modulos: [], guia: "Potencia de iluminación frente al cuadro de cargas, circuitos, protecciones y tensión de los equipos." }
+];
+export const esRetilap = (p) => p?.alcance === "retilap";
+export const ALCANCES = [
+  { valor: "retie", texto: "Diseño eléctrico completo (literales a) a x) del RETIE)" },
+  { valor: "retilap", texto: "Solo iluminación (capítulos del RETILAP)" }
+];
+// Esquema con el que se organiza el proyecto: literales del RETIE o capítulos del RETILAP.
+export function esquemaDe(p) {
+  return esRetilap(p)
+    ? { items: CAPITULOS_RETILAP, fuente: FUENTE_RETILAP, nombre: "Capítulos RETILAP", singular: "capítulo", plural: "capítulos", cod: (l) => l.l, col: "Cap.", titulo: "Revisión por capítulos del RETILAP", tituloTabla: "Alcance de la revisión por capítulo del RETILAP", ayudaCita: "Ej. R7, R10" }
+    : { items: LITERALES, fuente: FUENTE_LITERALES, nombre: "Literales a) a x)", singular: "literal", plural: "literales", cod: (l) => `${l.l})`, col: "Lit.", titulo: "Desarrollo según los literales a) a x) del RETIE 2024 (numeral 3.3.1.1)", tituloTabla: "Alcance de la memoria por literal del RETIE", ayudaCita: "Ej. c), h)" };
+}
+
+// Textos libres del informe (proyecto.textos[clave]): secciones que no salen
+// de los cálculos ni de los literales. Las vacías no aparecen en el documento.
+// lugar: dónde van en el documento (inicio, normas, hallazgos, cierre).
+export const TEXTOS_INFORME = {
+  verificacion: [
+    { clave: "objeto", titulo: "Objeto y alcance de la revisión", lugar: "inicio", guia: "Qué se revisó, para quién y con qué propósito; qué queda por fuera del alcance." },
+    { clave: "metodologia", titulo: "Metodología", lugar: "normas", guia: "Cómo se revisó: lectura de memoria y planos, recálculo de cifras, cruce memoria-planos, visita, etc." },
+    { clave: "marco", titulo: "Marco normativo adicional", lugar: "normas", guia: "Normas propias de este proyecto que no están en la tabla general (RETILAP, normas del operador de red, NTC específicas)." },
+    { clave: "conformes", titulo: "Aspectos conformes", lugar: "hallazgos", guia: "Lo que el diseño resuelve bien: así el diseñador sabe qué no tocar." },
+    { clave: "concepto", titulo: "Concepto de la revisión", lugar: "cierre", guia: "Conclusión de la interventoría: aprobado, aprobado con observaciones o no aprobado, y qué se requiere para cerrar." },
+    { clave: "limitaciones", titulo: "Limitaciones", lugar: "cierre", guia: "Supuestos de la revisión, documentos que no se recibieron, información verbal, etc." }
+  ],
+  diseno: [
+    { clave: "objeto", titulo: "Objeto y alcance", lugar: "inicio", guia: "Qué cubre el diseño y qué queda por fuera." },
+    { clave: "metodologia", titulo: "Criterios de diseño", lugar: "normas", guia: "Criterios generales adoptados (cargabilidad, regulación, reservas, etc.)." },
+    { clave: "marco", titulo: "Marco normativo adicional", lugar: "normas", guia: "Normas propias de este proyecto que no están en la tabla general." },
+    { clave: "concepto", titulo: "Conclusiones del diseñador", lugar: "cierre", guia: "Conclusiones generales del diseño." },
+    { clave: "limitaciones", titulo: "Limitaciones y supuestos", lugar: "cierre", guia: "Información pendiente, supuestos y condiciones para la construcción." }
+  ]
+};
+export const textosDe = (verif) => TEXTOS_INFORME[verif ? "verificacion" : "diseno"];
+
+// Letras de literal citadas en un texto como «e), h), m)».
+// También reconoce los capítulos del RETILAP: «R7, R10».
+export const letrasLiteral = (t) => [...new Set([...String(t || "").matchAll(/\b([a-x])\)|\b(R\d{1,2})\b/g)].map((m) => m[1] || m[2]))];
+
+// Estado de un literal con los cálculos (resultados por clave, con r.modulo),
+// lo que escribió el diseñador y los hallazgos que lo citan: un literal con
+// hallazgos no sale «Desarrollado» aunque tenga texto.
+export function estadoLiteral(lit, dato, resultados, tipoDiseno, hall = []) {
   const aplica = dato?.aplica !== "No";
   const texto = (dato?.texto || "").trim();
   const mods = Object.values(resultados).filter((r) => lit.modulos.includes(r.modulo) && !r.sinDatos); // un cálculo sin datos no desarrolla el literal
@@ -57,6 +113,15 @@ export function estadoLiteral(lit, dato, resultados, tipoDiseno) {
   if (!aplica) return texto ? { texto: "No aplica (justificado)", clase: "muted" } : { texto: "No aplica sin justificación", clase: "danger" };
   if (lit.modulos.length && !mods.length && !texto) return { texto: "Pendiente", clase: "warn" };
   if (!lit.modulos.length && !texto) return { texto: "Pendiente", clase: "warn" };
+  // Color según el hallazgo más grave: rojo si alguno es de severidad alta (o no
+  // la tiene, como los que detectan los cálculos); ámbar si solo hay medias o bajas.
+  const citan = hall.filter((h) => letrasLiteral(h.literales).includes(lit.l));
+  if (citan.length) {
+    const codigos = citan.map((h) => h.codigo).join(", ");
+    return citan.some((h) => !["Media", "Baja"].includes(h.severidad))
+      ? { texto: `Con hallazgo alto (${codigos})`, clase: "danger", hallazgos: citan.map((h) => h.codigo) }
+      : { texto: `Con observaciones (${codigos})`, clase: "obs", hallazgos: citan.map((h) => h.codigo) };
+  }
   const fallan = mods.some((r) => (r.verificaciones || []).some((v) => v.cumple === false));
   return fallan ? { texto: "Con incumplimientos", clase: "danger" } : { texto: "Desarrollado", clase: "ok" };
 }
