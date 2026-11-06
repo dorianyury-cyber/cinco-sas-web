@@ -191,19 +191,21 @@ export function iniciarNovedades({ contrato, contratoRef, puedeEditar, alCambiar
     const v = calcularVigencia(contrato);
     const finInicial = contrato.fechaFinOriginal !== undefined ? contrato.fechaFinOriginal : contrato.fechaFin;
     const valorInicial = contrato.valorOriginal !== undefined ? contrato.valorOriginal : contrato.valorContrato;
-    const dato = (etq, val) => `<div><span>${etq}</span><strong>${val}</strong></div>`;
+    const dato = (etq, val, clase = "") => `<div class="${clase}"><span>${etq}</span><strong>${val}</strong></div>`;
     resumenEl.innerHTML = [
       dato("Fin inicial", finInicial || "—"),
       dato("Fin vigente", v.fechaFin || "—"),
       dato("Prórroga total", finInicial && v.fechaFin ? `${diasEntre(finInicial, v.fechaFin)} días` : "—"),
+      valorInicial !== v.valor ? dato("Valor inicial", valorInicial ? formatoMoneda.format(valorInicial) : "—") : "",
       dato("Valor vigente", v.valor ? formatoMoneda.format(v.valor) : "—"),
-      v.suspendidoDesde ? dato("Estado", `Suspendido desde ${v.suspendidoDesde}`) : ""
+      v.suspendidoDesde ? dato("Estado", `Suspendido desde ${v.suspendidoDesde}`, "control-nov-suspendido") : ""
     ].join("");
 
     tbody.innerHTML = "";
     let suspendidoDesde = null;
     const lista = ordenadas(contrato.novedades);
     sinNovedades.classList.toggle("oculto", lista.length > 0);
+    tbody.closest(".control-tabla-wrap").classList.toggle("oculto", lista.length === 0);
     lista.forEach((n) => {
       const tr = document.createElement("tr");
       [n.fecha, TIPOS_NOVEDAD[n.tipo] || n.tipo, n.documento || "—", efectoNovedad(n, suspendidoDesde), n.observaciones || ""].forEach((t) => {
