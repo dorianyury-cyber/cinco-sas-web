@@ -133,7 +133,8 @@ function filtrosEnBotones(raiz) {
       grupo.setAttribute("role", "group");
       // Título corto del grupo («Estados», «Tipos») a partir del primer desplegable «Todos los estados», salvo si ya está dentro de una etiqueta.
       const m = !sel.closest("label") && /^(todos|todas) (los|las) (.+)$/i.exec(opciones[0].textContent.trim());
-      if (m) { const t = document.createElement("span"); t.className = "ctl-chips-titulo"; t.textContent = m[3].charAt(0).toUpperCase() + m[3].slice(1); grupo.appendChild(t); }
+      // En singular («Estado:», «Tipo:»): se lee como la pregunta que responde el filtro.
+      if (m) { const t = document.createElement("span"); t.className = "ctl-chips-titulo"; const s = m[3].replace(/s$/i, ""); t.textContent = `${s.charAt(0).toUpperCase() + s.slice(1)}:`; grupo.appendChild(t); }
       const botones = opciones.map((op) => {
         const b = document.createElement("button");
         b.type = "button";
@@ -237,7 +238,16 @@ function armarBarraAcciones(cabecera) {
     // Sigue la visibilidad del desplegable (oculto para quien no es gestor).
     movidos.push({ el: boton, marcador, sigue: detallesNuevo });
   }
-  if (filtros) mover(filtros);
+  if (filtros) {
+    // Tarjeta con título "Filtros" para que se entienda de un vistazo qué
+    // hacen el buscador y los botones de estado/tipo (pedido 2026-11-06).
+    filtros.classList.add("ctl-filtros-tarjeta");
+    const titulo = document.createElement("span");
+    titulo.className = "ctl-filtros-titulo";
+    titulo.textContent = "Filtros";
+    filtros.prepend(titulo);
+    mover(filtros);
+  }
   if (document.body.classList.contains("ctl-con-menu")) { filtrosEnBotones(filtros); contadorDeRegistros(interior); }
 
   // Un elemento movido se oculta en la barra si su lugar original quedó

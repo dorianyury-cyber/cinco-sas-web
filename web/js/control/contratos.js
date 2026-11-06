@@ -215,11 +215,6 @@ function pintarVistaPreviaContrato() {
 
   const accionesEl = document.getElementById("contratoVpAcciones");
   accionesEl.appendChild(botonOfertas({ contratoId: c.id, cliente: c.cliente, referencia: c.codigo, contratoCodigo: c.codigo }));
-  const btnAbrir = document.createElement("a");
-  btnAbrir.className = "control-btn-mini";
-  btnAbrir.href = `contrato.html?id=${c.id}`;
-  btnAbrir.textContent = "Abrir contrato →";
-  accionesEl.appendChild(btnAbrir);
 }
 
 requireAuth(async (user) => {

@@ -2810,3 +2810,41 @@ body.app-control .control-vista-previa .control-vp-valor::before { content: none
 /* "👁 Ver" (visualizador de Informes): resaltado como la acción principal de la tarjeta. */
 .control-btn-mini.control-btn-ver { background: var(--cinco-amber); border-color: var(--cinco-amber); color: #1f2732; font-weight: 700; }
 .control-btn-mini.control-btn-ver:hover { filter: brightness(1.05); }
+
+/* ---- Barra de filtros como tarjeta con título "Filtros" (todas las
+   páginas): buscador + grupos "Estado:", "Tipo:" separados por una línea
+   fina, para que se entienda qué hace cada botón. ---- */
+body.app-control .control-barra-acciones .ctl-filtros-tarjeta {
+  display: flex; flex-wrap: wrap; align-items: center; gap: 6px 12px;
+  padding: 5px 10px; border: 1px solid var(--border); border-radius: 10px; background: var(--bg);
+}
+.ctl-filtros-titulo {
+  display: inline-flex; align-items: center; gap: 6px; flex: none;
+  padding-right: 10px; border-right: 1px solid var(--border);
+  font-size: 10.5px; font-weight: 800; letter-spacing: 0.12em; text-transform: uppercase; color: var(--cinco-amber-dark);
+}
+.ctl-filtros-titulo::before {
+  content: ""; width: 11px; height: 11px; background: currentColor;
+  clip-path: polygon(0 0, 100% 0, 62% 48%, 62% 100%, 38% 84%, 38% 48%);
+}
+.ctl-filtros-tarjeta .ctl-chips { padding-left: 12px; border-left: 1px solid var(--border); }
+body.app-control .ctl-filtros-tarjeta .ctl-chips-titulo { text-transform: none; letter-spacing: 0; font-size: 12px; font-weight: 700; color: var(--text-muted); margin-right: 4px; }
+
+/* ---- Tarjeta de detalle (vista previa sobre la lista) — más baja y más
+   limpia: los datos de cada grupo en columnas (máx. 2 filas en vez de una
+   fila por dato), título del grupo con punto de color en vez de raya, y un
+   tinte muy suave del color del grupo de fondo. ---- */
+body.app-control .control-vista-previa .control-vp-grupo {
+  background: linear-gradient(180deg, color-mix(in srgb, var(--pc) 7%, transparent) 0%, transparent 70%), var(--card-bg);
+  border-left-width: 3px;
+}
+body.app-control .control-vista-previa .control-vp-grupo-titulo {
+  display: flex; align-items: center; gap: 6px; border-bottom: none; padding-bottom: 0; margin-bottom: 3px;
+}
+body.app-control .control-vista-previa .control-vp-grupo-titulo::before {
+  content: ""; width: 6px; height: 6px; border-radius: 50%; background: var(--pc); flex: none;
+}
+body.app-control .control-vista-previa .control-vp-grupo-campos {
+  display: grid; grid-template-columns: repeat(auto-fill, minmax(135px, 1fr)); gap: 1px 14px;
+}
+body.app-control .control-barra-acciones .ctl-filtros-tarjeta input[type="text"] { flex: 1 1 170px; min-width: 140px; }
