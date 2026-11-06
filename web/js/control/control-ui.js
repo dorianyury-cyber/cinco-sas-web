@@ -340,6 +340,52 @@ function marcarCamposLargos() {
   });
 }
 
+// <select data-segmentado>: en vez de la lista desplegable nativa (que
+// Windows dibuja aparte y en tema oscuro perdía el texto), todas las
+// opciones como botones segmentados a la vista. El <select> queda oculto
+// como fuente del valor: la página lo sigue leyendo y asignando igual
+// (Editar, Duplicar, importar JSON), y el botón activo se actualiza solo
+// porque se intercepta el setter de "value" de ese <select>.
+function selectsSegmentados() {
+  document.querySelectorAll("select[data-segmentado]").forEach((sel) => {
+    const grupo = document.createElement("div");
+    grupo.className = "control-segmentado";
+    grupo.setAttribute("role", "radiogroup");
+    const botones = Array.from(sel.options).map((op) => {
+      const b = document.createElement("button");
+      b.type = "button";
+      b.textContent = op.textContent;
+      b.dataset.valor = op.value;
+      b.setAttribute("role", "radio");
+      b.addEventListener("click", () => {
+        if (sel.value === op.value) return;
+        sel.value = op.value;
+        sel.dispatchEvent(new Event("change", { bubbles: true }));
+      });
+      grupo.appendChild(b);
+      return b;
+    });
+    const marcar = () => botones.forEach((b) => {
+      const activo = b.dataset.valor === sel.value;
+      b.classList.toggle("activo", activo);
+      b.setAttribute("aria-checked", activo);
+    });
+    const desc = Object.getOwnPropertyDescriptor(HTMLSelectElement.prototype, "value");
+    Object.defineProperty(sel, "value", {
+      configurable: true,
+      get() { return desc.get.call(this); },
+      set(v) { desc.set.call(this, v); marcar(); },
+    });
+    sel.addEventListener("change", marcar);
+    sel.form?.addEventListener("reset", () => setTimeout(marcar));
+    document.querySelector(`label[for="${sel.id}"]`)?.removeAttribute("for");
+    sel.hidden = true;
+    sel.after(grupo);
+    marcar();
+  });
+}
+selectsSegmentados();
+
 const cabecera = armarCabeceraFija(armarMenuLateral());
 armarBarraAcciones(cabecera);
 publicarAltoCabecera(cabecera);

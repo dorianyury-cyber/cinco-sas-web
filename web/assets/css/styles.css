@@ -2863,3 +2863,24 @@ body.app-control .control-vista-previa .control-vp-grupo-campos { display: flex;
 body.app-control .control-vista-previa .control-vp-campo { max-width: 100%; }
 body.app-control .control-vista-previa .control-vp-campo-largo { flex: 1 1 100%; }
 body.app-control .control-vista-previa .control-vp-campo:not(.control-vp-campo-largo) { display: inline-flex; align-items: baseline; gap: 6px; flex: 0 1 auto; }
+
+/* Listas desplegables nativas: el navegador dibuja la lista abierta con el
+   esquema de color que le declare la página — sin esto, en tema oscuro
+   salía con colores/márgenes del tema claro y se perdía el texto. */
+:root[data-theme="dark"] { color-scheme: dark; }
+:root[data-theme="light"] { color-scheme: light; }
+@media (prefers-color-scheme: dark) { :root:not([data-theme]) { color-scheme: dark; } }
+select option, select optgroup { background-color: var(--card-bg); color: var(--text); }
+
+/* <select data-segmentado> (control-ui.js): opciones como botones a la vista. */
+.control-segmentado { display: flex; flex-wrap: wrap; gap: 6px; margin: 2px 0 4px; }
+.control-segmentado button {
+  padding: 5px 13px; border: 1px solid var(--border); border-radius: 999px;
+  background: var(--card-bg); color: var(--text); font: inherit; font-size: 12.5px; font-weight: 600; line-height: 1.4;
+  cursor: pointer; transition: border-color 0.15s, background 0.15s;
+}
+.control-segmentado button:hover { border-color: var(--cinco-amber); }
+.control-segmentado button.activo { background: var(--cinco-amber); border-color: var(--cinco-amber); color: #1b1b1b; box-shadow: 0 1px 3px rgba(0, 0, 0, 0.18); }
+.control-segmentado button:focus-visible { outline: 2px solid var(--cinco-amber-dark); outline-offset: 1px; }
+form.pqr-form .control-segmentado button,
+body.ctl-con-menu form.pqr-form .control-segmentado button { width: auto; margin: 0; padding: 5px 13px; font-size: 12.5px; text-transform: none; letter-spacing: 0; min-height: 0; }
