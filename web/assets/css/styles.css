@@ -2782,3 +2782,28 @@ body.app-control .ctl-main #contratoCliente { margin-top: 5px; font-size: 12.5px
 /* Botones de la barra superior desactivados (ej. "Abrir contrato" sin
    ninguno seleccionado). */
 body.app-control .control-btn-nuevo:disabled { opacity: 0.45; cursor: not-allowed; }
+
+/* ---- Compactación general del módulo (pedido del usuario 2026-11-06:
+   "compacto donde se pueda") — mismo criterio aprobado en Copropiedad
+   Saludable: tarjeta de detalle con cada dato como "ETIQUETA: valor" en
+   una sola línea (sin viñetas), menos relleno en tarjetas y títulos. La
+   ficha del contrato (.control-campo/.control-cabecera) tiene su propia
+   compactación más arriba y se excluye aquí. ---- */
+body.app-control .ctl-main .page-banner { padding: 0 0 4px; }
+body.app-control .ctl-main .page-banner h1 { font-size: 20px; }
+body.app-control .ctl-main .page-banner p { font-size: 12px; margin-top: 0; }
+body.app-control .ctl-main .card:not(.control-campo):not(.control-cabecera) { padding: 14px 16px; margin-bottom: 10px; }
+
+body.app-control .control-vista-previa { padding: 8px 12px; gap: 6px; margin-bottom: 8px; }
+body.app-control .control-vista-previa .control-vp-titulo { font-size: 14.5px; line-height: 1.3; }
+body.app-control .control-vista-previa .control-vp-grupos { gap: 6px; }
+body.app-control .control-vista-previa .control-vp-grupo { padding: 5px 10px 6px; border-left-width: 4px; border-radius: 8px; box-shadow: 0 1px 4px rgba(0, 0, 0, 0.06); }
+body.app-control .control-vista-previa .control-vp-grupo-titulo { padding-bottom: 2px; margin-bottom: 3px; font-size: 10px; }
+body.app-control .control-vista-previa .control-vp-campo {
+  display: grid; grid-template-columns: auto minmax(0, 1fr); column-gap: 6px; align-items: baseline;
+  padding: 1px 0; border-bottom: none;
+}
+body.app-control .control-vista-previa .control-vp-etiqueta { display: inline; font-size: 9.5px; white-space: nowrap; }
+body.app-control .control-vista-previa .control-vp-etiqueta::after { content: ":"; }
+body.app-control .control-vista-previa .control-vp-valor { display: inline; padding-left: 0; font-size: 12.5px; }
+body.app-control .control-vista-previa .control-vp-valor::before { content: none; }
