@@ -72,7 +72,7 @@ function pintarLista() {
         <li data-id="${esc(c.id)}" class="${c.id === actual ? "activa" : ""}">
           <span class="selector-contrato-fila">
             <strong class="selector-contrato-codigo">${esc(c.codigo || "(sin código)")}</strong>
-            ${c.estado === "cerrado" ? '<span class="selector-contrato-estado">Cerrado</span>' : ""}
+            ${c.estado === "cerrado" || c.estado === "suspendido" ? `<span class="selector-contrato-estado">${c.estado === "cerrado" ? "Cerrado" : "Suspendido"}</span>` : ""}
           </span>
           <span class="selector-contrato-nombre">${esc(c.nombre || "—")}</span>
           ${c.cliente ? `<span class="text-muted">${esc(c.cliente)}</span>` : ""}

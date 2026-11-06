@@ -35,7 +35,10 @@ function calcular({ contratos, ofertas, documentos, ordenes, informes, cartas, e
       if (c.tipo === "obra") resumen.obra++; else resumen.servicio++;
       resumen.valor += Number(c.valorContrato) || 0;
       const fin = aFecha(c.fechaFin);
+      // Suspendido: el plazo está detenido (se corre al registrar el acta
+      // de reinicio, ver novedades-contrato.js) — no se avisa como vencido.
       if (!fin) sinFecha++;
+      else if (c.estado === "suspendido") { /* sin aviso de vencimiento */ }
       else {
         const d = diasEntre(fin, HOY);
         if (d <= 90) porVencer.push({ c, fin, d });

@@ -2631,3 +2631,27 @@ body.app-control .ctl-main #contratoCliente { margin-top: 5px; font-size: 12.5px
   .control-item.control-item-doc { padding-left: 4px; }
   .control-item-doc .control-doc-nombre { grid-column: 1 / -1; }
 }
+
+/* ---- Novedades contractuales (contrato.html → "Prórrogas y suspensiones"):
+   más ancho que .modal-ancho para que la tabla del historial quepa en una
+   línea por novedad; resumen en fichas chicas Etiqueta/valor arriba. ---- */
+.modal-novedades { max-width: 860px; }
+.control-nov-resumen { display: flex; flex-wrap: wrap; gap: 8px; margin: 0 0 12px; }
+.control-nov-resumen > div {
+  display: flex; flex-direction: column; gap: 2px;
+  padding: 6px 10px; border: 1px solid var(--border); border-radius: 8px; background: var(--bg);
+}
+.control-nov-resumen span { font-size: 10.5px; text-transform: uppercase; letter-spacing: 0.4px; color: var(--text-muted); }
+.control-nov-resumen strong { font-size: 13px; color: var(--text); }
+.control-nov-tabla { table-layout: fixed; width: 100%; }
+.control-nov-tabla td:nth-child(4) { white-space: normal; }
+.control-nov-ayuda { font-size: 12px; margin: 6px 0 0; }
+.control-nov-nota { font-size: 11px; font-weight: 600; color: var(--cinco-amber-dark); }
+.control-nov-nota.suspendido { color: #b23434; }
+@media (prefers-color-scheme: dark) {
+  :root:not([data-theme]) .control-nov-nota.suspendido { color: #ff8a8a; }
+}
+:root[data-theme="dark"] .control-nov-nota.suspendido { color: #ff8a8a; }
+@media (max-width: 600px) {
+  .modal-novedades form.modal-form-grid { grid-template-columns: minmax(0, 1fr); }
+}
