@@ -2779,3 +2779,6 @@ body.app-control .ctl-main #contratoCliente { margin-top: 5px; font-size: 12.5px
 .control-fase { padding-top: 8px; margin-top: 8px; }
 .control-fase[open] summary { margin-bottom: 4px; }
 .card.control-campo .control-informes-ayuda { margin: 4px 0 6px; }
+/* Botones de la barra superior desactivados (ej. "Abrir contrato" sin
+   ninguno seleccionado). */
+body.app-control .control-btn-nuevo:disabled { opacity: 0.45; cursor: not-allowed; }

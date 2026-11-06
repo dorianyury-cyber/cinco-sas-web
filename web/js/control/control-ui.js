@@ -198,6 +198,13 @@ function armarBarraAcciones(cabecera) {
     movidos.push({ el, marcador });
   }
 
+  // Acciones principales de la página marcadas con .control-accion-barra
+  // (ej. "Abrir contrato" en Contratos): van a la barra antes del botón
+  // "Nuevo", con su misma estética.
+  Array.from(contenedorPagina.querySelectorAll(".control-accion-barra"))
+    .filter(fueraDeModalYFormulario)
+    .forEach((el) => { el.classList.add("control-btn-nuevo"); mover(el); });
+
   if (botonNuevo) {
     botonNuevo.classList.add("control-btn-nuevo");
     mover(botonNuevo);

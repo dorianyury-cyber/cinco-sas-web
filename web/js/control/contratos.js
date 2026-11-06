@@ -137,6 +137,8 @@ function aplicarFiltroContratos() {
       actualizarResaltadoContrato();
       pintarVistaPreviaContrato();
     });
+    fila.addEventListener("dblclick", () => abrirContrato(c.id));
+    fila.title = "Doble clic para abrir el contrato";
     lista.appendChild(fila);
   });
   actualizarResaltadoContrato();
@@ -152,8 +154,17 @@ function actualizarResaltadoContrato() {
   });
 }
 
+// "Abrir contrato" de la barra superior (antes solo estaba, poco visible,
+// dentro de la tarjeta de detalle): abre el contrato seleccionado y dice
+// cuál es, para no tener que buscarlo con la vista.
+const abrirContratoBtn = document.getElementById("abrirContratoBtn");
+const abrirContrato = (id) => { if (id) window.location.href = `contrato.html?id=${id}`; };
+abrirContratoBtn.addEventListener("click", () => abrirContrato(contratoSeleccionadoId));
+
 function pintarVistaPreviaContrato() {
   const c = contratosListaActual.find((x) => x.id === contratoSeleccionadoId);
+  abrirContratoBtn.disabled = !c;
+  abrirContratoBtn.textContent = c?.codigo ? `Abrir ${c.codigo} →` : "Abrir contrato →";
   if (!c) {
     vistaPreviaEl.innerHTML = `<p class="text-muted" style="margin:0;">${contratosListaCompleta.length === 0 ? "Todavía no hay contratos registrados." : "Ningún contrato coincide con el filtro."}</p>`;
     return;
