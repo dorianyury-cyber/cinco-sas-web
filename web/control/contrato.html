@@ -200,7 +200,10 @@
            vigentes del contrato (ver novedades-contrato.js). -->
       <div class="modal-backdrop" id="novedadesBackdrop">
         <div class="modal modal-ancho modal-novedades">
-          <h2>Prórrogas, suspensiones y otrosí</h2>
+          <div class="control-nov-titulo">
+            <h2>Prórrogas, suspensiones y otrosí</h2>
+            <button type="button" class="control-nov-x" id="novCerrarX" title="Cerrar (Esc)" aria-label="Cerrar">×</button>
+          </div>
           <div class="control-nov-resumen" id="novResumen"></div>
 
           <div class="control-tabla-wrap">
@@ -236,8 +239,9 @@
               <input type="date" id="novFecha" required>
             </div>
             <div>
-              <label for="novDocumento">Documento</label>
-              <input type="text" id="novDocumento" maxlength="80">
+              <label for="novDocumentoSel">Documento</label>
+              <select id="novDocumentoSel"></select>
+              <input type="text" id="novDocumento" class="control-nov-otro oculto" maxlength="80" placeholder="Escribe el nombre del documento">
             </div>
             <div data-nov-tipos="otrosi">
               <label for="novDias">Prórroga (días)</label>
@@ -254,19 +258,18 @@
                 <input type="number" id="novValor" min="0">
               </div>
             </div>
-            <p class="text-muted campo-ancho control-nov-ayuda" data-nov-tipos="reinicio" id="novAyudaReinicio"></p>
+            <p class="campo-ancho control-nov-ayuda" data-nov-tipos="otrosi" id="novAyudaProrroga"></p>
+            <p class="campo-ancho control-nov-ayuda" data-nov-tipos="reinicio" id="novAyudaReinicio"></p>
             <div class="campo-ancho">
               <label for="novObservaciones">Observaciones (opcional)</label>
               <input type="text" id="novObservaciones" maxlength="300" placeholder="Ej. Suspensión por lluvias, a solicitud del supervisor">
             </div>
             <div class="campo-ancho control-edicion-botones">
               <button type="submit" class="btn" id="novGuardarBtn">Registrar</button>
+              <button type="button" class="control-btn-mini" id="novCerrarBtn">Cerrar</button>
             </div>
             <div class="form-alert campo-ancho" id="novAlert"></div>
           </form>
-          <div class="control-edicion-botones">
-            <button type="button" class="control-btn-mini" id="novCerrarBtn">Cerrar</button>
-          </div>
         </div>
       </div>
 
