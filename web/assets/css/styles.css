@@ -2758,3 +2758,24 @@ body.app-control .ctl-main #contratoCliente { margin-top: 5px; font-size: 12.5px
 .modal-novedades form.modal-form-grid input:not([type="checkbox"]),
 .modal-novedades form.modal-form-grid select { background: var(--card-bg); }
 #novAyudaProrroga { background: var(--card-bg); border: 1px solid var(--border); }
+
+/* ---- Ficha del contrato compacta (pedido del usuario 2026-11-06:
+   "optimizar espacio"): menos separación entre tarjetas, encabezados de
+   sección más bajos, sin aire muerto entre el encabezado y la tabla, y
+   filas del checklist de una línea con controles de 28 px. ---- */
+.card.control-cabecera { padding: 10px 16px; margin-bottom: 10px; }
+.card.control-campo { padding: 0 16px 10px; margin-bottom: 10px; }
+.card.control-campo:not([open]) { padding-bottom: 0; }
+.card.control-campo > summary { margin: 0 -16px; padding: 8px 16px; }
+.card.control-campo[open] > summary { margin-bottom: 2px; }
+.card.control-campo > summary::before { width: 22px; height: 22px; font-size: 16px; }
+.card.control-campo > summary > span:first-child { font-size: 13px; gap: 10px; }
+.control-campo-num { min-width: 24px; height: 24px; border-radius: 7px; font-size: 12.5px; box-shadow: 0 2px 5px rgba(217, 148, 0, 0.3); }
+.control-item { padding: 3px 4px; gap: 8px; }
+.control-item-header { padding-top: 6px; padding-bottom: 6px; }
+.control-item input,
+.control-item select { height: 28px; padding: 3px 8px; }
+.control-item .control-btn-mini { padding-top: 3px; padding-bottom: 3px; }
+.control-fase { padding-top: 8px; margin-top: 8px; }
+.control-fase[open] summary { margin-bottom: 4px; }
+.card.control-campo .control-informes-ayuda { margin: 4px 0 6px; }
