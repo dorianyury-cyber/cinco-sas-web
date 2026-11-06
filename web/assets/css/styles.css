@@ -2848,3 +2848,18 @@ body.app-control .control-vista-previa .control-vp-grupo-campos {
   display: grid; grid-template-columns: repeat(auto-fill, minmax(135px, 1fr)); gap: 1px 14px;
 }
 body.app-control .control-barra-acciones .ctl-filtros-tarjeta input[type="text"] { flex: 1 1 170px; min-width: 140px; }
+/* Valor largo en la tarjeta de detalle (lo marca control-ui.js): ancho
+   completo del grupo y máximo 2 líneas con "…"; el grupo que los tiene
+   recibe el doble de ancho que los demás. */
+body.app-control .control-vista-previa .control-vp-campo-largo { grid-column: 1 / -1; }
+body.app-control .control-vista-previa .control-vp-campo-largo .control-vp-valor {
+  display: -webkit-box; -webkit-box-orient: vertical; -webkit-line-clamp: 2; overflow: hidden;
+}
+body.app-control .control-vista-previa .control-vp-grupo:has(.control-vp-campo-largo) { flex-grow: 2; }
+body.app-control .control-vista-previa .control-vp-campo:not(.control-vp-campo-largo) .control-vp-valor { white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+/* Los datos cortos se acomodan uno tras otro con el ancho que necesitan
+   (sin columnas fijas que los recorten); los largos van en línea propia. */
+body.app-control .control-vista-previa .control-vp-grupo-campos { display: flex; flex-direction: row; flex-wrap: wrap; gap: 1px 18px; }
+body.app-control .control-vista-previa .control-vp-campo { max-width: 100%; }
+body.app-control .control-vista-previa .control-vp-campo-largo { flex: 1 1 100%; }
+body.app-control .control-vista-previa .control-vp-campo:not(.control-vp-campo-largo) { display: inline-flex; align-items: baseline; gap: 6px; flex: 0 1 auto; }

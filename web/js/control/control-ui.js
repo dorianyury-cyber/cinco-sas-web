@@ -321,7 +321,27 @@ function navegacionConFlechas() {
   });
 }
 
+// Tarjeta de detalle: un valor largo (objeto del contrato, cliente, cargo…)
+// encajonado en media columna estiraba toda la tarjeta hacia abajo. Se
+// marca para que ocupe el ancho completo de su grupo, recortado a 2 líneas
+// por CSS (.control-vp-campo-largo), con el texto completo al pasar el mouse.
+const LARGO_VALOR = 30;
+function marcarCamposLargos() {
+  document.querySelectorAll(".control-vista-previa").forEach((vp) => {
+    const marcar = () => vp.querySelectorAll(".control-vp-campo").forEach((c) => {
+      const valor = c.querySelector(".control-vp-valor");
+      if (!valor) return;
+      const texto = valor.textContent.trim();
+      c.classList.toggle("control-vp-campo-largo", texto.length > LARGO_VALOR);
+      valor.title = texto;
+    });
+    marcar();
+    new MutationObserver(marcar).observe(vp, { childList: true, subtree: true });
+  });
+}
+
 const cabecera = armarCabeceraFija(armarMenuLateral());
 armarBarraAcciones(cabecera);
 publicarAltoCabecera(cabecera);
 navegacionConFlechas();
+marcarCamposLargos();
