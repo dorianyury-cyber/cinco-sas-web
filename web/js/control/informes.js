@@ -3,7 +3,7 @@ import {
   collection, doc, getDoc, getDocs, deleteDoc, updateDoc, setDoc, runTransaction,
   serverTimestamp, onSnapshot, query, orderBy
 } from "https://www.gstatic.com/firebasejs/10.7.1/firebase-firestore.js";
-import { ref, uploadBytes, getDownloadURL, deleteObject } from "https://www.gstatic.com/firebasejs/10.7.1/firebase-storage.js";
+import { ref, uploadBytes, getDownloadURL, deleteObject, getBlob } from "https://www.gstatic.com/firebasejs/10.7.1/firebase-storage.js";
 import { auth, db, storage, requireAuth, obtenerPerfil } from "./firebase-control.js";
 import { generarInformePDF } from "./informes-pdf.js";
 import { descargarInformeDocx } from "./informes-docx.js";
@@ -11,6 +11,7 @@ import { registrarDocumentoSGC } from "./documentos-sgc.js";
 import { escucharOfertas, botonOfertas } from "./visor-ofertas.js";
 import { truncar, fechaLocalISO } from "./texto.js";
 import { mejorarSelectorContrato } from "./selector-contrato.js";
+import { verPdfEnVisor } from "./adjuntos.js";
 import { crearCampoTextoRico } from "./texto-rico.js";
 import {
   normalizarMerges, celdaCombinada, expandirRangoConMerges, quitarMergesQueIntersectan,
@@ -1385,6 +1386,23 @@ function pintarVistaPreviaInforme() {
   tdAccion.appendChild(botonOfertas({ contratoId: inf.contratoId, cliente: inf.contratoCliente || inf.cliente, referencia: inf.radicado, contratoCodigo: inf.contratoCodigo }));
 
   const tieneFinal = !!inf.archivoFinalUrl;
+
+  // Visualizador: el informe en PDF dentro de una ventana grande, sin tener
+  // que descargarlo (mismo visor de los documentos adjuntos del contrato).
+  // Si hay versión final en PDF se muestra esa, que es la que se entregó.
+  const finalEsPdf = tieneFinal && inf.archivoFinalRuta && /\.pdf$/i.test(inf.archivoFinalNombre || inf.archivoFinalRuta);
+  const btnVer = document.createElement("button");
+  btnVer.type = "button";
+  btnVer.className = "control-btn-mini control-btn-ver";
+  btnVer.textContent = finalEsPdf ? "👁 Ver versión final" : "👁 Ver";
+  btnVer.addEventListener("click", () => verPdfEnVisor({
+    titulo: `${inf.radicado} — ${inf.titulo || ""}`,
+    nombreArchivo: finalEsPdf ? inf.archivoFinalNombre : `${inf.radicado}.pdf`,
+    obtenerBlob: finalEsPdf
+      ? () => getBlob(ref(storage, inf.archivoFinalRuta))
+      : async () => (await generarInformePDF(inf)).output("blob")
+  }));
+  tdAccion.appendChild(btnVer);
 
   if (tieneFinal) {
     const btnFinal = document.createElement("a");

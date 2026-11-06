@@ -74,6 +74,8 @@ async function verDocumento(d) {
   const v = obtenerVisor();
   v.titulo.textContent = d.nombre;
   v.descargar.href = d.url;
+  v.descargar.removeAttribute("download");
+  v.descargar.classList.remove("oculto");
   v.cuerpo.replaceChildren();
   v.fondo.classList.add("open");
   const clase = tipoVisor(d.nombre);
@@ -97,6 +99,33 @@ async function verDocumento(d) {
     }
   } else {
     mensajeVisor(v.cuerpo, "Los archivos de Word y Excel no se pueden ver aquí: descárgalos para abrirlos.", d.url);
+  }
+}
+
+// Muestra en el mismo visualizador un PDF que se arma en el navegador (ej.
+// un informe generado con jsPDF) — `obtenerBlob` es async y se llama ya con
+// la ventana abierta, para que se vea "Generando…" mientras tanto. El
+// botón Descargar baja ese mismo PDF con `nombreArchivo`.
+export async function verPdfEnVisor({ titulo, nombreArchivo, obtenerBlob }) {
+  const v = obtenerVisor();
+  v.titulo.textContent = titulo;
+  v.descargar.classList.add("oculto");
+  v.fondo.classList.add("open");
+  mensajeVisor(v.cuerpo, "Generando vista previa…");
+  try {
+    const blob = await obtenerBlob();
+    if (!v.fondo.classList.contains("open")) return;
+    if (urlTemporal) URL.revokeObjectURL(urlTemporal);
+    urlTemporal = URL.createObjectURL(new Blob([blob], { type: "application/pdf" }));
+    v.descargar.href = urlTemporal;
+    v.descargar.download = nombreArchivo;
+    v.descargar.classList.remove("oculto");
+    const marco = el("iframe", "control-visor-marco");
+    marco.title = titulo;
+    marco.src = urlTemporal;
+    v.cuerpo.replaceChildren(marco);
+  } catch (err) {
+    mensajeVisor(v.cuerpo, err.message || "No se pudo generar la vista previa.");
   }
 }
 

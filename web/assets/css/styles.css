@@ -2807,3 +2807,6 @@ body.app-control .control-vista-previa .control-vp-etiqueta { display: inline; f
 body.app-control .control-vista-previa .control-vp-etiqueta::after { content: ":"; }
 body.app-control .control-vista-previa .control-vp-valor { display: inline; padding-left: 0; font-size: 12.5px; }
 body.app-control .control-vista-previa .control-vp-valor::before { content: none; }
+/* "👁 Ver" (visualizador de Informes): resaltado como la acción principal de la tarjeta. */
+.control-btn-mini.control-btn-ver { background: var(--cinco-amber); border-color: var(--cinco-amber); color: #1f2732; font-weight: 700; }
+.control-btn-mini.control-btn-ver:hover { filter: brightness(1.05); }
