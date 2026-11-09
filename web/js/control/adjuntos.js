@@ -129,6 +129,14 @@ export async function verPdfEnVisor({ titulo, nombreArchivo, obtenerBlob }) {
   }
 }
 
+// Botón "👁 Ver" de las tarjetas de detalle (Informes, Correspondencia,
+// Órdenes de Trabajo, Ofertas): abre el documento en el visualizador, sin
+// descargarlo. `texto` permite p. ej. "👁 Ver versión final".
+export function botonVerPdf({ titulo, nombreArchivo, obtenerBlob, texto = "👁 Ver" }) {
+  return boton("control-btn-mini control-btn-ver", texto, "Ver el documento aquí mismo, sin descargarlo",
+    () => verPdfEnVisor({ titulo, nombreArchivo, obtenerBlob }));
+}
+
 function nuevoId() {
   return (globalThis.crypto?.randomUUID?.() || `${Date.now()}${Math.random().toString(16).slice(2)}`).replace(/-/g, "").slice(0, 20);
 }

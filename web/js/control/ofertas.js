@@ -6,6 +6,7 @@ import {
 import { ref, uploadBytes, getDownloadURL } from "https://www.gstatic.com/firebasejs/10.7.1/firebase-storage.js";
 import { auth, db, storage, requireAuth, obtenerPerfil } from "./firebase-control.js";
 import { generarOfertaPDF } from "./ofertas-pdf.js";
+import { botonVerPdf } from "./adjuntos.js";
 import { registrarDocumentoSGC } from "./documentos-sgc.js";
 import { truncar } from "./texto.js";
 import { mejorarSelectorContrato } from "./selector-contrato.js";
@@ -1172,6 +1173,11 @@ function pintarVistaPreviaOferta() {
   `;
 
   const accionesEl = document.getElementById("ofertaVpAcciones");
+  accionesEl.appendChild(botonVerPdf({
+    titulo: `${of.radicado || ""} — ${of.titulo || of.cliente || ""}`,
+    nombreArchivo: `${of.radicado || "oferta"}.pdf`,
+    obtenerBlob: async () => (await generarOfertaPDF(of)).output("blob")
+  }));
 
   const btnPdf = document.createElement("button");
   btnPdf.type = "button";

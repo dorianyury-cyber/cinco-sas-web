@@ -8,10 +8,9 @@ import { auth, db, storage, requireAuth, obtenerPerfil } from "./firebase-contro
 import { generarInformePDF } from "./informes-pdf.js";
 import { descargarInformeDocx } from "./informes-docx.js";
 import { registrarDocumentoSGC } from "./documentos-sgc.js";
-import { escucharOfertas, botonOfertas } from "./visor-ofertas.js";
 import { truncar, fechaLocalISO } from "./texto.js";
 import { mejorarSelectorContrato } from "./selector-contrato.js";
-import { verPdfEnVisor } from "./adjuntos.js";
+import { botonVerPdf } from "./adjuntos.js";
 import { crearCampoTextoRico } from "./texto-rico.js";
 import {
   normalizarMerges, celdaCombinada, expandirRangoConMerges, quitarMergesQueIntersectan,
@@ -1383,7 +1382,6 @@ function pintarVistaPreviaInforme() {
       `)}
     </div>`;
   const tdAccion = document.getElementById("informeVpAcciones");
-  tdAccion.appendChild(botonOfertas({ contratoId: inf.contratoId, cliente: inf.contratoCliente || inf.cliente, referencia: inf.radicado, contratoCodigo: inf.contratoCodigo }));
 
   const tieneFinal = !!inf.archivoFinalUrl;
 
@@ -1391,18 +1389,14 @@ function pintarVistaPreviaInforme() {
   // que descargarlo (mismo visor de los documentos adjuntos del contrato).
   // Si hay versión final en PDF se muestra esa, que es la que se entregó.
   const finalEsPdf = tieneFinal && inf.archivoFinalRuta && /\.pdf$/i.test(inf.archivoFinalNombre || inf.archivoFinalRuta);
-  const btnVer = document.createElement("button");
-  btnVer.type = "button";
-  btnVer.className = "control-btn-mini control-btn-ver";
-  btnVer.textContent = finalEsPdf ? "👁 Ver versión final" : "👁 Ver";
-  btnVer.addEventListener("click", () => verPdfEnVisor({
+  tdAccion.appendChild(botonVerPdf({
+    texto: finalEsPdf ? "👁 Ver versión final" : "👁 Ver",
     titulo: `${inf.radicado} — ${inf.titulo || ""}`,
     nombreArchivo: finalEsPdf ? inf.archivoFinalNombre : `${inf.radicado}.pdf`,
     obtenerBlob: finalEsPdf
       ? () => getBlob(ref(storage, inf.archivoFinalRuta))
       : async () => (await generarInformePDF(inf)).output("blob")
   }));
-  tdAccion.appendChild(btnVer);
 
   if (tieneFinal) {
     const btnFinal = document.createElement("a");
@@ -1567,7 +1561,6 @@ requireAuth(async (user) => {
   // puntual sin ser "autorizado" al módulo completo, ver contratos.js.
   document.getElementById("navOrdenesTrabajo")?.classList.toggle("oculto", perfil?.estado !== "activo");
 
-  escucharOfertas(pintarVistaPreviaInforme);
 
   const q = query(collection(db, "informes"), orderBy("creadoEn", "desc"));
   onSnapshot(q, (snapshot) => {
