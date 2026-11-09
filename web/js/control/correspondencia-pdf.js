@@ -185,7 +185,8 @@ export async function generarCartaPDF(datos) {
       const siguiente = bloques[bloques.indexOf(bloque) + 1];
       const lineasSiguiente = siguiente?.tipo === "texto" ? Math.min(4, parsearHtmlARuns(siguiente.texto).filter((r) => r.salto).length || 1) : 0;
       if (y + avance + lineasSiguiente * 7.2 > limiteInferior) { doc.addPage(); y = 20; }
-      const urlFirmaBloque = firmaGuardada();
+      // Firma tomada de un Word editado (bloque.url): se usa esa misma imagen; si no, la guardada en este navegador.
+      const urlFirmaBloque = bloque.url || firmaGuardada();
       if (urlFirmaBloque) {
         try {
           const f = await cargarImagenComoDataURL(urlFirmaBloque, null, "PNG");

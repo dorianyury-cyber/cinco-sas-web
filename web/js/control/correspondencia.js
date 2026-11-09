@@ -2,11 +2,11 @@ import { signOut } from "https://www.gstatic.com/firebasejs/10.7.1/firebase-auth
 import {
   collection, doc, deleteDoc, getDocs, runTransaction, serverTimestamp, onSnapshot, query, orderBy, updateDoc
 } from "https://www.gstatic.com/firebasejs/10.7.1/firebase-firestore.js";
-import { ref, uploadBytes, getDownloadURL } from "https://www.gstatic.com/firebasejs/10.7.1/firebase-storage.js";
+import { ref, uploadBytes, getDownloadURL, getBlob } from "https://www.gstatic.com/firebasejs/10.7.1/firebase-storage.js";
 import { auth, db, storage, requireAuth, obtenerPerfil } from "./firebase-control.js";
 import { generarCartaPDF } from "./correspondencia-pdf.js";
 import { firmaGuardada, guardarFirma, procesarArchivoFirma, ajustesFirma, guardarAjustesFirma } from "./firma-local.js";
-import { docxABloques } from "./docx-a-bloques.js";
+import { docxABloques, bloquesDeCartaEditada } from "./docx-a-bloques.js";
 import { descargarCartaDocx } from "./correspondencia-docx.js";
 import { truncar, fechaLocalISO } from "./texto.js";
 import { mejorarSelectorContrato } from "./selector-contrato.js";
@@ -655,12 +655,15 @@ function pintarVistaPreviaCarta() {
   const btnPdf = document.createElement("button");
   btnPdf.type = "button";
   btnPdf.className = "control-btn-mini";
-  btnPdf.textContent = "PDF";
+  btnPdf.textContent = c.wordFinalUrl ? "PDF ✓" : "PDF";
+  btnPdf.title = c.wordFinalUrl ? "PDF armado con el Word editado que subieron" : "";
   btnPdf.addEventListener("click", async () => {
     btnPdf.disabled = true;
     try {
-      const pdf = await generarCartaPDF(c);
+      const pdf = await generarCartaPDF(await datosParaPdf(c));
       pdf.save(`${c.radicado}.pdf`);
+    } catch (err) {
+      mostrarAlerta(`No se pudo generar el PDF${c.wordFinalUrl ? " desde el Word editado" : ""}: ${err.message || err}`, "error");
     } finally {
       btnPdf.disabled = false;
     }
@@ -719,6 +722,20 @@ function pintarVistaPreviaCarta() {
   accionesEl.appendChild(btnBorrar);
 }
 
+// ---- PDF a partir del Word editado ----
+// Antes "Cargar Word editado" solo cambiaba lo que descargaba el botón
+// "Word": el PDF se seguía armando con el contenido original de la carta.
+// Ahora, si la carta tiene Word editado, el PDF se arma leyendo ESE Word
+// (membrete y radicado de Cinco + su contenido tal cual), como un
+// documento propio. Se lee cada vez desde Storage, así sirve también para
+// las cartas que ya tenían el Word cargado antes de este cambio.
+async function datosParaPdf(carta) {
+  if (!carta?.wordFinalUrl || !carta.id) return carta;
+  const blob = await getBlob(ref(storage, `correspondencia/${carta.id}/final.docx`));
+  const { bloques } = await docxABloques(blob);
+  return { ...carta, modo: "documento", bloques: bloquesDeCartaEditada(bloques, carta) };
+}
+
 inputWordFinal.addEventListener("change", async () => {
   const archivo = inputWordFinal.files[0];
   inputWordFinal.value = "";
@@ -733,7 +750,7 @@ inputWordFinal.addEventListener("change", async () => {
       actualizadoEn: serverTimestamp(),
       actualizadoPor: usuarioActual.email
     });
-    mostrarAlerta("Versión editada guardada — el botón \"Word\" de esa carta ahora descarga este archivo.", "ok");
+    mostrarAlerta("Versión editada guardada — los botones \"Word\" y \"PDF\" de esa carta ahora salen de este archivo.", "ok");
   } catch (err) {
     mostrarAlerta(err.message || "No se pudo subir el archivo.", "error");
   } finally {
@@ -900,7 +917,7 @@ requireAuth(async (user) => {
     descargarBtn.disabled = true;
     descargarBtn.textContent = "Generando...";
     try {
-      const pdf = await generarCartaPDF(cartaGuardadaActual);
+      const pdf = await generarCartaPDF(await datosParaPdf(cartaGuardadaActual));
       pdf.save(`${cartaGuardadaActual.radicado}.pdf`);
     } catch (err) {
       mostrarAlerta(err.message || "No se pudo descargar la carta.", "error");

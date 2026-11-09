@@ -186,3 +186,39 @@ export async function docxABloques(archivo) {
   const primero = items.find((it) => it.tipo === "p" && it.texto.trim() && !/^\s*_+\s*$/.test(it.texto));
   return { bloques: bloques.filter((b) => b.tipo !== "texto" || b.texto), titulo: (primero?.texto || "").trim() };
 }
+
+// Bloques leídos del Word editado de una carta (formato Cinco) → bloques
+// para armar su PDF como documento propio (ver correspondencia.js,
+// datosParaPdf): sin el radicado/fecha del inicio (el PDF ya los pone) y
+// con la imagen de firma que trae el Word dibujada como firma.
+const PARRAFO_RADICADO = /^\s*Radicado:/i;
+const PARRAFO_FECHA = /^\s*[A-Za-zÁ-úñÑ .]{2,40},\s*\d{1,2}\s+de\s+[A-Za-zÁ-úñÑ]+\s+(de\s+)?\d{4}\s*$/;
+const textoPlano = (html) => { const d = document.createElement("div"); d.innerHTML = html || ""; return d.textContent || ""; };
+
+export function bloquesDeCartaEditada(leidos, carta) {
+  const bloques = leidos.map((b) => (b.tipo === "imagen" ? { tipo: "imagen", url: URL.createObjectURL(b.blob) } : b));
+  // 1. Radicado y fecha del inicio: el PDF ya los escribe arriba.
+  const primero = bloques.findIndex((b) => b.tipo === "texto");
+  if (primero >= 0) {
+    const d = document.createElement("div");
+    d.innerHTML = bloques[primero].texto;
+    Array.from(d.children).forEach((p) => { if (PARRAFO_RADICADO.test(p.textContent) || PARRAFO_FECHA.test(p.textContent)) p.remove(); });
+    while (d.firstElementChild && !d.firstElementChild.textContent.trim()) d.firstElementChild.remove();
+    if (d.innerHTML.trim()) bloques[primero] = { ...bloques[primero], texto: d.innerHTML };
+    else bloques.splice(primero, 1);
+  }
+  // 2. Firma: la carta del formato Cinco no tiene línea "_____", así que el
+  // lector agrega una firma al final; se quita, y la imagen de firma que
+  // trae el Word (justo después de "Cordialmente," o justo antes del nombre
+  // de quien firma) se dibuja como firma, con su tamaño normal.
+  if (bloques[bloques.length - 1]?.tipo === "firma") bloques.pop();
+  const nombre = (carta.firmaNombre || "").trim().toLowerCase();
+  bloques.forEach((b, i) => {
+    if (b.tipo !== "imagen") return;
+    const antes = bloques[i - 1]?.tipo === "texto" ? textoPlano(bloques[i - 1].texto).trim() : "";
+    const despues = bloques[i + 1]?.tipo === "texto" ? textoPlano(bloques[i + 1].texto).trim().toLowerCase() : "";
+    if (/cordialmente,?$/i.test(antes) || (nombre && despues.startsWith(nombre))) bloques[i] = { tipo: "firma", url: b.url };
+  });
+  return bloques;
+}
+
