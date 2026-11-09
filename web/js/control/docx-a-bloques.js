@@ -212,6 +212,16 @@ export function bloquesDeCartaEditada(leidos, carta) {
   // trae el Word (justo después de "Cordialmente," o justo antes del nombre
   // de quien firma) se dibuja como firma, con su tamaño normal.
   if (bloques[bloques.length - 1]?.tipo === "firma") bloques.pop();
+  // Si el Word trae su propia línea "_____" (el lector pone ahí un bloque de
+  // firma) y justo encima la imagen de la firma, esa imagen ES la firma: se
+  // dibuja en ese lugar con su tamaño normal, no aparte a todo el ancho
+  // (salía la firma gigante y otra pequeña sobre la línea).
+  for (let i = bloques.length - 1; i > 0; i--) {
+    if (bloques[i].tipo === "firma" && !bloques[i].url && bloques[i - 1].tipo === "imagen") {
+      bloques[i] = { tipo: "firma", url: bloques[i - 1].url };
+      bloques.splice(i - 1, 1);
+    }
+  }
   const nombre = (carta.firmaNombre || "").trim().toLowerCase();
   bloques.forEach((b, i) => {
     if (b.tipo !== "imagen") return;
