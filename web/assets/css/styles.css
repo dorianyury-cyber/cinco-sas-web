@@ -2884,3 +2884,17 @@ select option, select optgroup { background-color: var(--card-bg); color: var(--
 .control-segmentado button:focus-visible { outline: 2px solid var(--cinco-amber-dark); outline-offset: 1px; }
 form.pqr-form .control-segmentado button,
 body.ctl-con-menu form.pqr-form .control-segmentado button { width: auto; margin: 0; padding: 5px 13px; font-size: 12.5px; text-transform: none; letter-spacing: 0; min-height: 0; }
+
+/* Formulario "+ Nuevo…" (Informes, Correspondencia, Ofertas) abierto: usa
+   toda la altura disponible en vez de un recuadro de media pantalla con
+   barra propia que cortaba los campos de abajo; mientras tanto se ocultan
+   la tarjeta de detalle y la lista (vuelven con "✕ Cerrar" de la barra). */
+@media (min-width: 901px) and (min-height: 521px) {
+  body.ctl-lista-fija .ctl-cadena:has(> details.control-nuevo[open]) > details.control-nuevo[open] { max-height: none; flex: 1 1 auto; min-height: 0; overflow: auto; }
+  body.ctl-lista-fija .ctl-cadena:has(> details.control-nuevo[open]) > :is(.control-vista-previa, .control-tabla-wrap) { display: none; }
+}
+/* Casillas dentro de los formularios de página (ej. "Hace parte del
+   Sistema de Gestión Integrado"): heredaban width:100% de los campos y
+   quedaban solas y centradas encima de su texto. */
+form.pqr-form .control-check-inline { display: flex; align-items: center; gap: 8px; }
+form.pqr-form input[type="checkbox"], form.pqr-form input[type="radio"] { width: auto; margin: 0; padding: 0; flex: none; }
