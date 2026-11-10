@@ -333,7 +333,12 @@ function pintarMenu({ user, perfil, esGestor, puede, contratos, contrato }) {
       return `<a href="${href}" class="${esActivo ? "active" : ""}">${imgModulo(it.foto || it.m)}${esc(it.label || mod.label)}</a>`;
     }).join("");
     const contieneActivo = cap.items.some((it) => moduloActual === it.m && (capActual || null) === (it.cap || null));
-    return { cap, items, contieneActivo };
+    // Acceso directo al contenido adicional (párrafos, tablas, imágenes)
+    // de este capítulo en el Informe mensual: abre el editor de una vez.
+    const adicional = contrato && puede.generarInforme
+      ? `<a href="informe.html?adicional=${cap.id}" class="ip-nav-adicional" title="Agregar párrafos, tablas e imágenes propias al final de este capítulo del informe mensual">✚ Contenido adicional del informe</a>`
+      : "";
+    return { cap, items: items + adicional, contieneActivo };
   });
 
   // Los dos grupos (Herramientas / Capítulos del informe) y cada capítulo

@@ -85,7 +85,7 @@ async function iniciar({ user, perfil, contrato }) {
   const capsAdicional = { intro: "Introducción", ...Object.fromEntries(CAPITULOS.map((c) => [c.id, `${c.numero}. ${c.label}`])) };
   function botonAdicional(capId) {
     const n = editorAdicional.cuantos(capId);
-    return `<button type="button" class="btn secondary ip-btn-adicional" data-cap="${capId}" title="Párrafos, subtítulos e imágenes que van al final de este capítulo">✚ Contenido adicional${n ? ` (${n})` : ""}</button>`;
+    return `<button type="button" class="btn secondary ip-btn-adicional" data-cap="${capId}" title="Párrafos, subtítulos, tablas e imágenes que van al final de este capítulo">✚ Contenido adicional${n ? ` (${n})` : ""}</button>`;
   }
   function tarjeta(i, foto, titulo, claves, itemsHtml, capId) {
     const todas = claves.every((k) => seleccion.has(k));
@@ -235,6 +235,13 @@ async function iniciar({ user, perfil, contrato }) {
   await editorAdicional.cargarMes(selMes.value);
   pintar();
   pintarFotos();
+  // Acceso directo desde el menú lateral (informe.html?adicional=capId):
+  // abre de una vez el contenido adicional de ese capítulo.
+  const capPedido = new URLSearchParams(location.search).get("adicional");
+  if (capPedido && capsAdicional[capPedido]) {
+    editorAdicional.abrir({ id: capPedido, label: capsAdicional[capPedido] });
+    history.replaceState(null, "", location.pathname);
+  }
   const sinSeleccion = () => {
     if (seleccion.size) return false;
     mostrarAlerta(alerta, "Selecciona al menos una sección para incluir en el informe.");
