@@ -105,27 +105,38 @@ export async function generarInformeMensual({ contrato, ym, datos, elaboradoPor,
         if (bl.pieDeFoto) cuerpo.push(new Paragraph({ alignment: AlignmentType.RIGHT, spacing: { after: 160 }, children: [T(bl.pieDeFoto, { size: 17, italics: true, color: MUTED })] }));
       } catch (e) { cuerpo.push(P("(No se pudo cargar la imagen)", { italics: true, color: MUTED })); }
     } else if (bl.tipo === "fotos") {
-      // Una sola tabla de 2 columnas (una fila por cada par de fotos), con
-      // cada foto ajustada a un recuadro de 78 × 58 mm sin deformarse:
-      // ocupa mucho menos alto que una foto por bloque.
+      // Registro fotográfico en fichas iguales, 2 por fila (como el PDF):
+      // encabezado "FOTO N.º n · fecha" en navy, recuadro fijo de 78 × 58 mm
+      // con la foto ajustada sin deformarse, y debajo "Descripción /
+      // evidencia" y "Origen". La fila tiene alto mínimo fijo para que todas
+      // las fichas queden parejas aunque el texto sea corto o no haya.
+      const ANCHO_FOTO = 78, ALTO_FOTO = 58;
       const filas = [];
       for (let i = 0; i < bl.fotos.length; i += 2) {
-        const celdas = await Promise.all(bl.fotos.slice(i, i + 2).map(async (f) => {
-          const hijos = [];
+        const celdas = await Promise.all(bl.fotos.slice(i, i + 2).map(async (f, j) => {
+          const numero = i + j + 1;
+          const hijos = [new Paragraph({
+            shading: { type: ShadingType.CLEAR, fill: NAVY, color: "auto" },
+            spacing: { after: 80 },
+            children: [T(` FOTO N.º ${numero}`, { bold: true, size: 17, color: "FFFFFF" }), T(f.fecha ? `   ·   ${f.fecha}` : "", { size: 15, color: "DCE0E5" })]
+          })];
           try {
             const img = await cargarImagen(f.url);
-            let anchoMm = 78, altoMm = anchoMm * (img.alto / img.ancho);
-            if (altoMm > 58) { altoMm = 58; anchoMm = altoMm * (img.ancho / img.alto); }
-            hijos.push(new Paragraph({ alignment: AlignmentType.CENTER, children: [new ImageRun({ data: img.buffer, type: "jpg", transformation: { width: Math.round(anchoMm * PX_POR_MM), height: Math.round(altoMm * PX_POR_MM) } })] }));
+            let anchoMm = ANCHO_FOTO, altoMm = anchoMm * (img.alto / img.ancho);
+            if (altoMm > ALTO_FOTO) { altoMm = ALTO_FOTO; anchoMm = altoMm * (img.ancho / img.alto); }
+            // Relleno arriba/abajo para que el recuadro de la foto mida siempre lo mismo.
+            const sobra = Math.max(0, ALTO_FOTO - altoMm) / 2;
+            hijos.push(new Paragraph({ alignment: AlignmentType.CENTER, spacing: { before: Math.round(sobra * 56.7), after: Math.round(sobra * 56.7) + 60 }, children: [new ImageRun({ data: img.buffer, type: "jpg", transformation: { width: Math.round(anchoMm * PX_POR_MM), height: Math.round(altoMm * PX_POR_MM) } })] }));
           } catch (e) {
-            hijos.push(new Paragraph({ children: [T("(No se pudo cargar la foto)", { italics: true, color: MUTED, size: 16 })] }));
+            hijos.push(new Paragraph({ alignment: AlignmentType.CENTER, spacing: { before: 1400, after: 1400 }, children: [T("(No se pudo cargar la foto)", { italics: true, color: MUTED, size: 16 })] }));
           }
-          hijos.push(new Paragraph({ spacing: { before: 40 }, children: [T(f.observacion, { bold: true, size: 16 })] }));
-          hijos.push(new Paragraph({ children: [T(f.fecha, { size: 15, italics: true, color: MUTED })] }));
-          return new TableCell({ width: { size: 50, type: WidthType.PERCENTAGE }, margins: { top: 60, bottom: 60, left: 80, right: 80 }, children: hijos });
+          hijos.push(new Paragraph({ border: { top: { style: BorderStyle.SINGLE, size: 4, color: "E2E5E9" } }, spacing: { before: 40 }, children: [T("DESCRIPCIÓN / EVIDENCIA", { bold: true, size: 14, color: "D99400" })] }));
+          hijos.push(new Paragraph({ spacing: { after: 60 }, children: [T(String(f.descripcion || "").trim() || "—", { size: 17 })] }));
+          if (f.origen) hijos.push(new Paragraph({ children: [T(`Origen: ${f.origen}`, { size: 15, italics: true, color: MUTED })] }));
+          return new TableCell({ width: { size: 50, type: WidthType.PERCENTAGE }, margins: { top: 0, bottom: 80, left: 80, right: 80 }, children: hijos });
         }));
-        if (celdas.length === 1) celdas.push(new TableCell({ width: { size: 50, type: WidthType.PERCENTAGE }, children: [new Paragraph({ children: [] })] }));
-        filas.push(new TableRow({ cantSplit: true, children: celdas }));
+        if (celdas.length === 1) celdas.push(new TableCell({ width: { size: 50, type: WidthType.PERCENTAGE }, borders: { top: { style: BorderStyle.NONE, size: 0, color: "FFFFFF" }, bottom: { style: BorderStyle.NONE, size: 0, color: "FFFFFF" }, right: { style: BorderStyle.NONE, size: 0, color: "FFFFFF" } }, children: [new Paragraph({ children: [] })] }));
+        filas.push(new TableRow({ cantSplit: true, height: { value: Math.round(100 * 56.7), rule: "atLeast" }, children: celdas }));
       }
       if (filas.length) cuerpo.push(new Table({ width: { size: 100, type: WidthType.PERCENTAGE }, borders: bordes, rows: filas }));
     } else if (bl.tipo === "firma") {

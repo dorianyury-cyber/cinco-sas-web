@@ -32,8 +32,8 @@ export async function generarInformeMensualPDF({ contrato, ym, datos, elaboradoP
     } else if (b.tipo === "tablaEditor") {
       bloquesPdf.push({ ...b.bloque, tipo: "tabla" });
     } else if (b.tipo === "fotos") {
-      // Cuadrícula de 2 fotos por fila (ahorra espacio vertical).
-      bloquesPdf.push({ tipo: "galeria", columnas: 2, fotos: b.fotos.map((f) => ({ url: f.url, nombre: f.observacion, pie: f.fecha })) });
+      // Fichas 2 × 2 (ver dibujarGaleria en informes-pdf.js): descripción, fecha y origen por separado; no van a la lista de figuras.
+      bloquesPdf.push({ tipo: "galeria", columnas: 2, fotos: b.fotos.map((f) => ({ url: f.url, nombre: f.descripcion, pie: f.fecha, origen: f.origen })) });
     } else if (b.tipo === "firma") {
       bloquesPdf.push({ tipo: "firma", etiqueta: "Elaboró", firmantes: [{ nombre: b.nombre, cargo: `${b.cargo}\n${b.empresa}`, firmaUrl: null }] });
     }

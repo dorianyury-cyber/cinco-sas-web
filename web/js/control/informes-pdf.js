@@ -674,60 +674,92 @@ export async function generarInformePDF(informe) {
   // (la foto se ajusta sin deformarse) con su título y fecha debajo. Ocupa
   // mucho menos alto que una foto por bloque a todo el ancho. Cada foto
   // sigue contando como figura en la Lista de gráficos.
+  // Registro fotográfico (bloque "galeria", lo usa el informe mensual de
+  // Interventoría PRO): una FICHA por foto, 2 × 2 por página, todas del
+  // mismo tamaño — encabezado "FOTO N.º n" con la fecha, recuadro fijo con la
+  // foto ajustada sin deformarla ni recortarla, y debajo un espacio fijo de
+  // "Descripción / evidencia" y "Origen" (aunque venga vacío, para que todas
+  // las fichas queden parejas). Pedido del usuario 2026-11-10: estas fotos NO
+  // van a la lista de figuras.
   async function dibujarGaleria(bloque) {
-    const columnas = Math.max(1, Math.min(3, bloque.columnas || 2));
-    const separacion = 6;
-    const anchoCelda = (anchoUtil - separacion * (columnas - 1)) / columnas;
-    // Recuadro algo más bajo que 4:3 para que quepan 3 filas (6 fotos) por página.
-    const altoFoto = Math.min(anchoCelda * 0.62, (margenInferior - margenSuperior - 30) / 3 - 14);
+    const columnas = 2;
+    const sepX = 8, sepY = 8;
+    const anchoFicha = (anchoUtil - sepX) / columnas;
+    const altoCab = 7, pad = 2.2;
+    const altoMarco = anchoFicha * 0.78;
+    const altoDesc = 29;
+    const altoFicha = altoCab + altoMarco + altoDesc;
+    const lineasDesc = 4;
     const imagenes = await Promise.all((bloque.fotos || []).map(async (f) => {
       try { return await cargarImagenComoDataURL(f.url, "#ffffff", "JPEG"); } catch (e) { return null; }
     }));
-    for (let i = 0; i < imagenes.length; i += columnas) {
-      const fila = (bloque.fotos || []).slice(i, i + columnas);
-      // Texto de cada celda (máx. 3 renglones de título + 1 de fecha).
-      doc.setFontSize(8.5);
-      const textos = fila.map((f, j) => {
+    const fotos = bloque.fotos || [];
+    for (let i = 0; i < fotos.length; i += columnas) {
+      saltoSiNoCabe(altoFicha + 2);
+      fotos.slice(i, i + columnas).forEach((f, j) => {
+        const n = i + j + 1;
+        const x = margenIzq + j * (anchoFicha + sepX);
+        // Marco de la ficha.
+        doc.setDrawColor(210, 214, 219);
+        doc.setLineWidth(0.3);
+        doc.roundedRect(x, y, anchoFicha, altoFicha, 2, 2);
+        // Encabezado: número y fecha.
+        doc.setFillColor(...NAVY);
+        doc.roundedRect(x, y, anchoFicha, altoCab, 2, 2, "F");
+        doc.rect(x, y + altoCab - 2, anchoFicha, 2, "F");
+        doc.setFillColor(...AMBER);
+        doc.rect(x, y + altoCab, anchoFicha, 0.6, "F");
         doc.setFont("helvetica", "bold");
-        const numero = graficosEntradas.length + j + 1;
-        let titulo = doc.splitTextToSize(`Figura ${numero}. ${f.nombre || ""}`.trim(), anchoCelda);
-        if (titulo.length > 3) titulo = [...titulo.slice(0, 2), `${titulo[2].replace(/\s*\S*$/, "")}…`];
-        return { titulo, pie: f.pie || "" };
-      });
-      const altoTexto = Math.max(...textos.map((t) => t.titulo.length * 3.6 + (t.pie ? 3.8 : 0)));
-      saltoSiNoCabe(altoFoto + altoTexto + 6);
-      fila.forEach((f, j) => {
-        const x = margenIzq + j * (anchoCelda + separacion);
+        doc.setFontSize(8.5);
+        doc.setTextColor(255, 255, 255);
+        doc.text(`FOTO N.º ${n}`, x + 3, y + 4.8);
+        if (f.pie) {
+          doc.setFont("helvetica", "normal");
+          doc.setTextColor(220, 224, 229);
+          doc.text(String(f.pie), x + anchoFicha - 3, y + 4.8, { align: "right" });
+        }
+        // Recuadro fijo de la foto (fondo gris claro, foto centrada sin deformar).
+        const yMarco = y + altoCab + 0.6;
+        doc.setFillColor(...GRIS_CLARO);
+        doc.rect(x + pad, yMarco + pad, anchoFicha - pad * 2, altoMarco - pad * 2, "F");
         const img = imagenes[i + j];
-        doc.setDrawColor(220, 224, 229);
-        doc.rect(x, y, anchoCelda, altoFoto);
         if (img) {
-          let w = anchoCelda, h = w * (img.alto / img.ancho);
-          if (h > altoFoto) { h = altoFoto; w = h * (img.ancho / img.alto); }
-          doc.addImage(img.dataUrl, "JPEG", x + (anchoCelda - w) / 2, y + (altoFoto - h) / 2, w, h);
+          const anchoMax = anchoFicha - pad * 2, altoMax = altoMarco - pad * 2;
+          let w = anchoMax, h = w * (img.alto / img.ancho);
+          if (h > altoMax) { h = altoMax; w = h * (img.ancho / img.alto); }
+          doc.addImage(img.dataUrl, "JPEG", x + pad + (anchoMax - w) / 2, yMarco + pad + (altoMax - h) / 2, w, h);
         } else {
           doc.setFont("helvetica", "italic");
           doc.setFontSize(8);
           doc.setTextColor(178, 52, 52);
-          doc.text("No se pudo cargar esta foto.", x + anchoCelda / 2, y + altoFoto / 2, { align: "center" });
+          doc.text("No se pudo cargar esta foto.", x + anchoFicha / 2, yMarco + altoMarco / 2, { align: "center" });
         }
-        let yTexto = y + altoFoto + 4;
+        // Espacio fijo de descripción / evidencia.
+        const yDesc = yMarco + altoMarco;
+        doc.setDrawColor(226, 229, 233);
+        doc.line(x + pad, yDesc, x + anchoFicha - pad, yDesc);
         doc.setFont("helvetica", "bold");
+        doc.setFontSize(7);
+        doc.setTextColor(...AMBER_DARK);
+        doc.text("DESCRIPCIÓN / EVIDENCIA", x + 3, yDesc + 4);
+        doc.setFont("helvetica", "normal");
         doc.setFontSize(8.5);
-        doc.setTextColor(...NAVY);
-        doc.text(textos[j].titulo, x, yTexto);
-        yTexto += textos[j].titulo.length * 3.6;
-        if (textos[j].pie) {
+        doc.setTextColor(20, 22, 26);
+        let lineas = doc.splitTextToSize(String(f.nombre || "").trim() || "—", anchoFicha - 6);
+        if (lineas.length > lineasDesc) lineas = [...lineas.slice(0, lineasDesc - 1), `${lineas[lineasDesc - 1].replace(/s*S*$/, "")}…`];
+        doc.text(lineas, x + 3, yDesc + 8.2, { lineHeightFactor: 1.25 });
+        if (f.origen) {
           doc.setFont("helvetica", "italic");
-          doc.setFontSize(8);
+          doc.setFontSize(7.5);
           doc.setTextColor(...TEXT_MUTED);
-          doc.text(textos[j].pie, x, yTexto);
+          const origen = doc.splitTextToSize(`Origen: ${f.origen}`, anchoFicha - 6)[0];
+          doc.text(origen, x + 3, y + altoFicha - 2.6);
         }
-        graficosEntradas.push({ texto: f.nombre || "Foto", pagina: doc.internal.getNumberOfPages() });
       });
       paginasConContenido.add(doc.internal.getNumberOfPages());
-      y += altoFoto + altoTexto + 8;
+      y += altoFicha + sepY;
     }
+    doc.setLineWidth(0.2);
   }
 
   function dibujarTabla(bloque) {

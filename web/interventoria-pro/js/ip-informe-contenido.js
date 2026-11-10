@@ -45,7 +45,9 @@ export function fechaLarga(iso) {
 // fecha es la del registro: su primer campo de fecha o de mes, o el día en
 // que se creó). La usan el informe y la página Informe mensual.
 export function fotosDelContrato(datos) {
-  const fotos = (datos.fotos || []).filter((f) => f.foto).map((f) => ({ url: f.foto, fecha: f.fecha, observacion: f.observacion }));
+  // observacion: texto corto para elegir fotos en la página; descripcion y
+  // origen van por separado a la ficha del registro fotográfico.
+  const fotos = (datos.fotos || []).filter((f) => f.foto).map((f) => ({ url: f.foto, fecha: f.fecha, observacion: f.observacion, descripcion: f.observacion || "", origen: "Registro fotográfico" }));
   Object.values(MODULOS).forEach((m) => {
     const campoFotos = m.campos.find((c) => c.type === "fotos");
     if (!campoFotos) return;
@@ -57,7 +59,7 @@ export function fotosDelContrato(datos) {
       const f = (campoFecha && r[campoFecha.key]) || r.registradoEnCampo?.slice(0, 10) || creado;
       const fechaReg = /^\d{4}-\d{2}$/.test(f) ? `${f}-01` : f;
       const texto = r.observacion || r.descripcion || r.tema || r.actividad || r.hallazgos || r.texto || r.requisito || "";
-      lista.forEach((x) => fotos.push({ url: x.url, fecha: fechaReg, observacion: `${m.label}${texto ? `: ${String(texto).slice(0, 160)}` : ""}` }));
+      lista.forEach((x) => fotos.push({ url: x.url, fecha: fechaReg, observacion: `${m.label}${texto ? `: ${String(texto).slice(0, 160)}` : ""}`, descripcion: String(texto || ""), origen: m.label }));
     });
   });
   return fotos;
@@ -503,7 +505,7 @@ export async function construirInforme({ contrato, ym, datos, elaboradoPor, carg
       const todas = fotosDelContrato(datos);
       const elegidas = fotosIncluir ? new Set(fotosIncluir) : null;
       const fotos = todas.filter((f) => (elegidas ? elegidas.has(f.url) : String(f.fecha || "").startsWith(ym))).sort((a, c) => String(a.fecha).localeCompare(String(c.fecha)));
-      if (fotos.length) b.push({ tipo: "fotos", fotos: fotos.map((f) => ({ url: f.url, observacion: f.observacion || "-", fecha: fechaLarga(f.fecha) })) });
+      if (fotos.length) b.push({ tipo: "fotos", fotos: fotos.map((f) => ({ url: f.url, observacion: f.observacion || "-", descripcion: f.descripcion ?? f.observacion ?? "", origen: f.origen || "", fecha: fechaLarga(f.fecha) })) });
       else {
         // Avisa si hay fotos, pero de otros meses (para que no "desaparezcan").
         const otros = [...new Set(todas.map((f) => String(f.fecha || "").slice(0, 7)).filter(Boolean))].sort();
