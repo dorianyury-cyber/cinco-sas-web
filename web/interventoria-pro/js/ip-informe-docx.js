@@ -6,7 +6,7 @@
 // de Word, tablas con encabezado navy y anchos proporcionales al contenido.
 
 import { mesLargo } from "./ip-core.js";
-import { tablaConFormatoDocx } from "../../js/control/informes-docx.js";
+import { tablaConFormatoDocx, firmaConFormatoDocx, runsTextoRicoDocx } from "../../js/control/informes-docx.js";
 import { construirInforme, finDeMes, fechaLarga, tituloInforme } from "./ip-informe-contenido.js";
 
 const NAVY = "1F2732";
@@ -87,6 +87,13 @@ export async function generarInformeMensual({ contrato, ym, datos, elaboradoPor,
       cuerpo.push(new Paragraph({ heading: HeadingLevel.HEADING_1, numbering: { reference: REF, level: 0 }, spacing: { before: 280, after: 140 }, children: [new TextRun({ text: bl.texto.toUpperCase(), bold: true, color: NAVY, size: 24, font: "Arial" })] }));
     } else if (bl.tipo === "titulo2") {
       cuerpo.push(new Paragraph({ heading: HeadingLevel.HEADING_2, numbering: { reference: REF, level: 1 }, spacing: { before: 200, after: 100 }, children: [new TextRun({ text: bl.texto, bold: true, color: NAVY, size: 21, font: "Arial" })] }));
+    } else if (bl.tipo === "titulo3" || bl.tipo === "titulo4") {
+      const n3 = bl.tipo === "titulo3";
+      cuerpo.push(new Paragraph({ heading: n3 ? HeadingLevel.HEADING_3 : HeadingLevel.HEADING_4, numbering: { reference: REF, level: n3 ? 2 : 3 }, spacing: { before: 160, after: 80 }, children: [new TextRun({ text: bl.texto, bold: true, italics: !n3, color: n3 ? "1E2228" : MUTED, size: n3 ? 20 : 19, font: "Arial" })] }));
+    } else if (bl.tipo === "parrafo" && bl.rico) {
+      cuerpo.push(new Paragraph({ alignment: AlignmentType.JUSTIFIED, spacing: { after: 120, line: 276 }, children: runsTextoRicoDocx(bl.texto, 20) }));
+    } else if (bl.tipo === "firmaEditor") {
+      cuerpo.push(...await firmaConFormatoDocx(bl.bloque, { anchoUtilMm: 9292 / (1440 / 25.4), anchoUtilDxa: 9292 }));
     } else if (bl.tipo === "parrafo") {
       cuerpo.push(P(bl.texto, bl.nota ? { italics: true, color: MUTED } : {}));
     } else if (bl.tipo === "tabla") {
@@ -189,7 +196,9 @@ export async function generarInformeMensual({ contrato, ym, datos, elaboradoPor,
     styles: { default: { document: { run: { font: "Arial", size: 20 } } } },
     numbering: { config: [{ reference: REF, levels: [
       { level: 0, format: LevelFormat.DECIMAL, text: "%1.", alignment: AlignmentType.START, style: { paragraph: { indent: { left: 360, hanging: 360 } } } },
-      { level: 1, format: LevelFormat.DECIMAL, text: "%1.%2.", alignment: AlignmentType.START, style: { paragraph: { indent: { left: 576, hanging: 576 } } } }
+      { level: 1, format: LevelFormat.DECIMAL, text: "%1.%2.", alignment: AlignmentType.START, style: { paragraph: { indent: { left: 576, hanging: 576 } } } },
+      { level: 2, format: LevelFormat.DECIMAL, text: "%1.%2.%3.", alignment: AlignmentType.START, style: { paragraph: { indent: { left: 792, hanging: 792 } } } },
+      { level: 3, format: LevelFormat.DECIMAL, text: "%1.%2.%3.%4.", alignment: AlignmentType.START, style: { paragraph: { indent: { left: 1008, hanging: 1008 } } } }
     ] }] },
     sections: [{
       // Izquierda 1 cm más ancha (1247 + 567 twips) para archivar en carpeta física.

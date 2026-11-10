@@ -97,7 +97,10 @@ export function claveSeccion(it) {
   return it.cap ? `${it.m}:${it.cap}` : it.m;
 }
 
-export async function construirInforme({ contrato, ym, datos, elaboradoPor, cargo, incluir = null, fotosIncluir = null, adicional = null }) {
+// liviano: sin dibujar las gráficas (solo para calcular la numeración que
+// verá el editor de contenido adicional).
+export async function construirInforme({ contrato, ym, datos, elaboradoPor, cargo, incluir = null, fotosIncluir = null, adicional = null, liviano = false }) {
+  const aPng = liviano ? async () => ({ dataUrl: "", ancho: 1, alto: 1 }) : svgADataUrl;
   const corte = finDeMes(ym);
   const esObra = contrato.tipo === "Obra";
   const mesesHasta = mesesDelContrato(contrato).filter((m) => m <= ym);
@@ -146,11 +149,16 @@ export async function construirInforme({ contrato, ym, datos, elaboradoPor, carg
   async function capitulo(titulo, secciones, capId) {
     const activas = secciones.filter(([k]) => incluye(k));
     if (!activas.length) return;
-    H1(titulo);
+    b.push({ tipo: "titulo1", texto: titulo, capId });
     for (const [, fn] of activas) await fn();
+    // Títulos del editor: su "Título 1" es el siguiente numeral dentro del
+    // capítulo (ej. 7.4), "Título 2" va debajo (7.4.1) y "Título 3" (7.4.1.1).
     for (const x of (adicional && adicional[capId]) || []) {
-      if (x.tipo === "titulo2") H2(x.texto);
+      if (x.tipo === "titulo") b.push({ tipo: `titulo${Math.min(3, Math.max(1, Number(x.nivel) || 1)) + 1}`, texto: x.texto });
+      else if (x.tipo === "titulo2") H2(x.texto);
+      else if (x.tipo === "parrafo" && x.rico) b.push({ tipo: "parrafo", texto: x.texto, rico: true });
       else if (x.tipo === "parrafo") P(x.texto);
+      else if (x.tipo === "firma") b.push({ tipo: "firmaEditor", bloque: x });
       else if (x.tipo === "imagen" && x.url) b.push({ tipo: "imagen", url: x.url, nombre: x.nombre || "", tamano: x.tamano || 85, pieDeFoto: x.pieDeFoto || "" });
       // Tabla del editor de los informes (combinar, centrar, negrilla, color…):
       // pasa entera al PDF/Word, que la dibujan con el mismo código de Informes.
@@ -216,7 +224,7 @@ export async function construirInforme({ contrato, ym, datos, elaboradoPor, carg
       const puntos = curvaPlan(regs, ym);
       if (puntos.length) {
         try {
-          const png = await svgADataUrl(svgCurvaS(puntos, { ancho: 760, alto: 320 }));
+          const png = await aPng(svgCurvaS(puntos, { ancho: 760, alto: 320 }));
           b.push({ tipo: "imagen", dataUrl: png.dataUrl, url: png.dataUrl, ancho: png.ancho, alto: png.alto, tamano: 100, nombre: `Curva S del plan de actuaciones (únicas e hitos): programado contra cumplido a ${mesLargo(ym)}` });
         } catch (e) { nota("No se pudo dibujar la curva S del plan."); }
       }
@@ -420,7 +428,7 @@ export async function construirInforme({ contrato, ym, datos, elaboradoPor, carg
       if (acts.length) {
         const puntos = curvaS(acts, contrato, ym);
         try {
-          const png = await svgADataUrl(svgCurvaS(puntos, { ancho: 760, alto: 320 }));
+          const png = await aPng(svgCurvaS(puntos, { ancho: 760, alto: 320 }));
           b.push({ tipo: "imagen", dataUrl: png.dataUrl, url: png.dataUrl, ancho: png.ancho, alto: png.alto, tamano: 100, nombre: `Curva S — avance programado contra ejecutado acumulado a ${mesLargo(ym)}` });
         } catch (e) { nota("No se pudo dibujar la curva S."); }
         const enCorte = puntos.find((p) => p.ym === ym) || { programado: 0, ejecutado: 0 };
@@ -442,7 +450,7 @@ export async function construirInforme({ contrato, ym, datos, elaboradoPor, carg
             { titulo: `Avance por proyecto o frente a ${mesLargo(ym)}`, anchos: [28, 24, 16, 16, 16], tam: 15, alinearNum: [1, 2, 3, 4] });
           for (const x of porFrente) {
             try {
-              const png = await svgADataUrl(svgCurvaS(x.pts, { ancho: 760, alto: 300 }));
+              const png = await aPng(svgCurvaS(x.pts, { ancho: 760, alto: 300 }));
               b.push({ tipo: "imagen", dataUrl: png.dataUrl, url: png.dataUrl, ancho: png.ancho, alto: png.alto, tamano: 85, nombre: `Curva S — ${x.f}: avance programado contra ejecutado a ${mesLargo(ym)}` });
             } catch (e) { nota(`No se pudo dibujar la curva S de ${x.f}.`); }
           }

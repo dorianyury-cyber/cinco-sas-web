@@ -6,7 +6,7 @@ import { db, iniciarPagina, pintarEncabezado, esc, mesLargo, mesActual, mesesDel
 import { MODULOS, CAPITULOS, activoEnMes } from "./ip-modulos.js";
 import { generarInformeMensual } from "./ip-informe-docx.js";
 import { generarInformeMensualPDF } from "./ip-informe-pdf.js";
-import { claveSeccion, fotosDelContrato } from "./ip-informe-contenido.js";
+import { claveSeccion, fotosDelContrato, construirInforme } from "./ip-informe-contenido.js";
 import { montarEditorAdicional } from "./ip-informe-adicional.js";
 
 // Secciones que no forman parte del informe clásico: por defecto entran
@@ -83,6 +83,44 @@ async function iniciar({ user, perfil, contrato }) {
   // informe no saca de los módulos): ver ip-informe-adicional.js.
   const editorAdicional = montarEditorAdicional({ contrato, user, perfil, alGuardar: () => pintar() });
   const capsAdicional = { intro: "Introducción", ...Object.fromEntries(CAPITULOS.map((c) => [c.id, `${c.numero}. ${c.label}`])) };
+  // Dónde cae el capítulo en el informe tal como está marcado (número del
+  // capítulo, cuántos subtítulos N.x ya trae y cuántas tablas y figuras van
+  // antes de su final), para que el editor numere sus títulos a partir de
+  // ahí. Arma el informe sin gráficas (liviano) y sin el contenido adicional
+  // de ese capítulo.
+  async function numeracionCapitulo(capId) {
+    const contar = async (incluir) => {
+      const { bloques } = await construirInforme({
+        contrato, ym: selMes.value, datos, elaboradoPor: "", cargo: "", incluir, fotosIncluir: [...fotosSel],
+        adicional: { ...editorAdicional.contenido(), [capId]: [] }, liviano: true
+      });
+      const r = { capNum: 0, titulos: 0, tablas: 0, figuras: 0, incluido: false };
+      let dentro = false;
+      for (const b of bloques) {
+        if (b.tipo === "titulo1") {
+          if (dentro) break;
+          r.capNum += 1;
+          if (b.capId === capId) { dentro = true; r.incluido = true; }
+        } else if (b.tipo === "titulo2" && dentro) r.titulos += 1;
+        else if (b.tipo === "tabla" || b.tipo === "tablaEditor") r.tablas += 1;
+        else if (b.tipo === "imagen") r.figuras += 1;
+      }
+      return r;
+    };
+    const r = await contar(new Set(seleccion));
+    if (r.incluido) return r;
+    // Capítulo sin secciones marcadas: su lugar si estuviera todo marcado.
+    const todo = await contar(null);
+    return { ...todo, incluido: false };
+  }
+  async function abrirAdicional(capId, bt = null) {
+    const cap = { id: capId, label: capsAdicional[capId] || capId };
+    if (bt) bt.disabled = true;
+    let inicio = null;
+    try { inicio = await numeracionCapitulo(capId); } catch (err) { console.warn("Numeración del capítulo", err); }
+    if (bt) bt.disabled = false;
+    editorAdicional.abrir(cap, inicio);
+  }
   function botonAdicional(capId) {
     const n = editorAdicional.cuantos(capId);
     return `<button type="button" class="btn secondary ip-btn-adicional" data-cap="${capId}" title="Párrafos, subtítulos, tablas e imágenes que van al final de este capítulo">✚ Contenido adicional${n ? ` (${n})` : ""}</button>`;
@@ -117,7 +155,7 @@ async function iniciar({ user, perfil, contrato }) {
   }
   cont.addEventListener("click", (e) => {
     const bt = e.target.closest(".ip-btn-adicional");
-    if (bt) editorAdicional.abrir({ id: bt.dataset.cap, label: capsAdicional[bt.dataset.cap] || bt.dataset.cap });
+    if (bt) abrirAdicional(bt.dataset.cap, bt);
   });
   cont.addEventListener("change", (e) => {
     const t = e.target;
@@ -239,7 +277,7 @@ async function iniciar({ user, perfil, contrato }) {
   // abre de una vez el contenido adicional de ese capítulo.
   const capPedido = new URLSearchParams(location.search).get("adicional");
   if (capPedido && capsAdicional[capPedido]) {
-    editorAdicional.abrir({ id: capPedido, label: capsAdicional[capPedido] });
+    abrirAdicional(capPedido);
     history.replaceState(null, "", location.pathname);
   }
   const sinSeleccion = () => {

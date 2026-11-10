@@ -20,8 +20,11 @@ export async function generarInformeMensualPDF({ contrato, ym, datos, elaboradoP
 
   const bloquesPdf = [];
   for (const b of bloques) {
-    if (b.tipo === "titulo1" || b.tipo === "titulo2") {
+    if (/^titulo[1-4]$/.test(b.tipo)) {
       bloquesPdf.push({ tipo: b.tipo, texto: b.texto });
+    } else if (b.tipo === "parrafo" && b.rico) {
+      // Párrafo del editor de contenido adicional: ya es HTML con formato.
+      bloquesPdf.push({ tipo: "parrafo", texto: b.texto });
     } else if (b.tipo === "parrafo") {
       const html = escHtml(b.texto).replace(/\n/g, "<br>");
       bloquesPdf.push({ tipo: "parrafo", texto: b.nota ? `<i>${html}</i>` : html });
@@ -34,6 +37,8 @@ export async function generarInformeMensualPDF({ contrato, ym, datos, elaboradoP
     } else if (b.tipo === "fotos") {
       // Fichas 2 × 2 (ver dibujarGaleria en informes-pdf.js): descripción, fecha y origen por separado; no van a la lista de figuras.
       bloquesPdf.push({ tipo: "galeria", columnas: 2, fotos: b.fotos.map((f) => ({ url: f.url, nombre: f.descripcion, pie: f.fecha, origen: f.origen })) });
+    } else if (b.tipo === "firmaEditor") {
+      bloquesPdf.push({ ...b.bloque, tipo: "firma" });
     } else if (b.tipo === "firma") {
       bloquesPdf.push({ tipo: "firma", etiqueta: "Elaboró", firmantes: [{ nombre: b.nombre, cargo: `${b.cargo}\n${b.empresa}`, firmaUrl: null }] });
     }

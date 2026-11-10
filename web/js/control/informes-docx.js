@@ -303,6 +303,81 @@ export function tablaConFormatoDocx(bloque, { anchoUtilMm, anchoUtilDxa, titulo,
   return salida;
 }
 
+// Bloque de firma (etiqueta + firmantes en fila, con firma digital opcional)
+// para Word. Compartida con el informe mensual de Interventoría PRO.
+export async function firmaConFormatoDocx(bloque, { anchoUtilMm, anchoUtilDxa, saltoAntes = false }) {
+  const { Paragraph, TextRun, ImageRun, Table, TableRow, TableCell, WidthType, AlignmentType, BorderStyle, TableLayoutType } = window.docx;
+  const fija = { layout: TableLayoutType.FIXED };
+  const salida = [];
+    const firmantes = bloque.firmantes && bloque.firmantes.length ? bloque.firmantes : [{ nombre: "", cargo: "" }];
+    if (bloque.etiqueta) {
+      salida.push(new Paragraph({
+        pageBreakBefore: saltoAntes || undefined,
+        children: [new TextRun({ text: bloque.etiqueta.toUpperCase(), bold: true, color: NAVY_HEX, size: 19 })]
+      }));
+    }
+    const anchoColumnaDxa = Math.round(anchoUtilDxa / firmantes.length);
+    // Fila 1: firma digital (imagen subida en el editor) si el firmante
+    // tiene una, o el espacio en blanco de siempre para firmar a mano si
+    // no; fila 2: línea de firma (borde superior de la celda) con el
+    // nombre y cargo debajo.
+    // Word no dibuja libre como el PDF (es una tabla), así que agrandar la
+    // firma no la monta sobre el contenido de arriba — solo hace la
+    // imagen más grande dentro de su celda, con la fila creciendo si hace
+    // falta.
+    const anchoColumnaMmMenosPadding = anchoUtilMm / firmantes.length - 6;
+    const celdasEspacio = await Promise.all(firmantes.map(async (f) => {
+      if (f.firmaUrl) {
+        try {
+          const altoFirmaImgPx = Math.round(Math.min(60, Math.max(6, Number(f.altoFirma) || 14)) * PX_POR_MM);
+          const img = await cargarImagenParaDocx(f.firmaUrl, "#ffffff", "image/png", "png");
+          let anchoImgPx = Math.round(altoFirmaImgPx * (img.ancho / img.alto));
+          const anchoMaxPx = Math.round(anchoColumnaMmMenosPadding * PX_POR_MM);
+          if (anchoImgPx > anchoMaxPx) anchoImgPx = anchoMaxPx;
+          const altoImgPx = Math.round(anchoImgPx * (img.alto / img.ancho));
+          return new TableCell({
+            width: { size: anchoColumnaDxa, type: WidthType.DXA },
+            borders: sinBordes(),
+            children: [new Paragraph({
+              alignment: AlignmentType.CENTER,
+              children: [new ImageRun({ data: img.buffer, transformation: { width: anchoImgPx, height: altoImgPx }, type: "png" })]
+            })]
+          });
+        } catch (e) { /* si no carga, cae al espacio en blanco de abajo */ }
+      }
+      return new TableCell({
+        width: { size: anchoColumnaDxa, type: WidthType.DXA },
+        borders: sinBordes(),
+        children: [new Paragraph({ text: "" }), new Paragraph({ text: "" })]
+      });
+    }));
+    const celdaFirma = (f) => new TableCell({
+      width: { size: anchoColumnaDxa, type: WidthType.DXA },
+      borders: { ...sinBordes(), top: { style: BorderStyle.SINGLE, size: 4, color: "787E86" } },
+      margins: { top: 60 },
+      children: [
+        new Paragraph({ alignment: AlignmentType.CENTER, children: [new TextRun({ text: f.nombre || "", bold: true, size: 19 })] }),
+        ...(f.cargo ? [new Paragraph({ alignment: AlignmentType.CENTER, children: [new TextRun({ text: f.cargo, color: MUTED_HEX, size: 17 })] })] : [])
+      ]
+    });
+    salida.push(new Table({
+      width: { size: anchoUtilDxa, type: WidthType.DXA },
+      columnWidths: firmantes.map(() => anchoColumnaDxa), ...fija,
+      borders: sinBordes(),
+      rows: [
+        new TableRow({ children: celdasEspacio }),
+        new TableRow({ children: firmantes.map((f) => celdaFirma(f)) })
+      ]
+    }));
+    salida.push(new Paragraph({ text: "" }));
+  return salida;
+}
+
+// Texto con formato (negrilla, cursiva, color) de un párrafo del editor → TextRun de Word.
+export function runsTextoRicoDocx(html, tamano = 21) {
+  return runsParaDocx(window.docx.TextRun, html, tamano);
+}
+
 export async function generarInformeDocxBlob(informe) {
   // Margen de encuadernación (mm extra a la izquierda), igual que el PDF:
   // AHÍNCO usa 10 mm, así que el ancho útil es el mismo en los dos formatos.
@@ -612,67 +687,7 @@ export async function generarInformeDocxBlob(informe) {
     }
 
     if (bloque.tipo === "firma") {
-      const firmantes = bloque.firmantes && bloque.firmantes.length ? bloque.firmantes : [{ nombre: "", cargo: "" }];
-      if (bloque.etiqueta) {
-        cuerpo.push(new Paragraph({
-          pageBreakBefore: primerBloque || undefined,
-          children: [new TextRun({ text: bloque.etiqueta.toUpperCase(), bold: true, color: NAVY_HEX, size: 19 })]
-        }));
-      }
-      const anchoColumnaDxa = Math.round(anchoUtilDxa / firmantes.length);
-      // Fila 1: firma digital (imagen subida en el editor) si el firmante
-      // tiene una, o el espacio en blanco de siempre para firmar a mano si
-      // no; fila 2: línea de firma (borde superior de la celda) con el
-      // nombre y cargo debajo.
-      // Word no dibuja libre como el PDF (es una tabla), así que agrandar la
-      // firma no la monta sobre el contenido de arriba — solo hace la
-      // imagen más grande dentro de su celda, con la fila creciendo si hace
-      // falta.
-      const anchoColumnaMmMenosPadding = anchoUtilMm / firmantes.length - 6;
-      const celdasEspacio = await Promise.all(firmantes.map(async (f) => {
-        if (f.firmaUrl) {
-          try {
-            const altoFirmaImgPx = Math.round(Math.min(60, Math.max(6, Number(f.altoFirma) || 14)) * PX_POR_MM);
-            const img = await cargarImagenParaDocx(f.firmaUrl, "#ffffff", "image/png", "png");
-            let anchoImgPx = Math.round(altoFirmaImgPx * (img.ancho / img.alto));
-            const anchoMaxPx = Math.round(anchoColumnaMmMenosPadding * PX_POR_MM);
-            if (anchoImgPx > anchoMaxPx) anchoImgPx = anchoMaxPx;
-            const altoImgPx = Math.round(anchoImgPx * (img.alto / img.ancho));
-            return new TableCell({
-              width: { size: anchoColumnaDxa, type: WidthType.DXA },
-              borders: sinBordes(),
-              children: [new Paragraph({
-                alignment: AlignmentType.CENTER,
-                children: [new ImageRun({ data: img.buffer, transformation: { width: anchoImgPx, height: altoImgPx }, type: "png" })]
-              })]
-            });
-          } catch (e) { /* si no carga, cae al espacio en blanco de abajo */ }
-        }
-        return new TableCell({
-          width: { size: anchoColumnaDxa, type: WidthType.DXA },
-          borders: sinBordes(),
-          children: [new Paragraph({ text: "" }), new Paragraph({ text: "" })]
-        });
-      }));
-      const celdaFirma = (f) => new TableCell({
-        width: { size: anchoColumnaDxa, type: WidthType.DXA },
-        borders: { ...sinBordes(), top: { style: BorderStyle.SINGLE, size: 4, color: "787E86" } },
-        margins: { top: 60 },
-        children: [
-          new Paragraph({ alignment: AlignmentType.CENTER, children: [new TextRun({ text: f.nombre || "", bold: true, size: 19 })] }),
-          ...(f.cargo ? [new Paragraph({ alignment: AlignmentType.CENTER, children: [new TextRun({ text: f.cargo, color: MUTED_HEX, size: 17 })] })] : [])
-        ]
-      });
-      cuerpo.push(new Table({
-        width: { size: anchoUtilDxa, type: WidthType.DXA },
-        columnWidths: firmantes.map(() => anchoColumnaDxa), ...fija,
-        borders: sinBordes(),
-        rows: [
-          new TableRow({ children: celdasEspacio }),
-          new TableRow({ children: firmantes.map((f) => celdaFirma(f)) })
-        ]
-      }));
-      cuerpo.push(new Paragraph({ text: "" }));
+      cuerpo.push(...await firmaConFormatoDocx(bloque, { anchoUtilMm, anchoUtilDxa, saltoAntes: primerBloque }));
       continue;
     }
 

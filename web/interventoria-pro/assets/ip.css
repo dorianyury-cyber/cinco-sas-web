@@ -2638,3 +2638,136 @@ form.pqr-form .control-tabla-flotante button { width: auto; min-width: 34px; mar
 .ip-adicional-tamano input[type="range"] { width: 200px; }
 .ip-adicional-bloque .control-tabla-editor input[type="text"] { width: 100%; box-sizing: border-box; padding: 6px 9px; border: 1px solid var(--border); border-radius: 8px; background: var(--card-bg); color: var(--text); font: inherit; font-size: 13px; }
 .modal.ip-adicional-modal { max-width: 1100px; width: 96vw; }
+
+/* ---- Editor de contenido adicional = editor de los Informes de gestión.
+   Copia de web/assets/css/styles.css (bloques, texto con formato y firma):
+   mantener en sincronía. ---- */
+.control-bloque {
+  display: flex;
+  gap: 12px;
+  align-items: flex-start;
+  border: 1px solid var(--border);
+  border-radius: 10px;
+  padding: 10px;
+}
+.control-bloque-contenido { flex: 1; min-width: 0; }
+.control-bloque-contenido textarea {
+  width: 100%;
+  padding: 10px 12px;
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  background: var(--card-bg);
+  color: var(--text);
+  font-family: inherit;
+  font-size: 13.5px;
+  resize: vertical;
+}
+.control-bloque-imagen { max-width: 100%; max-height: 160px; border-radius: 6px; display: block; margin-bottom: 8px; }
+.control-imagen-tamano { display: flex; align-items: center; gap: 10px; margin-bottom: 8px; font-size: 12.5px; color: var(--text-muted); }
+.control-imagen-tamano input[type="range"] { flex: 1; max-width: 200px; }
+.control-bloque-controles { display: flex; flex-direction: column; gap: 6px; flex-shrink: 0; }
+.control-bloques-botones { display: flex; gap: 10px; margin: 4px 0 20px; flex-wrap: wrap; }
+form.pqr-form .control-bloques-botones button,
+form.pqr-form .control-tabla-botones button,
+form.pqr-form .control-bloque-gap button { width: auto; margin-top: 0; }
+/* Visualizar / Guardar / Descargar — misma franja de 3 acciones en
+   Informes, Ofertas y Correspondencia. */
+.control-3botones { display: flex; gap: 10px; margin-top: 20px; }
+form.pqr-form .control-3botones button { width: auto; flex: 1; margin-top: 0; }
+form.pqr-form .control-3botones button:disabled { opacity: 0.5; cursor: not-allowed; }
+.control-bloque-etiqueta { display: block; font-size: 11.5px; font-weight: 700; text-transform: uppercase; letter-spacing: 0.4px; color: var(--text-muted); margin-bottom: 4px; }
+/* Campo de párrafo con formato (negrilla/cursiva/color) — ver
+   web/js/control/texto-rico.js. Mismo lenguaje visual que el resto de los
+.control-rich-toolbar { display: flex; gap: 4px; margin-bottom: 6px; flex-wrap: wrap; }
+.control-rich-btn, .control-rich-color {
+  width: 26px; height: 26px; border-radius: 6px;
+  border: 1px solid var(--border); background: var(--card-bg);
+  cursor: pointer; padding: 0;
+}
+.control-rich-btn { font-size: 13px; color: var(--text); display: inline-flex; align-items: center; justify-content: center; }
+.control-rich-btn:hover, .control-rich-color:hover { border-color: var(--cinco-amber); }
+.control-rich-btn.activo { border-color: var(--cinco-amber); background: rgba(254, 178, 9, 0.18); }
+.control-rich-color { padding: 2px; }
+/* Dos reglas genéricas de más arriba en este archivo le ganan por
+   especificidad a este componente y lo desconfiguran dentro de
+   Ofertas/Informes/Correspondencia (los tres formularios con class
+   "pqr-form"): "form.pqr-form button { width:100%; margin-top:20px }"
+   (botones grandes de acción) estira cada botón de la barra (Negrilla,
+   Cursiva, viñeta, alineación) a lo ancho del formulario, y
+   "form.pqr-form input { width:100%; padding:12px 14px }" (campos de
+   texto) hace lo mismo con el selector de color. Resultado sin esto: la
+   barra compacta de íconos se ve como una pila de filas sueltas. Mismo
+   arreglo que ya tienen los otros grupos de botones chicos del formulario
+   (.control-bloques-header, .control-bloque-gap, etc.) más abajo. */
+form.pqr-form .control-rich-btn, form.pqr-form .control-rich-color { width: 26px; margin-top: 0; }
+form.pqr-form .control-rich-color { padding: 2px; border-radius: 6px; }
+.control-rich-editable {
+  width: 100%; min-height: 70px; padding: 10px 12px;
+  border: 1px solid var(--border); border-radius: 8px; font-size: 13.5px;
+  background: var(--bg); color: var(--text); font-family: inherit; overflow-y: auto;
+}
+.control-rich-editable:focus { outline: none; border-color: var(--cinco-amber); box-shadow: 0 0 0 3px rgba(254, 178, 9, 0.18); }
+.control-rich-editable:empty:before { content: attr(data-placeholder); color: var(--text-muted); }
+.control-rich-editable ul, .control-rich-editable ol { margin: 4px 0; padding-left: 22px; }
+.control-rich-editable li { margin: 2px 0; }
+.control-bloque-gap {
+  display: flex;
+  gap: 6px;
+  flex-wrap: wrap;
+  justify-content: center;
+  align-items: center;
+  padding: 6px;
+  background: rgba(254, 178, 9, 0.06);
+  border: 1px dashed rgba(254, 178, 9, 0.35);
+  border-radius: 10px;
+}
+.control-bloque-contenido input[type="text"] {
+  width: 100%;
+  padding: 10px 12px;
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  background: var(--card-bg);
+  color: var(--text);
+  font-family: inherit;
+  font-size: 13.5px;
+  margin-top: 6px;
+}
+
+.control-badge-final {
+  font-size: 11.5px;
+  color: #1a7f4e;
+  font-weight: 600;
+  margin-top: 3px;
+}
+
+.control-firma-editor { display: flex; flex-direction: column; gap: 8px; }
+.control-firma-firmantes { display: flex; flex-direction: column; gap: 6px; }
+.control-firma-firmante { display: flex; gap: 8px; flex-wrap: wrap; align-items: center; }
+.control-firma-firmante input { flex: 1; min-width: 160px; }
+.control-firma-imagen-wrap { display: flex; align-items: center; gap: 8px; flex-wrap: wrap; }
+.control-firma-imagen-preview { height: 110px; max-width: 260px; object-fit: contain; border: 1px solid var(--border); border-radius: 4px; background: #fff; }
+.control-firma-tamano { display: flex; align-items: center; gap: 4px; font-size: 12.5px; color: var(--text-muted); white-space: nowrap; }
+.control-firma-tamano input { flex: 0 0 auto; min-width: 0; width: 52px; }
+.control-rich-editable .rt-al-center { text-align: center; }
+.control-rich-editable .rt-al-right { text-align: right; }
+.control-rich-editable .rt-al-justify { text-align: justify; }
+.modal.ip-adicional-modal { max-width: 1180px; width: 96vw; height: 92vh; display: flex; flex-direction: column; padding-bottom: 12px; }
+.ip-adicional-encabezado { flex: 0 0 auto; }
+.ip-adicional-encabezado .ip-ayuda { margin: 2px 0 4px; }
+.ip-adicional-numeracion { margin: 0 0 6px; padding: 6px 10px; font-size: 12.5px; border-left: 3px solid var(--cinco-amber, #f5a623); background: rgba(245, 166, 35, 0.08); border-radius: 6px; }
+.ip-adicional-numeracion:empty { display: none; }
+.modal.ip-adicional-modal .ip-adicional-lista { flex: 1 1 auto; overflow-y: auto; margin: 6px 0; padding-right: 4px; gap: 4px; }
+.ip-adicional-cabeza { display: flex; justify-content: flex-end; }
+.ip-adicional-insertar { display: flex; flex-wrap: wrap; gap: 4px; justify-content: center; padding: 3px 0; opacity: 0.55; transition: opacity 0.15s; }
+.ip-adicional-insertar:hover, .ip-adicional-insertar:first-of-type { opacity: 1; }
+.ip-adicional-insertar .control-btn-mini { font-size: 11.5px; padding: 2px 8px; }
+.ip-adicional-titulo { display: flex; gap: 8px; align-items: center; }
+.ip-adicional-titulo select { flex: 0 0 auto; width: auto; }
+.ip-adicional-titulo input { flex: 1; width: auto; }
+.ip-adicional-imagen { display: flex; flex-direction: column; gap: 6px; }
+.ip-adicional-imagen .ip-adicional-img { max-height: 260px; object-fit: contain; align-self: center; }
+.ip-adicional-img-acciones { display: flex; align-items: center; gap: 10px; flex-wrap: wrap; }
+.ip-adicional-botones { flex: 0 0 auto; }
+.control-btn-danger { background: none; border: 1.5px solid #d64545; color: #ff8a8a; font-weight: 700; font-size: 11.5px; padding: 4px 12px; border-radius: 999px; cursor: pointer; }
+.control-btn-danger:hover { background: rgba(214, 69, 69, 0.12); }
+.control-numero-indicativo { flex: 0 0 auto; font-weight: 700; color: var(--cinco-amber, #f5a623); font-size: 13px; min-width: 2.5em; }
