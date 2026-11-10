@@ -14,8 +14,8 @@ function escHtml(t) {
   return String(t ?? "").replace(/[&<>]/g, (c) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;" }[c]));
 }
 
-export async function generarInformeMensualPDF({ contrato, ym, datos, elaboradoPor, cargo, portada = "oscura", radicado = "", incluir = null, fotosIncluir = null }) {
-  const { titulo, bloques } = await construirInforme({ contrato, ym, datos, elaboradoPor, cargo, incluir, fotosIncluir });
+export async function generarInformeMensualPDF({ contrato, ym, datos, elaboradoPor, cargo, portada = "oscura", radicado = "", incluir = null, fotosIncluir = null, adicional = null }) {
+  const { titulo, bloques } = await construirInforme({ contrato, ym, datos, elaboradoPor, cargo, incluir, fotosIncluir, adicional });
   const firma = bloques.find((b) => b.tipo === "firma");
 
   const bloquesPdf = [];

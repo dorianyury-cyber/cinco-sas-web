@@ -95,7 +95,7 @@ export function claveSeccion(it) {
   return it.cap ? `${it.m}:${it.cap}` : it.m;
 }
 
-export async function construirInforme({ contrato, ym, datos, elaboradoPor, cargo, incluir = null, fotosIncluir = null }) {
+export async function construirInforme({ contrato, ym, datos, elaboradoPor, cargo, incluir = null, fotosIncluir = null, adicional = null }) {
   const corte = finDeMes(ym);
   const esObra = contrato.tipo === "Obra";
   const mesesHasta = mesesDelContrato(contrato).filter((m) => m <= ym);
@@ -138,11 +138,19 @@ export async function construirInforme({ contrato, ym, datos, elaboradoPor, carg
   // Un capítulo se escribe solo si al menos una de sus secciones está
   // seleccionada; la numeración del Word/PDF se recalcula sola.
   const incluye = (k) => !incluir || incluir.has(k);
-  async function capitulo(titulo, secciones) {
+  // capId: id del capítulo (CAPITULOS / "intro") para su contenido
+  // adicional (párrafos, subtítulos e imágenes de informe.html), que va al
+  // final del capítulo en el orden en que se dejó.
+  async function capitulo(titulo, secciones, capId) {
     const activas = secciones.filter(([k]) => incluye(k));
     if (!activas.length) return;
     H1(titulo);
     for (const [, fn] of activas) await fn();
+    for (const x of (adicional && adicional[capId]) || []) {
+      if (x.tipo === "titulo2") H2(x.texto);
+      else if (x.tipo === "parrafo") P(x.texto);
+      else if (x.tipo === "imagen" && x.url) b.push({ tipo: "imagen", url: x.url, nombre: x.nombre || "" });
+    }
   }
   const ef = estadoFinanciero(contrato, hasta("financiero"));
   const acts = actividadesConItems(datos.actividades || [], datos.items || []).sort((a, c) => (Number(a.item) || 0) - (Number(c.item) || 0));
@@ -155,7 +163,7 @@ export async function construirInforme({ contrato, ym, datos, elaboradoPor, carg
       H2(esObra ? "Alcance de la interventoría" : "Alcance del seguimiento contractual");
       P(contrato.alcance || `El presente informe recoge, de manera organizada, el avance del contrato durante ${mesLargo(ym)}, con las cifras, tablas y evidencias que soportan la gestión adelantada en cada uno de sus aspectos.`);
     }]
-  ]);
+  ], "intro");
 
   // ================================================================ 2. ADMINISTRATIVOS
   await capitulo("Aspectos administrativos", [
@@ -214,7 +222,7 @@ export async function construirInforme({ contrato, ym, datos, elaboradoPor, carg
     }],
     ["observaciones:administrativo", () => { H2("Observaciones administrativas"); observaciones("administrativo"); }],
     ["anexos:administrativo", () => { H2("Documentos administrativos anexos"); anexos("administrativo"); }]
-  ]);
+  ], "administrativo");
 
   // ================================================================ 3. FINANCIEROS
   await capitulo("Aspectos financieros", [
@@ -244,7 +252,7 @@ export async function construirInforme({ contrato, ym, datos, elaboradoPor, carg
     }],
     ["observaciones:financiero", () => { H2("Observaciones financieras"); observaciones("financiero"); }],
     ["anexos:financiero", () => { H2("Documentos financieros anexos"); anexos("financiero"); }]
-  ]);
+  ], "financiero");
 
   // ================================================================ 4. JURÍDICOS
   await capitulo("Aspectos jurídicos", [
@@ -262,7 +270,7 @@ export async function construirInforme({ contrato, ym, datos, elaboradoPor, carg
     }],
     ["observaciones:juridico", () => { H2("Observaciones jurídicas"); observaciones("juridico"); }],
     ["anexos:juridico", () => { H2("Documentos jurídicos anexos"); anexos("juridico"); }]
-  ]);
+  ], "juridico");
 
   // ================================================================ 5. SST
   await capitulo("Aspectos de seguridad y salud en el trabajo", [
@@ -302,7 +310,7 @@ export async function construirInforme({ contrato, ym, datos, elaboradoPor, carg
     ["inspecciones", () => { H2("Inspecciones"); matriz(datos.inspecciones || [], "tipo", MODULOS.inspecciones.campos[1].opciones, "Inspecciones por mes"); }],
     ["observaciones:sst", () => { H2("Observaciones de seguridad y salud en el trabajo"); observaciones("sst"); }],
     ["anexos:sst", () => { H2("Documentos de seguridad y salud en el trabajo (anexos)"); anexos("sst"); }]
-  ]);
+  ], "sst");
 
   // ================================================================ 6. SOCIALES
   await capitulo("Aspectos sociales", [
@@ -311,7 +319,7 @@ export async function construirInforme({ contrato, ym, datos, elaboradoPor, carg
       tabla(["Fecha", "Actividad", "Lugar", "Asistentes", "Descripción"], del("socializacion").map((r) => [fecha(r.fecha), r.actividad, r.lugar || "-", String(r.asistentes || "-"), r.descripcion || "-"]), { titulo: "Socialización del proyecto", tam: 15 }, "Sin actividades de socialización en el periodo.");
     }],
     ["anexos:social", () => { H2("Documentos anexos"); anexos("social"); }]
-  ]);
+  ], "social");
 
   // ================================================================ 7. AMBIENTALES
   await capitulo("Aspectos ambientales", [
@@ -343,7 +351,7 @@ export async function construirInforme({ contrato, ym, datos, elaboradoPor, carg
     }],
     ["observaciones:ambiental", () => { H2("Observaciones ambientales"); observaciones("ambiental"); }],
     ["anexos:ambiental", () => { H2("Documentos y anexos de aspectos ambientales"); anexos("ambiental"); }]
-  ]);
+  ], "ambiental");
 
   // ================================================================ 8. TÉCNICOS
   await capitulo("Aspectos técnicos", [
@@ -447,7 +455,7 @@ export async function construirInforme({ contrato, ym, datos, elaboradoPor, carg
     }],
     ["observaciones:tecnico", () => { H2("Resumen y observaciones técnicas"); observaciones("tecnico"); }],
     ["anexos:tecnico", () => { H2("Documentos técnicos anexos"); anexos("tecnico"); }]
-  ]);
+  ], "tecnico");
 
   // ================================================================ 9. RIESGOS
   await capitulo("Seguimiento a la matriz de riesgos", [
@@ -462,7 +470,7 @@ export async function construirInforme({ contrato, ym, datos, elaboradoPor, carg
       const mat = lista.filter((r) => r.estado === "Materializado");
       if (mat.length) P(`Riesgos materializados: ${mat.map((r) => `N° ${r.item} (${r.riesgo})`).join("; ")}.`);
     }]
-  ]);
+  ], "riesgos");
 
   // ================================================================ 10. CALIDAD
   await capitulo("Gestión de calidad", [
@@ -480,7 +488,7 @@ export async function construirInforme({ contrato, ym, datos, elaboradoPor, carg
     }],
     ["observaciones:calidad", () => { H2("Observaciones de calidad"); observaciones("calidad"); }],
     ["anexos:calidad", () => { H2("Documentos de calidad anexos"); anexos("calidad"); }]
-  ]);
+  ], "calidad");
 
   // ================================================================ 11. REGISTRO FOTOGRÁFICO
   await capitulo("Registro fotográfico", [
@@ -501,7 +509,7 @@ export async function construirInforme({ contrato, ym, datos, elaboradoPor, carg
           : "Sin registro fotográfico para el periodo.");
       }
     }]
-  ]);
+  ], "fotografico");
 
   // ================================================================ firma
   b.push({ tipo: "firma", nombre: elaboradoPor || contrato.director || "", cargo: cargo || (esObra ? "Director de Interventoría" : "Director del contrato"), empresa: "CONSTRUCCIÓN, INGENIERÍA Y CONSULTORÍA – CINCO S.A.S." });

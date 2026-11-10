@@ -2519,3 +2519,19 @@ textarea { font-family: inherit; }
 /* Traer presupuesto de APU PRO: frente por sitio */
 .ip-apu-sitio { display: grid; grid-template-columns: minmax(0, 1fr) minmax(0, 1.4fr); gap: 10px; align-items: center; margin: 6px 0; font-size: 13px; }
 .ip-apu-sitio span { font-weight: 600; }
+
+/* ---- Informe mensual: contenido adicional por capítulo (ip-informe-adicional.js) ---- */
+.ip-btn-adicional { margin-top: 10px; font-size: 12.5px; padding: 6px 12px; }
+.modal.ip-adicional-modal { max-width: 820px; }
+.ip-adicional-lista { display: flex; flex-direction: column; gap: 10px; margin: 10px 0; }
+.ip-adicional-vacio { margin: 6px 0; padding: 14px; text-align: center; border: 1px dashed var(--border); border-radius: 10px; }
+.ip-adicional-bloque { padding: 8px 10px 10px; border: 1px solid var(--border); border-left: 4px solid var(--cinco-orange, #f5a623); border-radius: 10px; background: var(--bg); }
+.ip-adicional-cab { display: flex; align-items: center; gap: 6px; margin-bottom: 6px; }
+.ip-adicional-cab strong { flex: 1; font-size: 11px; text-transform: uppercase; letter-spacing: 0.06em; color: var(--text-muted); }
+.ip-adicional-accion { padding: 2px 10px; font-size: 12px; min-width: 0; }
+.ip-adicional-quitar { color: var(--danger, #c0392b); }
+.ip-adicional-texto { width: 100%; box-sizing: border-box; font: inherit; font-size: 13.5px; padding: 7px 10px; border: 1px solid var(--border); border-radius: 8px; background: var(--card-bg); color: var(--text); }
+textarea.ip-adicional-texto { resize: vertical; line-height: 1.5; }
+.ip-adicional-img { display: block; max-width: 100%; max-height: 260px; margin: 0 auto 8px; border-radius: 8px; object-fit: contain; }
+.ip-adicional-agregar { display: flex; flex-wrap: wrap; gap: 8px; padding: 10px; border: 1px dashed var(--cinco-orange, #f5a623); border-radius: 10px; justify-content: center; }
+.ip-adicional-botones { display: flex; gap: 8px; margin-top: 12px; }

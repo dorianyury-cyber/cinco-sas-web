@@ -58,6 +58,27 @@
     </div>
   </div>
 
+  <!-- Contenido adicional de un capítulo (js/ip-informe-adicional.js):
+       párrafos, subtítulos e imágenes que van al final del capítulo. -->
+  <div class="modal-backdrop" id="adicionalModal">
+    <div class="modal ip-adicional-modal">
+      <h2 id="adicionalTitulo">Contenido adicional</h2>
+      <p class="text-muted ip-ayuda">Va al final de este capítulo en el PDF y el Word del informe de <strong id="adicionalMes"></strong>. Ordénalo con ↑ ↓.</p>
+      <div id="adicionalBloques" class="ip-adicional-lista"></div>
+      <div class="ip-adicional-agregar">
+        <button type="button" class="btn secondary" data-adicional="parrafo">+ Párrafo</button>
+        <button type="button" class="btn secondary" data-adicional="titulo2">+ Subtítulo</button>
+        <button type="button" class="btn secondary" data-adicional="imagen">+ Imagen</button>
+        <input type="file" id="adicionalArchivo" accept="image/*" multiple hidden>
+      </div>
+      <div class="alert" id="adicionalAlerta"></div>
+      <div class="ip-adicional-botones">
+        <button type="button" class="btn" id="adicionalGuardarBtn">Guardar</button>
+        <button type="button" class="btn secondary" id="adicionalCerrarBtn">Cancelar</button>
+      </div>
+    </div>
+  </div>
+
   <script src="../js/vendor/jspdf.umd.min.js"></script>
   <script src="../js/vendor/docx.iife.js"></script>
   <script type="module" src="js/ip-informe.js"></script>

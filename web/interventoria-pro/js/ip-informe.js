@@ -7,6 +7,7 @@ import { MODULOS, CAPITULOS, activoEnMes } from "./ip-modulos.js";
 import { generarInformeMensual } from "./ip-informe-docx.js";
 import { generarInformeMensualPDF } from "./ip-informe-pdf.js";
 import { claveSeccion, fotosDelContrato } from "./ip-informe-contenido.js";
+import { montarEditorAdicional } from "./ip-informe-adicional.js";
 
 // Secciones que no forman parte del informe clásico: por defecto entran
 // solo si el contrato ya tiene información en ellas.
@@ -78,17 +79,25 @@ async function iniciar({ user, perfil, contrato }) {
   const guardarSeleccion = () => { try { localStorage.setItem(CLAVE_SEL, JSON.stringify([...seleccion])); } catch (e) { /* sin almacenamiento */ } };
 
   const casilla = (clave) => `<input type="checkbox" class="ip-chk-seccion" data-clave="${esc(clave)}" ${seleccion.has(clave) ? "checked" : ""} title="Incluir en el informe">`;
-  function tarjeta(i, foto, titulo, claves, itemsHtml) {
+  // Contenido adicional por capítulo (párrafos, subtítulos e imágenes que el
+  // informe no saca de los módulos): ver ip-informe-adicional.js.
+  const editorAdicional = montarEditorAdicional({ contrato, user, perfil, alGuardar: () => pintar() });
+  const capsAdicional = { intro: "Introducción", ...Object.fromEntries(CAPITULOS.map((c) => [c.id, `${c.numero}. ${c.label}`])) };
+  function botonAdicional(capId) {
+    const n = editorAdicional.cuantos(capId);
+    return `<button type="button" class="btn secondary ip-btn-adicional" data-cap="${capId}" title="Párrafos, subtítulos e imágenes que van al final de este capítulo">✚ Contenido adicional${n ? ` (${n})` : ""}</button>`;
+  }
+  function tarjeta(i, foto, titulo, claves, itemsHtml, capId) {
     const todas = claves.every((k) => seleccion.has(k));
     const algunas = claves.some((k) => seleccion.has(k));
     const parcial = !todas && algunas ? ' data-parcial="1"' : "";
     return `<div class="card cinta cinta-${i % 4}${algunas ? "" : " ip-cap-excluido"}">
       <h2><input type="checkbox" class="ip-chk-cap" data-claves="${claves.join(",")}" ${todas ? "checked" : ""}${parcial} title="Incluir o quitar todo el capítulo">${imgModulo(foto, "ip-capitulo-foto")} ${titulo}</h2>
-      <ul class="ip-informe-lista">${itemsHtml}</ul></div>`;
+      <ul class="ip-informe-lista">${itemsHtml}</ul>${capId ? botonAdicional(capId) : ""}</div>`;
   }
   function pintar() {
     const ym = selMes.value;
-    const intro = tarjeta(3, "informe", "Introducción", ["intro"], `<li>${casilla("intro")} Objetivo y alcance <span class="text-muted">(de la información del contrato)</span></li>`);
+    const intro = tarjeta(3, "informe", "Introducción", ["intro"], `<li>${casilla("intro")} Objetivo y alcance <span class="text-muted">(de la información del contrato)</span></li>`, "intro");
     const caps = CAPITULOS.map((cap, i) => {
       const its = visibles(cap);
       const items = its.map((it) => {
@@ -100,12 +109,16 @@ async function iniciar({ user, perfil, contrato }) {
         const marca = acumulado ? ' <span class="text-muted">(acumulado)</span>' : "";
         return `<li>${casilla(k)} <span class="badge ${n ? "ok" : "warn"}">${n}</span> <a href="${hrefModulo(it.m, it.cap)}">${esc(it.label || mod.label)}</a>${marca}</li>`;
       }).join("");
-      return tarjeta(i, `cap-${cap.id}`, `${cap.numero}. ${esc(cap.label)}`, its.map(claveSeccion), items);
+      return tarjeta(i, `cap-${cap.id}`, `${cap.numero}. ${esc(cap.label)}`, its.map(claveSeccion), items, cap.id);
     }).join("");
     cont.innerHTML = `<div class="ip-informe-grid">${intro}${caps}</div>`;
     cont.querySelectorAll("input[data-parcial]").forEach((chk) => { chk.indeterminate = true; });
     document.getElementById("informeConteo").textContent = `${seleccion.size} de ${todasLasClaves.length} secciones seleccionadas`;
   }
+  cont.addEventListener("click", (e) => {
+    const bt = e.target.closest(".ip-btn-adicional");
+    if (bt) editorAdicional.abrir({ id: bt.dataset.cap, label: capsAdicional[bt.dataset.cap] || bt.dataset.cap });
+  });
   cont.addEventListener("change", (e) => {
     const t = e.target;
     if (t.classList.contains("ip-chk-seccion")) {
@@ -217,8 +230,9 @@ async function iniciar({ user, perfil, contrato }) {
   });
   ponerRadicadoDelMes();
 
-  selMes.addEventListener("change", () => { cargarFotosSel(); pintar(); pintarFotos(); ponerRadicadoDelMes(); });
+  selMes.addEventListener("change", async () => { cargarFotosSel(); await editorAdicional.cargarMes(selMes.value); pintar(); pintarFotos(); ponerRadicadoDelMes(); });
   cargarFotosSel();
+  await editorAdicional.cargarMes(selMes.value);
   pintar();
   pintarFotos();
   const sinSeleccion = () => {
@@ -234,7 +248,8 @@ async function iniciar({ user, perfil, contrato }) {
     cargo: document.getElementById("informeCargo").value.trim(),
     radicado: document.getElementById("informeRadicado").value.trim(),
     incluir: new Set(seleccion),
-    fotosIncluir: [...fotosSel]
+    fotosIncluir: [...fotosSel],
+    adicional: editorAdicional.contenido()
   });
   const nombreArchivo = (ext) => `Informe ${contrato.tipo === "Obra" ? "de Interventoría" : "de seguimiento"} ${mesLargo(selMes.value)} (Contrato ${String(contrato.numero || "").replace(/[\/:*?"<>|]/g, "-")}).${ext}`;
   function descargar(url, nombre) {
@@ -302,6 +317,7 @@ async function iniciar({ user, perfil, contrato }) {
         cargo: document.getElementById("informeCargo").value.trim(),
         incluir: new Set(seleccion),
         fotosIncluir: [...fotosSel],
+        adicional: editorAdicional.contenido(),
         radicado: radicadoEl.value.trim()
       });
       const a = document.createElement("a");
