@@ -6,6 +6,7 @@
 // de Word, tablas con encabezado navy y anchos proporcionales al contenido.
 
 import { mesLargo } from "./ip-core.js";
+import { tablaConFormatoDocx } from "../../js/control/informes-docx.js";
 import { construirInforme, finDeMes, fechaLarga, tituloInforme } from "./ip-informe-contenido.js";
 
 const NAVY = "1F2732";
@@ -91,12 +92,17 @@ export async function generarInformeMensual({ contrato, ym, datos, elaboradoPor,
     } else if (bl.tipo === "tabla") {
       cuerpo.push(tabla(bl.encabezados, bl.filas, bl));
       cuerpo.push(P("", { after: 80 }));
+    } else if (bl.tipo === "tablaEditor") {
+      // Página carta con márgenes 1814/1134 twips → 9292 twips útiles.
+      cuerpo.push(...tablaConFormatoDocx(bl.bloque, { anchoUtilMm: 9292 / (1440 / 25.4), anchoUtilDxa: 9292, titulo: `Tabla. ${bl.bloque.titulo || ""}`.trim() }));
     } else if (bl.tipo === "imagen") {
       try {
         const img = await cargarImagen(bl.dataUrl || bl.url, "#ffffff", "image/png");
-        const anchoPx = Math.round(170 * PX_POR_MM);
+        // "Tamaño en el informe" del contenido adicional (30–100 %); las fotos de los módulos, a todo el ancho.
+        const anchoPx = Math.round(170 * PX_POR_MM * Math.min(100, Math.max(30, bl.tamano || 100)) / 100);
         cuerpo.push(new Paragraph({ alignment: AlignmentType.CENTER, children: [new ImageRun({ data: img.buffer, type: "png", transformation: { width: anchoPx, height: Math.round(anchoPx * (img.alto / img.ancho)) } })] }));
-        if (bl.nombre) cuerpo.push(new Paragraph({ alignment: AlignmentType.CENTER, spacing: { after: 160 }, children: [T(`Figura. ${bl.nombre}.`, { size: 17, italics: true, color: MUTED })] }));
+        if (bl.nombre) cuerpo.push(new Paragraph({ alignment: AlignmentType.CENTER, spacing: { after: bl.pieDeFoto ? 40 : 160 }, children: [T(`Figura. ${bl.nombre}.`, { size: 17, italics: true, color: MUTED })] }));
+        if (bl.pieDeFoto) cuerpo.push(new Paragraph({ alignment: AlignmentType.RIGHT, spacing: { after: 160 }, children: [T(bl.pieDeFoto, { size: 17, italics: true, color: MUTED })] }));
       } catch (e) { cuerpo.push(P("(No se pudo cargar la imagen)", { italics: true, color: MUTED })); }
     } else if (bl.tipo === "fotos") {
       // Una sola tabla de 2 columnas (una fila por cada par de fotos), con

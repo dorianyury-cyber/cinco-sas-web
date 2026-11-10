@@ -2535,3 +2535,102 @@ textarea.ip-adicional-texto { resize: vertical; line-height: 1.5; }
 .ip-adicional-img { display: block; max-width: 100%; max-height: 260px; margin: 0 auto 8px; border-radius: 8px; object-fit: contain; }
 .ip-adicional-agregar { display: flex; flex-wrap: wrap; gap: 8px; padding: 10px; border: 1px dashed var(--cinco-orange, #f5a623); border-radius: 10px; justify-content: center; }
 .ip-adicional-botones { display: flex; gap: 8px; margin-top: 12px; }
+
+/* ---- Editor de tablas compartido con Informes (web/js/control/editor-tabla.js):
+   mismas reglas que web/assets/css/styles.css, copiadas porque Interventoría
+   PRO no carga esa hoja. Si se cambian allá, actualizar aquí. ---- */
+.control-btn-mini {
+  padding: 5px 12px;
+  border-radius: 999px;
+  border: 1.5px solid var(--border);
+  background: none;
+  color: var(--cinco-navy);
+  font-weight: 600;
+  font-size: 11.5px;
+  cursor: pointer;
+  white-space: nowrap;
+}
+.control-btn-mini:hover { border-color: var(--cinco-amber-dark); color: var(--cinco-amber-dark); }
+.control-btn-mini:disabled { opacity: 0.35; cursor: default; }
+.control-btn-mini { color: var(--text); }
+.control-tabla-editor { display: flex; flex-direction: column; gap: 8px; }
+.control-tabla-tamano { display: flex; align-items: center; gap: 10px; flex-wrap: wrap; }
+.control-tabla-tamano label { display: flex; align-items: center; gap: 4px; font-size: 12.5px; color: var(--text-muted); }
+.control-tabla-tamano input[type="number"] {
+  width: 60px;
+  padding: 4px 6px;
+  border: 1px solid var(--border);
+  border-radius: 6px;
+  background: var(--card-bg);
+  color: var(--text);
+  font-size: 12.5px;
+}
+.control-tabla-grid { display: grid; gap: 4px; overflow-x: auto; }
+.control-tabla-grid input, .control-tabla-grid select, .control-tabla-grid textarea {
+  min-width: 90px;
+  width: 100%;
+  padding: 6px 8px;
+  border: 1px solid var(--border);
+  border-radius: 6px;
+  background: var(--card-bg);
+  color: var(--text);
+  font-size: 12.5px;
+}
+/* La celda es un <textarea> (para que un salto de línea se quede dentro de
+   la misma celda en vez de saltar a la de abajo) pero debe verse y
+   comportarse como el <input> de una sola línea que era antes — sin barra
+   de redimensionar a mano ni scrollbar propia; el alto real lo ajusta JS
+   (ver "autoAltura" en renderTablaEditor) según el contenido. */
+.control-tabla-grid textarea {
+  resize: none;
+  overflow: hidden;
+  font-family: inherit;
+  line-height: 1.35;
+}
+/* Resalta el rango de celdas seleccionado por arrastre, antes de combinar
+   o separar — mismo acento ámbar que el resto de la suite. */
+.control-tabla-grid input.control-celda-sel, .control-tabla-grid select.control-celda-sel, .control-tabla-grid textarea.control-celda-sel {
+  border-color: var(--cinco-amber);
+  box-shadow: 0 0 0 2px rgba(254, 178, 9, 0.35);
+  background: rgba(254, 178, 9, 0.1);
+}
+/* Mini-barra flotante que aparece pegada a la última celda seleccionada
+   (ver actualizarResaltado en renderTablaEditor) — mismas acciones más
+   usadas que la barra fija de abajo, para no tener que bajar hasta allá
+   cada vez, como en Excel. */
+.control-tabla-flotante {
+  display: inline-flex;
+  margin: 0 0 8px;
+  gap: 4px;
+  background: var(--card-bg);
+  border: 1px solid var(--cinco-amber);
+  border-radius: 8px;
+  padding: 4px;
+  box-shadow: 0 4px 14px rgba(0, 0, 0, 0.2);
+}
+.control-tabla-flotante.inactiva { opacity: 0.45; }
+.control-tabla-flotante { align-self: flex-start; width: auto; }
+form.pqr-form .control-tabla-flotante button { width: auto; min-width: 34px; margin-top: 0; }
+.control-tabla-botones { display: flex; gap: 8px; align-items: center; flex-wrap: wrap; }
+.control-tabla-color {
+  width: 34px;
+  height: 30px;
+  padding: 2px;
+  border: 1px solid var(--border);
+  border-radius: 6px;
+  background: var(--card-bg);
+  cursor: pointer;
+}
+/* Barra de la tabla en grupos con título (filas/columnas, combinar,
+   alinear...), como los Informes de gestión de Cinco Conecta — ver
+   grupoBotones() en js/control/editor-tabla.js. */
+.control-tabla-botones.control-tabla-grupos { display: flex; flex-wrap: wrap; gap: 10px; justify-content: center; align-items: stretch; }
+.control-tabla-grupo { background: var(--bg); border: 1px solid var(--border); border-radius: 10px; padding: 8px 10px; display: flex; flex-direction: column; gap: 6px; }
+.control-tabla-grupo-titulo { font-size: 11px; font-weight: 700; text-transform: uppercase; letter-spacing: 0.03em; color: var(--text-muted); }
+.control-tabla-grupo-botones { display: flex; gap: 6px; align-items: center; flex-wrap: wrap; }
+/* Colores de marca que usa el editor de tablas compartido. */
+:root { --cinco-amber: #feb209; --cinco-amber-dark: #d99400; }
+.ip-adicional-tamano { display: flex; align-items: center; gap: 10px; margin: 4px 0 8px; font-size: 12.5px; color: var(--text-muted); }
+.ip-adicional-tamano input[type="range"] { width: 200px; }
+.ip-adicional-bloque .control-tabla-editor input[type="text"] { width: 100%; box-sizing: border-box; padding: 6px 9px; border: 1px solid var(--border); border-radius: 8px; background: var(--card-bg); color: var(--text); font: inherit; font-size: 13px; }
+.modal.ip-adicional-modal { max-width: 1100px; width: 96vw; }

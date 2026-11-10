@@ -18,7 +18,7 @@ import { parsearHtmlARuns, MARCADORES_VINETA } from "./texto-rico.js";
 import {
   normalizarMerges, celdaCombinada, normalizarCentrados, celdaCentrada,
   normalizarNegritas, celdaNegrita, normalizarColoresCelda, colorCelda,
-  filasEncabezadoAutomatico
+  filasEncabezadoAutomatico, normalizarCentradosVertical, celdaCentradaVertical
 } from "./tabla-celdas.js";
 
 const NAVY = [31, 39, 50];
@@ -758,6 +758,7 @@ export async function generarInformePDF(informe) {
     // página.
     const filasEncabezado = Math.max(1, Math.min(Number(bloque.filasEncabezado) || filasEncabezadoAutomatico(numFilas, merges), numFilas));
     const centrados = normalizarCentrados(bloque.centrados || [], numFilas, numCols);
+    const centradosVertical = normalizarCentradosVertical(bloque.centradosVertical || [], numFilas, numCols);
     const negritas = normalizarNegritas(bloque.negritas || [], numFilas, numCols);
     const coloresCelda = normalizarColoresCelda(bloque.coloresCelda || [], numFilas, numCols);
 
@@ -871,8 +872,13 @@ export async function generarInformePDF(informe) {
           doc.setFont("helvetica", esNegrita ? "bold" : "normal");
           doc.setTextColor(...color);
           const lineas = doc.splitTextToSize(String(fila[ci] || ""), ancho - padding * 2);
-          if (celdaCentrada(centrados, fi, ci)) doc.text(lineas, x + ancho / 2, yPos + padding + offsetBase, { align: "center" });
-          else doc.text(lineas, x + padding, yPos + padding + offsetBase);
+          // Centrado vertical: el espacio sobrante de la fila, mitad arriba y mitad abajo.
+          const alto = info && info.merge.filas > 1 ? sumaRango(alturaFilas, fi, info.merge.filas) : alturaFilas[fi];
+          const yTexto = celdaCentradaVertical(centradosVertical, fi, ci)
+            ? yPos + Math.max(padding, (alto - lineas.length * pasoLinea) / 2) + offsetBase
+            : yPos + padding + offsetBase;
+          if (celdaCentrada(centrados, fi, ci)) doc.text(lineas, x + ancho / 2, yTexto, { align: "center" });
+          else doc.text(lineas, x + padding, yTexto);
         }
         x += anchos[ci];
       }

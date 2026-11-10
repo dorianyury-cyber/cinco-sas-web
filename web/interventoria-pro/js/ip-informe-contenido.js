@@ -149,7 +149,10 @@ export async function construirInforme({ contrato, ym, datos, elaboradoPor, carg
     for (const x of (adicional && adicional[capId]) || []) {
       if (x.tipo === "titulo2") H2(x.texto);
       else if (x.tipo === "parrafo") P(x.texto);
-      else if (x.tipo === "imagen" && x.url) b.push({ tipo: "imagen", url: x.url, nombre: x.nombre || "" });
+      else if (x.tipo === "imagen" && x.url) b.push({ tipo: "imagen", url: x.url, nombre: x.nombre || "", tamano: x.tamano || 85, pieDeFoto: x.pieDeFoto || "" });
+      // Tabla del editor de los informes (combinar, centrar, negrilla, color…):
+      // pasa entera al PDF/Word, que la dibujan con el mismo código de Informes.
+      else if (x.tipo === "tabla" && x.filas?.length) b.push({ tipo: "tablaEditor", bloque: { ...x, filas: x.filas.map((f) => (Array.isArray(f) ? f : f.celdas || [])) } });
     }
   }
   const ef = estadoFinanciero(contrato, hasta("financiero"));

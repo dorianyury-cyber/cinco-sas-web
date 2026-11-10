@@ -28,7 +28,9 @@ export async function generarInformeMensualPDF({ contrato, ym, datos, elaboradoP
     } else if (b.tipo === "tabla") {
       bloquesPdf.push({ tipo: "tabla", titulo: b.titulo || "", filas: [b.encabezados, ...b.filas], merges: [], centrados: [], filasEncabezado: 1 });
     } else if (b.tipo === "imagen") {
-      bloquesPdf.push({ tipo: "imagen", url: b.dataUrl || b.url, nombre: b.nombre || "", pieDeFoto: "", tamano: b.tamano || 100 });
+      bloquesPdf.push({ tipo: "imagen", url: b.dataUrl || b.url, nombre: b.nombre || "", pieDeFoto: b.pieDeFoto || "", tamano: b.tamano || 100 });
+    } else if (b.tipo === "tablaEditor") {
+      bloquesPdf.push({ ...b.bloque, tipo: "tabla" });
     } else if (b.tipo === "fotos") {
       // Cuadrícula de 2 fotos por fila (ahorra espacio vertical).
       bloquesPdf.push({ tipo: "galeria", columnas: 2, fotos: b.fotos.map((f) => ({ url: f.url, nombre: f.observacion, pie: f.fecha })) });

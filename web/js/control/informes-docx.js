@@ -27,7 +27,7 @@ import { medidasTablaPDF } from "./informes-pdf.js";
 import {
   normalizarMerges, celdaCombinada, normalizarCentrados, celdaCentrada,
   normalizarNegritas, celdaNegrita, normalizarColoresCelda, colorCelda,
-  filasEncabezadoAutomatico
+  filasEncabezadoAutomatico, normalizarCentradosVertical, celdaCentradaVertical
 } from "./tabla-celdas.js";
 
 const NAVY_HEX = "1F2732";
@@ -190,6 +190,117 @@ function sumaRango(valores, inicio, cantidad) {
   let total = 0;
   for (let i = inicio; i < inicio + cantidad; i++) total += valores[i];
   return total;
+}
+
+// Tabla del editor de bloques en Word, con todo su formato: celdas
+// combinadas, centrado, negrilla, color de letra, filas de encabezado que se
+// repiten en cada página y anchos iguales a los del PDF. Compartida con el
+// informe mensual de Interventoría PRO (su "Contenido adicional"). Devuelve
+// los elementos a agregar: título "Tabla N. …", la tabla y su nota (Fuente).
+export function tablaConFormatoDocx(bloque, { anchoUtilMm, anchoUtilDxa, titulo, saltoAntes = false }) {
+  const {
+    Paragraph, TextRun, Table, TableRow, TableCell, WidthType, ShadingType,
+    VerticalMergeType, AlignmentType, BorderStyle, TableLayoutType, VerticalAlign
+  } = window.docx;
+  const lineaTabla = { style: BorderStyle.SINGLE, size: 4, color: BORDE_TABLA_HEX };
+  const bordesTabla = { top: lineaTabla, bottom: lineaTabla, left: lineaTabla, right: lineaTabla, insideHorizontal: lineaTabla, insideVertical: lineaTabla };
+  const salida = [];
+  const filasCrudas = bloque.filas && bloque.filas.length ? bloque.filas : [[""]];
+  const filas = filasCrudas.map((f) => (Array.isArray(f) ? f : f.celdas || []));
+  salida.push(new Paragraph({
+    alignment: AlignmentType.CENTER,
+    pageBreakBefore: saltoAntes || undefined,
+    keepNext: true,
+    spacing: { before: 160, after: 100 },
+    children: [new TextRun({ text: titulo, bold: true, color: NAVY_HEX, size: 19 })]
+  }));
+
+  const numFilasTabla = filas.length;
+  const numColsTabla = Math.max(...filas.map((f) => f.length));
+  // Combinar celdas, ver web/js/control/tabla-celdas.js — el texto de
+  // una celda combinada se excluye del cálculo de ancho de columna.
+  const merges = normalizarMerges(bloque.merges || [], numFilasTabla, numColsTabla);
+  // Cuántas filas desde arriba son encabezado — se detecta solo (ver
+  // filasEncabezadoAutomatico) a partir de si la fila 0 tiene columnas
+  // combinadas, salvo que "Filas de encabezado" se haya fijado a mano
+  // en el editor. Antes solo la fila 0 se marcaba tableHeader siempre,
+  // así que un encabezado de dos filas (ej. "Memorias de cálculo"
+  // combinada arriba de "Pág. inicial"/"Pág. final") perdía la segunda
+  // fila al repetirse en la página siguiente.
+  const filasEncabezado = Math.max(1, Math.min(Number(bloque.filasEncabezado) || filasEncabezadoAutomatico(numFilasTabla, merges), numFilasTabla));
+  const centrados = normalizarCentrados(bloque.centrados || [], numFilasTabla, numColsTabla);
+  const centradosVertical = normalizarCentradosVertical(bloque.centradosVertical || [], numFilasTabla, numColsTabla);
+  const negritas = normalizarNegritas(bloque.negritas || [], numFilasTabla, numColsTabla);
+  const coloresCelda = normalizarColoresCelda(bloque.coloresCelda || [], numFilasTabla, numColsTabla);
+  // Mismas columnas y misma letra que el PDF (medidasTablaPDF); si jsPDF no
+  // está cargado en la página, el reparto propio por caracteres a 8 pt.
+  let anchos, tamTabla = 16;
+  try {
+    const medidas = medidasTablaPDF(filas, merges, anchoUtilMm);
+    anchos = medidas.anchosMm.map(mmATw);
+    tamTabla = Math.round(medidas.fontSize * 2);
+  } catch (e) {
+    anchos = anchosColumnaDocx(filas, merges).map((a) => Math.round(a * anchoUtilDxa / ANCHO_UTIL_DXA));
+  }
+  anchos[anchos.length - 1] += anchoUtilDxa - anchos.reduce((s, a) => s + a, 0); // que sumen justo el ancho útil
+  // Relleno de 1,8 mm por lado, como el PDF.
+  const margenesCelda = { top: mmATw(1.8), bottom: mmATw(1.8), left: mmATw(1.8), right: mmATw(1.8) };
+
+  const filasDocx = filas.map((fila, fi) => {
+    const celdas = [];
+    for (let ci = 0; ci < numColsTabla; ci++) {
+      const info = celdaCombinada(merges, fi, ci);
+      if (info && !info.esAncla) {
+        // Celda cubierta por un merge: si es puramente horizontal
+        // (mismo renglón que su ancla), columnSpan ya la cubre y no se
+        // agrega ninguna celda. Si es una fila de continuación de un
+        // merge vertical, docx.js sí exige una celda "placeholder" en
+        // la columna donde arranca ese merge, marcada CONTINUE.
+        if (ci === info.merge.col && fi > info.merge.fila) {
+          celdas.push(new TableCell({
+            width: { size: sumaRango(anchos, ci, info.merge.cols), type: WidthType.DXA },
+            columnSpan: info.merge.cols > 1 ? info.merge.cols : undefined,
+            verticalMerge: VerticalMergeType.CONTINUE,
+            margins: margenesCelda,
+            children: [new Paragraph({ children: [] })]
+          }));
+        }
+        continue;
+      }
+      const ancho = info ? sumaRango(anchos, ci, info.merge.cols) : anchos[ci];
+      const colorTexto = colorCelda(coloresCelda, fi, ci);
+      celdas.push(new TableCell({
+        width: { size: ancho, type: WidthType.DXA },
+        shading: fi === 0 ? { type: ShadingType.CLEAR, fill: GRIS_CLARO_HEX, color: "auto" } : undefined,
+        columnSpan: info && info.merge.cols > 1 ? info.merge.cols : undefined,
+        verticalMerge: info && info.merge.filas > 1 ? VerticalMergeType.RESTART : undefined,
+        verticalAlign: celdaCentradaVertical(centradosVertical, fi, ci) ? VerticalAlign.CENTER : undefined,
+        margins: margenesCelda,
+        children: [new Paragraph({
+          alignment: celdaCentrada(centrados, fi, ci) ? AlignmentType.CENTER : undefined,
+          children: [new TextRun({
+            text: String(fila[ci] || ""), size: tamTabla,
+            bold: fi === 0 || celdaNegrita(negritas, fi, ci),
+            color: colorTexto ? colorTexto.replace("#", "") : undefined
+          })]
+        })]
+      }));
+    }
+    // tableHeader: true en las filas de encabezado hace que Word las
+    // repita solas al principio de cada página nueva en la que siga la
+    // tabla — a diferencia del PDF (que arma sus páginas a mano), acá
+    // no hace falta dibujar nada de más, es una propiedad nativa de la
+    // tabla, solo hay que marcar todas las filas que correspondan.
+    // cantSplit: como el PDF, una fila no se parte entre dos páginas.
+    return new TableRow({ children: celdas, cantSplit: true, tableHeader: fi < filasEncabezado || undefined });
+  });
+  salida.push(new Table({ width: { size: anchoUtilDxa, type: WidthType.DXA }, columnWidths: anchos, layout: TableLayoutType.FIXED, borders: bordesTabla, rows: filasDocx }));
+
+  if (bloque.nota) {
+    salida.push(new Paragraph({ alignment: AlignmentType.RIGHT, children: [new TextRun({ text: bloque.nota, italics: true, color: MUTED_HEX, size: 17 })] }));
+  }
+  salida.push(new Paragraph({ spacing: { after: 120 }, children: [] }));
+  return salida;
 }
 
 export async function generarInformeDocxBlob(informe) {
@@ -459,101 +570,9 @@ export async function generarInformeDocxBlob(informe) {
 
     if (bloque.tipo === "tabla") {
       numeroTabla += 1;
-      const filasCrudas = bloque.filas && bloque.filas.length ? bloque.filas : [[""]];
-      const filas = filasCrudas.map((f) => (Array.isArray(f) ? f : f.celdas || []));
       const tituloTexto = `Tabla ${numeroTabla}. ${bloque.titulo || ""}`.trim();
       tablasEntradas.push(tituloTexto);
-      cuerpo.push(new Paragraph({
-        alignment: AlignmentType.CENTER,
-        pageBreakBefore: primerBloque || undefined,
-        keepNext: true,
-        spacing: { before: 160, after: 100 },
-        children: [new TextRun({ text: tituloTexto, bold: true, color: NAVY_HEX, size: 19 })]
-      }));
-
-      const numFilasTabla = filas.length;
-      const numColsTabla = Math.max(...filas.map((f) => f.length));
-      // Combinar celdas, ver web/js/control/tabla-celdas.js — el texto de
-      // una celda combinada se excluye del cálculo de ancho de columna.
-      const merges = normalizarMerges(bloque.merges || [], numFilasTabla, numColsTabla);
-      // Cuántas filas desde arriba son encabezado — se detecta solo (ver
-      // filasEncabezadoAutomatico) a partir de si la fila 0 tiene columnas
-      // combinadas, salvo que "Filas de encabezado" se haya fijado a mano
-      // en el editor. Antes solo la fila 0 se marcaba tableHeader siempre,
-      // así que un encabezado de dos filas (ej. "Memorias de cálculo"
-      // combinada arriba de "Pág. inicial"/"Pág. final") perdía la segunda
-      // fila al repetirse en la página siguiente.
-      const filasEncabezado = Math.max(1, Math.min(Number(bloque.filasEncabezado) || filasEncabezadoAutomatico(numFilasTabla, merges), numFilasTabla));
-      const centrados = normalizarCentrados(bloque.centrados || [], numFilasTabla, numColsTabla);
-      const negritas = normalizarNegritas(bloque.negritas || [], numFilasTabla, numColsTabla);
-      const coloresCelda = normalizarColoresCelda(bloque.coloresCelda || [], numFilasTabla, numColsTabla);
-      // Mismas columnas y misma letra que el PDF (medidasTablaPDF); si jsPDF no
-      // está cargado en la página, el reparto propio por caracteres a 8 pt.
-      let anchos, tamTabla = 16;
-      try {
-        const medidas = medidasTablaPDF(filas, merges, anchoUtilMm);
-        anchos = medidas.anchosMm.map(mmATw);
-        tamTabla = Math.round(medidas.fontSize * 2);
-      } catch (e) {
-        anchos = anchosColumnaDocx(filas, merges).map((a) => Math.round(a * anchoUtilDxa / ANCHO_UTIL_DXA));
-      }
-      anchos[anchos.length - 1] += anchoUtilDxa - anchos.reduce((s, a) => s + a, 0); // que sumen justo el ancho útil
-      // Relleno de 1,8 mm por lado, como el PDF.
-      const margenesCelda = { top: mmATw(1.8), bottom: mmATw(1.8), left: mmATw(1.8), right: mmATw(1.8) };
-
-      const filasDocx = filas.map((fila, fi) => {
-        const celdas = [];
-        for (let ci = 0; ci < numColsTabla; ci++) {
-          const info = celdaCombinada(merges, fi, ci);
-          if (info && !info.esAncla) {
-            // Celda cubierta por un merge: si es puramente horizontal
-            // (mismo renglón que su ancla), columnSpan ya la cubre y no se
-            // agrega ninguna celda. Si es una fila de continuación de un
-            // merge vertical, docx.js sí exige una celda "placeholder" en
-            // la columna donde arranca ese merge, marcada CONTINUE.
-            if (ci === info.merge.col && fi > info.merge.fila) {
-              celdas.push(new TableCell({
-                width: { size: sumaRango(anchos, ci, info.merge.cols), type: WidthType.DXA },
-                columnSpan: info.merge.cols > 1 ? info.merge.cols : undefined,
-                verticalMerge: VerticalMergeType.CONTINUE,
-                margins: margenesCelda,
-                children: [new Paragraph({ children: [] })]
-              }));
-            }
-            continue;
-          }
-          const ancho = info ? sumaRango(anchos, ci, info.merge.cols) : anchos[ci];
-          const colorTexto = colorCelda(coloresCelda, fi, ci);
-          celdas.push(new TableCell({
-            width: { size: ancho, type: WidthType.DXA },
-            shading: fi === 0 ? { type: ShadingType.CLEAR, fill: GRIS_CLARO_HEX, color: "auto" } : undefined,
-            columnSpan: info && info.merge.cols > 1 ? info.merge.cols : undefined,
-            verticalMerge: info && info.merge.filas > 1 ? VerticalMergeType.RESTART : undefined,
-            margins: margenesCelda,
-            children: [new Paragraph({
-              alignment: celdaCentrada(centrados, fi, ci) ? AlignmentType.CENTER : undefined,
-              children: [new TextRun({
-                text: String(fila[ci] || ""), size: tamTabla,
-                bold: fi === 0 || celdaNegrita(negritas, fi, ci),
-                color: colorTexto ? colorTexto.replace("#", "") : undefined
-              })]
-            })]
-          }));
-        }
-        // tableHeader: true en las filas de encabezado hace que Word las
-        // repita solas al principio de cada página nueva en la que siga la
-        // tabla — a diferencia del PDF (que arma sus páginas a mano), acá
-        // no hace falta dibujar nada de más, es una propiedad nativa de la
-        // tabla, solo hay que marcar todas las filas que correspondan.
-        // cantSplit: como el PDF, una fila no se parte entre dos páginas.
-        return new TableRow({ children: celdas, cantSplit: true, tableHeader: fi < filasEncabezado || undefined });
-      });
-      cuerpo.push(new Table({ width: { size: anchoUtilDxa, type: WidthType.DXA }, columnWidths: anchos, ...fija, borders: bordesTabla, rows: filasDocx }));
-
-      if (bloque.nota) {
-        cuerpo.push(new Paragraph({ alignment: AlignmentType.RIGHT, children: [new TextRun({ text: bloque.nota, italics: true, color: MUTED_HEX, size: 17 })] }));
-      }
-      cuerpo.push(new Paragraph({ spacing: { after: 120 }, children: [] }));
+      cuerpo.push(...tablaConFormatoDocx(bloque, { anchoUtilMm, anchoUtilDxa, titulo: tituloTexto, saltoAntes: primerBloque }));
       continue;
     }
 

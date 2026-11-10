@@ -125,6 +125,37 @@ export function alinearIzquierdaRango(centrados, fMin, fMax, cMin, cMax) {
 // encabezado, ver dibujarTabla) puede además marcarse en negrilla y/o con
 // un color de letra propio — pensado para resaltar filas/celdas puntuales
 // dentro de una tabla larga (ej. un ítem no conforme), no para texto con
+// ---- alineación VERTICAL de celdas (centrado dentro del alto de su fila)
+// — mismo criterio de "lista dispersa de coordenadas" que "centrados"
+// (horizontal), pero independiente: una celda puede estar centrada en
+// horizontal, en vertical, en ambas o en ninguna. Por defecto (fuera de la
+// lista) el texto queda arriba de la celda, igual que hasta ahora — esto
+// solo importa cuando la fila es más alta de lo que esa celda puntual
+// necesita (ej. una celda corta al lado de otra con varias líneas).
+export function celdaCentradaVertical(centradosV, fi, ci) {
+  return (centradosV || []).some((c) => c.fila === fi && c.col === ci);
+}
+
+export function normalizarCentradosVertical(centradosV, numFilas, numCols) {
+  return (centradosV || []).filter((c) => c && c.fila >= 0 && c.col >= 0 && c.fila < numFilas && c.col < numCols);
+}
+
+export function centrarVerticalRango(centradosV, fMin, fMax, cMin, cMax) {
+  const resultado = centradosV.slice();
+  for (let fi = fMin; fi <= fMax; fi++) {
+    for (let ci = cMin; ci <= cMax; ci++) {
+      if (!celdaCentradaVertical(resultado, fi, ci)) resultado.push({ fila: fi, col: ci });
+    }
+  }
+  return resultado;
+}
+
+// Quita el centrado vertical (vuelve a "arriba", el valor por defecto) de
+// cualquier coordenada dentro de [fMin..fMax, cMin..cMax].
+export function alinearArribaRango(centradosV, fMin, fMax, cMin, cMax) {
+  return centradosV.filter((c) => !(c.fila >= fMin && c.fila <= fMax && c.col >= cMin && c.col <= cMax));
+}
+
 // varios estilos mezclados dentro de la misma celda.
 
 export function celdaNegrita(negritas, fi, ci) {
@@ -279,6 +310,7 @@ export function insertarFilaEnBloque(bloque, indice, numCols) {
   insertarFila(bloque.filas, indice, numCols);
   bloque.merges = desplazarFilaEnMerges(bloque.merges || [], indice, true);
   bloque.centrados = desplazarFilaEnCoordenadas(bloque.centrados || [], indice, true);
+  bloque.centradosVertical = desplazarFilaEnCoordenadas(bloque.centradosVertical || [], indice, true);
   bloque.negritas = desplazarFilaEnCoordenadas(bloque.negritas || [], indice, true);
   bloque.coloresCelda = desplazarFilaEnCoordenadas(bloque.coloresCelda || [], indice, true);
 }
@@ -287,6 +319,7 @@ export function eliminarFilaEnBloque(bloque, indice) {
   eliminarFila(bloque.filas, indice);
   bloque.merges = desplazarFilaEnMerges(bloque.merges || [], indice, false);
   bloque.centrados = desplazarFilaEnCoordenadas(bloque.centrados || [], indice, false);
+  bloque.centradosVertical = desplazarFilaEnCoordenadas(bloque.centradosVertical || [], indice, false);
   bloque.negritas = desplazarFilaEnCoordenadas(bloque.negritas || [], indice, false);
   bloque.coloresCelda = desplazarFilaEnCoordenadas(bloque.coloresCelda || [], indice, false);
 }
