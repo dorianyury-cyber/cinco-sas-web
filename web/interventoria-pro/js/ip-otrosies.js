@@ -64,14 +64,14 @@ const HTML = `
     <div class="ip-datos ip-ot-resumen" id="otResumen"></div>
     <div class="tabla-scroll" id="otTablaWrap">
       <table class="tabla-compacta tabla-fija">
-        <colgroup><col class="ip-w11"><col class="ip-w13"><col class="ip-w18"><col class="ip-w26"><col><col class="ip-w8"></colgroup>
+        <colgroup><col class="ip-w11"><col class="ip-w13"><col class="ip-w18"><col class="ip-w26"><col><col class="ip-w11"></colgroup>
         <thead><tr><th>Fecha</th><th>Tipo</th><th>Documento</th><th>Efecto</th><th>Observaciones</th><th></th></tr></thead>
         <tbody id="otLista"></tbody>
       </table>
     </div>
     <p class="text-muted" id="otVacio">Sin otrosíes ni actas registradas: el contrato va con su plazo inicial.</p>
     <form id="otForm" class="ip-form-grid">
-      <div class="ip-campo-ancho"><h3 class="ip-sin-margen">Registrar otrosí o acta</h3></div>
+      <div class="ip-campo-ancho"><h3 class="ip-sin-margen" id="otFormTitulo">Registrar otrosí o acta</h3></div>
       <div class="ip-campo"><label for="otTipo">Tipo</label>
         <select id="otTipo">
           <option value="otrosi">Otrosí / prórroga (plazo y/o valor)</option>
@@ -87,7 +87,7 @@ const HTML = `
         <p class="text-muted ip-ayuda">Entra solo al Estado financiero como adición: no la registres también allá.</p></div>
       <p class="ip-campo-ancho text-muted ip-ayuda" id="otAyuda"></p>
       <div class="ip-campo ip-campo-ancho"><label for="otObs">Observaciones</label><input type="text" id="otObs" maxlength="200" placeholder="Ej. Prórroga por demoras en suministro de equipos"></div>
-      <div class="ip-form-acciones ip-campo-ancho"><button type="submit" class="btn" id="otGuardarBtn">Registrar</button></div>
+      <div class="ip-form-acciones ip-campo-ancho"><button type="button" class="btn secondary hidden" id="otCancelarEdBtn">Cancelar edición</button><button type="submit" class="btn" id="otGuardarBtn">Registrar</button></div>
     </form>
     <div class="alert" id="otAlerta"></div>
     <div class="ip-form-acciones"><button type="button" class="btn secondary" id="otCerrarBtn">Cerrar</button></div>
@@ -104,18 +104,38 @@ export function montarOtrosies({ user, perfil, puedeEditar, puedeBorrarActas, al
   const diasEl = $("otDias"), finEl = $("otFin"), valorEl = $("otValor"), ayuda = $("otAyuda"), btn = $("otGuardarBtn");
   let c = null;
   let huboCambios = false;
+  // Novedad que se está corrigiendo (null = registrar una nueva).
+  let editando = null;
+
+  // Plazo de referencia para los cálculos del formulario: con todas las
+  // novedades al registrar; al editar, sin la que se corrige y solo con las
+  // anteriores a su fecha (la prórroga se mide desde la terminación de ese momento).
+  function vigBase() {
+    if (!editando) return calcularVigencia(c);
+    const hasta = fechaEl.value || editando.fecha;
+    const otras = (c.novedades || []).filter((x) => x !== editando && (x.fecha || "") <= hasta);
+    return calcularVigencia({ fechaFinOriginal: fechaFinInicial(c), novedades: otras });
+  }
 
   form.classList.toggle("hidden", !puedeEditar);
   const cerrar = () => { cerrarModal("otrosiModal"); if (huboCambios) { huboCambios = false; alCerrarConCambios?.(c); } };
   $("otCerrarBtn").addEventListener("click", cerrar);
   $("otrosiModal").addEventListener("click", (e) => { if (e.target.id === "otrosiModal") cerrar(); });
 
-  // Documento con el consecutivo siguiente (Otrosí N.° 2 si ya hay uno).
-  function poblarDocumentos(tipo) {
-    const siguiente = (c.novedades || []).filter((n) => n.tipo === tipo).length + 1;
+  // Documento con el consecutivo siguiente (Otrosí N.° 2 si ya hay uno). Toma
+  // el primer número libre: si se quitó el N.° 2 por un error, se vuelve a
+  // ofrecer el N.° 2 y no el 3.
+  function poblarDocumentos(tipo, actual = "") {
+    const mismos = (c.novedades || []).filter((n) => n.tipo === tipo && n !== editando);
+    const usados = new Set(mismos.map((n) => Number((String(n.documento || "").match(/N\.?\s*°?\s*(\d+)/i) || [])[1])).filter((x) => x > 0));
+    let siguiente = 1;
+    if (usados.size) { while (usados.has(siguiente)) siguiente += 1; } else siguiente = mismos.length + 1;
     docSel.innerHTML = "";
-    NOMBRES_DOCUMENTO[tipo].forEach((nombre) => docSel.appendChild(new Option(`${nombre} N.° ${siguiente}`)));
+    const nombres = NOMBRES_DOCUMENTO[tipo].map((nombre) => `${nombre} N.° ${siguiente}`);
+    if (actual && !nombres.includes(actual)) nombres.unshift(actual);
+    nombres.forEach((nombre) => docSel.appendChild(new Option(nombre)));
     docSel.appendChild(new Option("Otro (escribirlo)…", OTRO));
+    if (actual) docSel.value = actual;
     docEl.value = "";
     docEl.classList.add("hidden");
   }
@@ -141,14 +161,14 @@ export function montarOtrosies({ user, perfil, puedeEditar, puedeBorrarActas, al
   }
   // "Terminación vigente + N días = nueva fecha", visible mientras se escribe.
   function pintarAyudaProrroga() {
-    const { fechaFin } = calcularVigencia(c);
+    const { fechaFin } = vigBase();
     if (!fechaFin) ayuda.textContent = "El contrato no tiene fecha de terminación: escribe directamente la nueva fecha.";
     else if (finEl.value) ayuda.innerHTML = `Terminación vigente <strong>${fecha(fechaFin)}</strong> + <strong>${diasEntre(fechaFin, finEl.value)} días</strong> → nueva terminación <strong>${fecha(finEl.value)}</strong>`;
     else ayuda.innerHTML = `Terminación vigente: <strong>${fecha(fechaFin)}</strong>. Escribe los días de prórroga o la nueva fecha; el otro dato se calcula solo.`;
   }
   // Reinicio: se propone la terminación corrida los días suspendidos (editable).
   function proponerFinReinicio() {
-    const { fechaFin, suspendidoDesde } = calcularVigencia(c);
+    const { fechaFin, suspendidoDesde } = vigBase();
     if (!fechaEl.value || !suspendidoDesde) { ayuda.textContent = ""; return; }
     const dias = Math.max(0, diasEntre(suspendidoDesde, fechaEl.value));
     ayuda.textContent = `Suspendido desde ${fecha(suspendidoDesde)}: ${dias} días. La terminación se corre esos mismos días.`;
@@ -156,20 +176,68 @@ export function montarOtrosies({ user, perfil, puedeEditar, puedeBorrarActas, al
   }
   ["input", "change"].forEach((ev) => {
     diasEl.addEventListener(ev, () => {
-      const { fechaFin } = calcularVigencia(c);
+      const { fechaFin } = vigBase();
       const dias = Number(diasEl.value);
       if (fechaFin) finEl.value = dias > 0 ? sumarDias(fechaFin, dias) : "";
       pintarAyudaProrroga();
     });
     finEl.addEventListener(ev, () => {
       if (tipoSel.value !== "otrosi") return;
-      const { fechaFin } = calcularVigencia(c);
+      const { fechaFin } = vigBase();
       if (fechaFin && finEl.value) diasEl.value = diasEntre(fechaFin, finEl.value);
       pintarAyudaProrroga();
     });
   });
   tipoSel.addEventListener("change", actualizarFormulario);
-  fechaEl.addEventListener("input", () => { if (tipoSel.value === "reinicio") proponerFinReinicio(); });
+  fechaEl.addEventListener("input", () => {
+    if (tipoSel.value === "reinicio") proponerFinReinicio();
+    if (tipoSel.value === "otrosi" && editando) { finEl.dispatchEvent(new Event("change")); }
+  });
+
+  // Vuelve al modo "registrar nuevo" con el consecutivo recalculado.
+  function nuevoRegistro() {
+    editando = null;
+    form.reset();
+    tipoSel.disabled = false;
+    fechaEl.value = hoyISO();
+    $("otFormTitulo").textContent = "Registrar otrosí o acta";
+    btn.textContent = "Registrar";
+    $("otCancelarEdBtn").classList.add("hidden");
+    ajustarTipos();
+    actualizarFormulario();
+  }
+  $("otCancelarEdBtn").addEventListener("click", () => { limpiarAlerta(alerta); nuevoRegistro(); });
+
+  // Carga una novedad en el formulario para corregir fecha, documento, plazo,
+  // valor u observaciones (el tipo no cambia: para eso se quita y se registra).
+  function editar(original) {
+    limpiarAlerta(alerta);
+    editando = original;
+    form.reset();
+    tipoSel.querySelectorAll("option").forEach((o) => { o.disabled = false; });
+    tipoSel.value = original.tipo;
+    tipoSel.disabled = true;
+    actualizarFormulario();
+    fechaEl.value = original.fecha || "";
+    poblarDocumentos(original.tipo, original.documento || "");
+    $("otObs").value = original.observaciones || "";
+    if (original.tipo !== "suspension") finEl.value = original.fechaFinNueva || "";
+    if (original.tipo === "otrosi") {
+      valorEl.value = original.valorAdicional || "";
+      const { fechaFin } = vigBase();
+      diasEl.value = fechaFin && finEl.value ? diasEntre(fechaFin, finEl.value) : "";
+      pintarAyudaProrroga();
+    }
+    if (original.tipo === "reinicio") {
+      const { suspendidoDesde } = vigBase();
+      ayuda.textContent = suspendidoDesde ? `Suspendido desde ${fecha(suspendidoDesde)}: ${Math.max(0, diasEntre(suspendidoDesde, fechaEl.value))} días.` : "";
+    }
+    $("otFormTitulo").textContent = `Corregir ${original.documento || TIPO_CRONOLOGIA[original.tipo]}`;
+    btn.textContent = "Guardar cambios";
+    $("otCancelarEdBtn").classList.remove("hidden");
+    form.scrollIntoView({ behavior: "smooth", block: "start" });
+    fechaEl.focus();
+  }
 
   function pintar() {
     const v = calcularVigencia(c);
@@ -191,8 +259,10 @@ export function montarOtrosies({ user, perfil, puedeEditar, puedeBorrarActas, al
     $("otLista").innerHTML = lista.map((n, i) => `<tr>
       <td>${fecha(n.fecha)}</td><td title="${esc(n.tipoTexto)}">${esc(n.tipoTexto)}</td><td title="${esc(n.documento || "")}">${esc(n.documento || "—")}</td>
       <td title="${esc(n.efecto)}">${esc(n.efecto)}</td><td title="${esc(n.observaciones || "")}">${esc(n.observaciones || "")}</td>
-      <td>${puedeEditar ? `<button type="button" class="btn secondary ip-btn-mini" data-quitar="${i}" title="Quitar">✕</button>` : ""}</td></tr>`).join("");
+      <td>${puedeEditar ? `<button type="button" class="btn secondary ip-btn-mini" data-editar="${i}" title="Corregir fecha, documento, plazo o valor">✎</button><button type="button" class="btn secondary ip-btn-mini" data-quitar="${i}" title="Quitar">✕</button>` : ""}</td></tr>`).join("");
+    const buscar = (n) => (c.novedades || []).find((x) => x.creadoEn === n.creadoEn && x.fecha === n.fecha && x.tipo === n.tipo);
     $("otLista").querySelectorAll("[data-quitar]").forEach((b) => b.addEventListener("click", () => quitar(lista[Number(b.dataset.quitar)])));
+    $("otLista").querySelectorAll("[data-editar]").forEach((b) => b.addEventListener("click", () => { const o = buscar(lista[Number(b.dataset.editar)]); if (o) editar(o); }));
   }
 
   // Guarda el arreglo completo y los campos derivados, con su historial, en
@@ -208,7 +278,7 @@ export function montarOtrosies({ user, perfil, puedeEditar, puedeBorrarActas, al
     if ((c.fechaFin || null) !== v.fechaFin) hist.push({ campo: "fechaFin", etiqueta: "Fecha de terminación", antes: fecha(c.fechaFin), despues: fecha(v.fechaFin) });
     if (cambios.estado && cambios.estado !== (c.estado || "Activo")) hist.push({ campo: "estado", etiqueta: "Estado", antes: c.estado || "Activo", despues: cambios.estado });
     anotarEnLote(lote, c.id, { user, perfil, modulo: "contrato", moduloLabel: "Otrosíes y prórrogas", registroId: c.id, accion: "contrato", resumen, cambios: hist });
-    if (crono) lote.set(crono.ref, crono.datos);
+    if (crono) lote.set(crono.ref, crono.datos, { merge: true });
     if (borrarCrono) lote.delete(doc(db, "ipContratos", c.id, "cronologia", borrarCrono));
     await lote.commit();
     Object.assign(c, cambios, { actualizadoEn: new Date() });
@@ -226,6 +296,7 @@ export function montarOtrosies({ user, perfil, puedeEditar, puedeBorrarActas, al
         resumen: `Quitó ${n.documento || n.tipoTexto} del ${fecha(n.fecha)}`,
         borrarCrono: puedeBorrarActas ? original.cronologiaId || null : null
       });
+      nuevoRegistro(); // el consecutivo del documento se recalcula sin la quitada
       mostrarAlerta(alerta, "Se quitó y se recalculó la terminación del contrato.", "success");
     } catch (err) {
       mostrarAlerta(alerta, errorAmigable(err));
@@ -236,30 +307,36 @@ export function montarOtrosies({ user, perfil, puedeEditar, puedeBorrarActas, al
     e.preventDefault();
     limpiarAlerta(alerta);
     const tipo = tipoSel.value;
-    const n = { tipo, fecha: fechaEl.value, documento: leerDocumento(), observaciones: $("otObs").value.trim(), creadoEn: new Date().toISOString(), creadoPor: user.email };
+    const original = editando;
+    const n = original
+      ? { ...original, fecha: fechaEl.value, documento: leerDocumento(), observaciones: $("otObs").value.trim(), editadoEn: new Date().toISOString(), editadoPor: user.email }
+      : { tipo, fecha: fechaEl.value, documento: leerDocumento(), observaciones: $("otObs").value.trim(), creadoEn: new Date().toISOString(), creadoPor: user.email };
     if (tipo !== "suspension") n.fechaFinNueva = finEl.value || null;
     if (tipo === "otrosi") n.valorAdicional = Number(valorEl.value) || null;
+    if (!n.fecha) { mostrarAlerta(alerta, "Indica la fecha."); fechaEl.focus(); return; }
     if (!n.documento) { mostrarAlerta(alerta, "Escribe el nombre del documento."); docEl.focus(); return; }
     if (tipo === "otrosi" && !n.fechaFinNueva && !n.valorAdicional) { mostrarAlerta(alerta, "Indica la prórroga (días o nueva fecha de terminación) o el valor adicional."); return; }
-    const v = calcularVigencia(c);
-    if (tipo === "reinicio" && n.fecha < v.suspendidoDesde) { mostrarAlerta(alerta, "La fecha de reinicio no puede ser anterior a la de suspensión."); return; }
+    const v = vigBase();
+    if (tipo === "reinicio" && v.suspendidoDesde && n.fecha < v.suspendidoDesde) { mostrarAlerta(alerta, "La fecha de reinicio no puede ser anterior a la de suspensión."); return; }
     if (n.fechaFinNueva && c.fechaInicio && n.fechaFinNueva < c.fechaInicio) { mostrarAlerta(alerta, "La nueva fecha de terminación no puede ser anterior al inicio del contrato."); return; }
-    // El acta queda también en Cronología de actas (informe mensual).
-    const refCrono = doc(collection(db, "ipContratos", c.id, "cronologia"));
+    // El acta queda también en Cronología de actas (informe mensual); al
+    // corregir se actualiza la misma acta.
+    const refCrono = n.cronologiaId ? doc(db, "ipContratos", c.id, "cronologia", n.cronologiaId) : doc(collection(db, "ipContratos", c.id, "cronologia"));
     n.cronologiaId = refCrono.id;
     const efecto = efectoNovedad(n, v.suspendidoDesde);
-    const crono = {
-      ref: refCrono,
-      datos: { tipo: TIPO_CRONOLOGIA[tipo], fecha: n.fecha, descripcion: `${n.documento}: ${efecto}${n.observaciones ? `. ${n.observaciones}` : ""}`, origen: "otrosies", creadoPor: perfil.nombre || user.email, creadoEn: serverTimestamp() }
-    };
+    const datosCrono = { tipo: TIPO_CRONOLOGIA[tipo], fecha: n.fecha, descripcion: `${n.documento}: ${efecto}${n.observaciones ? `. ${n.observaciones}` : ""}`, origen: "otrosies" };
+    if (original) Object.assign(datosCrono, { actualizadoPor: perfil.nombre || user.email, actualizadoEn: serverTimestamp() });
+    else Object.assign(datosCrono, { creadoPor: perfil.nombre || user.email, creadoEn: serverTimestamp() });
+    const cambio = (k, etiqueta, f = (x) => x || "—") => (original && (original[k] || null) !== (n[k] || null) ? `${etiqueta} ${f(original[k])} → ${f(n[k])}` : null);
+    const resumen = original
+      ? `Corrigió ${n.documento}: ${[cambio("fecha", "fecha", fecha), cambio("documento", "documento"), cambio("fechaFinNueva", "terminación", fecha), cambio("valorAdicional", "valor", moneda), cambio("observaciones", "observaciones")].filter(Boolean).join("; ") || "sin cambios"}`
+      : `Registró ${n.documento} (${efecto})`;
     btn.disabled = true;
     try {
-      await guardar([...(c.novedades || []), n], { resumen: `Registró ${n.documento} (${efecto})`, crono });
-      form.reset();
-      fechaEl.value = hoyISO();
-      ajustarTipos();
-      actualizarFormulario();
-      mostrarAlerta(alerta, "Registrado. La terminación del contrato ya quedó actualizada.", "success");
+      const novedades = original ? (c.novedades || []).map((x) => (x === original ? n : x)) : [...(c.novedades || []), n];
+      await guardar(novedades, { resumen, crono: { ref: refCrono, datos: datosCrono } });
+      nuevoRegistro();
+      mostrarAlerta(alerta, original ? "Corregido. La terminación del contrato y la Cronología de actas ya quedaron actualizadas." : "Registrado. La terminación del contrato ya quedó actualizada.", "success");
     } catch (err) {
       mostrarAlerta(alerta, errorAmigable(err));
     } finally {
@@ -269,11 +346,8 @@ export function montarOtrosies({ user, perfil, puedeEditar, puedeBorrarActas, al
 
   return function abrir(contrato) {
     c = contrato;
-    form.reset();
     limpiarAlerta(alerta);
-    fechaEl.value = hoyISO();
-    ajustarTipos();
-    actualizarFormulario();
+    nuevoRegistro();
     pintar();
     abrirModal("otrosiModal");
   };
