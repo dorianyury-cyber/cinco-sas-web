@@ -348,10 +348,21 @@ export function actividadesConItems(actividades = [], items = []) {
   });
 }
 
+// Adiciones de valor que vienen en los otrosíes del contrato (contratos.html
+// → Otrosíes y prórrogas), como movimientos "Adición" del Estado financiero.
+// Con "corte" solo las firmadas hasta esa fecha (informe de un mes pasado).
+export function adicionesOtrosi(contrato, corte = null) {
+  return (contrato?.novedades || [])
+    .filter((n) => n.tipo === "otrosi" && Number(n.valorAdicional) > 0 && (!corte || n.fecha <= corte))
+    .map((n) => ({ tipo: "Adición", descripcion: `${n.documento || "Otrosí"} (adición)`, fecha: n.fecha, valor: Number(n.valorAdicional), deOtrosi: true }));
+}
+
 // Estado financiero: valor total (inicial + adiciones - reducciones),
-// ejecutado (actas/constancias de cumplimiento) y saldo.
-export function estadoFinanciero(contrato, movimientos) {
-  const suma = (tipo) => movimientos.filter((m) => m.tipo === tipo).reduce((s, m) => s + (Number(m.valor) || 0), 0);
+// ejecutado (actas/constancias de cumplimiento) y saldo. Incluye las
+// adiciones de los otrosíes.
+export function estadoFinanciero(contrato, movimientos, corte = null) {
+  const todos = [...movimientos, ...adicionesOtrosi(contrato, corte)];
+  const suma = (tipo) => todos.filter((m) => m.tipo === tipo).reduce((s, m) => s + (Number(m.valor) || 0), 0);
   const valorTotal = (Number(contrato?.valorInicial) || 0) + suma("Adición") - suma("Reducción");
   const ejecutado = suma("Acta parcial / Constancia de cumplimiento") + suma("Acta de recibo final");
   return {
@@ -523,7 +534,7 @@ export const MODULOS = {
   financiero: {
     acumulaEnInforme: true,
     label: "Estado financiero", icon: "💵", coleccion: "financiero",
-    desc: "Adiciones, actas parciales / constancias de cumplimiento, anticipo y amortizaciones. El valor inicial se toma de la información del contrato.",
+    desc: "Adiciones, actas parciales / constancias de cumplimiento, anticipo y amortizaciones. El valor inicial se toma de la información del contrato y las adiciones de los otrosíes, de «Otrosíes y prórrogas» del contrato (no las registres también aquí).",
     campos: [
       { key: "tipo", label: "Tipo de movimiento", type: "select", opciones: ["Acta parcial / Constancia de cumplimiento", "Acta de recibo final", "Adición", "Reducción", "Anticipo", "Amortización de anticipo"], required: true },
       { key: "descripcion", label: "Descripción", type: "text", required: true, placeholder: "Ej. Constancia de cumplimiento 7" },
@@ -542,7 +553,7 @@ export const MODULOS = {
       let saldo = Number(ctx.contrato.valorInicial) || 0;
       let acumulado = 0;
       const filas = [`<tr><td>Valor inicial del contrato</td><td class="ip-num">${moneda(saldo)}</td><td class="ip-num">–</td><td class="ip-num">${moneda(saldo)}</td><td class="ip-num">–</td></tr>`];
-      [...ctx.registros].filter((m) => ["Adición", "Reducción", "Acta parcial / Constancia de cumplimiento", "Acta de recibo final"].includes(m.tipo))
+      [...ctx.registros, ...adicionesOtrosi(ctx.contrato)].filter((m) => ["Adición", "Reducción", "Acta parcial / Constancia de cumplimiento", "Acta de recibo final"].includes(m.tipo))
         .sort((a, b) => String(a.fecha).localeCompare(String(b.fecha)))
         .forEach((m) => {
           const v = Number(m.valor) || 0;

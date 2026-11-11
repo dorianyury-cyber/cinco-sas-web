@@ -2778,3 +2778,6 @@ form.pqr-form .control-rich-color { padding: 2px; border-radius: 6px; }
 .ip-adicional-seccion-off { opacity: 0.6; border-left-style: dashed; }
 .ip-adicional-ubicacion { display: flex; align-items: center; gap: 6px; margin-top: 6px; font-size: 12px; color: var(--text-muted); }
 .ip-adicional-ubicacion select { width: auto; max-width: 100%; font-size: 12px; padding: 3px 8px; }
+
+/* Otrosíes, prórrogas y suspensiones (ip-otrosies.js) */
+.ip-ot-resumen { margin: 4px 0 14px; }

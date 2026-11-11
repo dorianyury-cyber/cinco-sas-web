@@ -8,6 +8,7 @@
 import { collection, addDoc, updateDoc, deleteDoc, doc, getDocs, serverTimestamp, writeBatch } from "https://www.gstatic.com/firebasejs/10.7.1/firebase-firestore.js";
 import { anotarEnLote, diferencias } from "./ip-historial.js";
 import { montarTablero } from "./ip-tablero.js";
+import { montarOtrosies, calcularVigencia, fechaFinInicial } from "./ip-otrosies.js";
 import { htmlCampo, controlDocumentos } from "./ip-formulario.js";
 import { ref, uploadBytes, getDownloadURL } from "https://www.gstatic.com/firebasejs/10.7.1/firebase-storage.js";
 import {
@@ -33,7 +34,8 @@ async function iniciar({ user, perfil, esGestor, puede, contratos, contrato }) {
   const ETIQUETAS = { numero: "Contrato N.º", tipo: "Tipo de interventoría", estado: "Estado", objeto: "Objeto", municipio: "Municipio", objetivo: "Objetivo", alcance: "Alcance", frentes: "Proyectos / frentes", contratante: "Contratante", contratista: "Contratista", supervisor: "Supervisor", director: "Director / interventor", valorInicial: "Valor inicial", anticipoPct: "Anticipo (%)", fechaInicio: "Fecha de inicio", fechaFin: "Fecha de terminación", plazo: "Plazo", smmlv: "SMMLV" };
   // Documentos del contrato (PDF): contrato firmado, actas, pólizas…
   const CAMPO_DOCS = { key: "documentos", label: "Documentos del contrato (PDF)", type: "documentos", ayuda: "Ej. contrato firmado, acta de inicio, pólizas aprobadas, otrosíes. Se ven con 👁 y se pueden quitar." };
-  const CAMPOS_HIST = [...CAMPOS.map((k) => ({ key: k, label: ETIQUETAS[k] || k, type: ["valorInicial", "smmlv"].includes(k) ? "money" : k.startsWith("fecha") ? "date" : "text" })), CAMPO_DOCS];
+  const CAMPOS_HIST = [...CAMPOS.map((k) => ({ key: k, label: ETIQUETAS[k] || k, type: ["valorInicial", "smmlv"].includes(k) ? "money" : k.startsWith("fecha") ? "date" : "text" })),
+    { key: "fechaFinOriginal", label: "Fecha de terminación inicial", type: "date" }, CAMPO_DOCS];
   const docsEl = document.getElementById("c_docsCampo");
   let docsCtrl = null;
 
@@ -42,6 +44,11 @@ async function iniciar({ user, perfil, esGestor, puede, contratos, contrato }) {
     limpiarAlerta(alerta);
     document.getElementById("contratoFormTitulo").textContent = c ? `Editar contrato ${c.numero || ""}` : "Nuevo contrato";
     CAMPOS.forEach((k) => { document.getElementById(`c_${k}`).value = c?.[k] ?? (k === "estado" ? "Activo" : k === "tipo" ? "Servicios" : k === "contratista" ? "CINCO S.A.S." : ""); });
+    // Con otrosíes registrados, aquí se corrige la terminación INICIAL; la
+    // vigente sale de los otrosíes (si no, editar aquí pisaría las prórrogas).
+    const conOtrosies = (c?.novedades || []).length > 0;
+    if (conOtrosies) document.getElementById("c_fechaFin").value = fechaFinInicial(c) || "";
+    document.querySelector('label[for="c_fechaFin"]').textContent = conOtrosies ? "Fecha de terminación inicial * (las prórrogas van en «Otrosíes y prórrogas»)" : "Fecha de terminación *";
     docsEl.innerHTML = htmlCampo(CAMPO_DOCS, c?.documentos);
     docsCtrl = controlDocumentos(docsEl, [CAMPO_DOCS], c);
     document.getElementById("contratoEliminarBtn").classList.toggle("hidden", !(c && puede.eliminarContratos));
@@ -59,6 +66,12 @@ async function iniciar({ user, perfil, esGestor, puede, contratos, contrato }) {
     if (datos.fechaFin && datos.fechaInicio && datos.fechaFin < datos.fechaInicio) {
       mostrarAlerta(alerta, "La fecha de terminación no puede ser anterior a la de inicio.");
       return;
+    }
+    // El campo es la terminación inicial: la vigente se recalcula con los otrosíes.
+    const previo = editandoId ? contratos.find((c) => c.id === editandoId) : null;
+    if ((previo?.novedades || []).length) {
+      datos.fechaFinOriginal = datos.fechaFin || null;
+      datos.fechaFin = calcularVigencia({ fechaFinOriginal: datos.fechaFinOriginal, novedades: previo.novedades }).fechaFin;
     }
     datos.actualizadoEn = serverTimestamp();
     datos.actualizadoPor = user.email;
@@ -122,7 +135,10 @@ async function iniciar({ user, perfil, esGestor, puede, contratos, contrato }) {
 
   // Lista con semáforo + ficha del seleccionado (ip-tablero.js). El gestor
   // edita desde la ficha.
-  montarTablero({ contratos, activo: contrato, esGestor: puede.crearContratos, onEditar: abrirFormulario });
+  // Otrosíes, prórrogas y suspensiones: todos los ven; los registra quien
+  // puede editar contratos.
+  const abrirOtrosies = montarOtrosies({ user, perfil, puedeEditar: !!puede.crearContratos, puedeBorrarActas: !!puede.eliminarRegistros, alCerrarConCambios: () => location.reload() });
+  montarTablero({ contratos, activo: contrato, esGestor: puede.crearContratos, onEditar: abrirFormulario, onOtrosies: abrirOtrosies });
   const editar = new URLSearchParams(location.search).get("editar");
   if (editar && puede.crearContratos) {
     const c = contratos.find((x) => x.id === editar);

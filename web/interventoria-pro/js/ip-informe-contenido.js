@@ -20,8 +20,9 @@
 import { moneda, numero, fecha, mesCorto, mesLargo, mesesDelContrato, diasEntre } from "./ip-core.js";
 import {
   MODULOS, curvaS, svgCurvaS, estadoFinanciero, indicadoresSST, INDICADORES_SST,
-  activoEnMes, avanceReal, inicioActividad, frentesDeActividades, actividadesConItems, valorItem, ejecutadoItem, periodosActuacion, cumplimientoPeriodica, validarActuacion, curvaPlan, nivelRiesgo
+  adicionesOtrosi, activoEnMes, avanceReal, inicioActividad, frentesDeActividades, actividadesConItems, valorItem, ejecutadoItem, periodosActuacion, cumplimientoPeriodica, validarActuacion, curvaPlan, nivelRiesgo
 } from "./ip-modulos.js";
+import { vigenciaAl, novedadesConEfecto, fechaFinInicial } from "./ip-otrosies.js";
 
 // Fecha AAAA-MM-DD en la hora local (Colombia), no en UTC: toISOString() desde las 7:00 p. m. da el día siguiente.
 const fechaLocalISO = (d = new Date()) => `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}-${String(d.getDate()).padStart(2, "0")}`;
@@ -198,7 +199,10 @@ export async function construirInforme({ contrato, ym, datos, elaboradoPor, carg
     }
     extra.filter((x) => !claves.has(String(x.ubicacion || "").split("#")[0])).forEach((x) => { if (!soltados.has(x)) { soltados.add(x); emitirAdicional(x); } });
   }
-  const ef = estadoFinanciero(contrato, hasta("financiero"));
+  const ef = estadoFinanciero(contrato, hasta("financiero"), corte);
+  // Plazo vigente al corte del informe y los otrosíes/actas firmados hasta entonces.
+  const vig = vigenciaAl(contrato, corte);
+  const otrosies = novedadesConEfecto(contrato, corte);
   const acts = actividadesConItems(datos.actividades || [], datos.items || []).sort((a, c) => (Number(a.item) || 0) - (Number(c.item) || 0));
 
   // ================================================================ 1. INTRODUCCIÓN
@@ -221,9 +225,15 @@ export async function construirInforme({ contrato, ym, datos, elaboradoPor, carg
         ["Supervisor", contrato.supervisor], ...(contrato.municipio ? [["Municipio", contrato.municipio]] : []),
         ...(contrato.frentes ? [["Proyectos / frentes", String(contrato.frentes).split(/[\n,;]+/).map((x) => x.trim()).filter(Boolean).join(" · ")]] : []),
         ["Valor inicial", moneda(contrato.valorInicial)], ["Valor total (con adiciones)", moneda(ef.valorTotal)],
-        ["Fecha de inicio", fechaLarga(contrato.fechaInicio)], ["Fecha de terminación", fechaLarga(contrato.fechaFin)],
+        ["Fecha de inicio", fechaLarga(contrato.fechaInicio)],
+        ...(otrosies.length ? [["Fecha de terminación inicial", fechaLarga(fechaFinInicial(contrato))], ["Fecha de terminación vigente", fechaLarga(vig.fechaFin)]] : [["Fecha de terminación", fechaLarga(contrato.fechaFin)]]),
         ["Plazo", contrato.plazo || "-"]
       ].map(([a, v]) => [a, v || "-"]), { titulo: "Información básica del contrato", anchos: [30, 70], tam: 17 });
+      if (otrosies.length) {
+        H2("Otrosíes, prórrogas y suspensiones");
+        tabla(["Fecha", "Tipo", "Documento", "Efecto", "Observaciones"], otrosies.map((n) => [fecha(n.fecha), n.tipoTexto, n.documento || "-", n.efecto, n.observaciones || "-"]),
+          { titulo: "Otrosíes, prórrogas y suspensiones del contrato", anchos: [12, 15, 21, 30, 22], tam: 13 });
+      }
     }],
     ["actainicio", () => {
       H2("Requisitos para el acta de inicio");
@@ -276,7 +286,7 @@ export async function construirInforme({ contrato, ym, datos, elaboradoPor, carg
       H2("Estado financiero del contrato");
       let saldo = Number(contrato.valorInicial) || 0, acum = 0;
       const filas = [["Valor inicial del contrato", moneda(saldo), "–", moneda(saldo), "0 %"]];
-      hasta("financiero").sort((a, c) => String(a.fecha).localeCompare(String(c.fecha))).forEach((m) => {
+      [...hasta("financiero"), ...adicionesOtrosi(contrato, corte)].sort((a, c) => String(a.fecha).localeCompare(String(c.fecha))).forEach((m) => {
         const v = Number(m.valor) || 0;
         if (m.tipo === "Adición") { saldo += v; filas.push([m.descripcion, moneda(v), "–", moneda(saldo), "–"]); }
         else if (m.tipo === "Reducción") { saldo -= v; filas.push([m.descripcion, `-${moneda(v)}`, "–", moneda(saldo), "–"]); }

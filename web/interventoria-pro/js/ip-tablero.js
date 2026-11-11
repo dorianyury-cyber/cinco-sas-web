@@ -15,7 +15,7 @@ const SEMAFORO = {
 };
 const INACTIVOS = ["Terminado", "Liquidado"];
 
-export async function montarTablero({ contratos, activo, esGestor, onEditar }) {
+export async function montarTablero({ contratos, activo, esGestor, onEditar, onOtrosies }) {
   const tarjetasEl = document.getElementById("tbTarjetas");
   const listaEl = document.getElementById("tbLista");
   const detalleEl = document.getElementById("tbDetalle");
@@ -140,7 +140,9 @@ export async function montarTablero({ contratos, activo, esGestor, onEditar }) {
           ${dato("Valor inicial", c.valorInicial ? moneda(c.valorInicial) : "-")}
           ${dato("Anticipo", c.anticipoPct ? `${numero(c.anticipoPct, 1)}%` : "-")}
           ${dato("Inicio", fecha(c.fechaInicio))}
-          ${dato("Terminación", fecha(c.fechaFin))}
+          ${dato("Terminación", (c.novedades || []).length && c.fechaFinOriginal !== c.fechaFin
+            ? `${fecha(c.fechaFin)} <span class="text-muted">(inicial ${fecha(c.fechaFinOriginal)})</span>` : fecha(c.fechaFin))}
+          ${(c.novedades || []).length ? dato("Otrosíes y actas", `${c.novedades.length} registrado(s)`) : ""}
           ${dato("Plazo", esc(c.plazo))}
           ${dato("SMMLV vigente", c.smmlv ? moneda(c.smmlv) : '<span class="text-muted">Sin registrar</span>')}
           ${r ? dato("Tiempo transcurrido", `${r.tiempo}%`) : ""}
@@ -153,6 +155,7 @@ export async function montarTablero({ contratos, activo, esGestor, onEditar }) {
           <button type="button" class="btn" data-abrir="inicio.html">${activo?.id === c.id ? "Ir al contrato" : "Usar este contrato"}</button>
           <button type="button" class="btn secondary" data-abrir="informe.html">Informe mensual</button>
           <button type="button" class="btn secondary" data-abrir="avisos.html">📧 Avisos</button>
+          ${onOtrosies ? `<button type="button" class="btn secondary" id="tbOtrosiesBtn">📑 Otrosíes y prórrogas${(c.novedades || []).length ? ` (${c.novedades.length})` : ""}</button>` : ""}
           ${esGestor ? '<button type="button" class="btn secondary" id="tbEditarBtn">✏️ Editar</button>' : ""}
         </div>
       </div>
@@ -167,6 +170,7 @@ export async function montarTablero({ contratos, activo, esGestor, onEditar }) {
     detalleEl.querySelectorAll("[data-abrir]").forEach((b) => b.addEventListener("click", () => { fijarContratoActivo(c.id); location.href = b.dataset.abrir; }));
     detalleEl.querySelectorAll("a[data-modulo]").forEach((a) => a.addEventListener("click", () => fijarContratoActivo(c.id)));
     document.getElementById("tbEditarBtn")?.addEventListener("click", () => onEditar(c));
+    document.getElementById("tbOtrosiesBtn")?.addEventListener("click", () => onOtrosies(c));
     detalleEl.querySelectorAll("[data-doc]").forEach((b) => b.addEventListener("click", () => {
       const d = c.documentos[Number(b.dataset.doc)];
       verPdf(d.url, d.nombre);
