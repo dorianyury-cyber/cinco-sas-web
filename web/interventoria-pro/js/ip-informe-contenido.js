@@ -100,7 +100,7 @@ export function claveSeccion(it) {
 
 // liviano: sin dibujar las gráficas (solo para calcular la numeración que
 // verá el editor de contenido adicional).
-export async function construirInforme({ contrato, ym, datos, elaboradoPor, cargo, incluir = null, fotosIncluir = null, adicional = null, liviano = false }) {
+export async function construirInforme({ contrato, ym, datos, elaboradoPor, cargo, incluir = null, fotosIncluir = null, adicional = null, ocultar = null, liviano = false }) {
   const aPng = liviano ? async () => ({ dataUrl: "", ancho: 1, alto: 1 }) : svgADataUrl;
   const corte = finDeMes(ym);
   const esObra = contrato.tipo === "Obra";
@@ -115,7 +115,8 @@ export async function construirInforme({ contrato, ym, datos, elaboradoPor, carg
   // antesDeH2: lo usa capitulo() para soltar el contenido adicional ubicado
   // después del numeral anterior, justo antes de que empiece el siguiente.
   let antesDeH2 = null;
-  const H2 = (texto) => { antesDeH2?.(); b.push({ tipo: "titulo2", texto }); };
+  let despuesDeH2 = null;
+  const H2 = (texto) => { antesDeH2?.(); b.push({ tipo: "titulo2", texto }); despuesDeH2?.(); };
   const P = (texto) => b.push({ tipo: "parrafo", texto: String(texto ?? "") });
   const nota = (texto) => b.push({ tipo: "parrafo", texto, nota: true });
   // Aviso de "sin registros" de un numeral. Si en ese mismo numeral se puso
@@ -177,6 +178,9 @@ export async function construirInforme({ contrato, ym, datos, elaboradoPor, carg
     const activas = secciones.filter(([k]) => incluye(k));
     if (!activas.length) return;
     const extra = (adicional && adicional[capId]) || [];
+    // Numerales marcados «Usar solo mi contenido» en el editor del capítulo:
+    // queda su título, pero no lo que el aplicativo saca de los módulos.
+    const soloPropio = new Set((ocultar && ocultar[capId]) || []);
     const claves = new Set(secciones.map(([k]) => k));
     const soltados = new Set();
     const soltar = (clave) => {
@@ -196,13 +200,16 @@ export async function construirInforme({ contrato, ym, datos, elaboradoPor, carg
       vaciosNumeral = [];
       if (incluye(k)) {
         let j = -1;
+        let inicioNumeral = b.length;
         const cerrarNumeral = () => {
           if (j < 0) return;
+          if (soloPropio.has(`${k}#${j}`)) b.splice(inicioNumeral);
           soltar(`${k}#${j}`);
           if (liviano) b.push({ tipo: "finNumeral", k, j });
         };
         antesDeH2 = () => { cerrarNumeral(); j += 1; vaciosNumeral = []; };
-        try { await fn(); } finally { antesDeH2 = null; }
+        despuesDeH2 = () => { inicioNumeral = b.length; };
+        try { await fn(); } finally { antesDeH2 = null; despuesDeH2 = null; }
         cerrarNumeral();
       }
       // Marca de fin de sección (solo al calcular la numeración del editor).

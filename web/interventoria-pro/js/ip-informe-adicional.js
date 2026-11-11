@@ -73,6 +73,8 @@ export function montarEditorAdicional({ contrato, user, perfil, alGuardar }) {
   const guardarBtn = document.getElementById("adicionalGuardarBtn");
 
   let porMes = {};          // { [capId]: [bloques] } del mes cargado
+  let ocultosMes = {};      // { [capId]: ["k#j", …] } numerales con «Usar solo mi contenido»
+  let soloPropio = new Set(); // los del capítulo abierto, en edición
   let ymCargado = null;
   let capActual = null;
   let inicio = null;        // { capNum, titulos, tablas, figuras, incluido }
@@ -85,9 +87,10 @@ export function montarEditorAdicional({ contrato, user, perfil, alGuardar }) {
   async function cargarMes(ym) {
     ymCargado = ym;
     porMes = {};
+    ocultosMes = {};
     try {
       const snap = await getDoc(doc(db, "ipContratos", contrato.id, "informeAdicional", ym));
-      if (snap.exists()) porMes = snap.data().capitulos || {};
+      if (snap.exists()) { porMes = snap.data().capitulos || {}; ocultosMes = snap.data().ocultos || {}; }
     } catch (err) { /* sin contenido adicional todavía */ }
     return porMes;
   }
@@ -129,8 +132,8 @@ export function montarEditorAdicional({ contrato, user, perfil, alGuardar }) {
     const cabeceras = {};
     secciones.forEach((sec) => {
       cabeceras[sec.k] = (sec.titulos || []).map((t) => { t1 += 1; t2 = 0; t3 = 0; return `${cap}.${t1}. ${t}`; });
-      nTabla += sec.tablas || 0;
-      nFig += sec.figuras || 0;
+      // Con «Usar solo mi contenido», las tablas y figuras del aplicativo no salen.
+      if (!soloPropio.has(sec.k)) { nTabla += sec.tablas || 0; nFig += sec.figuras || 0; }
       bloques.filter((b) => posSeccion(b.ubicacion) === posSeccion(sec.k)).forEach((b) => {
         if (b.tipo === "titulo") {
           const n = Math.min(3, Math.max(1, Number(b.nivel) || 1));
@@ -359,6 +362,24 @@ export function montarEditorAdicional({ contrato, user, perfil, alGuardar }) {
         : !sec.activa ? "sección no marcada: no sale en el informe, pero lo que agregues aquí sí, en este punto"
         : nums.length ? "contenido del aplicativo" : `${sec.nombre} — contenido del aplicativo`;
       cab.append(tit, nota);
+      // Numeral del aplicativo: se puede reemplazar por el contenido propio,
+      // para no tener que llenar lo mismo en el módulo y aquí.
+      if (sec.k.includes("#")) {
+        const solo = soloPropio.has(sec.k);
+        if (solo) nota.textContent = "solo sale tu contenido: lo del aplicativo en este numeral NO va al informe";
+        const lab = document.createElement("label");
+        lab.className = "ip-adicional-solo";
+        lab.title = "Deja el título del numeral y quita del informe la tabla o el texto que el aplicativo saca de los módulos; queda solo lo que agregues debajo";
+        const chk = document.createElement("input");
+        chk.type = "checkbox";
+        chk.checked = solo;
+        chk.addEventListener("change", () => {
+          if (chk.checked) soloPropio.add(sec.k); else soloPropio.delete(sec.k);
+          pintar();
+        });
+        lab.append(chk, " Usar solo mi contenido en este numeral");
+        cab.appendChild(lab);
+      }
       lista.appendChild(cab);
 
       const propios = bloques.map((b, i) => [b, i]).filter(([b]) => posSeccion(b.ubicacion) === si);
@@ -479,14 +500,15 @@ export function montarEditorAdicional({ contrato, user, perfil, alGuardar }) {
     try {
       const lote = writeBatch(db);
       lote.set(doc(db, "ipContratos", contrato.id, "informeAdicional", ymCargado), {
-        ym: ymCargado, capitulos: { [capActual.id]: limpios }, actualizadoEn: serverTimestamp(), actualizadoPor: user.email
+        ym: ymCargado, capitulos: { [capActual.id]: limpios }, ocultos: { [capActual.id]: [...soloPropio] }, actualizadoEn: serverTimestamp(), actualizadoPor: user.email
       }, { merge: true });
       anotarEnLote(lote, contrato.id, {
         user, perfil, modulo: "informe", moduloLabel: "Informe mensual", accion: "editar",
-        resumen: `Contenido adicional de «${capActual.label}» (${mesLargo(ymCargado)}): ${limpios.length} bloque(s)`
+        resumen: `Contenido adicional de «${capActual.label}» (${mesLargo(ymCargado)}): ${limpios.length} bloque(s)${soloPropio.size ? `, ${soloPropio.size} numeral(es) solo con contenido propio` : ""}`
       });
       await lote.commit();
       porMes[capActual.id] = limpios;
+      ocultosMes[capActual.id] = [...soloPropio];
       cerrar();
       alGuardar?.();
     } catch (err) {
@@ -499,6 +521,7 @@ export function montarEditorAdicional({ contrato, user, perfil, alGuardar }) {
   return {
     cargarMes,
     contenido: () => porMes,
+    ocultos: () => ocultosMes,
     cuantos: (capId) => (porMes[capId] || []).length,
     // inicio: numeración del capítulo en el informe (ver numeracionCapitulo
     // en ip-informe.js) para que los títulos sigan desde el último numeral.
@@ -508,6 +531,7 @@ export function montarEditorAdicional({ contrato, user, perfil, alGuardar }) {
       secciones = [...(inicio?.secciones || []).map((x) => ({ ...x })), { k: "", nombre: "Final del capítulo", titulos: [], tablas: 0, figuras: 0, activa: true }];
       // Copia profunda: si se cancela, lo guardado no queda tocado.
       bloques = (porMes[cap.id] || []).map(normalizar);
+      soloPropio = new Set(ocultosMes[cap.id] || []);
       historial = [];
       tituloEl.textContent = `Contenido adicional — ${cap.label}`;
       mesEl.textContent = mesLargo(ymCargado);

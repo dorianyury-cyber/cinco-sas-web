@@ -95,7 +95,7 @@ async function iniciar({ user, perfil, contrato }) {
     const contar = async (incluir) => {
       const { bloques } = await construirInforme({
         contrato, ym: selMes.value, datos, elaboradoPor: "", cargo: "", incluir, fotosIncluir: [...fotosSel],
-        adicional: { ...editorAdicional.contenido(), [capId]: [] }, liviano: true
+        adicional: { ...editorAdicional.contenido(), [capId]: [] }, ocultar: { ...editorAdicional.ocultos(), [capId]: [] }, liviano: true
       });
       const r = { capNum: 0, titulos: 0, tablas: 0, figuras: 0, incluido: false, secciones: [] };
       let dentro = false;
@@ -308,7 +308,7 @@ async function iniciar({ user, perfil, contrato }) {
     radicado: document.getElementById("informeRadicado").value.trim(),
     incluir: new Set(seleccion),
     fotosIncluir: [...fotosSel],
-    adicional: editorAdicional.contenido()
+    adicional: editorAdicional.contenido(), ocultar: editorAdicional.ocultos()
   });
   const nombreArchivo = (ext) => `Informe ${contrato.tipo === "Obra" ? "de Interventoría" : "de seguimiento"} ${mesLargo(selMes.value)} (Contrato ${String(contrato.numero || "").replace(/[\/:*?"<>|]/g, "-")}).${ext}`;
   function descargar(url, nombre) {
@@ -376,7 +376,7 @@ async function iniciar({ user, perfil, contrato }) {
         cargo: document.getElementById("informeCargo").value.trim(),
         incluir: new Set(seleccion),
         fotosIncluir: [...fotosSel],
-        adicional: editorAdicional.contenido(),
+        adicional: editorAdicional.contenido(), ocultar: editorAdicional.ocultos(),
         radicado: radicadoEl.value.trim()
       });
       const a = document.createElement("a");
