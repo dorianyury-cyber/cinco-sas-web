@@ -18,7 +18,7 @@ import { parsearHtmlARuns, MARCADORES_VINETA } from "./texto-rico.js";
 import {
   normalizarMerges, celdaCombinada, normalizarCentrados, celdaCentrada,
   normalizarNegritas, celdaNegrita, normalizarColoresCelda, colorCelda,
-  filasEncabezadoAutomatico, normalizarCentradosVertical, celdaCentradaVertical
+  filasEncabezadoAutomatico, normalizarCentradosVertical, celdaCentradaVertical, anchosManuales
 } from "./tabla-celdas.js";
 
 const NAVY = [31, 39, 50];
@@ -811,7 +811,9 @@ export async function generarInformePDF(informe) {
       if (resultadoAnchos.cabe || fontSize <= 6) break;
       fontSize -= 0.5;
     }
-    const anchos = resultadoAnchos.anchos;
+    // Ancho fijado a mano en el editor («Ancho de columnas») o, si no, según el contenido.
+    const manuales = anchosManuales(bloque, numCols);
+    const anchos = manuales ? manuales.map((x) => x * anchoUtil) : resultadoAnchos.anchos;
     // Alto de línea y línea base del texto dentro de la celda, en la misma
     // proporción que se usaba a 8.5pt/4.2mm/3.2mm — escalados al tamaño de
     // fuente que de verdad se usó (que puede haber bajado de 8 si la tabla

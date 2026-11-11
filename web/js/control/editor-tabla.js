@@ -13,7 +13,8 @@ import {
   redimensionarFilas, celdaNegrita, normalizarNegritas, negritaRango, quitarNegritaRango,
   colorCelda, normalizarColoresCelda, colorearRango, normalizarOpcionesColumna,
   insertarFilaEnBloque, eliminarFilaEnBloque, filasEncabezadoAutomatico,
-  celdaCentradaVertical, normalizarCentradosVertical, centrarVerticalRango, alinearArribaRango
+  celdaCentradaVertical, normalizarCentradosVertical, centrarVerticalRango, alinearArribaRango,
+  anchosManuales, fijarAnchoColumna
 } from "./tabla-celdas.js";
 
 let ctx = { antesDeCambiar: () => {}, alCambiar: () => {}, avisar: () => {} };
@@ -153,8 +154,10 @@ function renderTablaEditor(bloque) {
   grid.className = "control-tabla-grid";
   // Ancho de columna proporcional a su contenido (no partes iguales) —
   // mismo criterio que el PDF/Word, ver anchosColumnaEditor.
+  // Si se fijó el ancho a mano («Ancho de columnas»), ese reparto manda.
   const pesosCol = anchosColumnaEditor(bloque.filas, bloque.merges, numFilas, numCols);
-  grid.style.gridTemplateColumns = pesosCol.map((p) => `minmax(90px, ${p}fr)`).join(" ");
+  const manuales = anchosManuales(bloque, numCols);
+  grid.style.gridTemplateColumns = (manuales || pesosCol).map((p) => `minmax(90px, ${p}fr)`).join(" ");
 
   // Barra flotante — aparece pegada a la última celda seleccionada con las
   // acciones más usadas (negrilla, alinear, combinar), para no tener que
@@ -558,6 +561,51 @@ function renderTablaEditor(bloque) {
     else delete bloque.opcionesColumna[ci];
     renderBloques();
   });
+  // Ancho de columnas: por defecto según el contenido; aquí se puede dejar
+  // todas iguales, fijar el % de una columna o volver al automático. El PDF
+  // y el Word usan el mismo reparto (bloque.anchosColumna).
+  const botonMini = (texto, titulo, alClic) => {
+    const b = document.createElement("button");
+    b.type = "button";
+    b.className = "control-btn-mini";
+    b.textContent = texto;
+    b.title = titulo;
+    b.addEventListener("click", alClic);
+    return b;
+  };
+  const igualesBtn = botonMini("↔ Columnas iguales", "Reparte el ancho de la tabla en partes iguales entre todas las columnas", () => {
+    guardarHistorialBloques();
+    bloque.anchosColumna = new Array(numCols).fill(Math.round(1000 / numCols) / 10);
+    renderBloques();
+  });
+  const anchoColBtn = botonMini("📏 Ancho de esta columna…", "Haz clic en una celda de la columna y escribe qué porcentaje del ancho de la tabla debe ocupar; las demás se ajustan solas", () => {
+    if (!bloque._selA) {
+      mostrarAlerta("Haz clic en una celda de la columna a la que le quieres cambiar el ancho.", "error");
+      return;
+    }
+    const ci = bloque._selA.ci;
+    const actual = Math.round((anchosManuales(bloque, numCols) || pesosCol.map((p) => p / pesosCol.reduce((s, x) => s + x, 0)))[ci] * 100);
+    const texto = window.prompt(`Ancho de la columna ${ci + 1} en % del ancho de la tabla (ahora ${actual} %):`, String(actual));
+    if (texto === null) return;
+    const pct = Number(String(texto).replace(",", ".").replace("%", "").trim());
+    if (!(pct > 0 && pct < 100)) {
+      mostrarAlerta("Escribe un porcentaje entre 1 y 99.", "error");
+      return;
+    }
+    guardarHistorialBloques();
+    fijarAnchoColumna(bloque, numCols, ci, pct, pesosCol);
+    renderBloques();
+  });
+  const autoAnchoBtn = botonMini("↺ Automático", "Vuelve al reparto automático: cada columna tan ancha como su contenido", () => {
+    guardarHistorialBloques();
+    delete bloque.anchosColumna;
+    renderBloques();
+  });
+  autoAnchoBtn.disabled = !manuales;
+  const anchosTexto = document.createElement("span");
+  anchosTexto.className = "control-tabla-anchos";
+  anchosTexto.textContent = manuales ? `Fijado: ${manuales.map((f) => `${Math.round(f * 100)} %`).join(" · ")}` : "Automático (según el contenido)";
+
   // Botones en "tarjeticas" con título propio (como los Informes de gestión
   // de Cinco Conecta), en vez de una sola fila corrida: se ve de una qué
   // hace cada grupo sin tener que leer todos los botones.
@@ -579,6 +627,7 @@ function renderTablaEditor(bloque) {
     grupoBotones("Vaciar tabla", [vaciarBtn]),
     grupoBotones("Pegar datos", [pegarBtn]),
     grupoBotones("Combinar celdas", [combinarBtn, separarBtn]),
+    grupoBotones("Ancho de columnas", [igualesBtn, anchoColBtn, autoAnchoBtn, anchosTexto]),
     grupoBotones("Alineación y negrilla", [centrarBtn, izquierdaBtn, centrarVerticalBtn, arribaBtn, negritaBtn]),
     grupoBotones("Color de letra", [colorInput, colorQuitarBtn]),
     grupoBotones("Lista desplegable por columna", [opcionesBtn])

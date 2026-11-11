@@ -2906,3 +2906,6 @@ form.pqr-form input[type="checkbox"], form.pqr-form input[type="radio"] { width:
 .control-tabla-grupo { background: var(--bg); border: 1px solid var(--border); border-radius: 10px; padding: 8px 10px; display: flex; flex-direction: column; gap: 6px; }
 .control-tabla-grupo-titulo { font-size: 11px; font-weight: 700; text-transform: uppercase; letter-spacing: 0.03em; color: var(--text-muted); }
 .control-tabla-grupo-botones { display: flex; gap: 6px; align-items: center; flex-wrap: wrap; }
+
+/* Ancho de columnas fijado (editor-tabla.js) */
+.control-tabla-anchos { font-size: 11.5px; color: var(--text-muted, #6b7280); }

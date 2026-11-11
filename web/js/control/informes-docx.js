@@ -27,7 +27,7 @@ import { medidasTablaPDF } from "./informes-pdf.js";
 import {
   normalizarMerges, celdaCombinada, normalizarCentrados, celdaCentrada,
   normalizarNegritas, celdaNegrita, normalizarColoresCelda, colorCelda,
-  filasEncabezadoAutomatico, normalizarCentradosVertical, celdaCentradaVertical
+  filasEncabezadoAutomatico, normalizarCentradosVertical, celdaCentradaVertical, anchosManuales
 } from "./tabla-celdas.js";
 
 const NAVY_HEX = "1F2732";
@@ -242,6 +242,9 @@ export function tablaConFormatoDocx(bloque, { anchoUtilMm, anchoUtilDxa, titulo,
   } catch (e) {
     anchos = anchosColumnaDocx(filas, merges).map((a) => Math.round(a * anchoUtilDxa / ANCHO_UTIL_DXA));
   }
+  // Ancho fijado a mano en el editor («Ancho de columnas»): manda sobre el automático.
+  const manuales = anchosManuales(bloque, numColsTabla);
+  if (manuales) anchos = manuales.map((x) => Math.round(x * anchoUtilDxa));
   anchos[anchos.length - 1] += anchoUtilDxa - anchos.reduce((s, a) => s + a, 0); // que sumen justo el ancho útil
   // Relleno de 1,8 mm por lado, como el PDF.
   const margenesCelda = { top: mmATw(1.8), bottom: mmATw(1.8), left: mmATw(1.8), right: mmATw(1.8) };

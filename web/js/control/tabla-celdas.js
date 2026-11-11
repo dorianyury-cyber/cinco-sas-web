@@ -249,6 +249,33 @@ export function anchosColumnaEditor(filas, merges, numFilas, numCols) {
   return pesos.map((p) => Math.min(p, ANCHO_MAX_CH));
 }
 
+// ---- ancho de columnas fijado a mano ----
+// Por defecto el ancho se reparte según el contenido (arriba); el grupo
+// «Ancho de columnas» del editor permite fijarlo: bloque.anchosColumna =
+// porcentajes del ancho de la tabla, uno por columna. El editor, el PDF y el
+// Word usan este reparto si existe. Si después se agregan o quitan columnas
+// (siempre al final), se completa con el promedio o se recorta, y se vuelve a
+// llevar a 100 %. Devuelve fracciones que suman 1, o null = automático.
+export const ANCHO_COLUMNA_MIN_PCT = 5;
+export function anchosManuales(bloque, numCols) {
+  const base = Array.isArray(bloque?.anchosColumna) ? bloque.anchosColumna.map(Number).filter((x) => x > 0) : [];
+  if (!base.length || !numCols) return null;
+  const prom = base.reduce((s, x) => s + x, 0) / base.length;
+  const lista = Array.from({ length: numCols }, (_, i) => base[i] ?? prom);
+  const total = lista.reduce((s, x) => s + x, 0);
+  return lista.map((x) => x / total);
+}
+
+// Fija el ancho (%) de la columna ci y reparte el resto entre las demás en
+// la misma proporción que ya tenían (o según el contenido si era automático).
+export function fijarAnchoColumna(bloque, numCols, ci, pct, pesosAuto) {
+  const actual = anchosManuales(bloque, numCols) || (() => { const t = pesosAuto.reduce((s, x) => s + x, 0); return pesosAuto.map((x) => x / t); })();
+  const objetivo = Math.max(ANCHO_COLUMNA_MIN_PCT, Math.min(100 - ANCHO_COLUMNA_MIN_PCT * (numCols - 1), pct)) / 100;
+  const resto = actual.reduce((s, x, i) => (i === ci ? s : s + x), 0) || 1;
+  const nuevo = actual.map((x, i) => (i === ci ? objetivo : (x / resto) * (1 - objetivo)));
+  bloque.anchosColumna = nuevo.map((x) => Math.round(x * 1000) / 10);
+}
+
 // Ajusta "filas" (en el sitio, misma referencia) a un número exacto de
 // filas y columnas de una sola vez — crece agregando celdas vacías al
 // final, encoge quitando desde el final. Para el control "Filas x
