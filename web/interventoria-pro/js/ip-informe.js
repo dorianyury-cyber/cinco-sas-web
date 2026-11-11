@@ -88,25 +88,39 @@ async function iniciar({ user, perfil, contrato }) {
   // antes de su final), para que el editor numere sus títulos a partir de
   // ahí. Arma el informe sin gráficas (liviano) y sin el contenido adicional
   // de ese capítulo.
+  // Nombre de cada sección (clave → etiqueta del módulo) para el editor.
+  const nombreSeccion = { intro: "Objetivo y alcance" };
+  CAPITULOS.forEach((cap) => cap.items.forEach((it) => { nombreSeccion[claveSeccion(it)] = it.label || MODULOS[it.m]?.label || it.m; }));
   async function numeracionCapitulo(capId) {
     const contar = async (incluir) => {
       const { bloques } = await construirInforme({
         contrato, ym: selMes.value, datos, elaboradoPor: "", cargo: "", incluir, fotosIncluir: [...fotosSel],
         adicional: { ...editorAdicional.contenido(), [capId]: [] }, liviano: true
       });
-      const r = { capNum: 0, titulos: 0, tablas: 0, figuras: 0, incluido: false };
+      const r = { capNum: 0, titulos: 0, tablas: 0, figuras: 0, incluido: false, secciones: [] };
       let dentro = false;
+      let actual = { titulos: [], tablas: 0, figuras: 0 };
+      const conNumerales = new Set();
       for (const b of bloques) {
         if (b.tipo === "titulo1") {
           if (dentro) break;
           r.capNum += 1;
           if (b.capId === capId) { dentro = true; r.incluido = true; }
-        } else if (b.tipo === "titulo2" && dentro) r.titulos += 1;
-        else if (b.tipo === "tabla" || b.tipo === "tablaEditor") r.tablas += 1;
-        else if (b.tipo === "imagen") r.figuras += 1;
+        } else if (b.tipo === "finNumeral") {
+          // Un punto de inserción por numeral (ver capitulo() en ip-informe-contenido.js).
+          if (dentro) { r.secciones.push({ k: `${b.k}#${b.j}`, activa: true, nombre: nombreSeccion[b.k] || b.k, ...actual }); conNumerales.add(b.k); }
+          actual = { titulos: [], tablas: 0, figuras: 0 };
+        } else if (b.tipo === "finSeccion") {
+          if (dentro && !conNumerales.has(b.k)) r.secciones.push({ k: b.k, activa: b.activa, nombre: nombreSeccion[b.k] || b.k, ...actual });
+          actual = { titulos: [], tablas: 0, figuras: 0 };
+        } else if (b.tipo === "titulo2" && dentro) { r.titulos += 1; actual.titulos.push(b.texto); }
+        else if (b.tipo === "tabla" || b.tipo === "tablaEditor") { if (dentro) actual.tablas += 1; else r.tablas += 1; }
+        else if (b.tipo === "imagen") { if (dentro) actual.figuras += 1; else r.figuras += 1; }
       }
       return r;
     };
+    // r.tablas / r.figuras: las que van ANTES del capítulo; las de cada
+    // sección van en r.secciones[i].
     const r = await contar(new Set(seleccion));
     if (r.incluido) return r;
     // Capítulo sin secciones marcadas: su lugar si estuviera todo marcado.

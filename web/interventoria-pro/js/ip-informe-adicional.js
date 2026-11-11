@@ -78,7 +78,8 @@ export function montarEditorAdicional({ contrato, user, perfil, alGuardar }) {
   let inicio = null;        // { capNum, titulos, tablas, figuras, incluido }
   let bloques = [];         // copia en edición del capítulo abierto
   let historial = [];       // para «Deshacer»
-  let insertarEn = null;    // posición donde va la imagen que se está eligiendo
+  let insertarEn = null;    // { indice, ubicacion } donde va la imagen que se está eligiendo
+  let secciones = [];       // secciones del capítulo en orden + el final (k: "")
   let enfocar = null;
 
   async function cargarMes(ym) {
@@ -98,31 +99,82 @@ export function montarEditorAdicional({ contrato, user, perfil, alGuardar }) {
   }
   const avisar = (texto, tipo) => mostrarAlerta(alerta, texto, tipo === "ok" ? "success" : "error");
 
-  // Números indicativos, como los pondrá el PDF.
-  function numeros() {
-    const t = [inicio?.titulos || 0, 0, 0];
-    let nTabla = inicio?.tablas || 0, nFig = inicio?.figuras || 0;
-    const cap = inicio?.capNum || "?";
-    return bloques.map((b) => {
-      if (b.tipo === "titulo") {
-        const n = Math.min(3, Math.max(1, Number(b.nivel) || 1));
-        t[n - 1] += 1;
-        for (let k = n; k < 3; k++) t[k] = 0;
-        return `${cap}.${t.slice(0, n).join(".")}.`;
-      }
-      if (b.tipo === "tabla") return `Tabla ${++nTabla}.`;
-      if (b.tipo === "imagen") return `Figura ${++nFig}.`;
-      return "";
-    });
+  // Orden del documento: los bloques van agrupados por la sección del
+  // capítulo después de la cual quedan (en el orden del informe); dentro de
+  // cada sección, en el orden en que se dejaron.
+  // Ubicación guardada → posición en la lista de numerales. Si ese numeral
+  // no salió este mes (o se guardó solo la sección), va al último numeral
+  // de su sección; si la sección ya no existe, al final del capítulo.
+  function posSeccion(k) {
+    const clave = k || "";
+    const i = secciones.findIndex((x) => x.k === clave);
+    if (i >= 0) return i;
+    const base = clave.split("#")[0];
+    for (let j = secciones.length - 1; j >= 0; j--) if (secciones[j].k === base || secciones[j].k.startsWith(`${base}#`)) return j;
+    return secciones.length - 1;
+  }
+  function ordenar() {
+    bloques = bloques.map((b, i) => [b, i]).sort((x, y) => posSeccion(x[0].ubicacion) - posSeccion(y[0].ubicacion) || x[1] - y[1]).map(([b]) => b);
   }
 
-  function barraInsertar(indice) {
+  // Números indicativos, como los pondrá el PDF: recorre las secciones del
+  // capítulo en orden, sumando los títulos, tablas y figuras propios del
+  // informe y los que se agregan aquí. Devuelve el número de cada bloque y
+  // los títulos (ya numerados) de cada sección.
+  function numeros() {
+    const cap = inicio?.capNum || "?";
+    let t1 = 0, t2 = 0, t3 = 0;
+    let nTabla = inicio?.tablas || 0, nFig = inicio?.figuras || 0;
+    const porBloque = new Map();
+    const cabeceras = {};
+    secciones.forEach((sec) => {
+      cabeceras[sec.k] = (sec.titulos || []).map((t) => { t1 += 1; t2 = 0; t3 = 0; return `${cap}.${t1}. ${t}`; });
+      nTabla += sec.tablas || 0;
+      nFig += sec.figuras || 0;
+      bloques.filter((b) => posSeccion(b.ubicacion) === posSeccion(sec.k)).forEach((b) => {
+        if (b.tipo === "titulo") {
+          const n = Math.min(3, Math.max(1, Number(b.nivel) || 1));
+          if (n === 1) { t1 += 1; t2 = 0; t3 = 0; } else if (n === 2) { t2 += 1; t3 = 0; } else t3 += 1;
+          porBloque.set(b, `${cap}.${[t1, t2, t3].slice(0, n).join(".")}.`);
+        } else if (b.tipo === "tabla") porBloque.set(b, `Tabla ${++nTabla}.`);
+        else if (b.tipo === "imagen") porBloque.set(b, `Figura ${++nFig}.`);
+      });
+    });
+    return { porBloque, cabeceras };
+  }
+
+  function selectorUbicacion(b) {
+    const lab = document.createElement("label");
+    lab.className = "ip-adicional-ubicacion";
+    lab.textContent = "Ubicación: ";
+    const sel = document.createElement("select");
+    secciones.forEach((sec) => {
+      const o = document.createElement("option");
+      o.value = sec.k;
+      o.textContent = sec.k ? `Después de «${sec.etiqueta}»` : "Al final del capítulo";
+      if (posSeccion(b.ubicacion) === posSeccion(sec.k)) o.selected = true;
+      sel.appendChild(o);
+    });
+    sel.addEventListener("change", () => {
+      guardarHistorial();
+      // Al final de la sección elegida.
+      bloques.splice(bloques.indexOf(b), 1);
+      b.ubicacion = sel.value;
+      bloques.push(b);
+      ordenar();
+      pintar();
+    });
+    lab.appendChild(sel);
+    return lab;
+  }
+
+  function barraInsertar(indice, ubicacion) {
     const barra = document.createElement("div");
     barra.className = "ip-adicional-insertar";
     BOTONES.forEach(([tipo, texto]) => barra.appendChild(boton(texto, "control-btn-mini", "", () => {
-      if (tipo === "imagen") { insertarEn = indice; archivo.click(); return; }
+      if (tipo === "imagen") { insertarEn = { indice, ubicacion }; archivo.click(); return; }
       guardarHistorial();
-      bloques.splice(indice, 0, NUEVOS[tipo]());
+      bloques.splice(indice, 0, { ...NUEVOS[tipo](), ubicacion });
       enfocar = indice;
       pintar();
     })));
@@ -277,7 +329,9 @@ export function montarEditorAdicional({ contrato, user, perfil, alGuardar }) {
   function pintar() {
     const scroll = lista.scrollTop;
     lista.replaceChildren();
-    const nums = numeros();
+    ordenar();
+    const { porBloque, cabeceras } = numeros();
+    secciones.forEach((sec) => { sec.etiqueta = (cabeceras[sec.k] || [])[0] || sec.nombre; });
 
     const cabeza = document.createElement("div");
     cabeza.className = "ip-adicional-cabeza";
@@ -289,50 +343,77 @@ export function montarEditorAdicional({ contrato, user, perfil, alGuardar }) {
     deshacer.disabled = !historial.length;
     cabeza.appendChild(deshacer);
     lista.appendChild(cabeza);
-    lista.appendChild(barraInsertar(0));
-
-    if (!bloques.length) {
-      const p = document.createElement("p");
-      p.className = "text-muted ip-adicional-vacio";
-      p.textContent = "Todavía no hay contenido adicional en este capítulo. Agrégalo con los botones de arriba.";
-      lista.appendChild(p);
-    }
 
     let paraEnfocar = null;
-    bloques.forEach((b, i) => {
-      const fila = document.createElement("div");
-      fila.className = "control-bloque ip-adicional-bloque";
-      const cont = document.createElement("div");
-      cont.className = "control-bloque-contenido";
-      if (b.tipo === "titulo") {
-        cont.appendChild(etiqueta(`Título ${Number(b.nivel) || 1}`));
-        cont.appendChild(editorTitulo(b, nums[i]));
-      } else if (b.tipo === "parrafo") {
-        cont.appendChild(etiqueta("Párrafo"));
-        cont.appendChild(crearCampoTextoRico({ valor: b.texto || "", placeholder: "Escribe el párrafo… (negrilla, cursiva, color y viñetas con la barra)", onInput: (html) => { b.texto = html; } }));
-      } else if (b.tipo === "tabla") {
-        cont.appendChild(etiqueta(nums[i]));
-        cont.appendChild(crearEditorTabla(b, { antesDeCambiar: guardarHistorial, alCambiar: pintar, avisar }));
-      } else if (b.tipo === "imagen") {
-        cont.appendChild(etiqueta(`Imagen · ${nums[i]}`));
-        cont.appendChild(editorImagen(b));
-      } else if (b.tipo === "firma") {
-        cont.appendChild(etiqueta("Firma"));
-        cont.appendChild(editorFirma(b));
-      }
-      fila.appendChild(cont);
-      if (i === enfocar) paraEnfocar = cont.querySelector("[contenteditable], input[type=text], textarea");
+    secciones.forEach((sec, si) => {
+      // Encabezado de la sección (lo genera el aplicativo con los módulos):
+      // debajo, la barra para insertar justo después de ese numeral.
+      const cab = document.createElement("div");
+      cab.className = `ip-adicional-seccion${sec.k && !sec.activa ? " ip-adicional-seccion-off" : ""}`;
+      const nums = cabeceras[sec.k] || [];
+      const tit = document.createElement("strong");
+      tit.textContent = sec.k ? (nums.length ? nums.join("  ·  ") : sec.nombre) : "Final del capítulo";
+      const nota = document.createElement("span");
+      nota.className = "text-muted";
+      nota.textContent = !sec.k ? "lo que va después de todas las secciones"
+        : !sec.activa ? "sección no marcada: no sale en el informe, pero lo que agregues aquí sí, en este punto"
+        : nums.length ? "contenido del aplicativo" : `${sec.nombre} — contenido del aplicativo`;
+      cab.append(tit, nota);
+      lista.appendChild(cab);
 
-      const ctrl = document.createElement("div");
-      ctrl.className = "control-bloque-controles";
-      const subir = boton("↑", "control-btn-mini", "Subir", () => { guardarHistorial(); [bloques[i - 1], bloques[i]] = [bloques[i], bloques[i - 1]]; pintar(); });
-      subir.disabled = i === 0;
-      const bajar = boton("↓", "control-btn-mini", "Bajar", () => { guardarHistorial(); [bloques[i + 1], bloques[i]] = [bloques[i], bloques[i + 1]]; pintar(); });
-      bajar.disabled = i === bloques.length - 1;
-      ctrl.append(subir, bajar, boton("Quitar", "control-btn-danger", "Quitar este bloque", () => { guardarHistorial(); bloques.splice(i, 1); pintar(); }));
-      fila.appendChild(ctrl);
-      lista.appendChild(fila);
-      lista.appendChild(barraInsertar(i + 1));
+      const propios = bloques.map((b, i) => [b, i]).filter(([b]) => posSeccion(b.ubicacion) === si);
+      const inicioSec = propios.length ? propios[0][1] : bloques.filter((b) => posSeccion(b.ubicacion) < si).length;
+      lista.appendChild(barraInsertar(inicioSec, sec.k));
+
+      propios.forEach(([b, i]) => {
+        const numero = porBloque.get(b) || "";
+        const fila = document.createElement("div");
+        fila.className = "control-bloque ip-adicional-bloque";
+        const cont = document.createElement("div");
+        cont.className = "control-bloque-contenido";
+        if (b.tipo === "titulo") {
+          cont.appendChild(etiqueta(`Título ${Number(b.nivel) || 1}`));
+          cont.appendChild(editorTitulo(b, numero));
+        } else if (b.tipo === "parrafo") {
+          cont.appendChild(etiqueta("Párrafo"));
+          cont.appendChild(crearCampoTextoRico({ valor: b.texto || "", placeholder: "Escribe el párrafo… (negrilla, cursiva, color y viñetas con la barra)", onInput: (html) => { b.texto = html; } }));
+        } else if (b.tipo === "tabla") {
+          cont.appendChild(etiqueta(numero));
+          cont.appendChild(crearEditorTabla(b, { antesDeCambiar: guardarHistorial, alCambiar: pintar, avisar }));
+        } else if (b.tipo === "imagen") {
+          cont.appendChild(etiqueta(`Imagen · ${numero}`));
+          cont.appendChild(editorImagen(b));
+        } else if (b.tipo === "firma") {
+          cont.appendChild(etiqueta("Firma"));
+          cont.appendChild(editorFirma(b));
+        }
+        cont.appendChild(selectorUbicacion(b));
+        fila.appendChild(cont);
+        if (i === enfocar) paraEnfocar = cont.querySelector("[contenteditable], input[type=text], textarea");
+
+        // ↑ ↓ también cruzan de un numeral a otro: el primero de una sección
+        // sube al final de la anterior; el último baja al inicio de la siguiente.
+        const ctrl = document.createElement("div");
+        ctrl.className = "control-bloque-controles";
+        const subir = boton("↑", "control-btn-mini", "Subir (o pasar al numeral anterior)", () => {
+          guardarHistorial();
+          if (i > 0 && posSeccion(bloques[i - 1].ubicacion) === si) [bloques[i - 1], bloques[i]] = [bloques[i], bloques[i - 1]];
+          else b.ubicacion = secciones[si - 1].k;
+          pintar();
+        });
+        subir.disabled = si === 0 && i === 0;
+        const bajar = boton("↓", "control-btn-mini", "Bajar (o pasar al numeral siguiente)", () => {
+          guardarHistorial();
+          if (i < bloques.length - 1 && posSeccion(bloques[i + 1].ubicacion) === si) [bloques[i + 1], bloques[i]] = [bloques[i], bloques[i + 1]];
+          else b.ubicacion = secciones[si + 1].k;
+          pintar();
+        });
+        bajar.disabled = si === secciones.length - 1 && i === bloques.length - 1;
+        ctrl.append(subir, bajar, boton("Quitar", "control-btn-danger", "Quitar este bloque", () => { guardarHistorial(); bloques.splice(i, 1); pintar(); }));
+        fila.appendChild(ctrl);
+        lista.appendChild(fila);
+        lista.appendChild(barraInsertar(i + 1, sec.k));
+      });
     });
     enfocar = null;
     if (paraEnfocar) paraEnfocar.focus(); else lista.scrollTop = scroll;
@@ -356,14 +437,15 @@ export function montarEditorAdicional({ contrato, user, perfil, alGuardar }) {
   archivo.addEventListener("change", async () => {
     const elegidos = [...archivo.files];
     archivo.value = "";
-    let pos = insertarEn ?? bloques.length;
+    let pos = insertarEn?.indice ?? bloques.length;
+    const ubicacion = insertarEn?.ubicacion ?? "";
     insertarEn = null;
     for (const f of elegidos) {
       avisar(`Subiendo ${f.name}…`, "ok");
       const url = await subir(f, "jpg");
       if (!url) continue;
       guardarHistorial();
-      bloques.splice(pos++, 0, { tipo: "imagen", url, nombre: "", tamano: 85, pieDeFoto: "" });
+      bloques.splice(pos++, 0, { tipo: "imagen", url, nombre: "", tamano: 85, pieDeFoto: "", ubicacion });
       limpiarAlerta(alerta);
       pintar();
     }
@@ -385,13 +467,14 @@ export function montarEditorAdicional({ contrato, user, perfil, alGuardar }) {
         if (b.tipo === "parrafo") return textoPlanoDesdeHtml(b.texto || "").trim();
         return String(b.texto || "").trim();
       })
-      .map((b) => {
+      .map((b) => ({ ...convertir(b), ubicacion: b.ubicacion || "" }));
+    function convertir(b) {
         if (b.tipo === "imagen") return { tipo: "imagen", url: b.url, nombre: String(b.nombre || "").trim(), tamano: Number(b.tamano) || 85, pieDeFoto: String(b.pieDeFoto || "").trim() };
         if (b.tipo === "tabla") return sinIndefinidos({ ...b, filas: filasEditables(b.filas).map((f) => ({ celdas: f })) });
         if (b.tipo === "titulo") return { tipo: "titulo", nivel: Math.min(3, Math.max(1, Number(b.nivel) || 1)), texto: String(b.texto).trim() };
         if (b.tipo === "parrafo") return { tipo: "parrafo", rico: true, texto: b.texto };
         return sinIndefinidos({ tipo: "firma", etiqueta: String(b.etiqueta || "").trim(), firmantes: b.firmantes.map((f) => ({ nombre: String(f.nombre || "").trim(), cargo: String(f.cargo || "").trim(), ...(f.firmaUrl ? { firmaUrl: f.firmaUrl, altoFirma: Number(f.altoFirma) || 14 } : {}) })) });
-      });
+    }
     guardarBtn.disabled = true;
     try {
       const lote = writeBatch(db);
@@ -422,14 +505,15 @@ export function montarEditorAdicional({ contrato, user, perfil, alGuardar }) {
     abrir(cap, inicioCap = null) {
       capActual = cap;
       inicio = inicioCap;
+      secciones = [...(inicio?.secciones || []).map((x) => ({ ...x })), { k: "", nombre: "Final del capítulo", titulos: [], tablas: 0, figuras: 0, activa: true }];
       // Copia profunda: si se cancela, lo guardado no queda tocado.
       bloques = (porMes[cap.id] || []).map(normalizar);
       historial = [];
       tituloEl.textContent = `Contenido adicional — ${cap.label}`;
       mesEl.textContent = mesLargo(ymCargado);
-      if (!inicio) numEl.textContent = "";
-      else if (!inicio.incluido) numEl.textContent = "Este capítulo no tiene secciones marcadas para el informe: márcalo para que este contenido salga. Los números que ves son indicativos.";
-      else numEl.textContent = `En el informe este capítulo es el ${inicio.capNum}${inicio.titulos ? ` y ya trae hasta el ${inicio.capNum}.${inicio.titulos}` : ""}: tu «Título 1» sigue como ${inicio.capNum}.${inicio.titulos + 1}, el «Título 2» como ${inicio.capNum}.${inicio.titulos + 1}.1 y el «Título 3» como ${inicio.capNum}.${inicio.titulos + 1}.1.1.`;
+      if (!inicio) numEl.textContent = "No se pudo calcular la numeración del capítulo: el contenido se agrega al final del capítulo.";
+      else numEl.textContent = (inicio.incluido ? "" : "Este capítulo no tiene secciones marcadas para el informe: márcalo para que este contenido salga. ")
+        + `Abajo están los numerales del capítulo ${inicio.capNum} en el orden del informe: usa la barra que hay debajo de cada uno para insertar justo ahí (imagen, tabla, párrafo, título o firma). Los números se recalculan solos; el «Título 1» que agregues pasa a ser el siguiente numeral en ese punto.`;
       limpiarAlerta(alerta);
       pintar();
       modal.classList.add("open");

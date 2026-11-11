@@ -111,7 +111,10 @@ export async function construirInforme({ contrato, ym, datos, elaboradoPor, carg
 
   const b = [];
   const H1 = (texto) => b.push({ tipo: "titulo1", texto });
-  const H2 = (texto) => b.push({ tipo: "titulo2", texto });
+  // antesDeH2: lo usa capitulo() para soltar el contenido adicional ubicado
+  // después del numeral anterior, justo antes de que empiece el siguiente.
+  let antesDeH2 = null;
+  const H2 = (texto) => { antesDeH2?.(); b.push({ tipo: "titulo2", texto }); };
   const P = (texto) => b.push({ tipo: "parrafo", texto: String(texto ?? "") });
   const nota = (texto) => b.push({ tipo: "parrafo", texto, nota: true });
   const tabla = (encabezados, filas, opciones = {}, vacio) => {
@@ -146,24 +149,54 @@ export async function construirInforme({ contrato, ym, datos, elaboradoPor, carg
   // capId: id del capítulo (CAPITULOS / "intro") para su contenido
   // adicional (párrafos, subtítulos e imágenes de informe.html), que va al
   // final del capítulo en el orden en que se dejó.
+  // Cada bloque del contenido adicional lleva "ubicacion": la clave de la
+  // sección del capítulo después de la cual va (ej. "actividades" → justo
+  // después de "8.3. Avance porcentual de actividades"); sin ubicación (o
+  // si esa sección ya no existe) va al final del capítulo. Si la sección no
+  // está marcada, el bloque igual sale en ese punto del capítulo.
+  // Títulos del editor: su "Título 1" es el siguiente numeral en ese punto
+  // (ej. 7.4), "Título 2" va debajo (7.4.1) y "Título 3" (7.4.1.1).
+  function emitirAdicional(x) {
+    if (x.tipo === "titulo") b.push({ tipo: `titulo${Math.min(3, Math.max(1, Number(x.nivel) || 1)) + 1}`, texto: x.texto });
+    else if (x.tipo === "titulo2") b.push({ tipo: "titulo2", texto: x.texto });
+    else if (x.tipo === "parrafo" && x.rico) b.push({ tipo: "parrafo", texto: x.texto, rico: true });
+    else if (x.tipo === "parrafo") P(x.texto);
+    else if (x.tipo === "firma") b.push({ tipo: "firmaEditor", bloque: x });
+    else if (x.tipo === "imagen" && x.url) b.push({ tipo: "imagen", url: x.url, nombre: x.nombre || "", tamano: x.tamano || 85, pieDeFoto: x.pieDeFoto || "" });
+    // Tabla del editor de los informes (combinar, centrar, negrilla, color…):
+    // pasa entera al PDF/Word, que la dibujan con el mismo código de Informes.
+    else if (x.tipo === "tabla" && x.filas?.length) b.push({ tipo: "tablaEditor", bloque: { ...x, filas: x.filas.map((f) => (Array.isArray(f) ? f : f.celdas || [])) } });
+  }
   async function capitulo(titulo, secciones, capId) {
     const activas = secciones.filter(([k]) => incluye(k));
     if (!activas.length) return;
+    const extra = (adicional && adicional[capId]) || [];
+    const claves = new Set(secciones.map(([k]) => k));
+    const soltados = new Set();
+    const soltar = (clave) => extra.filter((x) => x.ubicacion === clave && !soltados.has(x)).forEach((x) => { soltados.add(x); emitirAdicional(x); });
     b.push({ tipo: "titulo1", texto: titulo, capId });
-    for (const [, fn] of activas) await fn();
-    // Títulos del editor: su "Título 1" es el siguiente numeral dentro del
-    // capítulo (ej. 7.4), "Título 2" va debajo (7.4.1) y "Título 3" (7.4.1.1).
-    for (const x of (adicional && adicional[capId]) || []) {
-      if (x.tipo === "titulo") b.push({ tipo: `titulo${Math.min(3, Math.max(1, Number(x.nivel) || 1)) + 1}`, texto: x.texto });
-      else if (x.tipo === "titulo2") H2(x.texto);
-      else if (x.tipo === "parrafo" && x.rico) b.push({ tipo: "parrafo", texto: x.texto, rico: true });
-      else if (x.tipo === "parrafo") P(x.texto);
-      else if (x.tipo === "firma") b.push({ tipo: "firmaEditor", bloque: x });
-      else if (x.tipo === "imagen" && x.url) b.push({ tipo: "imagen", url: x.url, nombre: x.nombre || "", tamano: x.tamano || 85, pieDeFoto: x.pieDeFoto || "" });
-      // Tabla del editor de los informes (combinar, centrar, negrilla, color…):
-      // pasa entera al PDF/Word, que la dibujan con el mismo código de Informes.
-      else if (x.tipo === "tabla" && x.filas?.length) b.push({ tipo: "tablaEditor", bloque: { ...x, filas: x.filas.map((f) => (Array.isArray(f) ? f : f.celdas || [])) } });
+    // Ubicación "k#j": después del contenido del numeral j (0, 1, …) de la
+    // sección k, cuando la sección arma varios numerales (ej. avance de
+    // actividades → avance, curva S y observaciones). "k": al final de k.
+    for (const [k, fn] of secciones) {
+      if (incluye(k)) {
+        let j = -1;
+        const cerrarNumeral = () => {
+          if (j < 0) return;
+          soltar(`${k}#${j}`);
+          if (liviano) b.push({ tipo: "finNumeral", k, j });
+        };
+        antesDeH2 = () => { cerrarNumeral(); j += 1; };
+        try { await fn(); } finally { antesDeH2 = null; }
+        cerrarNumeral();
+      }
+      // Marca de fin de sección (solo al calcular la numeración del editor).
+      if (liviano) b.push({ tipo: "finSeccion", k, activa: incluye(k) });
+      // Lo de un numeral que este mes no salió, y lo ubicado al final de k.
+      extra.filter((x) => String(x.ubicacion || "").startsWith(`${k}#`)).forEach((x) => soltar(x.ubicacion));
+      soltar(k);
     }
+    extra.filter((x) => !claves.has(String(x.ubicacion || "").split("#")[0])).forEach((x) => { if (!soltados.has(x)) { soltados.add(x); emitirAdicional(x); } });
   }
   const ef = estadoFinanciero(contrato, hasta("financiero"));
   const acts = actividadesConItems(datos.actividades || [], datos.items || []).sort((a, c) => (Number(a.item) || 0) - (Number(c.item) || 0));
