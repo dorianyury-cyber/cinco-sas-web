@@ -118,9 +118,14 @@ export async function construirInforme({ contrato, ym, datos, elaboradoPor, carg
   const H2 = (texto) => { antesDeH2?.(); b.push({ tipo: "titulo2", texto }); };
   const P = (texto) => b.push({ tipo: "parrafo", texto: String(texto ?? "") });
   const nota = (texto) => b.push({ tipo: "parrafo", texto, nota: true });
+  // Aviso de "sin registros" de un numeral. Si en ese mismo numeral se puso
+  // contenido adicional (ej. la tabla propia de la cronología), el aviso se
+  // quita al soltar ese contenido (capitulo → soltar): ya no está vacío.
+  let vaciosNumeral = [];
+  const notaVacia = (texto) => { const bl = { tipo: "parrafo", texto, nota: true }; b.push(bl); vaciosNumeral.push(bl); };
   const tabla = (encabezados, filas, opciones = {}, vacio) => {
     if (filas.length) b.push({ tipo: "tabla", encabezados, filas: filas.map((f) => f.map((v) => String(v ?? ""))), ...opciones });
-    else nota(vacio || "No se registró información para este periodo.");
+    else notaVacia(vacio || "No se registró información para este periodo.");
   };
   const matriz = (registros, campoTipo, tipos, titulo, campoFecha = "fecha") => {
     const filas = tipos.map((t) => {
@@ -136,7 +141,7 @@ export async function construirInforme({ contrato, ym, datos, elaboradoPor, carg
   const observaciones = (cap) => {
     const obs = porCap("observaciones", cap);
     if (obs.length) obs.forEach((o) => String(o.texto).split("\n").filter((l) => l.trim()).forEach(P));
-    else nota("Sin observaciones registradas para este periodo.");
+    else notaVacia("Sin observaciones registradas para este periodo.");
   };
   const anexos = (cap) => {
     const docs = (datos.anexos || []).filter((d) => d.capitulo === cap && String(d.mes || d.fecha || "").startsWith(ym));
@@ -174,12 +179,21 @@ export async function construirInforme({ contrato, ym, datos, elaboradoPor, carg
     const extra = (adicional && adicional[capId]) || [];
     const claves = new Set(secciones.map(([k]) => k));
     const soltados = new Set();
-    const soltar = (clave) => extra.filter((x) => x.ubicacion === clave && !soltados.has(x)).forEach((x) => { soltados.add(x); emitirAdicional(x); });
+    const soltar = (clave) => {
+      const aqui = extra.filter((x) => x.ubicacion === clave && !soltados.has(x));
+      aqui.forEach((x) => { soltados.add(x); emitirAdicional(x); });
+      // Con contenido propio en el numeral, su aviso de "sin registros" sobra.
+      if (aqui.length && vaciosNumeral.length) {
+        vaciosNumeral.forEach((bl) => { const i = b.indexOf(bl); if (i >= 0) b.splice(i, 1); });
+        vaciosNumeral = [];
+      }
+    };
     b.push({ tipo: "titulo1", texto: titulo, capId });
     // Ubicación "k#j": después del contenido del numeral j (0, 1, …) de la
     // sección k, cuando la sección arma varios numerales (ej. avance de
     // actividades → avance, curva S y observaciones). "k": al final de k.
     for (const [k, fn] of secciones) {
+      vaciosNumeral = [];
       if (incluye(k)) {
         let j = -1;
         const cerrarNumeral = () => {
@@ -187,7 +201,7 @@ export async function construirInforme({ contrato, ym, datos, elaboradoPor, carg
           soltar(`${k}#${j}`);
           if (liviano) b.push({ tipo: "finNumeral", k, j });
         };
-        antesDeH2 = () => { cerrarNumeral(); j += 1; };
+        antesDeH2 = () => { cerrarNumeral(); j += 1; vaciosNumeral = []; };
         try { await fn(); } finally { antesDeH2 = null; }
         cerrarNumeral();
       }
@@ -247,7 +261,7 @@ export async function construirInforme({ contrato, ym, datos, elaboradoPor, carg
     ["actuaciones", async () => {
       H2("Plan de actuaciones de la interventoría");
       const regs = [...(datos.actuaciones || [])].filter((r) => r.estado !== "No aplica").sort((a, c) => (Number(a.item) || 0) - (Number(c.item) || 0));
-      if (!regs.length) { nota("Sin plan de actuaciones registrado."); return; }
+      if (!regs.length) { notaVacia("Sin plan de actuaciones registrado."); return; }
       const unicas = regs.filter((r) => ["Única", "Hito"].includes(r.tipo));
       const debidas = unicas.filter((r) => r.fechaFin && r.fechaFin <= corte);
       const cumplidasAlCorte = debidas.filter((r) => r.estado === "Cumplida" && (r.fechaCumplida || r.fechaFin) <= corte);
@@ -422,7 +436,7 @@ export async function construirInforme({ contrato, ym, datos, elaboradoPor, carg
     ["items", () => {
       H2("Presupuesto y cantidades de obra por ítem");
       const its = datos.items || [];
-      if (!its.length) { nota("Sin presupuesto por ítems registrado."); return; }
+      if (!its.length) { notaVacia("Sin presupuesto por ítems registrado."); return; }
       const vu = (it) => Number(it.valorUnitario) || 0;
       const frentes = [...new Set(its.map((it) => it.proyecto || "General"))];
       const fila = (nombre, regs) => {
@@ -466,7 +480,7 @@ export async function construirInforme({ contrato, ym, datos, elaboradoPor, carg
         tabla(["Ítem", "Actividad", "Duración (sem.)", "Fecha terminación", ...mesesHasta.map(mesCorto)],
           acts.map((a) => [String(a.item ?? ""), a.actividad, String(a.duracionSemanas ?? "-"), a.fechaFin ? a.fechaFin.split("-").reverse().join("/") : "-", ...mesesHasta.map((m) => (a.avance?.[m] != null && a.avance[m] !== "" ? String(a.avance[m]) : ""))]),
           { titulo: "Avance mensual por actividad (%)", anchos: [5, 100 - 5 - 8 - 10 - anchoMes * mesesHasta.length, 8, 10, ...mesesHasta.map(() => anchoMes)], tam: 13, alinearNum: [2, ...mesesHasta.map((_, i) => i + 4)] });
-      } else nota("Sin actividades registradas.");
+      } else notaVacia("Sin actividades registradas.");
       H2("Avance gráfico del contrato — curva S");
       if (acts.length) {
         const puntos = curvaS(acts, contrato, ym);
