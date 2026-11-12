@@ -6,7 +6,7 @@
 // de Word, tablas con encabezado navy y anchos proporcionales al contenido.
 
 import { mesLargo } from "./ip-core.js";
-import { tablaConFormatoDocx, firmaConFormatoDocx, runsTextoRicoDocx } from "../../js/control/informes-docx.js";
+import { tablaConFormatoDocx, firmaConFormatoDocx, runsTextoRicoDocx, fichaFiguraDocx } from "../../js/control/informes-docx.js";
 import { construirInforme, finDeMes, fechaLarga, tituloInforme } from "./ip-informe-contenido.js";
 
 const NAVY = "1F2732";
@@ -108,25 +108,9 @@ export async function generarInformeMensual({ contrato, ym, datos, elaboradoPor,
         const img = await cargarImagen(bl.dataUrl || bl.url, "#ffffff", "image/png");
         // "Tamaño en el informe" del contenido adicional (30–100 %); las fotos de los módulos, a todo el ancho.
         const anchoPx = Math.min(Math.round(170 * PX_POR_MM * Math.min(100, Math.max(30, bl.tamano || 100)) / 100), Math.floor(((9292 - 160) / 56.7) * PX_POR_MM));
-        // Ficha como las del registro fotográfico (pedido 2026-11-12): tabla
-        // de una celda centrada — banda navy «FIGURA N.º n» con línea ámbar,
-        // la imagen sobre gris claro y debajo «DESCRIPCIÓN» y la fuente.
+        // Ficha como las del registro fotográfico (mismo helper de Informes).
         numFigura += 1;
-        const anchoDxa = Math.min(9292, Math.max(5400, Math.round((anchoPx / PX_POR_MM) * 56.7) + 2 * 125));
-        const hijos = [
-          new Paragraph({ shading: { type: ShadingType.CLEAR, fill: NAVY, color: "auto" }, border: { bottom: { style: BorderStyle.SINGLE, size: 12, color: AMBER } }, spacing: { after: 100 }, children: [T(` FIGURA N.º ${numFigura}`, { bold: true, size: 17, color: "FFFFFF" })] }),
-          new Paragraph({ alignment: AlignmentType.CENTER, shading: { type: ShadingType.CLEAR, fill: "F5F6F8", color: "auto" }, spacing: { after: 80 }, children: [new ImageRun({ data: img.buffer, type: "png", transformation: { width: anchoPx, height: Math.round(anchoPx * (img.alto / img.ancho)) } })] })
-        ];
-        if (bl.nombre) {
-          hijos.push(new Paragraph({ border: { top: { style: BorderStyle.SINGLE, size: 4, color: "E2E5E9" } }, spacing: { before: 40 }, children: [T("DESCRIPCIÓN", { bold: true, size: 14, color: "D99400" })] }));
-          hijos.push(new Paragraph({ spacing: { after: 60 }, children: [T(bl.nombre, { size: 17 })] }));
-        }
-        if (bl.pieDeFoto) hijos.push(new Paragraph({ spacing: { after: 40 }, children: [T(bl.pieDeFoto, { size: 15, italics: true, color: MUTED })] }));
-        cuerpo.push(new Table({
-          alignment: AlignmentType.CENTER, width: { size: anchoDxa, type: WidthType.DXA }, borders: bordes,
-          rows: [new TableRow({ cantSplit: true, children: [new TableCell({ width: { size: anchoDxa, type: WidthType.DXA }, margins: { top: 0, bottom: 80, left: 80, right: 80 }, children: hijos })] })]
-        }));
-        cuerpo.push(P("", { after: 120 }));
+        cuerpo.push(...fichaFiguraDocx({ data: img.buffer, tipo: "png", anchoPx, altoPx: Math.round(anchoPx * (img.alto / img.ancho)), numero: numFigura, nombre: bl.nombre || "", pie: bl.pieDeFoto || "", anchoUtilDxa: 9292 }));
       } catch (e) { cuerpo.push(P("(No se pudo cargar la imagen)", { italics: true, color: MUTED })); }
     } else if (bl.tipo === "fotos") {
       // Registro fotográfico en fichas iguales, 2 por fila (como el PDF):

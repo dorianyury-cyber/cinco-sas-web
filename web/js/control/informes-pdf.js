@@ -593,7 +593,7 @@ export async function generarInformePDF(informe) {
   }
 
   // Figura en FICHA, con el mismo diseño de las fotos del registro
-  // fotográfico (Interventoría PRO, pedido 2026-11-12): banda navy
+  // fotográfico (pedido 2026-11-12; todos los informes: Informes de gestión, AHÍNCO e IP): banda navy
   // «FIGURA N.º n», línea ámbar, la imagen sobre fondo gris claro y debajo
   // «DESCRIPCIÓN» con el nombre y, en cursiva, la fuente (pie de foto). Va
   // centrada, con el ancho del «Tamaño en el informe», y sigue contando en
@@ -670,7 +670,9 @@ export async function generarInformePDF(informe) {
   async function dibujarImagen(bloque) {
     try {
       const img = await cargarImagenComoDataURL(bloque.url, "#ffffff", "JPEG");
-      if (bloque.marco) { await dibujarFiguraFicha(bloque, img); return; }
+      // Todas las figuras de los informes van en ficha (aprobado 2026-11-12);
+      // marco: false deja la imagen suelta, como antes.
+      if (bloque.marco !== false) { await dibujarFiguraFicha(bloque, img); return; }
 
       // Nombre arriba, centrado (mismo criterio que el título de una
       // tabla) — la Lista de gráficos del índice usa este mismo texto.

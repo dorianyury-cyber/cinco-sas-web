@@ -381,6 +381,40 @@ export function runsTextoRicoDocx(html, tamano = 21) {
   return runsParaDocx(window.docx.TextRun, html, tamano);
 }
 
+// Figura en FICHA, con el diseño de las fotos del registro fotográfico
+// (aprobado 2026-11-12, para todos los informes: Informes de gestión,
+// AHÍNCO e Interventoría PRO): tabla de una celda centrada con banda navy
+// «FIGURA N.º n» y línea ámbar, la imagen sobre gris claro y debajo
+// «DESCRIPCIÓN» (nombre) y la fuente en cursiva. Mismo diseño que
+// dibujarFiguraFicha en informes-pdf.js.
+export function fichaFiguraDocx({ data, tipo = "jpg", anchoPx, altoPx, numero, nombre = "", pie = "", anchoUtilDxa, saltoAntes = false }) {
+  const { Paragraph, TextRun, ImageRun, Table, TableRow, TableCell, WidthType, ShadingType, AlignmentType, BorderStyle } = window.docx;
+  const T = (text, o = {}) => new TextRun({ text, font: "Arial", ...o });
+  const margen = 80;
+  const anchoDxa = Math.min(anchoUtilDxa, Math.max(5400, Math.round((anchoPx / PX_POR_MM) * DXA_POR_MM) + 2 * margen));
+  const maxPx = Math.floor(((anchoDxa - 2 * margen) / DXA_POR_MM) * PX_POR_MM);
+  if (anchoPx > maxPx) { altoPx = Math.round(altoPx * (maxPx / anchoPx)); anchoPx = maxPx; }
+  const hijos = [
+    new Paragraph({ shading: { type: ShadingType.CLEAR, fill: NAVY_HEX, color: "auto" }, border: { bottom: { style: BorderStyle.SINGLE, size: 12, color: AMBER_HEX } }, spacing: { after: 100 }, children: [T(` FIGURA N.º ${numero}`, { bold: true, size: 17, color: "FFFFFF" })] }),
+    new Paragraph({ alignment: AlignmentType.CENTER, shading: { type: ShadingType.CLEAR, fill: GRIS_CLARO_HEX, color: "auto" }, spacing: { after: 80 }, children: [new ImageRun({ data, type: tipo, transformation: { width: anchoPx, height: altoPx } })] })
+  ];
+  if (nombre) {
+    hijos.push(new Paragraph({ border: { top: { style: BorderStyle.SINGLE, size: 4, color: "E2E5E9" } }, spacing: { before: 40 }, children: [T("DESCRIPCIÓN", { bold: true, size: 14, color: AMBER_DARK_HEX })] }));
+    hijos.push(new Paragraph({ spacing: { after: 60 }, children: [T(nombre, { size: 17 })] }));
+  }
+  if (pie) hijos.push(new Paragraph({ spacing: { after: 40 }, children: [T(pie, { size: 15, italics: true, color: MUTED_HEX })] }));
+  const borde = { style: BorderStyle.SINGLE, size: 4, color: "C9CED6" };
+  const resultado = [];
+  if (saltoAntes) resultado.push(new Paragraph({ pageBreakBefore: true, children: [] }));
+  resultado.push(new Table({
+    alignment: AlignmentType.CENTER, width: { size: anchoDxa, type: WidthType.DXA },
+    borders: { top: borde, bottom: borde, left: borde, right: borde, insideHorizontal: borde, insideVertical: borde },
+    rows: [new TableRow({ cantSplit: true, children: [new TableCell({ width: { size: anchoDxa, type: WidthType.DXA }, margins: { top: 0, bottom: margen, left: margen, right: margen }, children: hijos })] })]
+  }));
+  resultado.push(new Paragraph({ spacing: { after: 120 }, children: [] }));
+  return resultado;
+}
+
 export async function generarInformeDocxBlob(informe) {
   // Margen de encuadernación (mm extra a la izquierda), igual que el PDF:
   // AHÍNCO usa 10 mm, así que el ancho útil es el mismo en los dos formatos.
@@ -658,11 +692,6 @@ export async function generarInformeDocxBlob(informe) {
       numeroFigura += 1;
       const nombreTexto = `Figura ${numeroFigura}. ${bloque.nombre || ""}`.trim();
       graficosEntradas.push(nombreTexto);
-      cuerpo.push(new Paragraph({
-        alignment: AlignmentType.CENTER,
-        pageBreakBefore: primerBloque || undefined,
-        children: [new TextRun({ text: nombreTexto, bold: true, color: NAVY_HEX, size: 19 })]
-      }));
       try {
         const img = await cargarImagenParaDocx(bloque.url, "#ffffff", "image/jpeg", "jpg");
         // Mismo "Tamaño en el informe" elegido en el editor que usa el PDF
@@ -671,21 +700,15 @@ export async function generarInformeDocxBlob(informe) {
         const escalaImagen = Math.min(100, Math.max(30, bloque.tamano || 85)) / 100;
         let anchoPx = Math.round(anchoUtilMm * PX_POR_MM * escalaImagen);
         let altoPx = Math.round(anchoPx * (img.alto / img.ancho));
-        const altoMaximoPx = Math.round(200 * PX_POR_MM);
+        const altoMaximoPx = Math.round(180 * PX_POR_MM); // deja sitio a la banda y la descripción de la ficha
         if (altoPx > altoMaximoPx) { altoPx = altoMaximoPx; anchoPx = Math.round(altoPx * (img.ancho / img.alto)); }
-        cuerpo.push(new Paragraph({
-          alignment: AlignmentType.CENTER,
-          children: [new ImageRun({ data: img.buffer, transformation: { width: anchoPx, height: altoPx }, type: "jpg" })]
-        }));
+        cuerpo.push(...fichaFiguraDocx({ data: img.buffer, tipo: "jpg", anchoPx, altoPx, numero: numeroFigura, nombre: bloque.nombre || "", pie: bloque.pieDeFoto || "", anchoUtilDxa, saltoAntes: primerBloque }));
       } catch (e) {
         cuerpo.push(new Paragraph({
-          children: [new TextRun({ text: "⚠ No se pudo cargar esta imagen al generar el documento.", italics: true, color: "B23434", size: 19 })]
+          pageBreakBefore: primerBloque || undefined,
+          children: [new TextRun({ text: `${nombreTexto} — no se pudo cargar esta imagen al generar el documento.`, italics: true, color: "B23434", size: 19 })]
         }));
       }
-      if (bloque.pieDeFoto) {
-        cuerpo.push(new Paragraph({ alignment: AlignmentType.RIGHT, children: [new TextRun({ text: bloque.pieDeFoto, italics: true, color: MUTED_HEX, size: 17 })] }));
-      }
-      cuerpo.push(new Paragraph({ text: "" }));
       continue;
     }
 
