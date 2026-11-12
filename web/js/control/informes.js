@@ -12,7 +12,7 @@ import { truncar, fechaLocalISO } from "./texto.js";
 import { mejorarSelectorContrato } from "./selector-contrato.js";
 import { botonVerPdf } from "./adjuntos.js";
 import { crearCampoTextoRico } from "./texto-rico.js";
-import { crearEditorTabla, nuevaTabla } from "./editor-tabla.js";
+import { crearEditorTabla, nuevaTabla, tablaNuevaDesdeHtml } from "./editor-tabla.js";
 
 // Área/tipo fijos para que un informe quede en el Listado Maestro de
 // Documentos (SGC) sin pedir un campo más en el formulario — el checkbox
@@ -311,7 +311,16 @@ function renderBloques() {
       contenido.appendChild(crearCampoTextoRico({
         valor: bloque.texto,
         placeholder: "Escribe un párrafo...",
-        onInput: (html) => { bloque.texto = html; }
+        onInput: (html) => { bloque.texto = html; },
+        // Tabla de Word/Excel pegada en el párrafo → bloque Tabla con su estructura.
+        alPegarTabla: (html) => {
+          const nueva = tablaNuevaDesdeHtml(html);
+          if (!nueva) return;
+          guardarHistorialBloques();
+          const vacio = !String(bloque.texto || "").replace(/<[^>]*>|&nbsp;/g, "").trim();
+          bloques.splice(vacio ? i : i + 1, vacio ? 1 : 0, nueva);
+          renderBloques();
+        }
       }));
     } else if (bloque.tipo === "tabla") {
       const etiquetaTabla = document.createElement("span");

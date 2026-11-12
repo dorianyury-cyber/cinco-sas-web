@@ -303,21 +303,11 @@ export async function construirInforme({ contrato, ym, datos, elaboradoPor, carg
 
   // ================================================================ 3. FINANCIEROS
   await capitulo("Aspectos financieros", [
-    ["financiero", () => {
-      H2("Estado financiero del contrato");
-      let saldo = Number(contrato.valorInicial) || 0, acum = 0;
-      const filas = [["Valor inicial del contrato", moneda(saldo), "–", moneda(saldo), "0 %"]];
-      [...hasta("financiero"), ...adicionesOtrosi(contrato, corte)].sort((a, c) => String(a.fecha).localeCompare(String(c.fecha))).forEach((m) => {
-        const v = Number(m.valor) || 0;
-        if (m.tipo === "Adición") { saldo += v; filas.push([m.descripcion, moneda(v), "–", moneda(saldo), "–"]); }
-        else if (m.tipo === "Reducción") { saldo -= v; filas.push([m.descripcion, `-${moneda(v)}`, "–", moneda(saldo), "–"]); }
-        else if (m.tipo === "Anticipo") { filas.push([m.descripcion, "–", moneda(v), "–", ef.valorTotal ? `${numero((v / ef.valorTotal) * 100, 2)} %` : "–"]); }
-        else if (m.tipo === "Amortización de anticipo") { filas.push([m.descripcion, "–", moneda(v), "–", "–"]); }
-        else { saldo -= v; acum += v; filas.push([m.descripcion, "–", moneda(v), moneda(saldo), ef.valorTotal ? `${numero((acum / ef.valorTotal) * 100, 2)} %` : "–"]); }
-      });
-      filas.push(["TOTAL", moneda(ef.valorTotal), moneda(ef.ejecutado), moneda(ef.saldo), `${numero(ef.pct, 2)} %`]);
-      tabla(["Descripción", "Valores asignados", "Valor ejecutado", "Saldo", "Avance financiero"], filas, { titulo: "Estado financiero del contrato", tam: 16, alinearNum: [1, 2, 3, 4] });
-    }],
+    // 2026-11-12 (pedido de Nataly): la tabla «Estado financiero del
+    // contrato» que se armaba sola con el módulo Estado financiero ya NO sale:
+    // quedaba repetida (y a veces contradictoria) con la que la
+    // interventoría pone en su contenido propio. Queda el numeral para eso.
+    ["financiero", () => { H2("Estado financiero del contrato"); }],
     ["anticipo", () => {
       H2("Informe de inversión del anticipo");
       if (ef.anticipo) {
@@ -325,7 +315,9 @@ export async function construirInforme({ contrato, ym, datos, elaboradoPor, carg
         const invertido = inv.reduce((s, r) => s + (Number(r.valor) || 0), 0);
         tabla(["Concepto", "Fecha", "Valor"], inv.map((r) => [r.concepto, fechaLarga(r.fecha), moneda(r.valor)]), { titulo: "Inversión del anticipo", alinearNum: [2] }, "Sin inversiones del anticipo registradas.");
         P(`Anticipo recibido: ${moneda(ef.anticipo)} · Invertido (soportado): ${moneda(invertido)} · Amortizado: ${moneda(ef.amortizado)}.`);
-      } else nota("El contrato no contempla anticipo.");
+      }
+      // Sin anticipo registrado ya no se escribe «El contrato no contempla
+      // anticipo.» (contradecía lo que la interventoría reporta a mano).
     }],
     ["observaciones:financiero", () => { H2("Observaciones financieras"); observaciones("financiero"); }],
     ["anexos:financiero", () => { H2("Documentos financieros anexos"); anexos("financiero"); }]
@@ -357,34 +349,28 @@ export async function construirInforme({ contrato, ym, datos, elaboradoPor, carg
       tabla(["N.º", "Nombre", "Cédula", "Cargo", "Matrícula / licencia", "EPS", "AFP", "ARL"],
         activos.map((p, i) => [String(i + 1), p.nombre, p.cedula, p.cargo, p.matricula || "-", p.eps || "-", p.afp || "-", p.arl || "-"]), { titulo: "Listado de personal", tam: 14 }, "Sin personal vinculado en el periodo.");
     }],
-    ["novedades", () => { H2("Novedades de personal"); matriz(datos.novedades || [], "tipo", MODULOS.novedades.campos[1].opciones, "Novedades de personal por mes"); }],
+    // 2026-11-12 (pedido de Nataly): en 5.2, 5.4, 5.5, 5.6, 5.7 y 5.8 ya NO
+    // salen las tablas por mes que se armaban solas con los módulos (novedades,
+    // exámenes, seguridad social, indicadores de accidentalidad, capacitaciones
+    // e inspecciones): quedaban dobles con las que pone la interventoría.
+    ["novedades", () => { H2("Novedades de personal"); }],
     ["epp", () => {
       H2(esObra ? "Entrega de elementos de protección personal" : "Entrega de elementos de protección personal y/o dotación");
       tabla(["Nombre", "Cargo", "Fecha", "Tipo", "Elementos"],
         del("epp").map((r) => { const p = (datos.personal || []).find((x) => x.id === r.persona) || {}; return [p.nombre || "-", p.cargo || "-", fecha(r.fecha), r.tipo, r.elementos || "-"]; }),
         { titulo: "Entregas de EPP y dotación", tam: 15 }, "Sin entregas de EPP o dotación en el periodo.");
     }],
-    ["examenes", () => { H2("Exámenes ocupacionales de ingreso, periódicos y de egreso"); matriz(datos.examenes || [], "tipo", ["Ingreso", "Periódico", "Egreso"], "Exámenes ocupacionales por mes"); }],
-    ["segsocial", () => {
-      H2("Afiliación y pagos de seguridad social");
-      tabla(["Mes", "Personal vinculado", "Cotizantes pagados", "N.º de planilla", "Fecha de pago"],
-        mesesHasta.map((m) => {
-          const pl = (datos.segsocial || []).filter((r) => r.mes === m);
-          return [mesLargo(m), String((datos.personal || []).filter((p) => activoEnMes(p, m)).length), pl.length ? String(pl.reduce((s, r) => s + (Number(r.cotizantes) || 0), 0)) : "–", pl.map((r) => r.planilla).join(", ") || "–", pl.map((r) => fecha(r.fechaPago)).join(", ") || "–"];
-        }), { titulo: "Afiliación y pagos de seguridad social", tam: 15, alinearNum: [1, 2] });
-    }],
+    ["examenes", () => { H2("Exámenes ocupacionales de ingreso, periódicos y de egreso"); }],
+    ["segsocial", () => { H2("Afiliación y pagos de seguridad social"); }],
     ["accidentes", () => {
       H2("Accidentalidad");
       const accMes = del("accidentes");
       if (!accMes.length) P(`El contratista ${contrato.contratista || ""} no presenta accidentes ni incidentes de trabajo durante el periodo reportado.`);
       else tabla(["Fecha", "Tipo", "Persona", "Descripción", "Días incap.", "Investigado"], accMes.map((a) => [fecha(a.fecha), a.tipo, personaNombre(a.persona), a.descripcion, String(a.diasIncapacidad || 0), a.investigado || "-"]), { titulo: "Accidentes e incidentes del periodo", tam: 15 });
-      const ind = indicadoresSST(mesesHasta, { personal: datos.personal || [], accidentes: datos.accidentes || [], novedades: datos.novedades || [] });
-      const anchoMes = Math.min(6, 55 / Math.max(mesesHasta.length, 1));
-      tabla(["Indicador", ...mesesHasta.map(mesCorto)], INDICADORES_SST.map((d) => [`${d.nombre}\n${d.formula}`, ...ind.map((x) => `${numero(x[d.clave], x[d.clave] % 1 ? 2 : 0)}%`)]),
-        { titulo: "Indicadores de accidentalidad", anchos: [100 - anchoMes * mesesHasta.length, ...mesesHasta.map(() => anchoMes)], tam: 13, alinearNum: mesesHasta.map((_, i) => i + 1) });
+      // La tabla «Indicadores de accidentalidad» por mes ya no sale (ver arriba).
     }],
-    ["capacitaciones:sst", () => { H2("Capacitación"); matriz((datos.capacitaciones || []).filter((c) => c.categoria !== "ambiental"), "tipo", MODULOS.capacitaciones.campos[1].opciones, "Capacitaciones por mes"); }],
-    ["inspecciones", () => { H2("Inspecciones"); matriz(datos.inspecciones || [], "tipo", MODULOS.inspecciones.campos[1].opciones, "Inspecciones por mes"); }],
+    ["capacitaciones:sst", () => { H2("Capacitación"); }],
+    ["inspecciones", () => { H2("Inspecciones"); }],
     ["observaciones:sst", () => { H2("Observaciones de seguridad y salud en el trabajo"); observaciones("sst"); }],
     ["anexos:sst", () => { H2("Documentos de seguridad y salud en el trabajo (anexos)"); anexos("sst"); }]
   ], "sst");

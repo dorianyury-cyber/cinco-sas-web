@@ -16,6 +16,54 @@ import {
   celdaCentradaVertical, normalizarCentradosVertical, centrarVerticalRango, alinearArribaRango,
   anchosManuales, fijarAnchoColumna
 } from "./tabla-celdas.js";
+import { tablaDesdeHtml } from "./tabla-pegar-html.js";
+
+export { tablaDesdeHtml };
+
+// Bloque "tabla" nuevo a partir del HTML de una tabla copiada de Word/Excel
+// (para pegarla dentro de un párrafo: el editor la vuelve un bloque Tabla).
+export function tablaNuevaDesdeHtml(html) {
+  const t = tablaDesdeHtml(html);
+  if (!t) return null;
+  const { anchosColumna, ...resto } = t;
+  return { ...nuevaTabla(), ...resto, ...(anchosColumna ? { anchosColumna } : {}) };
+}
+
+const tablaVacia = (bloque) => bloque.filas.every((f) => f.every((v) => !String(v || "").trim()));
+
+// Pega la tabla de Word/Excel (ya leída de su HTML) desde la celda fi, ci:
+// celdas combinadas, saltos de línea dentro de la celda, negrilla, centrado,
+// color y, si la tabla estaba vacía o se pega desde la primera columna
+// cubriéndola toda, también el ancho de las columnas.
+function pegarHtmlEnTabla(bloque, filaInicio, colInicio, t) {
+  guardarHistorialBloques();
+  if (tablaVacia(bloque)) { filaInicio = 0; colInicio = 0; bloque.filas = [[""]]; bloque.merges = []; bloque.centrados = []; bloque.centradosVertical = []; bloque.negritas = []; bloque.coloresCelda = []; bloque.filasEncabezado = t.filasEncabezado; }
+  const nf = t.filas.length, nc = t.filas[0].length;
+  const colsNecesarias = colInicio + nc, filasNecesarias = filaInicio + nf;
+  const anchoActual = Math.max(...bloque.filas.map((f) => f.length));
+  bloque.filas.forEach((fila) => { while (fila.length < Math.max(colsNecesarias, anchoActual)) fila.push(""); });
+  while (bloque.filas.length < filasNecesarias) bloque.filas.push(bloque.filas[0].map(() => ""));
+  const fMax = filaInicio + nf - 1, cMax = colInicio + nc - 1;
+  const fuera = (c) => !(c.fila >= filaInicio && c.fila <= fMax && c.col >= colInicio && c.col <= cMax);
+  const mover = (c) => ({ ...c, fila: c.fila + filaInicio, col: c.col + colInicio });
+  bloque.merges = [...quitarMergesQueIntersectan(bloque.merges || [], filaInicio, fMax, colInicio, cMax), ...t.merges.map(mover)];
+  bloque.centrados = [...(bloque.centrados || []).filter(fuera), ...t.centrados.map(mover)];
+  bloque.centradosVertical = [...(bloque.centradosVertical || []).filter(fuera), ...t.centradosVertical.map(mover)];
+  bloque.negritas = [...(bloque.negritas || []).filter(fuera), ...t.negritas.map(mover)];
+  bloque.coloresCelda = [...(bloque.coloresCelda || []).filter(fuera), ...t.coloresCelda.map(mover)];
+  t.filas.forEach((fila, fi) => fila.forEach((v, ci) => { bloque.filas[filaInicio + fi][colInicio + ci] = v; }));
+  if (t.anchosColumna && colInicio === 0 && bloque.filas[0].length === nc) bloque.anchosColumna = t.anchosColumna;
+  bloque._selA = null;
+  bloque._selB = null;
+  renderBloques();
+  mostrarAlerta(`Tabla pegada: ${nf} fila(s) × ${nc} columna(s)${t.merges.length ? `, ${t.merges.length} celda(s) combinada(s)` : ""}.`, "ok");
+}
+
+// ¿El HTML del portapapeles es una tabla de verdad (más de una celda)?
+function tablaPegable(html) {
+  const t = tablaDesdeHtml(html);
+  return t && (t.filas.length > 1 || t.filas[0].length > 1) ? t : null;
+}
 
 let ctx = { antesDeCambiar: () => {}, alCambiar: () => {}, avisar: () => {} };
 const guardarHistorialBloques = () => ctx.antesDeCambiar();
@@ -223,6 +271,10 @@ function renderTablaEditor(bloque) {
         // copiado de Word) se repartía como si fueran filas nuevas, sin
         // forma de pegarlo tal cual en una sola celda.
         celdaInput.addEventListener("paste", (e) => {
+          // Tabla copiada de Word/Excel: se lee su HTML para conservar
+          // combinadas, saltos de línea en la celda, negrilla, centrado y anchos.
+          const t = tablaPegable(e.clipboardData?.getData("text/html") || "");
+          if (t) { e.preventDefault(); pegarHtmlEnTabla(bloque, fi, ci, t); return; }
           const texto = e.clipboardData?.getData("text/plain") ?? "";
           if (texto.includes("\t")) { e.preventDefault(); pegarEnTabla(bloque, fi, ci, texto); }
         });
@@ -370,6 +422,14 @@ function renderTablaEditor(bloque) {
     const fi = bloque._filaFoco ?? 0;
     const ci = bloque._colFoco ?? 0;
     try {
+      // Primero el HTML (estructura completa); si no se puede, el texto.
+      try {
+        for (const item of await navigator.clipboard.read()) {
+          if (!item.types.includes("text/html")) continue;
+          const t = tablaPegable(await (await item.getType("text/html")).text());
+          if (t) { pegarHtmlEnTabla(bloque, fi, ci, t); return; }
+        }
+      } catch (e) { /* sin permiso para leer HTML: se intenta el texto */ }
       const texto = await navigator.clipboard.readText();
       if (!texto) { mostrarAlerta("El portapapeles está vacío. Copia primero el rango en Excel o la tabla en Word.", "error"); return; }
       pegarEnTabla(bloque, fi, ci, texto);

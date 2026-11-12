@@ -28,7 +28,10 @@ export function htmlParaCampoRico(valor) {
 // Construye el campo (barra + contenteditable) con la API del DOM, para
 // insertarlo tal cual en el editor de bloques existente. `onInput` recibe
 // el HTML actual cada vez que cambia el contenido.
-export function crearCampoTextoRico({ valor, placeholder, onInput }) {
+// alPegarTabla(html): opcional. Si se pega una tabla de Word/Excel dentro del
+// párrafo, en vez de meter el HTML suelto (que el PDF/Word dibujaba sin filas
+// ni columnas) se le pasa a quien usa el campo para crear un bloque Tabla.
+export function crearCampoTextoRico({ valor, placeholder, onInput, alPegarTabla = null }) {
   const wrap = document.createElement("div");
   wrap.className = "control-rich-campo";
 
@@ -103,6 +106,14 @@ export function crearCampoTextoRico({ valor, placeholder, onInput }) {
   });
 
   editable.addEventListener("input", () => onInput?.(editable.innerHTML));
+  if (alPegarTabla) {
+    editable.addEventListener("paste", (e) => {
+      const html = e.clipboardData?.getData("text/html") || "";
+      if (!/<table/i.test(html)) return;
+      e.preventDefault();
+      alPegarTabla(html);
+    });
+  }
 
   // "indent" fuera de una viñeta se vuelve una cita/blockquote que el
   // exportador a PDF/Word no sabe dibujar (parsearHtmlARuns solo entiende

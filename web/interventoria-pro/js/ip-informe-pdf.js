@@ -31,7 +31,7 @@ export async function generarInformeMensualPDF({ contrato, ym, datos, elaboradoP
     } else if (b.tipo === "tabla") {
       bloquesPdf.push({ tipo: "tabla", titulo: b.titulo || "", filas: [b.encabezados, ...b.filas], merges: [], centrados: [], filasEncabezado: 1 });
     } else if (b.tipo === "imagen") {
-      bloquesPdf.push({ tipo: "imagen", url: b.dataUrl || b.url, nombre: b.nombre || "", pieDeFoto: b.pieDeFoto || "", tamano: b.tamano || 100 });
+      bloquesPdf.push({ tipo: "imagen", url: b.dataUrl || b.url, nombre: b.nombre || "", pieDeFoto: b.pieDeFoto || "", tamano: b.tamano || 100, marco: true });
     } else if (b.tipo === "tablaEditor") {
       bloquesPdf.push({ ...b.bloque, tipo: "tabla" });
     } else if (b.tipo === "fotos") {

@@ -21,7 +21,7 @@ import { ref, uploadBytes, getDownloadURL } from "https://www.gstatic.com/fireba
 import { db, storage, mesLargo, mostrarAlerta, limpiarAlerta, errorAmigable } from "./ip-core.js";
 import { comprimir } from "./ip-formulario.js";
 import { anotarEnLote } from "./ip-historial.js";
-import { crearEditorTabla, nuevaTabla } from "../../js/control/editor-tabla.js";
+import { crearEditorTabla, nuevaTabla, tablaNuevaDesdeHtml } from "../../js/control/editor-tabla.js";
 import { crearCampoTextoRico, htmlParaCampoRico, textoPlanoDesdeHtml } from "../../js/control/texto-rico.js";
 
 // Firestore no admite listas dentro de listas: las filas de una tabla se
@@ -397,7 +397,20 @@ export function montarEditorAdicional({ contrato, user, perfil, alGuardar }) {
           cont.appendChild(editorTitulo(b, numero));
         } else if (b.tipo === "parrafo") {
           cont.appendChild(etiqueta("Párrafo"));
-          cont.appendChild(crearCampoTextoRico({ valor: b.texto || "", placeholder: "Escribe el párrafo… (negrilla, cursiva, color y viñetas con la barra)", onInput: (html) => { b.texto = html; } }));
+          cont.appendChild(crearCampoTextoRico({
+            valor: b.texto || "", placeholder: "Escribe el párrafo… (negrilla, cursiva, color y viñetas con la barra)", onInput: (html) => { b.texto = html; },
+            // Tabla de Word/Excel pegada aquí → bloque Tabla (con combinadas,
+            // anchos y formato) en el mismo numeral; si el párrafo estaba vacío, lo reemplaza.
+            alPegarTabla: (html) => {
+              const nueva = tablaNuevaDesdeHtml(html);
+              if (!nueva) return;
+              guardarHistorial();
+              const vacio = !textoPlanoDesdeHtml(b.texto || "").trim();
+              bloques.splice(vacio ? i : i + 1, vacio ? 1 : 0, { ...nueva, ubicacion: b.ubicacion || "" });
+              pintar();
+              avisar("La tabla pegada quedó como bloque Tabla, con sus filas, columnas y celdas combinadas.", "ok");
+            }
+          }));
         } else if (b.tipo === "tabla") {
           cont.appendChild(etiqueta(numero));
           cont.appendChild(crearEditorTabla(b, { antesDeCambiar: guardarHistorial, alCambiar: pintar, avisar }));

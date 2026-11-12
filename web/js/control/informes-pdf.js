@@ -613,7 +613,12 @@ export async function generarInformePDF(informe) {
       const escalaImagen = Math.min(100, Math.max(30, bloque.tamano || 85)) / 100;
       let ancho = anchoUtil * escalaImagen;
       let alto = ancho * (img.alto / img.ancho);
-      const altoMaximo = Math.max(60, margenInferior - margenSuperior - 20);
+      // bloque.marco (Interventoría PRO, pedido 2026-11-12): la figura va en
+      // un recuadro como las fichas del registro fotográfico — borde gris
+      // redondeado y fondo gris claro alrededor de la imagen.
+      const padMarco = bloque.marco ? 2.2 : 0;
+      const altoMaximo = Math.max(60, margenInferior - margenSuperior - 20) - padMarco * 2;
+      if (bloque.marco && ancho > anchoUtil - padMarco * 2) { ancho = anchoUtil - padMarco * 2; alto = ancho * (img.alto / img.ancho); }
       if (alto > altoMaximo) { alto = altoMaximo; ancho = alto * (img.ancho / img.alto); }
 
       // Pie de foto (si hay) se mide antes del salto de página, por el
@@ -632,7 +637,7 @@ export async function generarInformePDF(informe) {
       // pie de foto (antes el salto solo miraba si cabían las 2 líneas del
       // nombre, así que una imagen que no cupiera detrás dejaba el nombre
       // huérfano al final de la página anterior).
-      saltoSiNoCabe(altoNombre + alto + 10 + altoPie);
+      saltoSiNoCabe(altoNombre + alto + padMarco * 2 + 10 + altoPie);
 
       doc.setFont("helvetica", "bold");
       doc.setFontSize(9.5);
@@ -643,9 +648,16 @@ export async function generarInformePDF(informe) {
       graficosEntradas.push({ texto: bloque.nombre || `Figura ${numero}`, pagina: doc.internal.getNumberOfPages() });
 
       const x = margenIzq + (anchoUtil - ancho) / 2;
+      if (padMarco) {
+        doc.setFillColor(...GRIS_CLARO);
+        doc.setDrawColor(210, 214, 219);
+        doc.setLineWidth(0.3);
+        doc.roundedRect(x - padMarco, y, ancho + padMarco * 2, alto + padMarco * 2, 2, 2, "FD");
+        y += padMarco;
+      }
       doc.addImage(img.dataUrl, "JPEG", x, y, ancho, alto);
       paginasConContenido.add(doc.internal.getNumberOfPages());
-      y += alto + 3;
+      y += alto + padMarco + 3;
 
       // Pie de página de la gráfica, abajo a la derecha.
       if (lineasPie.length) {
