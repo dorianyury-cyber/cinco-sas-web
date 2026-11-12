@@ -592,9 +592,85 @@ export async function generarInformePDF(informe) {
     y += lineas.length * (lineHeight + (nivel === 1 ? 1.5 : 0.5)) + 3;
   }
 
+  // Figura en FICHA, con el mismo diseño de las fotos del registro
+  // fotográfico (Interventoría PRO, pedido 2026-11-12): banda navy
+  // «FIGURA N.º n», línea ámbar, la imagen sobre fondo gris claro y debajo
+  // «DESCRIPCIÓN» con el nombre y, en cursiva, la fuente (pie de foto). Va
+  // centrada, con el ancho del «Tamaño en el informe», y sigue contando en
+  // la Lista de figuras.
+  async function dibujarFiguraFicha(bloque, img) {
+    const numero = graficosEntradas.length + 1;
+    const escala = Math.min(100, Math.max(30, bloque.tamano || 85)) / 100;
+    const anchoFicha = Math.max(95, anchoUtil * escala);
+    const altoCab = 7, pad = 2.2;
+    doc.setFont("helvetica", "normal");
+    doc.setFontSize(8.5);
+    const lineasNombre = bloque.nombre ? doc.splitTextToSize(bloque.nombre, anchoFicha - 6) : [];
+    doc.setFont("helvetica", "italic");
+    doc.setFontSize(7.5);
+    const lineasPie = bloque.pieDeFoto ? doc.splitTextToSize(bloque.pieDeFoto, anchoFicha - 6) : [];
+    const altoDesc = lineasNombre.length || lineasPie.length
+      ? 3 + (lineasNombre.length ? 5.2 + lineasNombre.length * 3.8 : 0) + (lineasPie.length ? 1.2 + lineasPie.length * 3.4 : 0) + 2
+      : 0;
+    const anchoMax = anchoFicha - pad * 2;
+    const altoMax = Math.max(50, margenInferior - margenSuperior - 16 - altoCab - altoDesc - pad * 2);
+    let w = anchoMax, h = w * (img.alto / img.ancho);
+    if (h > altoMax) { h = altoMax; w = h * (img.ancho / img.alto); }
+    const altoMarco = h + pad * 2;
+    const altoFicha = altoCab + 0.6 + altoMarco + altoDesc;
+    saltoSiNoCabe(altoFicha + 8);
+
+    const x = margenIzq + (anchoUtil - anchoFicha) / 2;
+    graficosEntradas.push({ texto: bloque.nombre || `Figura ${numero}`, pagina: doc.internal.getNumberOfPages() });
+    doc.setDrawColor(210, 214, 219);
+    doc.setLineWidth(0.3);
+    doc.roundedRect(x, y, anchoFicha, altoFicha, 2, 2);
+    doc.setFillColor(...NAVY);
+    doc.roundedRect(x, y, anchoFicha, altoCab, 2, 2, "F");
+    doc.rect(x, y + altoCab - 2, anchoFicha, 2, "F");
+    doc.setFillColor(...AMBER);
+    doc.rect(x, y + altoCab, anchoFicha, 0.6, "F");
+    doc.setFont("helvetica", "bold");
+    doc.setFontSize(8.5);
+    doc.setTextColor(255, 255, 255);
+    doc.text(`FIGURA N.º ${numero}`, x + 3, y + 4.8);
+
+    const yMarco = y + altoCab + 0.6;
+    doc.setFillColor(...GRIS_CLARO);
+    doc.rect(x + pad, yMarco + pad, anchoMax, h, "F");
+    doc.addImage(img.dataUrl, "JPEG", x + pad + (anchoMax - w) / 2, yMarco + pad, w, h);
+
+    if (altoDesc) {
+      let yd = yMarco + altoMarco;
+      doc.setDrawColor(226, 229, 233);
+      doc.line(x + pad, yd, x + anchoFicha - pad, yd);
+      yd += 3;
+      if (lineasNombre.length) {
+        doc.setFont("helvetica", "bold");
+        doc.setFontSize(7);
+        doc.setTextColor(...AMBER_DARK);
+        doc.text("DESCRIPCIÓN", x + 3, yd + 1);
+        doc.setFont("helvetica", "normal");
+        doc.setFontSize(8.5);
+        doc.setTextColor(20, 22, 26);
+        doc.text(lineasNombre, x + 3, yd + 5.2, { lineHeightFactor: 1.25 });
+        yd += 5.2 + lineasNombre.length * 3.8;
+      }
+      if (lineasPie.length) {
+        doc.setFont("helvetica", "italic");
+        doc.setFontSize(7.5);
+        doc.setTextColor(...TEXT_MUTED);
+        doc.text(lineasPie, x + 3, yd + 1.2, { lineHeightFactor: 1.25 });
+      }
+    }
+    paginasConContenido.add(doc.internal.getNumberOfPages());
+    y += altoFicha + 7;
+  }
+
   async function dibujarImagen(bloque) {
     try {
       const img = await cargarImagenComoDataURL(bloque.url, "#ffffff", "JPEG");
+      if (bloque.marco) { await dibujarFiguraFicha(bloque, img); return; }
 
       // Nombre arriba, centrado (mismo criterio que el título de una
       // tabla) — la Lista de gráficos del índice usa este mismo texto.
@@ -613,12 +689,7 @@ export async function generarInformePDF(informe) {
       const escalaImagen = Math.min(100, Math.max(30, bloque.tamano || 85)) / 100;
       let ancho = anchoUtil * escalaImagen;
       let alto = ancho * (img.alto / img.ancho);
-      // bloque.marco (Interventoría PRO, pedido 2026-11-12): la figura va en
-      // un recuadro como las fichas del registro fotográfico — borde gris
-      // redondeado y fondo gris claro alrededor de la imagen.
-      const padMarco = bloque.marco ? 2.2 : 0;
-      const altoMaximo = Math.max(60, margenInferior - margenSuperior - 20) - padMarco * 2;
-      if (bloque.marco && ancho > anchoUtil - padMarco * 2) { ancho = anchoUtil - padMarco * 2; alto = ancho * (img.alto / img.ancho); }
+      const altoMaximo = Math.max(60, margenInferior - margenSuperior - 20);
       if (alto > altoMaximo) { alto = altoMaximo; ancho = alto * (img.ancho / img.alto); }
 
       // Pie de foto (si hay) se mide antes del salto de página, por el
@@ -637,7 +708,7 @@ export async function generarInformePDF(informe) {
       // pie de foto (antes el salto solo miraba si cabían las 2 líneas del
       // nombre, así que una imagen que no cupiera detrás dejaba el nombre
       // huérfano al final de la página anterior).
-      saltoSiNoCabe(altoNombre + alto + padMarco * 2 + 10 + altoPie);
+      saltoSiNoCabe(altoNombre + alto + 10 + altoPie);
 
       doc.setFont("helvetica", "bold");
       doc.setFontSize(9.5);
@@ -648,16 +719,9 @@ export async function generarInformePDF(informe) {
       graficosEntradas.push({ texto: bloque.nombre || `Figura ${numero}`, pagina: doc.internal.getNumberOfPages() });
 
       const x = margenIzq + (anchoUtil - ancho) / 2;
-      if (padMarco) {
-        doc.setFillColor(...GRIS_CLARO);
-        doc.setDrawColor(210, 214, 219);
-        doc.setLineWidth(0.3);
-        doc.roundedRect(x - padMarco, y, ancho + padMarco * 2, alto + padMarco * 2, 2, 2, "FD");
-        y += padMarco;
-      }
       doc.addImage(img.dataUrl, "JPEG", x, y, ancho, alto);
       paginasConContenido.add(doc.internal.getNumberOfPages());
-      y += alto + padMarco + 3;
+      y += alto + 3;
 
       // Pie de página de la gráfica, abajo a la derecha.
       if (lineasPie.length) {
