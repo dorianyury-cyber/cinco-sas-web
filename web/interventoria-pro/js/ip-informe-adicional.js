@@ -22,6 +22,7 @@ import { db, storage, mesLargo, mostrarAlerta, limpiarAlerta, errorAmigable } fr
 import { comprimir } from "./ip-formulario.js";
 import { anotarEnLote } from "./ip-historial.js";
 import { crearEditorTabla, nuevaTabla, tablaNuevaDesdeHtml } from "../../js/control/editor-tabla.js";
+import { quitarColumnasSobrantes } from "../../js/control/tabla-pegar-html.js";
 import { crearCampoTextoRico, htmlParaCampoRico, textoPlanoDesdeHtml } from "../../js/control/texto-rico.js";
 
 // Firestore no admite listas dentro de listas: las filas de una tabla se
@@ -47,7 +48,9 @@ const BOTONES = [
 function normalizar(b) {
   if (b.tipo === "titulo2") return { tipo: "titulo", nivel: 1, texto: b.texto || "" };
   if (b.tipo === "parrafo" && !b.rico) return { tipo: "parrafo", rico: true, texto: htmlParaCampoRico(b.texto || "") };
-  if (b.tipo === "tabla") return { ...structuredClone(b), filas: filasEditables(b.filas) };
+  // Tablas pegadas antes de 2026-11-13 pudieron traer columnas vacías de más
+  // de la cuadrícula de Word (DIC partida en dos): se limpian al abrirlas.
+  if (b.tipo === "tabla") { const t = { ...structuredClone(b), filas: filasEditables(b.filas) }; quitarColumnasSobrantes(t); return t; }
   if (b.tipo === "firma") return structuredClone(b);
   return { ...b };
 }

@@ -205,7 +205,13 @@ function renderTablaEditor(bloque) {
   // Si se fijó el ancho a mano («Ancho de columnas»), ese reparto manda.
   const pesosCol = anchosColumnaEditor(bloque.filas, bloque.merges, numFilas, numCols);
   const manuales = anchosManuales(bloque, numCols);
-  grid.style.gridTemplateColumns = (manuales || pesosCol).map((p) => `minmax(90px, ${p}fr)`).join(" ");
+  // Con muchas columnas (ej. ítem + actividad + 12 meses) el mínimo de 90 px
+  // mandaba las últimas (DIC) fuera de la vista, detrás de un desplazamiento
+  // horizontal que no se notaba, y parecía que la tabla llegaba solo hasta
+  // NOV (Nataly, 2026-11-13): el mínimo baja según cuántas columnas hay.
+  const minimoCol = numCols > 12 ? 50 : numCols > 8 ? 64 : 90;
+  grid.style.gridTemplateColumns = (manuales || pesosCol).map((p) => `minmax(${minimoCol}px, ${p}fr)`).join(" ");
+  grid.classList.toggle("control-tabla-grid-densa", numCols > 8);
 
   // Barra flotante — aparece pegada a la última celda seleccionada con las
   // acciones más usadas (negrilla, alinear, combinar), para no tener que

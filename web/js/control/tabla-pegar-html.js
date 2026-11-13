@@ -117,6 +117,58 @@ function colorDeCelda(td, estiloTd) {
   return null;
 }
 
+// Columnas «sobrantes» (pedido de Nataly, 2026-11-13): Word, cuando los
+// bordes de columna no coinciden exactamente de una fila a otra, arma su
+// cuadrícula con columnas angostas de más; unas filas las cubren con una
+// celda combinada (colspan) y otras las dejan como una celda vacía aparte —
+// en el informe se veía, p. ej., la columna DIC a veces como una y a veces
+// como dos. Una columna c se quita si en TODAS las filas o está cubierta por
+// una celda combinada que también cubre c-1, o es una celda vacía sin
+// combinar. No se pierde texto: solo se quitan celdas vacías y se encogen
+// las combinadas. Su ancho se suma a la columna de la izquierda. Trabaja
+// sobre el bloque "tabla" (filas, merges, centrados, …) y lo modifica; devuelve
+// cuántas columnas quitó.
+export function quitarColumnasSobrantes(bloque) {
+  let quitadas = 0;
+  const filas = bloque.filas || [];
+  if (!filas.length) return 0;
+  const coords = ["centrados", "centradosVertical", "negritas", "coloresCelda"];
+  for (let c = Math.max(...filas.map((f) => f.length)) - 1; c >= 1; c--) {
+    const merges = bloque.merges || [];
+    const sobra = filas.every((fila, fi) => {
+      const m = merges.find((x) => fi >= x.fila && fi < x.fila + x.filas && c >= x.col && c < x.col + x.cols);
+      if (m) return m.col < c; // cubierta por una combinada que viene de la izquierda
+      return !String(fila[c] ?? "").trim();
+    });
+    // Y al menos una fila la cubre con una combinada desde la izquierda (la
+    // huella de la cuadrícula de Word): una columna vacía hecha a propósito
+    // (ej. una tabla nueva todavía sin llenar) no se toca.
+    const cubiertaAlguna = merges.some((x) => x.col < c && c < x.col + x.cols);
+    if (!sobra || !cubiertaAlguna) continue;
+    // Una combinada que EMPIEZA en c tampoco puede existir (se descartó arriba: m.col === c → no sobra).
+    filas.forEach((fila) => { if (fila.length > c) fila.splice(c, 1); });
+    bloque.merges = merges
+      .map((x) => (c >= x.col && c < x.col + x.cols ? { ...x, cols: x.cols - 1 } : x.col > c ? { ...x, col: x.col - 1 } : x))
+      .filter((x) => x.cols > 1 || x.filas > 1);
+    coords.forEach((k) => {
+      if (Array.isArray(bloque[k])) bloque[k] = bloque[k].filter((x) => x.col !== c).map((x) => (x.col > c ? { ...x, col: x.col - 1 } : x));
+    });
+    if (Array.isArray(bloque.anchosColumna) && bloque.anchosColumna.length > c) {
+      const a = bloque.anchosColumna.slice();
+      a[c - 1] = Math.round(((Number(a[c - 1]) || 0) + (Number(a[c]) || 0)) * 10) / 10;
+      a.splice(c, 1);
+      bloque.anchosColumna = a;
+    }
+    if (bloque.opcionesColumna && typeof bloque.opcionesColumna === "object") {
+      const o = {};
+      Object.entries(bloque.opcionesColumna).forEach(([k, v]) => { const n = Number(k); if (n !== c) o[n > c ? n - 1 : n] = v; });
+      bloque.opcionesColumna = o;
+    }
+    quitadas += 1;
+  }
+  return quitadas;
+}
+
 export function tablaDesdeHtml(html) {
   if (!html || !/<table/i.test(html)) return null;
   const docHtml = new DOMParser().parseFromString(html, "text/html");
@@ -209,5 +261,7 @@ export function tablaDesdeHtml(html) {
   const altoFila0 = Math.max(1, ...celdas.filter((c) => c.fi === 0).map((c) => c.filas));
   const filasEncabezado = Math.min(Math.max(1, enThead || altoFila0), Math.max(1, numFilas - 1));
 
-  return { filas, merges, centrados, centradosVertical, negritas, coloresCelda, anchosColumna, filasEncabezado };
+  const t = { filas, merges, centrados, centradosVertical, negritas, coloresCelda, anchosColumna, filasEncabezado };
+  quitarColumnasSobrantes(t);
+  return t;
 }

@@ -2591,6 +2591,14 @@ textarea.ip-adicional-texto { resize: vertical; line-height: 1.5; }
   font-family: inherit;
   line-height: 1.35;
 }
+/* Tablas de muchas columnas (más de 8, ej. 12 meses): celdas más angostas
+   y letra un poco menor para que quepan todas sin desplazarse de lado. */
+.control-tabla-grid.control-tabla-grid-densa { gap: 3px; }
+.control-tabla-grid.control-tabla-grid-densa input, .control-tabla-grid.control-tabla-grid-densa select, .control-tabla-grid.control-tabla-grid-densa textarea {
+  min-width: 0;
+  padding: 5px 4px;
+  font-size: 11.5px;
+}
 /* Resalta el rango de celdas seleccionado por arrastre, antes de combinar
    o separar — mismo acento ámbar que el resto de la suite. */
 .control-tabla-grid input.control-celda-sel, .control-tabla-grid select.control-celda-sel, .control-tabla-grid textarea.control-celda-sel {

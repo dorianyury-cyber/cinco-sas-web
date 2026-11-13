@@ -23,6 +23,7 @@ import {
   adicionesOtrosi, activoEnMes, avanceReal, inicioActividad, frentesDeActividades, actividadesConItems, valorItem, ejecutadoItem, periodosActuacion, cumplimientoPeriodica, validarActuacion, curvaPlan, nivelRiesgo
 } from "./ip-modulos.js";
 import { vigenciaAl, novedadesConEfecto, fechaFinInicial } from "./ip-otrosies.js";
+import { quitarColumnasSobrantes } from "../../js/control/tabla-pegar-html.js";
 
 // Fecha AAAA-MM-DD en la hora local (Colombia), no en UTC: toISOString() desde las 7:00 p. m. da el día siguiente.
 const fechaLocalISO = (d = new Date()) => `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}-${String(d.getDate()).padStart(2, "0")}`;
@@ -172,7 +173,12 @@ export async function construirInforme({ contrato, ym, datos, elaboradoPor, carg
     else if (x.tipo === "imagen" && x.url) b.push({ tipo: "imagen", url: x.url, nombre: x.nombre || "", tamano: x.tamano || 85, pieDeFoto: x.pieDeFoto || "" });
     // Tabla del editor de los informes (combinar, centrar, negrilla, color…):
     // pasa entera al PDF/Word, que la dibujan con el mismo código de Informes.
-    else if (x.tipo === "tabla" && x.filas?.length) b.push({ tipo: "tablaEditor", bloque: { ...x, filas: x.filas.map((f) => (Array.isArray(f) ? f : f.celdas || [])) } });
+    else if (x.tipo === "tabla" && x.filas?.length) {
+      // Sin las columnas vacías de más que deja la cuadrícula de Word (ver quitarColumnasSobrantes).
+      const bloque = { ...structuredClone(x), filas: x.filas.map((f) => (Array.isArray(f) ? [...f] : [...(f.celdas || [])])) };
+      quitarColumnasSobrantes(bloque);
+      b.push({ tipo: "tablaEditor", bloque });
+    }
   }
   async function capitulo(titulo, secciones, capId) {
     const activas = secciones.filter(([k]) => incluye(k));
