@@ -1437,6 +1437,30 @@ button.control-mes-pill.pendiente:hover { border-color: var(--cinco-amber-dark);
 :root[data-theme="light"] .control-estado-vigente { color: #1a7a4c; background: rgba(34, 153, 84, 0.14); border-color: rgba(34, 153, 84, 0.35); }
 :root[data-theme="light"] .control-estado-obsoleto { color: #96605f; background: rgba(150, 96, 95, 0.12); border-color: rgba(150, 96, 95, 0.28); }
 
+/* Estados de la correspondencia: borrador (gris), radicada sin enviar (ámbar, como .control-badge);
+   enviada y anulada reutilizan .control-estado-vigente y .control-estado-obsoleto. */
+.control-estado-borrador {
+  color: var(--text-muted, #6b7280);
+  background: rgba(107, 114, 128, 0.12);
+  border: 1px dashed rgba(107, 114, 128, 0.45);
+}
+.control-estado-radicada {
+  color: var(--cinco-amber-dark);
+  background: rgba(254, 178, 9, 0.14);
+  border: 1px solid rgba(254, 178, 9, 0.35);
+}
+.control-fila-anulada td { opacity: 0.6; }
+.control-fila-anulada td:first-child, .control-fila-anulada td:nth-child(5) { text-decoration: line-through; }
+.control-aviso-edicion {
+  margin: 0 0 12px;
+  padding: 8px 12px;
+  border-left: 4px solid var(--cinco-amber, #feb209);
+  background: rgba(254, 178, 9, 0.12);
+  font-size: 13px;
+  font-weight: 600;
+}
+.control-vp-titulo .control-estado-pill { margin-left: 8px; vertical-align: middle; }
+
 .control-btn-danger {
   background: none;
   border: 1.5px solid #d64545;

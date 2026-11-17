@@ -187,9 +187,23 @@ service cloud.firestore {
     // Correspondencia (web/control/correspondencia.html) — usa "contadores"
     // (doc "correspondencia_{año}"). Lectura abierta; crear/editar/borrar
     // requiere esGestor() (antes estaba abierto a cualquiera).
+    // Estados (correspondencia.js): borrador (sin radicado, se edita libre y se puede borrar),
+    // radicada (aún no enviada: se corrige el texto, pero el radicado no cambia), enviada y anulada
+    // (bloqueadas: solo se cambia el estado, p. ej. para quitar una marca puesta por error).
+    // Las cartas de antes de los estados no tienen el campo y cuentan como «radicada».
+    // Una carta radicada no se borra: se anula, para no dejar huecos en el consecutivo.
     match /correspondencia/{cartaId} {
       allow read: if request.auth != null;
-      allow write: if esGestor();
+      allow create: if esGestor();
+      allow update: if esGestor() && (
+        resource.data.get('estado', 'radicada') == 'borrador'
+        || (request.resource.data.get('estado', 'radicada') != 'borrador'
+            && resource.data.get('estado', 'radicada') == 'radicada'
+            && !request.resource.data.diff(resource.data).affectedKeys().hasAny(['radicado', 'consecutivo', 'anio']))
+        || (request.resource.data.get('estado', 'radicada') != 'borrador'
+            && request.resource.data.diff(resource.data).affectedKeys().hasOnly(['estado', 'envio', 'anulacion', 'actualizadoEn', 'actualizadoPor']))
+      );
+      allow delete: if esGestor() && resource.data.get('estado', 'radicada') == 'borrador';
     }
 
     // Informes de diseño propio (web/control/informes.html) — usa

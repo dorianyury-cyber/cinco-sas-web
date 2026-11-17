@@ -153,7 +153,9 @@ requireAuth(async (user) => {
   const perfil = await obtenerPerfil(user.email);
   document.getElementById("navOrdenesTrabajo")?.classList.toggle("oculto", perfil?.estado !== "activo");
   const nombres = ["contratos", "ofertas", "documentos", "ordenesTrabajo", "informes", "correspondencia", "empleados"];
-  const [contratos, ofertas, documentos, ordenes, informes, cartas, empleados] = await Promise.all(nombres.map(leer));
+  const [contratos, ofertas, documentos, ordenes, informes, todasLasCartas, empleados] = await Promise.all(nombres.map(leer));
+  // Los borradores (sin radicado) y las cartas anuladas no cuentan como correspondencia emitida.
+  const cartas = todasLasCartas && todasLasCartas.filter((c) => c.radicado && c.estado !== "anulada");
   pintar(calcular({ contratos, ofertas, documentos, ordenes, informes, cartas, empleados }));
   pintarActividad(await actividadReciente(contratos));
 });

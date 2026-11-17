@@ -41,11 +41,13 @@
 
   <section class="section">
     <div class="container">
-      <p id="soloGestorAviso" class="text-muted oculto">Solo un administrador o coadministrador puede crear o borrar cartas de correspondencia. Puedes ver el listado y descargar el PDF/Word, pero no crear nuevas.</p>
+      <p id="soloGestorAviso" class="text-muted oculto">Solo un administrador o coadministrador puede crear, editar o anular cartas de correspondencia. Puedes ver el listado y descargar el PDF/Word, pero no crear nuevas.</p>
 
       <details class="card control-nuevo" id="nuevaCartaDetails">
         <summary>+ Nueva carta</summary>
         <form class="pqr-form" id="nuevaCartaForm">
+          <p class="control-aviso-edicion oculto" id="editandoCartaAviso"></p>
+          <p class="text-muted control-informes-ayuda">«Guardar borrador» guarda sin radicado y se puede repetir cuantas veces haga falta. «Radicar» le asigna el número consecutivo. Mientras la carta no se marque como enviada, todavía se puede corregir con «Editar» sin cambiar el radicado.</p>
           <div class="control-modo-fila">
             <div class="control-modo-carta" role="radiogroup" aria-label="Tipo de carta">
               <label title="Destinatario, asunto, cuerpo y firma de cierre"><input type="radio" name="modoCarta" value="carta" checked><span>Carta con formato Cinco</span></label>
@@ -62,7 +64,7 @@
 
           <details class="control-nuevo solo-carta">
             <summary>Importar una carta ya elaborada desde un archivo JSON</summary>
-            <p class="text-muted control-informes-ayuda">Carga el destinatario, el asunto, el cuerpo (texto e imágenes) y la firma. No guarda nada: revisas con «Visualizar» y pulsas «Guardar», que es lo que asigna el radicado.</p>
+            <p class="text-muted control-informes-ayuda">Carga el destinatario, el asunto, el cuerpo (texto e imágenes) y la firma. No guarda nada: revisas con «Visualizar» y luego la guardas como borrador o la radicas. También sirve para reemplazar el texto de una carta que estás editando.</p>
             <input type="file" id="importarCartaArchivo" accept=".json,application/json">
             <textarea id="importarCartaTexto" rows="4" placeholder='o pega aquí el JSON: {"destinatario": "...", "asunto": "...", "bloques": [...]}'></textarea>
             <button type="button" class="control-btn-mini" id="importarCartaBtn">Cargar en el formulario</button>
@@ -116,7 +118,8 @@
 
           <div class="control-3botones">
             <button type="button" class="control-btn-mini" id="vistaPreviaBtn">Visualizar</button>
-            <button type="submit" class="btn" id="crearCartaBtn">Guardar</button>
+            <button type="button" class="btn" id="borradorCartaBtn">Guardar borrador</button>
+            <button type="submit" class="btn" id="crearCartaBtn">Radicar</button>
             <button type="button" class="btn" id="descargarCartaBtn" disabled>Descargar</button>
           </div>
           <button type="button" class="control-btn-mini oculto" id="nuevaCartaBtn">+ Nueva carta</button>
@@ -141,6 +144,7 @@
         <table class="control-tabla-documentos control-tabla-seleccionable">
           <colgroup>
             <col class="w-130">
+            <col class="w-150">
             <col class="w-110">
             <col>
             <col>
@@ -148,6 +152,7 @@
           <thead>
             <tr>
               <th>Radicado</th>
+              <th>Estado</th>
               <th>Fecha</th>
               <th>Destinatario</th>
               <th>Asunto</th>

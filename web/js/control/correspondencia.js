@@ -1,6 +1,6 @@
 import { signOut } from "https://www.gstatic.com/firebasejs/10.7.1/firebase-auth.js";
 import {
-  collection, doc, deleteDoc, getDocs, runTransaction, serverTimestamp, onSnapshot, query, orderBy, updateDoc
+  collection, doc, deleteDoc, getDocs, runTransaction, serverTimestamp, onSnapshot, query, orderBy, updateDoc, setDoc, deleteField
 } from "https://www.gstatic.com/firebasejs/10.7.1/firebase-firestore.js";
 import { ref, uploadBytes, getDownloadURL, getBlob } from "https://www.gstatic.com/firebasejs/10.7.1/firebase-storage.js";
 import { auth, db, storage, requireAuth, obtenerPerfil } from "./firebase-control.js";
@@ -38,14 +38,69 @@ const inputWordFinal = document.getElementById("inputWordFinal");
 let usuarioActual = null;
 let cartaIdParaSubirWord = null;
 
-// Igual criterio que informes.js/ofertas.js — última carta guardada con
-// el contenido actual; "Descargar" la usa sin volver a guardar. Como acá
-// no hay modo "editar" (una carta ya generada no se vuelve a tocar), tras
-// guardar se bloquea "Guardar" hasta que se pida explícitamente "+ Nueva
-// carta" — evita generar un radicado nuevo sin querer con un segundo clic.
+// Última carta guardada con el contenido actual; "Descargar" la usa sin volver a guardar.
 let cartaGuardadaActual = null;
 function actualizarDescargarBtn() {
   descargarBtn.disabled = !cartaGuardadaActual;
+}
+
+// ---- Estados de una carta ----
+// borrador: se edita cuantas veces haga falta y no tiene radicado (lo asigna «Radicar»).
+// radicada: tiene radicado pero aún no se envía; el texto se puede corregir sin cambiar el radicado.
+// enviada: ya la recibió el destinatario (fecha y medio registrados); queda bloqueada.
+// anulada: radicada que no se envió; se conserva en la lista (con su motivo) para no dejar huecos en el consecutivo.
+// Las cartas de antes de los estados no tienen el campo: se toman como «radicada».
+const ESTADOS_CARTA = {
+  borrador: { etiqueta: "Borrador", clase: "control-estado-borrador" },
+  radicada: { etiqueta: "Radicada · sin enviar", clase: "control-estado-radicada" },
+  enviada: { etiqueta: "Enviada", clase: "control-estado-vigente" },
+  anulada: { etiqueta: "Anulada", clase: "control-estado-obsoleto" }
+};
+const estadoDe = (c) => (c && ESTADOS_CARTA[c.estado] ? c.estado : "radicada");
+const etiquetaRadicado = (c) => c.radicado || "Borrador";
+const pillEstado = (c) => `<span class="control-estado-pill ${ESTADOS_CARTA[estadoDe(c)].clase}">${ESTADOS_CARTA[estadoDe(c)].etiqueta}</span>`;
+
+// Carta que está cargada en el formulario para seguir editándola (borrador o radicada sin enviar).
+// null = carta nueva.
+let cartaEditando = null;
+const borradorBtn = document.getElementById("borradorCartaBtn");
+const editandoAviso = document.getElementById("editandoCartaAviso");
+function actualizarBotonesFormulario() {
+  const radicada = cartaEditando?.estado === "radicada";
+  borradorBtn.classList.toggle("oculto", radicada);
+  crearBtn.textContent = radicada ? "Guardar cambios" : "Radicar";
+  crearBtn.disabled = false;
+  borradorBtn.disabled = false;
+  // En una carta radicada el contrato ya quedó archivado con ella: no se cambia al corregir el texto.
+  selectContrato.disabled = radicada;
+  const botonContrato = document.getElementById(`${selectContrato.id}Boton`);
+  if (botonContrato) {
+    botonContrato.disabled = radicada;
+    botonContrato.title = radicada ? "El contrato no se cambia al corregir una carta radicada" : "";
+  }
+  if (cartaEditando) {
+    editandoAviso.textContent = radicada
+      ? `Editando ${cartaEditando.radicado} (radicada, sin enviar). «Guardar cambios» corrige el texto y conserva el radicado.`
+      : "Editando un borrador. «Guardar borrador» lo actualiza sin radicar; «Radicar» le asigna el número cuando esté listo.";
+    editandoAviso.classList.remove("oculto");
+  } else {
+    editandoAviso.classList.add("oculto");
+  }
+}
+
+// Radicados citados en el texto (COM-AAAA-NNN) que todavía no constan como enviados: una carta que cita
+// otra que el destinatario no ha recibido no se va a entender.
+function referenciasNoEnviadas(datos, bloquesCarta, propioRadicado) {
+  const textos = [datos.asunto || "", ...bloquesCarta.map((b) => b.tipo === "texto" ? b.texto : b.tipo === "tabla" ? b.filas.map((f) => celdasDeFila(f).join(" ")).join(" ") : "")];
+  const citados = new Set(textos.join(" ").replace(/<[^>]+>/g, " ").match(/COM-\d{4}-\d{3}/g) || []);
+  citados.delete(propioRadicado);
+  return [...citados].filter((r) => {
+    const c = cartasListaCompleta.find((x) => x.radicado === r);
+    return !c || estadoDe(c) !== "enviada";
+  }).map((r) => {
+    const c = cartasListaCompleta.find((x) => x.radicado === r);
+    return `${r} (${c ? ESTADOS_CARTA[estadoDe(c)].etiqueta.toLowerCase() : "no existe"})`;
+  });
 }
 
 function mostrarAlerta(texto, tipo) {
@@ -252,7 +307,7 @@ document.getElementById("documentoArchivo").addEventListener("change", async (e)
     const nombre = titulo || archivo.name.replace(/\.docx$/i, "");
     document.getElementById("asunto").value = nombre.length > 200 ? nombre.slice(0, 197) + "..." : nombre;
     renderBloques();
-    mostrarAlerta(`Documento «${archivo.name}» cargado (${nuevos.length} bloques). Revísalo con «Visualizar» y pulsa «Guardar» para asignar el radicado.`, "ok");
+    mostrarAlerta(`Documento «${archivo.name}» cargado (${nuevos.length} bloques). Revísalo con «Visualizar»; guárdalo como borrador o radícalo cuando esté listo.`, "ok");
   } catch (err) {
     mostrarAlerta(err.message || "No se pudo leer el documento.", "error");
   }
@@ -435,7 +490,7 @@ function importarCartaJson(texto) {
   document.getElementById("importarCartaTexto").value = "";
   document.getElementById("importarCartaTexto").closest("details").open = false;
   document.getElementById("nuevaCartaDetails").open = true;
-  mostrarAlerta(`Carta importada con ${nuevos.length} bloques${cod && !opcion ? ` — no encontré el contrato «${cod}»: elígelo en «Contrato relacionado»` : ""}. Revísala con «Visualizar» y pulsa «Guardar» para asignar el radicado.`, "ok");
+  mostrarAlerta(`Carta importada con ${nuevos.length} bloques${cod && !opcion ? ` — no encontré el contrato «${cod}»: elígelo en «Contrato relacionado»` : ""}. Revísala con «Visualizar»; luego «Guardar borrador», «Radicar» o, si estás corrigiendo una carta radicada, «Guardar cambios».`, "ok");
 }
 document.getElementById("importarCartaBtn").addEventListener("click", () => {
   const texto = document.getElementById("importarCartaTexto").value.trim();
@@ -484,7 +539,7 @@ document.getElementById("vistaPreviaBtn").addEventListener("click", async () => 
   btn.textContent = "Generando vista previa...";
   try {
     const bloquesPreview = bloques.map((b) => b.tipo === "imagen"
-      ? { tipo: "imagen", url: URL.createObjectURL(b.blob) }
+      ? { tipo: "imagen", url: b.blob ? URL.createObjectURL(b.blob) : b.url }
       : b.tipo === "tabla" ? { tipo: "tabla", filas: b.filas } : b.tipo === "firma" ? { tipo: "firma" } : { tipo: "texto", texto: b.texto });
     const datosPreview = {
       modo: modoActual(),
@@ -493,8 +548,8 @@ document.getElementById("vistaPreviaBtn").addEventListener("click", async () => 
       asunto: document.getElementById("asunto").value,
       firmaNombre: document.getElementById("firmaNombre").value,
       firmaCargo: document.getElementById("firmaCargo").value,
-      fecha: hoyISO(),
-      radicado: "VISTA PREVIA — sin guardar",
+      fecha: cartaEditando?.fecha || hoyISO(),
+      radicado: cartaEditando?.radicado ? `${cartaEditando.radicado} (vista previa sin guardar)` : "BORRADOR — sin radicar",
       bloques: bloquesPreview
     };
     const pdf = await generarCartaPDF(datosPreview);
@@ -555,7 +610,8 @@ function aplicarFiltroCorrespondencia() {
     if (desde && (!c.fecha || c.fecha < desde)) return false;
     if (hasta && (!c.fecha || c.fecha > hasta)) return false;
     if (!texto) return true;
-    return (c.radicado || "").toLowerCase().includes(texto) ||
+    return etiquetaRadicado(c).toLowerCase().includes(texto) ||
+      ESTADOS_CARTA[estadoDe(c)].etiqueta.toLowerCase().includes(texto) ||
       (c.destinatario || "").toLowerCase().includes(texto) ||
       (c.asunto || "").toLowerCase().includes(texto);
   });
@@ -578,7 +634,11 @@ function aplicarFiltroCorrespondencia() {
   cartasListaFiltrada.forEach((c) => {
     const fila = document.createElement("tr");
     fila.dataset.id = c.id;
-    fila.appendChild(celda(c.radicado));
+    if (estadoDe(c) === "anulada") fila.classList.add("control-fila-anulada");
+    fila.appendChild(celda(etiquetaRadicado(c)));
+    const tdEstado = document.createElement("td");
+    tdEstado.innerHTML = pillEstado(c);
+    fila.appendChild(tdEstado);
     fila.appendChild(celda(c.fecha || ""));
     fila.appendChild(celda(c.destinatario || (c.modo === "documento" ? "(documento propio)" : "")));
     fila.appendChild(celda(c.asunto || ""));
@@ -629,12 +689,22 @@ function pintarVistaPreviaCarta() {
       <div class="control-vp-grupo-campos">${camposHtml}</div>
     </div>`;
 
+  const est = estadoDe(c);
+  const grupoEstado = est === "enviada"
+    ? grupo("Envío", `${campo("Enviada el", c.envio?.fecha)}${campo("Medio", c.envio?.medio)}${c.envio?.nota ? campo("Nota", c.envio.nota) : ""}`)
+    : est === "anulada"
+      ? grupo("Anulación", `${campo("Motivo", c.anulacion?.motivo)}${campo("Fecha", c.anulacion?.fecha)}`)
+      : grupo("Estado", campo("Situación", est === "borrador"
+        ? "Borrador sin radicar: edítalo cuantas veces haga falta y radícalo cuando esté listo."
+        : "Radicada y sin enviar: aún puedes corregir el texto («Editar»). Cuando la envíes, márcala como enviada."));
+
   vistaPreviaCartaEl.innerHTML = `
     <div class="control-vp-encabezado">
-      <span class="control-vp-titulo">${escapeHtml(c.radicado)} — ${escapeHtml(c.fecha || "")}</span>
+      <span class="control-vp-titulo">${escapeHtml(etiquetaRadicado(c))} — ${escapeHtml(c.fecha || "")} ${pillEstado(c)}</span>
       <div class="control-vp-acciones" id="cartaVpAcciones"></div>
     </div>
     <div class="control-vp-grupos">
+      ${grupoEstado}
       ${grupo("Destinatario", `
         ${campo("Destinatario", c.destinatario)}
         ${campo("Ciudad", c.ciudad)}
@@ -649,9 +719,10 @@ function pintarVistaPreviaCarta() {
   `;
 
   const accionesEl = document.getElementById("cartaVpAcciones");
+  const nombreArchivo = c.radicado || "Borrador";
   accionesEl.appendChild(botonVerPdf({
-    titulo: `${c.radicado} — ${c.asunto || ""}`,
-    nombreArchivo: `${c.radicado}.pdf`,
+    titulo: `${etiquetaRadicado(c)} — ${c.asunto || ""}`,
+    nombreArchivo: `${nombreArchivo}.pdf`,
     obtenerBlob: async () => (await generarCartaPDF(await datosParaPdf(c))).output("blob")
   }));
 
@@ -664,7 +735,7 @@ function pintarVistaPreviaCarta() {
     btnPdf.disabled = true;
     try {
       const pdf = await generarCartaPDF(await datosParaPdf(c));
-      pdf.save(`${c.radicado}.pdf`);
+      pdf.save(`${nombreArchivo}.pdf`);
     } catch (err) {
       mostrarAlerta(`No se pudo generar el PDF${c.wordFinalUrl ? " desde el Word editado" : ""}: ${err.message || err}`, "error");
     } finally {
@@ -684,7 +755,7 @@ function pintarVistaPreviaCarta() {
       if (c.wordFinalUrl) {
         window.open(c.wordFinalUrl, "_blank");
       } else {
-        await descargarCartaDocx(c);
+        await descargarCartaDocx({ ...c, radicado: radicadoParaDocumento(c) });
       }
     } finally {
       btnWord.disabled = false;
@@ -694,35 +765,113 @@ function pintarVistaPreviaCarta() {
 
   if (!esGestorActual) return;
 
-  const btnSubirWord = document.createElement("button");
-  btnSubirWord.type = "button";
-  btnSubirWord.className = "control-btn-mini";
-  btnSubirWord.textContent = "Cargar Word editado";
-  btnSubirWord.title = "Sube el .docx ya ajustado a mano (ej. imagen centrada) para que quede como la versión oficial de esta carta";
-  btnSubirWord.addEventListener("click", () => {
-    cartaIdParaSubirWord = c.id;
-    inputWordFinal.click();
-  });
-  accionesEl.appendChild(btnSubirWord);
+  const boton = (texto, titulo, clase, alHacerClic) => {
+    const b = document.createElement("button");
+    b.type = "button";
+    b.className = clase;
+    b.textContent = texto;
+    b.title = titulo;
+    b.addEventListener("click", async () => {
+      b.disabled = true;
+      try { await alHacerClic(); } catch (err) { mostrarAlerta(err.message || String(err), "error"); } finally { b.disabled = false; }
+    });
+    accionesEl.appendChild(b);
+  };
+  const actualizar = (campos) => updateDoc(doc(db, "correspondencia", c.id), { ...campos, actualizadoEn: serverTimestamp(), actualizadoPor: usuarioActual.email });
 
-  const btnBorrar = document.createElement("button");
-  btnBorrar.type = "button";
-  btnBorrar.className = "control-btn-danger";
-  btnBorrar.textContent = "Borrar";
-  btnBorrar.addEventListener("click", async () => {
-    const confirmado = window.confirm(
-      `¿Seguro que quieres borrar la carta ${c.radicado} (${c.asunto || "sin asunto"})?\n\nEsta acción no se puede deshacer. El radicado no se vuelve a usar para otra carta.`
-    );
-    if (!confirmado) return;
-    btnBorrar.disabled = true;
-    try {
+  if (est === "borrador" || est === "radicada") {
+    boton("Editar", est === "borrador" ? "Carga el borrador en el formulario para seguir editándolo" : "Carga la carta en el formulario para corregir el texto sin cambiar el radicado", "control-btn-mini", async () => cargarCartaEnFormulario(c));
+  }
+  if (est === "radicada") {
+    boton("Cargar Word editado", "Sube el .docx ya ajustado a mano (ej. imagen centrada) para que quede como la versión oficial de esta carta", "control-btn-mini", async () => {
+      cartaIdParaSubirWord = c.id;
+      inputWordFinal.click();
+    });
+    boton("Marcar enviada", "Registra que la carta ya la recibió el destinatario; desde ahí queda bloqueada", "control-btn-mini", async () => {
+      const citadas = referenciasNoEnviadas(c, (c.bloques || []).map((b) => b.tipo === "tabla" ? { tipo: "tabla", filas: (b.filas || []).map(celdasDeFila) } : b), c.radicado);
+      if (citadas.length && !window.confirm(`Esta carta cita ${citadas.join(", ")}, que no consta como enviada. El destinatario no la va a tener como referencia.\n\n¿Marcarla como enviada de todos modos?`)) return;
+      const fecha = window.prompt("Fecha de envío (AAAA-MM-DD):", hoyISO());
+      if (!fecha) return;
+      if (!/^\d{4}-\d{2}-\d{2}$/.test(fecha.trim())) throw new Error("La fecha debe tener el formato AAAA-MM-DD.");
+      const medio = window.prompt("¿Por qué medio se envió? (ej. correo electrónico a fernando.acero@..., entrega física, plataforma)", "Correo electrónico");
+      if (!medio) return;
+      const nota = window.prompt("Nota opcional (ej. con copia a la supervisión, anexos enviados):", "") || "";
+      await actualizar({ estado: "enviada", envio: { fecha: fecha.trim(), medio: medio.trim(), nota: nota.trim(), registradoPor: usuarioActual.email } });
+      mostrarAlerta(`${c.radicado} quedó como enviada el ${fecha.trim()}.`, "ok");
+    });
+    boton("Anular", "La carta no se envió y no se enviará: queda en la lista como anulada, con su motivo, sin dejar hueco en el consecutivo", "control-btn-danger", async () => {
+      const motivo = window.prompt(`Motivo de la anulación de ${c.radicado} (ej. «No enviada; reemplazada por COM-2026-0XX»):`, "");
+      if (!motivo || !motivo.trim()) return;
+      await actualizar({ estado: "anulada", anulacion: { motivo: motivo.trim(), fecha: hoyISO(), registradoPor: usuarioActual.email } });
+      mostrarAlerta(`${c.radicado} quedó anulada.`, "ok");
+    });
+  }
+  if (est === "enviada") {
+    boton("Quitar marca de enviada", "Solo si se marcó como enviada por error", "control-btn-mini", async () => {
+      if (!window.confirm(`¿Quitar la marca de enviada de ${c.radicado}? Úsalo solo si se marcó por error: una carta que ya recibió el destinatario no debe cambiar.`)) return;
+      await actualizar({ estado: "radicada", envio: deleteField() });
+    });
+  }
+  if (est === "anulada") {
+    boton("Quitar anulación", "Solo si se anuló por error", "control-btn-mini", async () => {
+      if (!window.confirm(`¿Quitar la anulación de ${c.radicado}?`)) return;
+      await actualizar({ estado: "radicada", anulacion: deleteField() });
+    });
+  }
+  if (est === "borrador") {
+    boton("Borrar", "Borra el borrador (no tiene radicado, no deja huecos)", "control-btn-danger", async () => {
+      if (!window.confirm(`¿Borrar este borrador (${c.asunto || "sin asunto"})? No se puede deshacer.`)) return;
       await deleteDoc(doc(db, "correspondencia", c.id));
-    } catch (err) {
-      mostrarAlerta(err.message || "No se pudo borrar la carta.", "error");
-      btnBorrar.disabled = false;
-    }
+      if (cartaEditando?.id === c.id) limpiarFormulario();
+    });
+  }
+}
+
+// El radicado que se imprime: un borrador no tiene número y una anulada lo dice.
+function radicadoParaDocumento(c) {
+  if (!c.radicado) return "BORRADOR — sin radicar";
+  return estadoDe(c) === "anulada" ? `${c.radicado} (ANULADA)` : c.radicado;
+}
+
+// Carga una carta guardada (borrador o radicada sin enviar) en el formulario para seguir editándola.
+function cargarCartaEnFormulario(c) {
+  const modo = c.modo === "documento" ? "documento" : "carta";
+  form.querySelector(`input[name="modoCarta"][value="${modo}"]`).checked = true;
+  document.getElementById("destinatario").value = c.destinatario || "";
+  document.getElementById("ciudad").value = c.ciudad || "Neiva";
+  document.getElementById("asunto").value = c.asunto || "";
+  document.getElementById("firmaNombre").value = c.firmaNombre || "";
+  document.getElementById("firmaCargo").value = c.firmaCargo || "";
+  selectContrato.value = c.contratoId || "";
+  bloques = (c.bloques || []).map((b) => {
+    if (b.tipo === "tabla") return { tipo: "tabla", filas: (b.filas || []).map((f) => [...celdasDeFila(f)]) };
+    if (b.tipo === "imagen") return { tipo: "imagen", url: b.url, previewUrl: b.url };
+    if (b.tipo === "firma") return { tipo: "firma" };
+    return { tipo: "texto", texto: b.texto || "" };
   });
-  accionesEl.appendChild(btnBorrar);
+  if (!bloques.length) bloques = [{ tipo: "texto", texto: "" }];
+  cartaEditando = { id: c.id, estado: estadoDe(c), radicado: c.radicado || null, fecha: c.fecha || null, wordFinalUrl: c.wordFinalUrl || null };
+  cartaGuardadaActual = { ...c };
+  aplicarModo();
+  actualizarBotonesFormulario();
+  actualizarDescargarBtn();
+  nuevaCartaBtn.classList.remove("oculto");
+  alertBox.className = "form-alert";
+  document.getElementById("nuevaCartaDetails").open = true;
+  document.getElementById("nuevaCartaDetails").scrollIntoView({ behavior: "smooth", block: "start" });
+}
+
+function limpiarFormulario() {
+  form.reset();
+  document.getElementById("ciudad").value = "Neiva";
+  bloques = [{ tipo: "texto", texto: "" }];
+  cartaEditando = null;
+  cartaGuardadaActual = null;
+  aplicarModo();
+  actualizarDescargarBtn();
+  actualizarBotonesFormulario();
+  nuevaCartaBtn.classList.add("oculto");
+  alertBox.className = "form-alert";
 }
 
 // ---- PDF a partir del Word editado ----
@@ -732,7 +881,8 @@ function pintarVistaPreviaCarta() {
 // (membrete y radicado de Cinco + su contenido tal cual), como un
 // documento propio. Se lee cada vez desde Storage, así sirve también para
 // las cartas que ya tenían el Word cargado antes de este cambio.
-async function datosParaPdf(carta) {
+async function datosParaPdf(cartaOriginal) {
+  const carta = cartaOriginal?.id ? { ...cartaOriginal, radicado: radicadoParaDocumento(cartaOriginal) } : cartaOriginal;
   if (!carta?.wordFinalUrl || !carta.id) return carta;
   const blob = await getBlob(ref(storage, `correspondencia/${carta.id}/final.docx`));
   const { bloques } = await docxABloques(blob);
@@ -804,46 +954,123 @@ requireAuth(async (user) => {
   });
   mejorarSelectorContrato(selectContrato, contratosPorId);
 
-  form.addEventListener("submit", async (e) => {
-    e.preventDefault();
-    crearBtn.disabled = true;
-    crearBtn.textContent = "Guardando...";
-    alertBox.className = "form-alert";
-
-    const anio = new Date().getFullYear();
-    // Un documento propio no lleva destinatario ni firma de cierre (los trae el mismo documento).
+  // Un documento propio no lleva destinatario ni firma de cierre (los trae el mismo documento).
+  const datosDelFormulario = () => {
     const esDocumento = modoActual() === "documento";
-    const datosBase = {
+    return {
       modo: esDocumento ? "documento" : "carta",
       destinatario: esDocumento ? "" : document.getElementById("destinatario").value,
       ciudad: document.getElementById("ciudad").value || "Neiva",
       asunto: document.getElementById("asunto").value,
       firmaNombre: esDocumento ? "" : document.getElementById("firmaNombre").value,
-      firmaCargo: esDocumento ? "" : document.getElementById("firmaCargo").value,
-      fecha: hoyISO()
+      firmaCargo: esDocumento ? "" : document.getElementById("firmaCargo").value
     };
+  };
+
+  // Sube las imágenes nuevas del editor (las ya subidas conservan su url) y devuelve los bloques a guardar.
+  // Cada imagen subida queda con su url en el editor, para no volver a subirla en el siguiente guardado.
+  async function bloquesParaGuardar(cartaId) {
+    const final = [];
+    let n = 0;
+    for (const bloque of bloques) {
+      if (bloque.tipo === "texto") {
+        final.push({ tipo: "texto", texto: bloque.texto });
+      } else if (bloque.tipo === "tabla") {
+        final.push({ tipo: "tabla", filas: bloque.filas.map((celdas) => ({ celdas })) });
+      } else if (bloque.tipo === "firma") {
+        final.push({ tipo: "firma" });
+      } else if (bloque.blob) {
+        n += 1;
+        const archivoRef = ref(storage, `correspondencia/${cartaId}/${Date.now()}-${n}.jpg`);
+        await uploadBytes(archivoRef, bloque.blob);
+        bloque.url = await getDownloadURL(archivoRef);
+        delete bloque.blob;
+        final.push({ tipo: "imagen", url: bloque.url });
+      } else {
+        final.push({ tipo: "imagen", url: bloque.url });
+      }
+    }
+    return final;
+  }
+
+  // ---- Guardar borrador: sin radicado, se puede repetir cuantas veces haga falta ----
+  borradorBtn.addEventListener("click", async () => {
+    borradorBtn.disabled = true;
+    crearBtn.disabled = true;
+    alertBox.className = "form-alert";
+    try {
+      const datosBase = datosDelFormulario();
+      const cartaRef = cartaEditando ? doc(db, "correspondencia", cartaEditando.id) : doc(collection(db, "correspondencia"));
+      const bloquesFinal = await bloquesParaGuardar(cartaRef.id);
+      const contratoId = selectContrato.value || null;
+      if (cartaEditando) {
+        await updateDoc(cartaRef, { ...datosBase, bloques: bloquesFinal, contratoId, actualizadoEn: serverTimestamp(), actualizadoPor: user.email });
+      } else {
+        await setDoc(cartaRef, {
+          ...datosBase, bloques: bloquesFinal, contratoId, estado: "borrador", radicado: null, fecha: hoyISO(),
+          creadoPor: user.email, creadoEn: serverTimestamp(), actualizadoEn: serverTimestamp(), actualizadoPor: user.email
+        });
+      }
+      cartaEditando = { id: cartaRef.id, estado: "borrador", radicado: null, fecha: null };
+      cartaGuardadaActual = { id: cartaRef.id, ...datosBase, bloques: bloquesFinal, radicado: null, estado: "borrador" };
+      cartaSeleccionadaId = cartaRef.id;
+      actualizarDescargarBtn();
+      nuevaCartaBtn.classList.remove("oculto");
+      mostrarAlerta("Borrador guardado, sin radicado. Puedes seguir editándolo; «Radicar» le asigna el número cuando esté listo.", "ok");
+    } catch (err) {
+      mostrarAlerta(err.message || "No se pudo guardar el borrador.", "error");
+    } finally {
+      actualizarBotonesFormulario();
+    }
+  });
+
+  form.addEventListener("submit", async (e) => {
+    e.preventDefault();
+    alertBox.className = "form-alert";
+    const datosBase = datosDelFormulario();
+    const corrigiendo = cartaEditando?.estado === "radicada";
+
+    // Antes de radicar (o de corregir una radicada): ¿cita cartas que el destinatario no ha recibido?
+    const citadas = referenciasNoEnviadas(datosBase, bloques, cartaEditando?.radicado);
+    if (citadas.length && !window.confirm(
+      `El texto cita ${citadas.join(", ")}, que no consta como enviada al destinatario.\n\nSi esa carta no se envió, el destinatario no va a entender la referencia: lo mejor es redactar esta carta completa, sin citarla.\n\n¿${corrigiendo ? "Guardar los cambios" : "Radicar"} de todos modos?`
+    )) return;
+
+    crearBtn.disabled = true;
+    borradorBtn.disabled = true;
+    crearBtn.textContent = corrigiendo ? "Guardando..." : "Radicando...";
+
+    if (corrigiendo) {
+      // Corregir una carta radicada que aún no se envía: conserva radicado, fecha y contrato.
+      try {
+        if (cartaEditando.wordFinalUrl && !window.confirm(`${cartaEditando.radicado} tiene un Word editado cargado, que hoy manda sobre el PDF. Al guardar los cambios se descarta ese Word y el PDF sale de este texto.\n\n¿Continuar?`)) {
+          actualizarBotonesFormulario();
+          return;
+        }
+        const cartaRef = doc(db, "correspondencia", cartaEditando.id);
+        const bloquesFinal = await bloquesParaGuardar(cartaRef.id);
+        const cambios = { ...datosBase, bloques: bloquesFinal, actualizadoEn: serverTimestamp(), actualizadoPor: user.email };
+        if (cartaEditando.wordFinalUrl) cambios.wordFinalUrl = deleteField();
+        await updateDoc(cartaRef, cambios);
+        cartaEditando.wordFinalUrl = null;
+        cartaGuardadaActual = { id: cartaRef.id, ...datosBase, bloques: bloquesFinal, radicado: cartaEditando.radicado, fecha: cartaEditando.fecha, estado: "radicada" };
+        actualizarDescargarBtn();
+        mostrarAlerta(`Cambios guardados en ${cartaEditando.radicado}; conserva su radicado y su fecha.`, "ok");
+      } catch (err) {
+        mostrarAlerta(err.message || "No se pudieron guardar los cambios.", "error");
+      } finally {
+        actualizarBotonesFormulario();
+      }
+      return;
+    }
+
+    const anio = new Date().getFullYear();
+    datosBase.fecha = hoyISO();
 
     try {
-      const cartaRef = doc(collection(db, "correspondencia"));
-
-      // Sube las imágenes del editor antes de guardar el registro.
-      const bloquesFinal = [];
-      let n = 0;
-      for (const bloque of bloques) {
-        if (bloque.tipo === "texto") {
-          bloquesFinal.push({ tipo: "texto", texto: bloque.texto });
-        } else if (bloque.tipo === "tabla") {
-          bloquesFinal.push({ tipo: "tabla", filas: bloque.filas.map((celdas) => ({ celdas })) });
-        } else if (bloque.tipo === "firma") {
-          bloquesFinal.push({ tipo: "firma" });
-        } else {
-          n += 1;
-          const archivoRef = ref(storage, `correspondencia/${cartaRef.id}/${n}.jpg`);
-          await uploadBytes(archivoRef, bloque.blob);
-          const url = await getDownloadURL(archivoRef);
-          bloquesFinal.push({ tipo: "imagen", url });
-        }
-      }
+      const desdeBorrador = cartaEditando?.estado === "borrador";
+      const cartaRef = desdeBorrador ? doc(db, "correspondencia", cartaEditando.id) : doc(collection(db, "correspondencia"));
+      const bloquesFinal = await bloquesParaGuardar(cartaRef.id);
 
       const contadorRef = doc(db, "contadores", `correspondencia_${anio}`);
       const contratoId = selectContrato.value;
@@ -851,19 +1078,20 @@ requireAuth(async (user) => {
 
       await runTransaction(db, async (tx) => {
         const contadorSnap = await tx.get(contadorRef);
+        if (desdeBorrador) {
+          const actual = await tx.get(cartaRef);
+          if (actual.exists() && actual.data().radicado) throw new Error(`Este borrador ya se radicó como ${actual.data().radicado}.`);
+        }
         const siguiente = contadorSnap.exists() ? contadorSnap.data().siguiente : 1;
         radicado = `COM-${anio}-${String(siguiente).padStart(3, "0")}`;
 
         tx.set(contadorRef, { siguiente: siguiente + 1 });
+        // creadoEn = momento de radicación (de ahí sale la fecha de la lista), también al radicar un borrador.
         tx.set(cartaRef, {
-          // contratoId también queda en la carta misma (antes solo se
-          // usaba para la referencia cruzada en contratos/{id}/documentos,
-          // más abajo) — así se puede filtrar el listado por contrato sin
-          // tener que ir a buscarlo ahí.
-          ...datosBase, bloques: bloquesFinal, radicado, anio, consecutivo: siguiente, contratoId: contratoId || null,
+          ...datosBase, bloques: bloquesFinal, estado: "radicada", radicado, anio, consecutivo: siguiente, contratoId: contratoId || null,
           creadoPor: user.email, creadoEn: serverTimestamp(),
           actualizadoEn: serverTimestamp(), actualizadoPor: user.email
-        });
+        }, { merge: true });
 
         if (contratoId) {
           const refEnContrato = doc(collection(db, "contratos", contratoId, "documentos"));
@@ -891,24 +1119,22 @@ requireAuth(async (user) => {
         }
       }
 
-      // No se limpia el formulario ni se cierra — se queda tal cual para
-      // que "Descargar" (y "Visualizar") reflejen justo lo que se guardó.
-      // "Guardar" queda bloqueado (evita generar un radicado nuevo con un
-      // segundo clic) hasta que se pida "+ Nueva carta".
-      cartaGuardadaActual = { ...datosBase, bloques: bloquesFinal, radicado };
+      // El formulario se queda con la carta: un segundo clic ya no radica otra vez, sino que
+      // «Guardar cambios» corrige esta misma mientras no se marque como enviada.
+      cartaEditando = { id: cartaRef.id, estado: "radicada", radicado, fecha: datosBase.fecha, wordFinalUrl: null };
+      cartaGuardadaActual = { id: cartaRef.id, ...datosBase, bloques: bloquesFinal, radicado, estado: "radicada" };
+      cartaSeleccionadaId = cartaRef.id;
       actualizarDescargarBtn();
       nuevaCartaBtn.classList.remove("oculto");
-      crearBtn.textContent = "Guardada";
 
-      let mensaje = `Carta ${radicado} guardada.`;
+      let mensaje = `Carta radicada como ${radicado}. Mientras no la marques como enviada, puedes corregirla con «Guardar cambios».`;
       if (codigoSgc) mensaje += ` Registrada en el SGC como ${codigoSgc}.`;
       if (errorSgc) mensaje += ` (No se pudo registrar en el SGC: ${errorSgc} — hazlo manualmente en Documentos.)`;
       mostrarAlerta(mensaje, errorSgc ? "error" : "ok");
-      return;
     } catch (err) {
-      mostrarAlerta(err.message || "No se pudo guardar la carta.", "error");
-      crearBtn.disabled = false;
-      crearBtn.textContent = "Guardar";
+      mostrarAlerta(err.message || "No se pudo radicar la carta.", "error");
+    } finally {
+      actualizarBotonesFormulario();
     }
   });
 
@@ -920,7 +1146,7 @@ requireAuth(async (user) => {
     descargarBtn.textContent = "Generando...";
     try {
       const pdf = await generarCartaPDF(await datosParaPdf(cartaGuardadaActual));
-      pdf.save(`${cartaGuardadaActual.radicado}.pdf`);
+      pdf.save(`${cartaGuardadaActual.radicado || "Borrador"}.pdf`);
     } catch (err) {
       mostrarAlerta(err.message || "No se pudo descargar la carta.", "error");
     } finally {
@@ -930,18 +1156,8 @@ requireAuth(async (user) => {
   });
 
   // ---- Nueva carta: limpia el formulario para empezar otra desde cero.
-  nuevaCartaBtn.addEventListener("click", () => {
-    form.reset();
-    document.getElementById("ciudad").value = "Neiva";
-    bloques = [{ tipo: "texto", texto: "" }];
-    aplicarModo();
-    cartaGuardadaActual = null;
-    actualizarDescargarBtn();
-    nuevaCartaBtn.classList.add("oculto");
-    crearBtn.disabled = false;
-    crearBtn.textContent = "Guardar";
-    alertBox.className = "form-alert";
-  });
+  nuevaCartaBtn.addEventListener("click", limpiarFormulario);
+  actualizarBotonesFormulario();
 });
 
 document.getElementById("logoutBtn").addEventListener("click", () => {
