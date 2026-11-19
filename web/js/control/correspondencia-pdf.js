@@ -175,6 +175,34 @@ export async function generarCartaPDF(datos) {
     ? datos.bloques
     : [{ tipo: "texto", texto: datos.cuerpo || "" }];
 
+  // Medidas de una tabla (letra, anchos, alto de cada fila): las usa el
+  // dibujo de la tabla y el párrafo que la antecede, para no dejar su título
+  // ni su encabezado solos al final de la hoja.
+  const medidasTabla = (bloque) => {
+    const filasT = (bloque.filas || []).map((f) => (Array.isArray(f) ? f : (f && f.celdas) || [])).filter((f) => f.length);
+    if (!filasT.length) return null;
+    // Se reduce la letra (hasta 6,5 pt) si ni así caben sin partir las palabras más largas en el ancho útil.
+    let tam = 8.5;
+    let anchos = anchosColumnasTabla(doc, filasT, anchoUtil, tam);
+    const sinPartir = (a, t) => filasT.every((f) => f.every((txt, c) => String(txt ?? "").split(/\s+/).every((p) => { doc.setFont("helvetica", f === filasT[0] ? "bold" : "normal"); doc.setFontSize(t); return doc.getTextWidth(p) * 1.08 + 4.6 <= a[c] + 0.01; })));
+    while (!sinPartir(anchos, tam) && tam > 6.5) { tam -= 0.5; anchos = anchosColumnasTabla(doc, filasT, anchoUtil, tam); }
+    const pad = 2.2, interlinea = tam * 0.3528 * 1.18;
+    const nCols = anchos.length;
+    // Las columnas cuyo contenido es corto se centran; las de texto largo van a la izquierda.
+    const centrada = anchos.map((_, c) => filasT.slice(1).every((f) => String(f[c] ?? "").length <= 18));
+    const lineasDe = (fila, r) => {
+      doc.setFont("helvetica", r === 0 ? "bold" : "normal");
+      doc.setFontSize(tam);
+      return Array.from({ length: nCols }, (_, c) => doc.splitTextToSize(String(fila[c] ?? ""), anchos[c] - 2 * 2));
+    };
+    const dibujarFila = (fila, r, yFila) => {
+      const lineas = lineasDe(fila, r);
+      const alto = Math.max(...lineas.map((l) => l.length)) * interlinea + pad * 2;
+      return { lineas, alto, yFila };
+    };
+    return { filasT, tam, anchos, pad, interlinea, nCols, centrada, lineasDe, dibujarFila };
+  };
+
   for (const bloque of bloques) {
     if (bloque.tipo === "firma") {
       // Firma digital (si quien genera la carta cargó la suya en este navegador) sobre la línea de firma.
@@ -231,27 +259,9 @@ export async function generarCartaPDF(datos) {
     }
 
     if (bloque.tipo === "tabla") {
-      const filasT = (bloque.filas || []).map((f) => (Array.isArray(f) ? f : (f && f.celdas) || [])).filter((f) => f.length);
-      if (!filasT.length) continue;
-      // Se reduce la letra (hasta 6,5 pt) si ni así caben sin partir las palabras más largas en el ancho útil.
-      let tam = 8.5;
-      let anchos = anchosColumnasTabla(doc, filasT, anchoUtil, tam);
-      const sinPartir = (a, t) => filasT.every((f) => f.every((txt, c) => String(txt ?? "").split(/\s+/).every((p) => { doc.setFont("helvetica", f === filasT[0] ? "bold" : "normal"); doc.setFontSize(t); return doc.getTextWidth(p) * 1.08 + 4.6 <= a[c] + 0.01; })));
-      while (!sinPartir(anchos, tam) && tam > 6.5) { tam -= 0.5; anchos = anchosColumnasTabla(doc, filasT, anchoUtil, tam); }
-      const pad = 2.2, interlinea = tam * 0.3528 * 1.18;
-      const nCols = anchos.length;
-      // Las columnas cuyo contenido es corto se centran; las de texto largo van a la izquierda.
-      const centrada = anchos.map((_, c) => filasT.slice(1).every((f) => String(f[c] ?? "").length <= 18));
-      const lineasDe = (fila, r) => {
-        doc.setFont("helvetica", r === 0 ? "bold" : "normal");
-        doc.setFontSize(tam);
-        return Array.from({ length: nCols }, (_, c) => doc.splitTextToSize(String(fila[c] ?? ""), anchos[c] - 2 * 2));
-      };
-      const dibujarFila = (fila, r, yFila) => {
-        const lineas = lineasDe(fila, r);
-        const alto = Math.max(...lineas.map((l) => l.length)) * interlinea + pad * 2;
-        return { lineas, alto, yFila };
-      };
+      const medidas = medidasTabla(bloque);
+      if (!medidas) continue;
+      const { filasT, tam, anchos, pad, interlinea, nCols, centrada, dibujarFila } = medidas;
       const pintarFila = (fila, r, yFila) => {
         const { lineas, alto } = dibujarFila(fila, r, yFila);
         let x = margenX;
@@ -271,8 +281,13 @@ export async function generarCartaPDF(datos) {
         return alto;
       };
       for (let r = 0; r < filasT.length; r++) {
-        const { alto } = dibujarFila(filasT[r], r, y);
-        if (y + alto > limiteInferior) {
+        let { alto } = dibujarFila(filasT[r], r, y);
+        // El encabezado nunca queda solo al final de la hoja (se veía el
+        // encabezado suelto y otra vez arriba en la hoja siguiente): debe
+        // caber junto con su primera fila de datos; si no, la tabla empieza
+        // en la hoja siguiente.
+        if (r === 0 && filasT.length > 1) alto += dibujarFila(filasT[1], 1, y).alto;
+        if (y + alto > limiteInferior && y > 20) {
           doc.addPage(); y = 20;
           if (r > 0) y += pintarFila(filasT[0], 0, y); // se repite el encabezado en la página nueva
         }
@@ -337,7 +352,22 @@ export async function generarCartaPDF(datos) {
       // sobrevive, pero se sigue evitando arrancar una línea de ajuste con
       // un espacio suelto.
       let lineaNueva = true;
-      tokens.forEach((token) => {
+      // Si detrás viene una tabla, la última línea del texto (normalmente su
+      // título, ej. «1. RESUMEN POR CAPÍTULO») no se queda sola al final de la
+      // hoja: si no cabe con el encabezado y la primera fila de la tabla
+      // (medidos de verdad), pasa con ella a la hoja siguiente.
+      const siguienteBloque = bloques[bloques.indexOf(bloque) + 1];
+      let inicioUltima = -1;
+      let reservaTabla = 0;
+      if (siguienteBloque?.tipo === "tabla") {
+        const ultimoTexto = tokens.map((t, i) => (!t.salto && t.texto.trim() ? i : -1)).filter((i) => i >= 0).pop() ?? -1;
+        for (let i = ultimoTexto; i >= 0; i--) { if (tokens[i].salto) break; inicioUltima = i; }
+        const m = medidasTabla(siguienteBloque);
+        if (m) reservaTabla = m.dibujarFila(m.filasT[0], 0, 0).alto + (m.filasT.length > 1 ? m.dibujarFila(m.filasT[1], 1, 0).alto : 0);
+      }
+      tokens.forEach((token, i) => {
+        // 18 mm: la línea del título, el salto que la cierra, la línea en blanco final y el espacio tras el bloque.
+        if (i === inicioUltima && !linea.length && y > 20 && y + 18 + reservaTabla > limiteInferior) { doc.addPage(); y = 20; }
         if (token.salto) { trazarLinea(); y += 5.5 * 0.3; lineaNueva = true; return; }
         const ancho = medirToken(token);
         const esEspacio = /^\s+$/.test(token.texto);

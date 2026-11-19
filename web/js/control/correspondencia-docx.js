@@ -29,14 +29,17 @@ function rgbAHexDocx(rgb) {
 // justificado) — así un documento propio subido en Word conserva sus títulos centrados. A diferencia de
 // correspondencia-pdf.js no hace falta partir en palabras: Word envuelve el texto solo. Recibe window.docx
 // porque esa librería no es un módulo importable.
-function parrafosParaDocx(docx, html, tamano) {
+// mantenerConSiguiente: si detrás viene una tabla, la última línea con texto
+// (normalmente su título) y lo que sigue quedan «conservar con el siguiente»
+// para que Word no deje el título solo al final de la hoja.
+function parrafosParaDocx(docx, html, tamano, mantenerConSiguiente = false) {
   const { Paragraph, TextRun, AlignmentType } = docx;
   const ALINEAR = { center: AlignmentType.CENTER, right: AlignmentType.RIGHT, justify: AlignmentType.JUSTIFIED };
   const parrafos = [];
   let actual = [];
   let alineacion = "";
   const cerrar = () => {
-    parrafos.push(new Paragraph({ alignment: ALINEAR[alineacion], children: actual.map((o) => new TextRun(o)) }));
+    parrafos.push({ alignment: ALINEAR[alineacion], runs: actual });
     actual = [];
     alineacion = "";
   };
@@ -52,7 +55,12 @@ function parrafosParaDocx(docx, html, tamano) {
     });
   });
   if (actual.length) cerrar();
-  return parrafos;
+  const ultimoConTexto = parrafos.map((p, i) => (p.runs.some((o) => String(o.text || "").trim()) ? i : -1)).filter((i) => i >= 0).pop() ?? -1;
+  return parrafos.map((p, i) => new Paragraph({
+    alignment: p.alignment,
+    ...(mantenerConSiguiente && ultimoConTexto >= 0 && i >= ultimoConTexto ? { keepNext: true, keepLines: true } : {}),
+    children: p.runs.map((o) => new TextRun(o))
+  }));
 }
 
 const PX_POR_MM = 96 / 25.4;
@@ -288,7 +296,9 @@ export async function generarCartaDocxBlob(datos) {
               margins: { top: 50, bottom: 50, left: 80, right: 80 },
               borders: { top: borde, bottom: borde, left: borde, right: borde },
               shading: r === 0 ? { type: ShadingType.CLEAR, fill: NAVY_HEX, color: "auto" } : r % 2 === 0 ? { type: ShadingType.CLEAR, fill: "F5F6F8", color: "auto" } : undefined,
+              // El encabezado queda «conservar con el siguiente»: Word no lo deja solo al final de la hoja.
               children: String(f[c] ?? "").split("\n").map((linea) => new Paragraph({
+                keepNext: r === 0 || undefined,
                 alignment: r === 0 || String(f[c] ?? "").length <= 18 ? AlignmentType.CENTER : AlignmentType.LEFT,
                 children: [new TextRun({ text: linea, bold: r === 0, color: r === 0 ? "FFFFFF" : "14161A", size: 17 })]
               }))
@@ -299,8 +309,9 @@ export async function generarCartaDocxBlob(datos) {
       }
       continue;
     }
-    cuerpo.push(...parrafosParaDocx(window.docx, bloque.texto, 21));
-    cuerpo.push(new Paragraph({ text: "" }));
+    const antesDeTabla = bloques[iBloque + 1]?.tipo === "tabla";
+    cuerpo.push(...parrafosParaDocx(window.docx, bloque.texto, 21, antesDeTabla));
+    cuerpo.push(new Paragraph({ text: "", keepNext: antesDeTabla || undefined }));
   }
 
   // ---- cierre y firma ---- (un documento propio ya trae la suya: ver el bloque "firma")
