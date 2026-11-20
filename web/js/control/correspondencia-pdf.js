@@ -143,10 +143,10 @@ export async function generarCartaPDF(datos) {
   // encabezado y su línea de firma; la carta solo le pone el membrete, el radicado y el pie de Cinco.
   const esDocumento = datos.modo === "documento";
   if (esDocumento) y += 12;
-  // Hasta dónde se escribe en cada página. Un documento propio aprovecha hasta cerca del pie (está a 16 mm
-  // del borde) para no mandar a otra hoja la firma de un documento de una página; la carta normal conserva
-  // su margen de siempre.
-  const limiteInferior = altoPagina - (esDocumento ? 28 : 45);
+  // Hasta dónde se escribe en cada página (cartas y documentos): hasta 8 mm por encima del pie (que mide 16 mm). Antes eran 28 mm en
+  // documentos y 45 mm en cartas: quedaba una franja en blanco de 12–29 mm
+  // en cada hoja y los cuadros saltaban a la hoja siguiente sin necesidad.
+  const limiteInferior = altoPagina - 24;
   // ---- destinatario ----
   if (!esDocumento) {
   y += 14;
