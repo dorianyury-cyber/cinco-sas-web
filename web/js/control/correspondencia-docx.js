@@ -298,7 +298,8 @@ export async function generarCartaDocxBlob(datos) {
         cuerpo.push(new Table({
           width: { size: totalTw, type: WidthType.DXA }, columnWidths: colTw,
           rows: filasT.map((f, r) => new TableRow({
-            tableHeader: r === 0, cantSplit: true,
+            // Las filas de datos pueden continuar en la hoja siguiente (como el PDF); el encabezado no.
+            tableHeader: r === 0, cantSplit: r === 0,
             children: Array.from({ length: nCols }, (_, c) => new TableCell({
               width: { size: colTw[c], type: WidthType.DXA },
               verticalAlign: VerticalAlign.CENTER,

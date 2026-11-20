@@ -262,8 +262,12 @@ export async function generarCartaPDF(datos) {
       const medidas = medidasTabla(bloque);
       if (!medidas) continue;
       const { filasT, tam, anchos, pad, interlinea, nCols, centrada, dibujarFila } = medidas;
-      const pintarFila = (fila, r, yFila) => {
-        const { lineas, alto } = dibujarFila(fila, r, yFila);
+      // desde/hasta: tramo de líneas de la fila (para partir una fila alta
+      // entre dos hojas, como hace Word); sin ellos, la fila completa.
+      const pintarFila = (fila, r, yFila, desde = 0, hasta = Infinity) => {
+        const completa = dibujarFila(fila, r, yFila);
+        const lineas = completa.lineas.map((l) => l.slice(desde, hasta));
+        const alto = desde === 0 && hasta === Infinity ? completa.alto : Math.max(1, ...lineas.map((l) => l.length)) * interlinea + pad * 2;
         let x = margenX;
         for (let c = 0; c < nCols; c++) {
           if (r === 0) doc.setFillColor(...NAVY); else if (r % 2 === 0) doc.setFillColor(...GRIS_CLARO); else doc.setFillColor(255, 255, 255);
@@ -280,18 +284,40 @@ export async function generarCartaPDF(datos) {
         }
         return alto;
       };
+      // Líneas de una fila (la celda más alta) y cuántas caben desde y.
+      const lineasFila = (r) => Math.max(1, ...dibujarFila(filasT[r], r, 0).lineas.map((l) => l.length));
+      const lineasQueCaben = (desdeY) => Math.floor((limiteInferior - desdeY - pad * 2) / interlinea + 1e-6);
+      const MIN_LINEAS = 2; // de una fila partida, al menos 2 líneas a cada lado
+      const nuevaHojaConEncabezado = () => { doc.addPage(); y = 20; y += pintarFila(filasT[0], 0, y); };
       for (let r = 0; r < filasT.length; r++) {
-        let { alto } = dibujarFila(filasT[r], r, y);
-        // El encabezado nunca queda solo al final de la hoja (se veía el
-        // encabezado suelto y otra vez arriba en la hoja siguiente): debe
-        // caber junto con su primera fila de datos; si no, la tabla empieza
-        // en la hoja siguiente.
-        if (r === 0 && filasT.length > 1) alto += dibujarFila(filasT[1], 1, y).alto;
-        if (y + alto > limiteInferior && y > 20) {
-          doc.addPage(); y = 20;
-          if (r > 0) y += pintarFila(filasT[0], 0, y); // se repite el encabezado en la página nueva
+        const { alto } = dibujarFila(filasT[r], r, y);
+        if (r === 0) {
+          // El encabezado nunca queda solo al final de la hoja: debe caber con
+          // la primera fila completa o, si esa fila es alta, con al menos 2 de
+          // sus líneas (el resto sigue en la hoja siguiente).
+          if (filasT.length > 1 && y > 20) {
+            const n1 = lineasFila(1);
+            const caben1 = Math.min(lineasQueCaben(y + alto), n1 - MIN_LINEAS);
+            const filaEntera = y + alto + dibujarFila(filasT[1], 1, y).alto <= limiteInferior;
+            if (!filaEntera && caben1 < MIN_LINEAS) { doc.addPage(); y = 20; }
+          } else if (y + alto > limiteInferior && y > 20) { doc.addPage(); y = 20; }
+          y += pintarFila(filasT[0], 0, y);
+          continue;
         }
-        y += pintarFila(filasT[r], r, y);
+        if (y + alto <= limiteInferior) { y += pintarFila(filasT[r], r, y); continue; }
+        // No cabe entera: se parte si quedan al menos 2 líneas en esta hoja y
+        // 2 en la siguiente; si no, pasa completa a la hoja siguiente.
+        const n = lineasFila(r);
+        // Si en la hoja siguiente quedaría 1 sola línea, se deja una menos aquí (como una línea viuda).
+        const caben = Math.min(lineasQueCaben(y), n - MIN_LINEAS);
+        if (caben >= MIN_LINEAS) {
+          y += pintarFila(filasT[r], r, y, 0, caben);
+          nuevaHojaConEncabezado();
+          y += pintarFila(filasT[r], r, y, caben);
+        } else {
+          nuevaHojaConEncabezado();
+          y += pintarFila(filasT[r], r, y);
+        }
       }
       y += 6;
       continue;
@@ -390,7 +416,8 @@ export async function generarCartaPDF(datos) {
         if (!siguienteBloque) return 0;
         if (siguienteBloque.tipo === "tabla") {
           const m = medidasTabla(siguienteBloque);
-          return m ? 6 + m.dibujarFila(m.filasT[0], 0, 0).alto + (m.filasT.length > 1 ? m.dibujarFila(m.filasT[1], 1, 0).alto : 0) : 0;
+          // Encabezado + la primera fila (o 2 de sus líneas, si es alta: la tabla puede partirla).
+          return m ? 6 + m.dibujarFila(m.filasT[0], 0, 0).alto + (m.filasT.length > 1 ? Math.min(m.dibujarFila(m.filasT[1], 1, 0).alto, 2 * m.interlinea + 2 * m.pad) : 0) : 0;
         }
         if (siguienteBloque.tipo === "imagen") return 60;
         if (siguienteBloque.tipo === "texto") return 5 + 2 * 5.5;
