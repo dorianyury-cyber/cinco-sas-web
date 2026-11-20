@@ -310,7 +310,10 @@ export async function generarCartaPDF(datos) {
         if (cursiva) return "italic";
         return "normal";
       };
+      // El tamaño se fija en cada medición/dibujo: medir la tabla que sigue
+      // (medidasTabla) cambia el tamaño de letra del documento.
       const medirToken = (token) => {
+        doc.setFontSize(10.5);
         doc.setFont("helvetica", estiloFuente(token.negrita, token.cursiva));
         return doc.getTextWidth(token.texto);
       };
@@ -322,63 +325,143 @@ export async function generarCartaPDF(datos) {
         });
       });
 
-      let linea = [];
-      let anchoLinea = 0;
-      // porAjuste: la línea se corta por ancho (no es la última del párrafo) — solo esas se justifican.
-      const trazarLinea = (porAjuste = false) => {
-        if (!linea.length) { y += 5.5; return; }
-        if (y + 5.5 > limiteInferior) { doc.addPage(); y = 20; }
-        while (linea.length > 1 && /^\s+$/.test(linea[linea.length - 1].texto)) anchoLinea -= medirToken(linea.pop());
-        const alineacion = linea.find((tk) => tk.alineacion)?.alineacion || "";
-        const espacios = linea.filter((tk) => /^\s+$/.test(tk.texto)).length;
-        const sobra = Math.max(0, anchoUtil - anchoLinea);
-        let x = margenX;
-        if (alineacion === "center") x += sobra / 2;
-        else if (alineacion === "right") x += sobra;
-        const extra = alineacion === "justify" && porAjuste && espacios ? sobra / espacios : 0;
-        linea.forEach((token) => {
-          doc.setFont("helvetica", estiloFuente(token.negrita, token.cursiva));
-          doc.setTextColor(...(token.color || COLOR_PARRAFO));
-          doc.text(token.texto, x, y);
-          x += medirToken(token) + (/^\s+$/.test(token.texto) ? extra : 0);
-        });
-        y += 5.5;
-        linea = [];
-        anchoLinea = 0;
-      };
+      // ---- Paso 1: partir el texto en líneas (sin dibujar) ----
       // lineaNueva: true justo tras un salto explícito (fin de línea/viñeta
       // en el HTML), no tras un salto de línea automático por ajuste de
       // ancho — así el espacio de sangría de una viñeta ("    o texto")
       // sobrevive, pero se sigue evitando arrancar una línea de ajuste con
       // un espacio suelto.
+      // items: { linea: tokens, ancho, porAjuste } | { espacio: mm }
+      // porAjuste: la línea se corta por ancho (no es la última del párrafo) — solo esas se justifican.
+      const items = [];
+      let linea = [];
+      let anchoLinea = 0;
+      const cerrarLinea = (porAjuste = false) => {
+        while (linea.length > 1 && /^\s+$/.test(linea[linea.length - 1].texto)) anchoLinea -= medirToken(linea.pop());
+        items.push(linea.length ? { linea, ancho: anchoLinea, porAjuste } : { vacia: true });
+        linea = [];
+        anchoLinea = 0;
+      };
       let lineaNueva = true;
-      // Si detrás viene una tabla, la última línea del texto (normalmente su
-      // título, ej. «1. RESUMEN POR CAPÍTULO») no se queda sola al final de la
-      // hoja: si no cabe con el encabezado y la primera fila de la tabla
-      // (medidos de verdad), pasa con ella a la hoja siguiente.
-      const siguienteBloque = bloques[bloques.indexOf(bloque) + 1];
-      let inicioUltima = -1;
-      let reservaTabla = 0;
-      if (siguienteBloque?.tipo === "tabla") {
-        const ultimoTexto = tokens.map((t, i) => (!t.salto && t.texto.trim() ? i : -1)).filter((i) => i >= 0).pop() ?? -1;
-        for (let i = ultimoTexto; i >= 0; i--) { if (tokens[i].salto) break; inicioUltima = i; }
-        const m = medidasTabla(siguienteBloque);
-        if (m) reservaTabla = m.dibujarFila(m.filasT[0], 0, 0).alto + (m.filasT.length > 1 ? m.dibujarFila(m.filasT[1], 1, 0).alto : 0);
-      }
-      tokens.forEach((token, i) => {
-        // 18 mm: la línea del título, el salto que la cierra, la línea en blanco final y el espacio tras el bloque.
-        if (i === inicioUltima && !linea.length && y > 20 && y + 18 + reservaTabla > limiteInferior) { doc.addPage(); y = 20; }
-        if (token.salto) { trazarLinea(); y += 5.5 * 0.3; lineaNueva = true; return; }
+      tokens.forEach((token) => {
+        if (token.salto) { cerrarLinea(); items.push({ espacio: 5.5 * 0.3 }); lineaNueva = true; return; }
         const ancho = medirToken(token);
         const esEspacio = /^\s+$/.test(token.texto);
         if (esEspacio && !linea.length && !lineaNueva) return;
-        if (!esEspacio && anchoLinea + ancho > anchoUtil && linea.length) trazarLinea(true);
+        if (!esEspacio && anchoLinea + ancho > anchoUtil && linea.length) cerrarLinea(true);
         linea.push(token);
         anchoLinea += ancho;
         lineaNueva = false;
       });
       // En un documento propio el bloque ya terminó en su salto: sin esto quedaba una línea en blanco de más.
-      if (!(esDocumento && !linea.length)) trazarLinea();
+      if (!(esDocumento && !linea.length)) cerrarLinea();
+
+      // Sin líneas en blanco ni espacios al final del bloque: el espacio entre
+      // un bloque y el siguiente ya lo pone el "y += 5" de abajo (antes quedaba
+      // una línea en blanco de más, y se veía mucho aire entre título y texto).
+      while (items.length && !items[items.length - 1].linea) items.pop();
+
+      // Párrafos: líneas seguidas unidas por ajuste de ancho (la última de
+      // cada párrafo es la que no viene "porAjuste").
+      const grupos = []; // { tipo: "parrafo", lineas: [...] } | item suelto (espacio / línea vacía)
+      let actual = null;
+      items.forEach((it) => {
+        if (it.linea) {
+          if (!actual) { actual = { tipo: "parrafo", lineas: [] }; grupos.push(actual); }
+          actual.lineas.push(it);
+          if (!it.porAjuste) actual = null;
+        } else { actual = null; grupos.push(it); }
+      });
+      const textoDe = (g) => g.lineas.map((l) => l.linea.map((t) => t.texto).join("")).join(" ").trim();
+      // Título: párrafo corto (1–2 líneas) todo en negrilla, o que arranca en
+      // negrilla con numeración («1.», «2.3») y es breve.
+      const esTitulo = (g) => {
+        if (g.lineas.length > 2) return false;
+        const palabras = g.lineas.flatMap((l) => l.linea).filter((t) => t.texto.trim());
+        if (!palabras.length) return false;
+        if (palabras.every((t) => t.negrita)) return true;
+        return palabras[0].negrita && /^\d+(\.\d+)*\.?\s/.test(textoDe(g)) && textoDe(g).length <= 160;
+      };
+
+      // Alto mínimo que debe acompañar a un título al final de la hoja: las
+      // 2 primeras líneas de lo que sigue (en este bloque o en el siguiente).
+      const siguienteBloque = bloques[bloques.indexOf(bloque) + 1];
+      const altoInicioSiguienteBloque = () => {
+        if (!siguienteBloque) return 0;
+        if (siguienteBloque.tipo === "tabla") {
+          const m = medidasTabla(siguienteBloque);
+          return m ? 6 + m.dibujarFila(m.filasT[0], 0, 0).alto + (m.filasT.length > 1 ? m.dibujarFila(m.filasT[1], 1, 0).alto : 0) : 0;
+        }
+        if (siguienteBloque.tipo === "imagen") return 60;
+        if (siguienteBloque.tipo === "texto") return 5 + 2 * 5.5;
+        return 0;
+      };
+      const altoTrasGrupo = (gi) => {
+        let alto = 0;
+        for (let k = gi + 1; k < grupos.length; k++) {
+          const g = grupos[k];
+          if (g.tipo === "parrafo") return alto + Math.min(2, g.lineas.length) * 5.5;
+          alto += g.espacio || (g.vacia ? 5.5 : 0);
+        }
+        return alto + 5 + altoInicioSiguienteBloque();
+      };
+
+      // ---- Paso 2: dibujar con reglas de paginación (como piden las normas
+      // APA y cualquier procesador de texto): ningún título queda al final
+      // de la hoja sin al menos dos líneas de lo que sigue; un párrafo no deja
+      // una sola línea al pie de la hoja (huérfana) ni una sola línea al
+      // comienzo de la siguiente (viuda); y la hoja nueva no arranca con
+      // espacios ni líneas en blanco.
+      const ALTO_LINEA = 5.5;
+      const arriba = () => y <= 20.01;
+      const nuevaHoja = () => { doc.addPage(); y = 20; };
+      const caben = () => Math.floor((limiteInferior - y) / ALTO_LINEA + 1e-6);
+      const dibujarLinea = (l) => {
+        const alineacion = l.linea.find((tk) => tk.alineacion)?.alineacion || "";
+        const espacios = l.linea.filter((tk) => /^\s+$/.test(tk.texto)).length;
+        const sobra = Math.max(0, anchoUtil - l.ancho);
+        let x = margenX;
+        if (alineacion === "center") x += sobra / 2;
+        else if (alineacion === "right") x += sobra;
+        const extra = alineacion === "justify" && l.porAjuste && espacios ? sobra / espacios : 0;
+        l.linea.forEach((token) => {
+          doc.setFontSize(10.5);
+          doc.setFont("helvetica", estiloFuente(token.negrita, token.cursiva));
+          doc.setTextColor(...(token.color || COLOR_PARRAFO));
+          doc.text(token.texto, x, y);
+          x += medirToken(token) + (/^\s+$/.test(token.texto) ? extra : 0);
+        });
+        y += ALTO_LINEA;
+      };
+      grupos.forEach((g, gi) => {
+        if (g.tipo !== "parrafo") {
+          if (arriba()) return; // la hoja nueva no empieza con espacio en blanco
+          y += g.espacio || ALTO_LINEA;
+          return;
+        }
+        const n = g.lineas.length;
+        const ultimoAntesDeTablaOImagen = gi === grupos.map((x) => x.tipo).lastIndexOf("parrafo") && ["tabla", "imagen"].includes(siguienteBloque?.tipo) && n <= 2;
+        if (esTitulo(g) || ultimoAntesDeTablaOImagen) {
+          // Título (o rótulo de la tabla/imagen que sigue): va con lo que sigue.
+          if (!arriba() && y + n * ALTO_LINEA + altoTrasGrupo(gi) > limiteInferior) nuevaHoja();
+          g.lineas.forEach((l) => { if (y + ALTO_LINEA > limiteInferior) nuevaHoja(); dibujarLinea(l); });
+          return;
+        }
+        let i = 0;
+        while (i < n) {
+          const quedan = n - i;
+          let aqui = caben();
+          if (aqui >= quedan) { g.lineas.slice(i).forEach(dibujarLinea); break; }
+          // Huérfana: no se empieza un párrafo con una sola línea al pie de la hoja.
+          if (quedan >= 2 && aqui < 2 && !arriba()) { nuevaHoja(); continue; }
+          // Viuda: no se deja una sola línea del párrafo al comienzo de la hoja siguiente.
+          if (quedan - aqui === 1) { if (aqui >= 3) aqui -= 1; else if (!arriba()) { nuevaHoja(); continue; } }
+          if (aqui <= 0) { nuevaHoja(); continue; }
+          g.lineas.slice(i, i + aqui).forEach(dibujarLinea);
+          i += aqui;
+          nuevaHoja();
+        }
+      });
       y += 5;
     }
   }

@@ -56,9 +56,18 @@ function parrafosParaDocx(docx, html, tamano, mantenerConSiguiente = false) {
   });
   if (actual.length) cerrar();
   const ultimoConTexto = parrafos.map((p, i) => (p.runs.some((o) => String(o.text || "").trim()) ? i : -1)).filter((i) => i >= 0).pop() ?? -1;
+  // Títulos (todo en negrilla, o numerados que arrancan en negrilla y son
+  // breves): «conservar con el siguiente», como en el PDF y las normas APA.
+  const esTitulo = (p) => {
+    const conTexto = p.runs.filter((o) => String(o.text || "").trim());
+    if (!conTexto.length) return false;
+    const texto = p.runs.map((o) => o.text).join("").trim();
+    return texto.length <= 160 && (conTexto.every((o) => o.bold) || (conTexto[0].bold && /^\d+(\.\d+)*\.?\s/.test(texto)));
+  };
   return parrafos.map((p, i) => new Paragraph({
     alignment: p.alignment,
-    ...(mantenerConSiguiente && ultimoConTexto >= 0 && i >= ultimoConTexto ? { keepNext: true, keepLines: true } : {}),
+    widowControl: true, // sin líneas viudas ni huérfanas
+    ...((mantenerConSiguiente && ultimoConTexto >= 0 && i >= ultimoConTexto) || esTitulo(p) ? { keepNext: true, keepLines: true } : {}),
     children: p.runs.map((o) => new TextRun(o))
   }));
 }
