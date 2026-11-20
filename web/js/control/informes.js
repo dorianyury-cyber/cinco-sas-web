@@ -607,8 +607,38 @@ cancelarEdicionBtn.addEventListener("click", limpiarFormulario);
 // "Duplicar" pero sin partir de un informe que ya esté guardado en el
 // sistema. El contrato relacionado se deja para que el usuario lo elija
 // él mismo (así trae los datos reales del contrato de Firestore).
+//
+// Las imágenes pueden venir dentro del JSON como
+// { tipo: "imagen", dataUrl: "data:image/jpeg;base64,...", nombre, pieDeFoto, tamano }
+// — se convierten a blob y pasan por redimensionarImagen, igual que una foto
+// subida a mano, así que se suben a Storage al guardar como cualquier otra.
+// Un JSON con fotos pesa varios MB: por eso también se puede elegir el
+// archivo .json en vez de pegarlo en el cuadro de texto.
+function blobDesdeDataUrl(dataUrl) {
+  const m = /^data:(image\/[a-z0-9.+-]+);base64,([a-z0-9+/=\s]+)$/i.exec(String(dataUrl || ""));
+  if (!m) return null;
+  const binario = atob(m[2].replace(/\s+/g, ""));
+  const bytes = new Uint8Array(binario.length);
+  for (let i = 0; i < binario.length; i++) bytes[i] = binario.charCodeAt(i);
+  return new Blob([bytes], { type: m[1] });
+}
+
 document.getElementById("importarJsonBtn").addEventListener("click", () => {
-  const textoJson = document.getElementById("importarJsonTexto").value.trim();
+  importarInformeDesdeJson(document.getElementById("importarJsonTexto").value.trim());
+});
+
+document.getElementById("importarJsonArchivo").addEventListener("change", async (e) => {
+  const archivo = e.target.files[0];
+  e.target.value = "";
+  if (!archivo) return;
+  try {
+    await importarInformeDesdeJson((await archivo.text()).trim());
+  } catch (err) {
+    mostrarAlerta(`No se pudo leer el archivo: ${err.message}`, "error");
+  }
+});
+
+async function importarInformeDesdeJson(textoJson) {
   if (!textoJson) return;
   let datos;
   try {
@@ -634,8 +664,8 @@ document.getElementById("importarJsonBtn").addEventListener("click", () => {
       mostrarAlerta(`El bloque #${i + 1} tiene un "tipo" no reconocido ("${b.tipo}"). Corrígelo antes de importar.`, "error");
       return;
     }
-    if (b.tipo === "imagen") {
-      mostrarAlerta(`El bloque #${i + 1} es de tipo "imagen" — este importador no trae fotos, solo agrégalas manualmente después de importar el resto.`, "error");
+    if (b.tipo === "imagen" && !blobDesdeDataUrl(b.dataUrl)) {
+      mostrarAlerta(`El bloque #${i + 1} es de tipo "imagen" pero no trae la foto en "dataUrl" (data:image/...;base64,...). Corrígelo o quítalo y agrégala a mano después de importar.`, "error");
       return;
     }
     if (b.tipo === "tabla") {
@@ -646,6 +676,25 @@ document.getElementById("importarJsonBtn").addEventListener("click", () => {
         return;
       }
     }
+  }
+
+  // Las fotos se preparan ANTES de limpiar el formulario: si alguna no se
+  // puede leer, el formulario queda como estaba en vez de a medio cargar.
+  let bloquesImportados;
+  try {
+    bloquesImportados = await Promise.all(datos.bloques.map(async (b) => {
+      if (b.tipo === "tabla") return { ...b };
+      if (b.tipo !== "imagen") return { ...b, texto: b.texto || "" };
+      const { blob, previewUrl } = await redimensionarImagen(blobDesdeDataUrl(b.dataUrl));
+      return {
+        tipo: "imagen", blob, previewUrl,
+        nombre: b.nombre || "", pieDeFoto: b.pieDeFoto || "",
+        tamano: Math.min(100, Math.max(30, Number(b.tamano) || 85))
+      };
+    }));
+  } catch (err) {
+    mostrarAlerta("Una de las imágenes del JSON no se pudo leer (¿formato distinto de JPG/PNG?). No se cargó nada.", "error");
+    return;
   }
 
   // Importar siempre arranca un informe nuevo: después de guardar, el
@@ -659,13 +708,14 @@ document.getElementById("importarJsonBtn").addEventListener("click", () => {
   if (datos.mes) document.getElementById("mes").value = datos.mes;
   if (datos.firmaNombre) document.getElementById("firmaNombre").value = datos.firmaNombre;
   if (datos.firmaCargo) document.getElementById("firmaCargo").value = datos.firmaCargo;
-  bloques = datos.bloques.map((b) => (b.tipo === "tabla" ? { ...b } : { ...b, texto: b.texto || "" }));
+  bloques = bloquesImportados;
   reiniciarHistorialBloques();
   renderBloques();
   document.getElementById("importarJsonTexto").value = "";
   document.getElementById("importarJsonTexto").closest("details").open = false;
-  mostrarAlerta(`Se cargaron ${bloques.length} bloques — falta elegir el "Contrato relacionado" y revisar antes de generar.`, "ok");
-});
+  const numImagenes = bloques.filter((b) => b.tipo === "imagen").length;
+  mostrarAlerta(`Se cargaron ${bloques.length} bloques${numImagenes ? ` (${numImagenes} imágenes)` : ""} — falta elegir el "Contrato relacionado" y revisar antes de generar.`, "ok");
+}
 
 // ---- listado ----
 function celda(texto) {
