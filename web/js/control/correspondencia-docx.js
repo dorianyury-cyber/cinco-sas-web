@@ -290,8 +290,19 @@ export async function generarCartaDocxBlob(datos) {
       const filasT = (bloque.filas || []).map((f) => (Array.isArray(f) ? f : (f && f.celdas) || [])).filter((f) => f.length);
       if (filasT.length) {
         const nCols = Math.max(...filasT.map((f) => f.length));
-        // Ancho de cada columna proporcional al texto más largo de su contenido (mínimo razonable), no partes iguales.
-        const pesos = Array.from({ length: nCols }, (_, c) => Math.min(40, Math.max(6, ...filasT.map((f) => Math.max(...String(f[c] ?? "").split("\n").map((l) => l.length))))));
+        const nFilas = filasT.length;
+        // Mismo formato que el PDF (ver medidasTabla en correspondencia-pdf.js):
+        // combinadas, centrado, negrilla, color, anchos fijados y filas de encabezado.
+        const merges = (bloque.merges || []).filter((m) => m && m.fila < nFilas && m.col < nCols).map((m) => ({ ...m, filas: Math.min(m.filas, nFilas - m.fila), cols: Math.min(m.cols, nCols - m.col) }));
+        const mergeEn = (r, c) => merges.find((m) => r >= m.fila && r < m.fila + m.filas && c >= m.col && c < m.col + m.cols) || null;
+        const enLista = (lista, r, c) => (lista || []).some((x) => x.fila === r && x.col === c);
+        const nEnc = nFilas > 1 ? Math.max(1, Math.min(Number(bloque.filasEncabezado) || 1, nFilas - 1)) : 1;
+        const conCentrados = Array.isArray(bloque.centrados);
+        const columnaCorta = Array.from({ length: nCols }, (_, c) => filasT.slice(nEnc).every((f) => String(f[c] ?? "").length <= 18));
+        const colorDe = (r, c) => { const x = (bloque.coloresCelda || []).find((k) => k.fila === r && k.col === c); const m = x && /^#?([0-9a-f]{6})$/i.exec(x.color || ""); return m ? m[1].toUpperCase() : null; };
+        // Ancho de cada columna: el fijado en el editor o, si no, proporcional al texto más largo (mínimo razonable).
+        const manuales = Array.isArray(bloque.anchosColumna) && bloque.anchosColumna.length >= nCols && bloque.anchosColumna.slice(0, nCols).every((x) => Number(x) > 0) ? bloque.anchosColumna.slice(0, nCols).map(Number) : null;
+        const pesos = manuales || Array.from({ length: nCols }, (_, c) => Math.min(40, Math.max(6, ...filasT.map((f, r) => { const m = mergeEn(r, c); return m && m.cols > 1 ? 0 : Math.max(...String(f[c] ?? "").split("\n").map((l) => l.length)); }))));
         const totalTw = Math.round(ANCHO_UTIL_MM * 56.7), suma = pesos.reduce((a, b) => a + b, 0);
         const colTw = pesos.map((p) => Math.round(totalTw * p / suma));
         const borde = { style: "single", size: 4, color: "B9BFC9" };
@@ -299,20 +310,30 @@ export async function generarCartaDocxBlob(datos) {
           width: { size: totalTw, type: WidthType.DXA }, columnWidths: colTw,
           rows: filasT.map((f, r) => new TableRow({
             // Las filas de datos pueden continuar en la hoja siguiente (como el PDF); el encabezado no.
-            tableHeader: r === 0, cantSplit: r === 0,
-            children: Array.from({ length: nCols }, (_, c) => new TableCell({
-              width: { size: colTw[c], type: WidthType.DXA },
-              verticalAlign: VerticalAlign.CENTER,
-              margins: { top: 50, bottom: 50, left: 80, right: 80 },
-              borders: { top: borde, bottom: borde, left: borde, right: borde },
-              shading: r === 0 ? { type: ShadingType.CLEAR, fill: NAVY_HEX, color: "auto" } : r % 2 === 0 ? { type: ShadingType.CLEAR, fill: "F5F6F8", color: "auto" } : undefined,
-              // El encabezado queda «conservar con el siguiente»: Word no lo deja solo al final de la hoja.
-              children: String(f[c] ?? "").split("\n").map((linea) => new Paragraph({
-                keepNext: r === 0 || undefined,
-                alignment: r === 0 || String(f[c] ?? "").length <= 18 ? AlignmentType.CENTER : AlignmentType.LEFT,
-                children: [new TextRun({ text: linea, bold: r === 0, color: r === 0 ? "FFFFFF" : "14161A", size: 17 })]
-              }))
-            }))
+            tableHeader: r < nEnc, cantSplit: r < nEnc,
+            children: Array.from({ length: nCols }, (_, c) => c).filter((c) => { const m = mergeEn(r, c); return !m || (m.fila === r && m.col === c); }).map((c) => {
+              const m = mergeEn(r, c);
+              const enc = r < nEnc;
+              const centrar = enc || (conCentrados ? enLista(bloque.centrados, r, c) : columnaCorta[c]);
+              const medio = enc || enLista(bloque.centradosVertical, r, c) || !conCentrados;
+              const negrita = enc || enLista(bloque.negritas, r, c);
+              const color = enc ? "FFFFFF" : colorDe(r, c) || "14161A";
+              return new TableCell({
+                width: { size: m ? colTw.slice(c, c + m.cols).reduce((s, x) => s + x, 0) : colTw[c], type: WidthType.DXA },
+                ...(m && m.cols > 1 ? { columnSpan: m.cols } : {}),
+                ...(m && m.filas > 1 ? { rowSpan: m.filas } : {}),
+                verticalAlign: medio ? VerticalAlign.CENTER : VerticalAlign.TOP,
+                margins: { top: 50, bottom: 50, left: 80, right: 80 },
+                borders: { top: borde, bottom: borde, left: borde, right: borde },
+                shading: enc ? { type: ShadingType.CLEAR, fill: NAVY_HEX, color: "auto" } : r % 2 === 0 ? { type: ShadingType.CLEAR, fill: "F5F6F8", color: "auto" } : undefined,
+                // El encabezado queda «conservar con el siguiente»: Word no lo deja solo al final de la hoja.
+                children: String(f[c] ?? "").split("\n").map((linea) => new Paragraph({
+                  keepNext: enc || undefined,
+                  alignment: centrar ? AlignmentType.CENTER : AlignmentType.LEFT,
+                  children: [new TextRun({ text: linea, bold: negrita, color, size: 17 })]
+                }))
+              });
+            })
           }))
         }));
         cuerpo.push(new Paragraph({ text: "" }));

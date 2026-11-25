@@ -178,29 +178,91 @@ export async function generarCartaPDF(datos) {
   // Medidas de una tabla (letra, anchos, alto de cada fila): las usa el
   // dibujo de la tabla y el párrafo que la antecede, para no dejar su título
   // ni su encabezado solos al final de la hoja.
+  // Formato (2026-11-25, mismo editor que Informes): celdas combinadas
+  // (merges), centrado horizontal (centrados) y vertical (centradosVertical),
+  // negrilla (negritas), color de letra (coloresCelda), ancho fijado
+  // (anchosColumna) y filas de encabezado (filasEncabezado, se repiten en
+  // cada hoja). Las tablas de antes, sin "centrados", centran solas las
+  // columnas de texto corto, como siempre.
   const medidasTabla = (bloque) => {
-    const filasT = (bloque.filas || []).map((f) => (Array.isArray(f) ? f : (f && f.celdas) || [])).filter((f) => f.length);
+    const filasT = (bloque.filas || []).map((f) => (Array.isArray(f) ? f : (f && f.celdas) || [])).filter((f) => f.length).map((f) => f.map((v) => String(v ?? "")));
     if (!filasT.length) return null;
+    const nCols = Math.max(...filasT.map((f) => f.length));
+    filasT.forEach((f) => { while (f.length < nCols) f.push(""); });
+    const nFilas = filasT.length;
+    const merges = (bloque.merges || []).filter((m) => m && m.fila < nFilas && m.col < nCols).map((m) => ({ ...m, filas: Math.min(m.filas, nFilas - m.fila), cols: Math.min(m.cols, nCols - m.col) }));
+    const mergeEn = (r, c) => merges.find((m) => r >= m.fila && r < m.fila + m.filas && c >= m.col && c < m.col + m.cols) || null;
+    const enLista = (lista, r, c) => (lista || []).some((x) => x.fila === r && x.col === c);
+    const nEnc = nFilas > 1 ? Math.max(1, Math.min(Number(bloque.filasEncabezado) || 1, nFilas - 1)) : 1;
+    const esEnc = (r) => r < nEnc;
+    const negrita = (r, c) => esEnc(r) || enLista(bloque.negritas, r, c);
+    const colorDe = (r, c) => {
+      const x = (bloque.coloresCelda || []).find((k) => k.fila === r && k.col === c);
+      const m = x && /^#?([0-9a-f]{6})$/i.exec(x.color || "");
+      return m ? [0, 2, 4].map((i) => parseInt(m[1].slice(i, i + 2), 16)) : null;
+    };
+    // Para repartir anchos: las celdas combinadas a lo ancho no cuentan (su texto ocupa varias columnas).
+    const paraAncho = filasT.map((f, r) => f.map((v, c) => { const m = mergeEn(r, c); return m && (m.cols > 1 || m.fila !== r || m.col !== c) ? "" : v; }));
+    const manuales = Array.isArray(bloque.anchosColumna) && bloque.anchosColumna.length >= nCols ? bloque.anchosColumna.slice(0, nCols).map(Number) : null;
+    const anchosDe = (t) => {
+      if (manuales && manuales.every((x) => x > 0)) { const s = manuales.reduce((a, b) => a + b, 0); return manuales.map((x) => (x / s) * anchoUtil); }
+      return anchosColumnasTabla(doc, paraAncho, anchoUtil, t);
+    };
     // Se reduce la letra (hasta 6,5 pt) si ni así caben sin partir las palabras más largas en el ancho útil.
     let tam = 8.5;
-    let anchos = anchosColumnasTabla(doc, filasT, anchoUtil, tam);
-    const sinPartir = (a, t) => filasT.every((f) => f.every((txt, c) => String(txt ?? "").split(/\s+/).every((p) => { doc.setFont("helvetica", f === filasT[0] ? "bold" : "normal"); doc.setFontSize(t); return doc.getTextWidth(p) * 1.08 + 4.6 <= a[c] + 0.01; })));
-    while (!sinPartir(anchos, tam) && tam > 6.5) { tam -= 0.5; anchos = anchosColumnasTabla(doc, filasT, anchoUtil, tam); }
+    let anchos = anchosDe(tam);
+    const anchoCelda = (a, r, c) => { const m = mergeEn(r, c); return m ? a.slice(m.col, m.col + m.cols).reduce((s, x) => s + x, 0) : a[c]; };
+    const sinPartir = (a, t) => filasT.every((f, r) => f.every((txt, c) => {
+      const m = mergeEn(r, c);
+      if (m && (m.fila !== r || m.col !== c)) return true;
+      return txt.split(/\s+/).every((p) => { doc.setFont("helvetica", negrita(r, c) ? "bold" : "normal"); doc.setFontSize(t); return doc.getTextWidth(p) * 1.08 + 4.6 <= anchoCelda(a, r, c) + 0.01; });
+    }));
+    while (!sinPartir(anchos, tam) && tam > 6.5) { tam -= 0.5; anchos = anchosDe(tam); }
     const pad = 2.2, interlinea = tam * 0.3528 * 1.18;
-    const nCols = anchos.length;
-    // Las columnas cuyo contenido es corto se centran; las de texto largo van a la izquierda.
-    const centrada = anchos.map((_, c) => filasT.slice(1).every((f) => String(f[c] ?? "").length <= 18));
-    const lineasDe = (fila, r) => {
-      doc.setFont("helvetica", r === 0 ? "bold" : "normal");
+    // Tablas de antes (sin "centrados"): las columnas de texto corto se centran solas.
+    const conCentrados = Array.isArray(bloque.centrados);
+    const columnaCorta = anchos.map((_, c) => filasT.slice(nEnc).every((f) => f[c].length <= 18));
+    const centrada = (r, c) => esEnc(r) || (conCentrados ? enLista(bloque.centrados, r, c) : columnaCorta[c]);
+    const medioV = (r, c) => esEnc(r) || enLista(bloque.centradosVertical, r, c);
+    // Líneas de texto de cada celda que se dibuja (las cubiertas por una combinada, null).
+    const lineas = filasT.map((f, r) => f.map((txt, c) => {
+      const m = mergeEn(r, c);
+      if (m && (m.fila !== r || m.col !== c)) return null;
+      doc.setFont("helvetica", negrita(r, c) ? "bold" : "normal");
       doc.setFontSize(tam);
-      return Array.from({ length: nCols }, (_, c) => doc.splitTextToSize(String(fila[c] ?? ""), anchos[c] - 2 * 2));
-    };
-    const dibujarFila = (fila, r, yFila) => {
-      const lineas = lineasDe(fila, r);
-      const alto = Math.max(...lineas.map((l) => l.length)) * interlinea + pad * 2;
-      return { lineas, alto, yFila };
-    };
-    return { filasT, tam, anchos, pad, interlinea, nCols, centrada, lineasDe, dibujarFila };
+      return doc.splitTextToSize(txt, anchoCelda(anchos, r, c) - 2 * 2);
+    }));
+    const altoLineas = (n) => Math.max(1, n) * interlinea + pad * 2;
+    // Alto de cada fila: el de su celda más alta (sin las combinadas hacia
+    // abajo); si una combinada hacia abajo necesita más, se le suma a su última fila.
+    const altos = filasT.map((f, r) => Math.max(altoLineas(1), ...f.map((_, c) => {
+      const m = mergeEn(r, c);
+      if (!lineas[r][c] || (m && m.filas > 1)) return 0;
+      return altoLineas(lineas[r][c].length);
+    })));
+    merges.filter((m) => m.filas > 1).forEach((m) => {
+      const falta = altoLineas(lineas[m.fila][m.col].length) - altos.slice(m.fila, m.fila + m.filas).reduce((s, x) => s + x, 0);
+      if (falta > 0) altos[m.fila + m.filas - 1] += falta;
+    });
+    // Grupos de filas que no se separan entre hojas (las unidas por una
+    // combinada hacia abajo); el encabezado es el primer grupo.
+    const grupos = [];
+    let r0 = nEnc;
+    while (r0 < nFilas) {
+      let fin = r0;
+      for (let k = r0; k <= fin; k++) merges.forEach((m) => { if (m.filas > 1 && k >= m.fila && k < m.fila + m.filas) fin = Math.max(fin, m.fila + m.filas - 1); });
+      grupos.push([r0, fin]);
+      r0 = fin + 1;
+    }
+    const altoRango = (a, b) => altos.slice(a, b + 1).reduce((s, x) => s + x, 0);
+    const altoEncabezado = altoRango(0, nEnc - 1);
+    // Lo mínimo que debe acompañar al encabezado: el primer grupo entero o,
+    // si es una sola fila alta (que se puede partir), 2 de sus líneas.
+    const primero = grupos[0];
+    const partible = (g) => g[0] === g[1] && !merges.some((m) => m.filas > 1 && g[0] >= m.fila && g[0] < m.fila + m.filas);
+    const lineasFila = (r) => Math.max(1, ...lineas[r].filter(Boolean).map((l) => l.length));
+    const minimoPrimero = !primero ? 0 : partible(primero) && lineasFila(primero[0]) >= 4 ? altoLineas(2) : altoRango(primero[0], primero[1]);
+    return { filasT, nFilas, nCols, nEnc, tam, anchos, pad, interlinea, merges, mergeEn, lineas, altos, grupos, altoRango, altoEncabezado, minimoPrimero, partible, lineasFila, negrita, colorDe, centrada, medioV, anchoCelda };
   };
 
   for (const bloque of bloques) {
@@ -259,65 +321,65 @@ export async function generarCartaPDF(datos) {
     }
 
     if (bloque.tipo === "tabla") {
-      const medidas = medidasTabla(bloque);
-      if (!medidas) continue;
-      const { filasT, tam, anchos, pad, interlinea, nCols, centrada, dibujarFila } = medidas;
-      // desde/hasta: tramo de líneas de la fila (para partir una fila alta
-      // entre dos hojas, como hace Word); sin ellos, la fila completa.
-      const pintarFila = (fila, r, yFila, desde = 0, hasta = Infinity) => {
-        const completa = dibujarFila(fila, r, yFila);
-        const lineas = completa.lineas.map((l) => l.slice(desde, hasta));
-        const alto = desde === 0 && hasta === Infinity ? completa.alto : Math.max(1, ...lineas.map((l) => l.length)) * interlinea + pad * 2;
-        let x = margenX;
+      const M = medidasTabla(bloque);
+      if (!M) continue;
+      const { nCols, nEnc, tam, anchos, pad, interlinea, mergeEn, lineas, altos, grupos, altoRango, altoEncabezado, minimoPrimero, partible, lineasFila } = M;
+      // Dibuja la fila r en yFila. desde/hasta: tramo de líneas (para partir
+      // una fila alta entre dos hojas, como hace Word); sin ellos, completa.
+      // Una celda combinada hacia abajo se dibuja desde su fila con el alto
+      // de todas las que abarca (esas filas nunca se separan entre hojas).
+      const pintarFila = (r, yFila, desde = 0, hasta = Infinity) => {
+        const parcial = desde !== 0 || hasta !== Infinity;
+        const tramo = (l) => (parcial ? l.slice(desde, hasta) : l);
+        const alto = parcial ? Math.max(1, ...lineas[r].filter(Boolean).map((l) => tramo(l).length)) * interlinea + pad * 2 : altos[r];
         for (let c = 0; c < nCols; c++) {
-          if (r === 0) doc.setFillColor(...NAVY); else if (r % 2 === 0) doc.setFillColor(...GRIS_CLARO); else doc.setFillColor(255, 255, 255);
+          const m = mergeEn(r, c);
+          const ancla = lineas[r][c];
+          if (!ancla) continue; // cubierta por una combinada
+          const x = margenX + anchos.slice(0, c).reduce((s2, w) => s2 + w, 0);
+          const ancho = M.anchoCelda(anchos, r, c);
+          const altoCelda = m && m.filas > 1 ? altoRango(r, r + m.filas - 1) : alto;
+          if (r < nEnc) doc.setFillColor(...NAVY); else if (r % 2 === 0) doc.setFillColor(...GRIS_CLARO); else doc.setFillColor(255, 255, 255);
           doc.setDrawColor(185, 191, 201);
           doc.setLineWidth(0.2);
-          doc.rect(x, yFila, anchos[c], alto, "FD");
-          doc.setFont("helvetica", r === 0 ? "bold" : "normal");
+          doc.rect(x, yFila, ancho, altoCelda, "FD");
+          doc.setFont("helvetica", M.negrita(r, c) ? "bold" : "normal");
           doc.setFontSize(tam);
-          if (r === 0) doc.setTextColor(255, 255, 255); else doc.setTextColor(20, 22, 26);
-          const alinear = r === 0 || centrada[c] ? "center" : "left";
-          const xt = alinear === "center" ? x + anchos[c] / 2 : x + 2;
-          doc.text(lineas[c], xt, yFila + pad + 2.9, { align: alinear, baseline: "alphabetic", lineHeightFactor: interlinea / (tam * 0.3528) });
-          x += anchos[c];
+          const color = M.colorDe(r, c);
+          if (r < nEnc) doc.setTextColor(255, 255, 255); else if (color) doc.setTextColor(...color); else doc.setTextColor(20, 22, 26);
+          const texto = tramo(ancla);
+          const alinear = M.centrada(r, c) ? "center" : "left";
+          const xt = alinear === "center" ? x + ancho / 2 : x + 2;
+          const altoTexto = Math.max(1, texto.length) * interlinea;
+          const yt = M.medioV(r, c) ? yFila + (altoCelda - altoTexto) / 2 + 2.9 : yFila + pad + 2.9;
+          if (texto.length) doc.text(texto, xt, yt, { align: alinear, baseline: "alphabetic", lineHeightFactor: interlinea / (tam * 0.3528) });
         }
         return alto;
       };
-      // Líneas de una fila (la celda más alta) y cuántas caben desde y.
-      const lineasFila = (r) => Math.max(1, ...dibujarFila(filasT[r], r, 0).lineas.map((l) => l.length));
+      const pintarEncabezado = () => { for (let r = 0; r < nEnc; r++) y += pintarFila(r, y); };
       const lineasQueCaben = (desdeY) => Math.floor((limiteInferior - desdeY - pad * 2) / interlinea + 1e-6);
       const MIN_LINEAS = 2; // de una fila partida, al menos 2 líneas a cada lado
-      const nuevaHojaConEncabezado = () => { doc.addPage(); y = 20; y += pintarFila(filasT[0], 0, y); };
-      for (let r = 0; r < filasT.length; r++) {
-        const { alto } = dibujarFila(filasT[r], r, y);
-        if (r === 0) {
-          // El encabezado nunca queda solo al final de la hoja: debe caber con
-          // la primera fila completa o, si esa fila es alta, con al menos 2 de
-          // sus líneas (el resto sigue en la hoja siguiente).
-          if (filasT.length > 1 && y > 20) {
-            const n1 = lineasFila(1);
-            const caben1 = Math.min(lineasQueCaben(y + alto), n1 - MIN_LINEAS);
-            const filaEntera = y + alto + dibujarFila(filasT[1], 1, y).alto <= limiteInferior;
-            if (!filaEntera && caben1 < MIN_LINEAS) { doc.addPage(); y = 20; }
-          } else if (y + alto > limiteInferior && y > 20) { doc.addPage(); y = 20; }
-          y += pintarFila(filasT[0], 0, y);
-          continue;
+      const nuevaHojaConEncabezado = () => { doc.addPage(); y = 20; pintarEncabezado(); };
+      // El encabezado nunca queda solo al final de la hoja: debe caber con el
+      // primer grupo de filas o, si es una fila alta, con 2 de sus líneas.
+      if (y > 20 && y + altoEncabezado + minimoPrimero > limiteInferior) { doc.addPage(); y = 20; }
+      pintarEncabezado();
+      for (const [a, b] of grupos) {
+        const altoG = altoRango(a, b);
+        if (y + altoG <= limiteInferior) { for (let r = a; r <= b; r++) y += pintarFila(r, y); continue; }
+        if (partible([a, b])) {
+          // No cabe entera: se parte si quedan al menos 2 líneas en esta hoja y
+          // 2 en la siguiente (si en la siguiente quedaría 1 sola, se deja una menos aquí).
+          const caben = Math.min(lineasQueCaben(y), lineasFila(a) - MIN_LINEAS);
+          if (caben >= MIN_LINEAS) {
+            y += pintarFila(a, y, 0, caben);
+            nuevaHojaConEncabezado();
+            y += pintarFila(a, y, caben);
+            continue;
+          }
         }
-        if (y + alto <= limiteInferior) { y += pintarFila(filasT[r], r, y); continue; }
-        // No cabe entera: se parte si quedan al menos 2 líneas en esta hoja y
-        // 2 en la siguiente; si no, pasa completa a la hoja siguiente.
-        const n = lineasFila(r);
-        // Si en la hoja siguiente quedaría 1 sola línea, se deja una menos aquí (como una línea viuda).
-        const caben = Math.min(lineasQueCaben(y), n - MIN_LINEAS);
-        if (caben >= MIN_LINEAS) {
-          y += pintarFila(filasT[r], r, y, 0, caben);
-          nuevaHojaConEncabezado();
-          y += pintarFila(filasT[r], r, y, caben);
-        } else {
-          nuevaHojaConEncabezado();
-          y += pintarFila(filasT[r], r, y);
-        }
+        nuevaHojaConEncabezado();
+        for (let r = a; r <= b; r++) y += pintarFila(r, y);
       }
       y += 6;
       continue;
@@ -417,7 +479,7 @@ export async function generarCartaPDF(datos) {
         if (siguienteBloque.tipo === "tabla") {
           const m = medidasTabla(siguienteBloque);
           // Encabezado + la primera fila (o 2 de sus líneas, si es alta: la tabla puede partirla).
-          return m ? 6 + m.dibujarFila(m.filasT[0], 0, 0).alto + (m.filasT.length > 1 ? Math.min(m.dibujarFila(m.filasT[1], 1, 0).alto, 2 * m.interlinea + 2 * m.pad) : 0) : 0;
+          return m ? 6 + m.altoEncabezado + m.minimoPrimero : 0;
         }
         if (siguienteBloque.tipo === "imagen") return 60;
         if (siguienteBloque.tipo === "texto") return 5 + 2 * 5.5;

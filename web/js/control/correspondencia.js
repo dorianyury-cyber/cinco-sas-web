@@ -12,6 +12,7 @@ import { truncar, fechaLocalISO } from "./texto.js";
 import { mejorarSelectorContrato } from "./selector-contrato.js";
 import { registrarDocumentoSGC } from "./documentos-sgc.js";
 import { crearCampoTextoRico } from "./texto-rico.js";
+import { crearEditorTabla, nuevaTabla as nuevaTablaEditor, tablaNuevaDesdeHtml } from "./editor-tabla.js";
 import { botonVerPdf } from "./adjuntos.js";
 
 // Área/tipo fijos para que una carta quede en el Listado Maestro de
@@ -162,11 +163,33 @@ function quitarBloque(indice) {
 // bloque que maneja una carta (texto/imagen, sin títulos ni tablas).
 let indiceInsertarImagen = null;
 
-// Tabla de la carta: filas de celdas de texto (la primera fila es el encabezado). Se edita aquí, celda por celda.
+// Tabla de la carta: el MISMO editor de Informes (web/js/control/editor-tabla.js,
+// 2026-11-25): seleccionar varias celdas arrastrando o con Shift + clic,
+// centrar, negrilla, color, combinar, ancho de columnas y pegar desde
+// Word/Excel. La primera fila (o las «Filas de encabezado») es el encabezado.
 function nuevaTabla() {
-  return { tipo: "tabla", filas: [["", ""], ["", ""]] };
+  return { ...nuevaTablaEditor(), tipo: "tabla" };
 }
 const celdasDeFila = (fila) => (Array.isArray(fila) ? fila : (fila && fila.celdas) || []);
+// Tabla guardada → la que edita el editor. Las de antes (sin "centrados")
+// centraban solas el encabezado y las columnas de texto corto: se marcan
+// esas celdas como centradas para que se vean igual al volver a guardarlas.
+function tablaParaEditar(b) {
+  const t = { ...JSON.parse(JSON.stringify(b)), tipo: "tabla", filas: (b.filas || []).map((f) => [...celdasDeFila(f)].map((v) => String(v ?? ""))) };
+  if (!Array.isArray(b.centrados)) {
+    const nCols = Math.max(1, ...t.filas.map((f) => f.length));
+    const corta = Array.from({ length: nCols }, (_, c) => t.filas.slice(1).every((f) => String(f[c] ?? "").length <= 18));
+    t.centrados = [];
+    t.filas.forEach((f, r) => { for (let c = 0; c < nCols; c++) if (r === 0 || corta[c]) t.centrados.push({ fila: r, col: c }); });
+  }
+  return t;
+}
+// Tabla del editor → la que se guarda (Firestore no admite listas dentro de
+// listas ni valores indefinidos; sin el estado interno del editor: _selA…).
+function tablaParaGuardar(b) {
+  const limpio = JSON.parse(JSON.stringify(b, (k, v) => (k.startsWith("_") ? undefined : v)));
+  return { ...limpio, tipo: "tabla", filas: (b.filas || []).map((celdas) => ({ celdas: [...celdasDeFila(celdas)] })) };
+}
 
 function insertarBloqueEn(indice, tipo) {
   if (tipo === "imagen") {
@@ -208,66 +231,6 @@ function renderHueco(indice) {
   return hueco;
 }
 
-// Editor de una tabla: una celda de texto por casilla; «+ Fila» y «+ Columna» agregan al final y «✕» quita esa fila o columna.
-function renderTablaCarta(bloque) {
-  const cont = document.createElement("div");
-  cont.className = "control-tabla-carta";
-  const pintar = () => {
-    cont.innerHTML = "";
-    const filas = bloque.filas;
-    const nCols = Math.max(1, ...filas.map((f) => f.length));
-    const tabla = document.createElement("table");
-    tabla.className = "control-tabla-carta-grid";
-    filas.forEach((fila, r) => {
-      const tr = document.createElement("tr");
-      for (let c = 0; c < nCols; c++) {
-        const td = document.createElement("td");
-        if (r === 0) td.className = "encabezado";
-        const t = document.createElement("textarea");
-        t.rows = 3;
-        t.value = fila[c] ?? "";
-        t.addEventListener("input", () => { while (bloque.filas[r].length <= c) bloque.filas[r].push(""); bloque.filas[r][c] = t.value; });
-        td.appendChild(t);
-        tr.appendChild(td);
-      }
-      const tdq = document.createElement("td");
-      const q = document.createElement("button");
-      q.type = "button"; q.className = "control-btn-danger"; q.textContent = "✕"; q.title = "Quitar esta fila";
-      q.disabled = filas.length <= 1;
-      q.addEventListener("click", () => { bloque.filas.splice(r, 1); pintar(); });
-      tdq.appendChild(q);
-      tr.appendChild(tdq);
-      tabla.appendChild(tr);
-    });
-    const trq = document.createElement("tr");
-    for (let c = 0; c < nCols; c++) {
-      const td = document.createElement("td");
-      const q = document.createElement("button");
-      q.type = "button"; q.className = "control-btn-danger"; q.textContent = "✕ columna"; q.title = "Quitar esta columna";
-      q.disabled = nCols <= 1;
-      q.addEventListener("click", () => { bloque.filas.forEach((f) => f.splice(c, 1)); pintar(); });
-      td.appendChild(q);
-      trq.appendChild(td);
-    }
-    tabla.appendChild(trq);
-    const envoltura = document.createElement("div");
-    envoltura.className = "control-tabla-carta-scroll";
-    envoltura.appendChild(tabla);
-    cont.appendChild(envoltura);
-    const botones = document.createElement("div");
-    botones.className = "control-bloques-botones";
-    const masF = document.createElement("button");
-    masF.type = "button"; masF.className = "control-btn-mini"; masF.textContent = "+ Fila";
-    masF.addEventListener("click", () => { bloque.filas.push(Array(nCols).fill("")); pintar(); });
-    const masC = document.createElement("button");
-    masC.type = "button"; masC.className = "control-btn-mini"; masC.textContent = "+ Columna";
-    masC.addEventListener("click", () => { bloque.filas.forEach((f) => { while (f.length < nCols) f.push(""); f.push(""); }); pintar(); });
-    botones.append(masF, masC);
-    cont.appendChild(botones);
-  };
-  pintar();
-  return cont;
-}
 
 // ---- Tipo de carta: con el formato de Cinco, o un documento propio en Word tal cual ----
 const modoActual = () => form.querySelector('input[name="modoCarta"]:checked')?.value || "carta";
@@ -326,10 +289,21 @@ function renderBloques() {
       contenido.appendChild(crearCampoTextoRico({
         valor: bloque.texto,
         placeholder: "Escribe un párrafo...",
-        onInput: (html) => { bloque.texto = html; }
+        onInput: (html) => { bloque.texto = html; },
+        // Tabla de Word/Excel pegada en el párrafo → bloque Tabla con su estructura.
+        alPegarTabla: (html) => {
+          const nueva = tablaNuevaDesdeHtml(html);
+          if (!nueva) return;
+          const i = bloques.indexOf(bloque);
+          const vacio = !String(bloque.texto || "").replace(/<[^>]*>|&nbsp;/g, "").trim();
+          bloques.splice(vacio ? i : i + 1, vacio ? 1 : 0, { ...nueva, tipo: "tabla" });
+          renderBloques();
+        }
       }));
     } else if (bloque.tipo === "tabla") {
-      contenido.appendChild(renderTablaCarta(bloque));
+      const editorTabla = crearEditorTabla(bloque, { alCambiar: renderBloques, avisar: mostrarAlerta });
+      editorTabla.classList.add("control-tabla-sin-titulo"); // la carta no lleva título de tabla
+      contenido.appendChild(editorTabla);
     } else if (bloque.tipo === "firma") {
       const marca = document.createElement("div");
       marca.className = "control-bloque-firma";
@@ -540,7 +514,7 @@ document.getElementById("vistaPreviaBtn").addEventListener("click", async () => 
   try {
     const bloquesPreview = bloques.map((b) => b.tipo === "imagen"
       ? { tipo: "imagen", url: b.blob ? URL.createObjectURL(b.blob) : b.url }
-      : b.tipo === "tabla" ? { tipo: "tabla", filas: b.filas } : b.tipo === "firma" ? { tipo: "firma" } : { tipo: "texto", texto: b.texto });
+      : b.tipo === "tabla" ? tablaParaGuardar(b) : b.tipo === "firma" ? { tipo: "firma" } : { tipo: "texto", texto: b.texto });
     const datosPreview = {
       modo: modoActual(),
       destinatario: document.getElementById("destinatario").value,
@@ -844,7 +818,7 @@ function cargarCartaEnFormulario(c) {
   document.getElementById("firmaCargo").value = c.firmaCargo || "";
   selectContrato.value = c.contratoId || "";
   bloques = (c.bloques || []).map((b) => {
-    if (b.tipo === "tabla") return { tipo: "tabla", filas: (b.filas || []).map((f) => [...celdasDeFila(f)]) };
+    if (b.tipo === "tabla") return tablaParaEditar(b);
     if (b.tipo === "imagen") return { tipo: "imagen", url: b.url, previewUrl: b.url };
     if (b.tipo === "firma") return { tipo: "firma" };
     return { tipo: "texto", texto: b.texto || "" };
@@ -976,7 +950,7 @@ requireAuth(async (user) => {
       if (bloque.tipo === "texto") {
         final.push({ tipo: "texto", texto: bloque.texto });
       } else if (bloque.tipo === "tabla") {
-        final.push({ tipo: "tabla", filas: bloque.filas.map((celdas) => ({ celdas })) });
+        final.push(tablaParaGuardar(bloque));
       } else if (bloque.tipo === "firma") {
         final.push({ tipo: "firma" });
       } else if (bloque.blob) {

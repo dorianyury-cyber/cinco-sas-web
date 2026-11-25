@@ -302,16 +302,46 @@ function renderTablaEditor(bloque) {
       // Excel), para los botones "Combinar celdas"/"Centrar"/"Negrilla"/
       // "Color" — un solo clic selecciona esa celda sola y no estorba para
       // escribir o elegir una opción.
-      celdaInput.addEventListener("mousedown", () => {
+      // Antes se usaba "mouseenter" en cada celda, pero al hacer clic en una
+      // celda de texto el navegador le deja el mouse a esa celda (para
+      // seleccionar letras) y las demás no reciben el arrastre: solo quedaba
+      // una celda seleccionada. Ahora el arrastre se sigue en todo el
+      // documento por la posición del puntero (elementFromPoint), y además
+      // Shift + clic extiende la selección desde la celda anterior.
+      celdaInput.addEventListener("mousedown", (e) => {
+        if (e.button !== 0) return;
+        if (e.shiftKey && bloque._selA) {
+          e.preventDefault();
+          bloque._selB = { fi, ci };
+          actualizarResaltado();
+          return;
+        }
         bloque._selA = { fi, ci };
         bloque._selB = { fi, ci };
         actualizarResaltado();
-      });
-      celdaInput.addEventListener("mouseenter", (e) => {
-        if (e.buttons === 1 && bloque._selA) {
-          bloque._selB = { fi, ci };
+        let varias = false;
+        const mover = (ev) => {
+          const el = document.elementFromPoint(ev.clientX, ev.clientY)?.closest?.("[data-fi]");
+          if (!el || !grid.contains(el)) return;
+          const destino = { fi: Number(el.dataset.fi), ci: Number(el.dataset.ci) };
+          if (destino.fi === bloque._selB.fi && destino.ci === bloque._selB.ci) return;
+          if (!varias && (destino.fi !== fi || destino.ci !== ci)) {
+            // Ya es un rango: se suelta la selección de letras de la celda inicial.
+            varias = true;
+            celdaInput.blur();
+            window.getSelection()?.removeAllRanges();
+            grid.classList.add("control-tabla-seleccionando");
+          }
+          bloque._selB = destino;
           actualizarResaltado();
-        }
+        };
+        const soltar = () => {
+          document.removeEventListener("mousemove", mover);
+          document.removeEventListener("mouseup", soltar);
+          grid.classList.remove("control-tabla-seleccionando");
+        };
+        document.addEventListener("mousemove", mover);
+        document.addEventListener("mouseup", soltar);
       });
       grid.appendChild(celdaInput);
     });

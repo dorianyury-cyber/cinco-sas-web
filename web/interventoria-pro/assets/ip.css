@@ -2599,6 +2599,8 @@ textarea.ip-adicional-texto { resize: vertical; line-height: 1.5; }
   padding: 5px 4px;
   font-size: 11.5px;
 }
+/* Mientras se arrastra para seleccionar varias celdas no se seleccionan letras. */
+.control-tabla-grid.control-tabla-seleccionando, .control-tabla-grid.control-tabla-seleccionando * { user-select: none; cursor: cell; }
 /* Resalta el rango de celdas seleccionado por arrastre, antes de combinar
    o separar — mismo acento ámbar que el resto de la suite. */
 .control-tabla-grid input.control-celda-sel, .control-tabla-grid select.control-celda-sel, .control-tabla-grid textarea.control-celda-sel {
