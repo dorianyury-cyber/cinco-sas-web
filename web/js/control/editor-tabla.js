@@ -758,5 +758,11 @@ function renderTablaEditor(bloque) {
     flotante.appendChild(mini);
   });
 
+  // Los campos del editor no son parte del formulario donde se inserta (ej.
+  // Correspondencia): sin esto, un valor fuera de rango en «Filas de
+  // encabezado» bloqueaba en silencio el botón Radicar, y Enter en un campo
+  // numérico enviaba (radicaba) el formulario. El atributo form apunta a un
+  // formulario que no existe, así quedan fuera de la validación y del envío.
+  cont.querySelectorAll("input, textarea, select").forEach((el) => el.setAttribute("form", "editor-tabla-sin-formulario"));
   return cont;
 }

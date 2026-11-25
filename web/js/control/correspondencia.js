@@ -30,6 +30,19 @@ const tbody = document.getElementById("listaCorrespondencia");
 const sinCartas = document.getElementById("sinCartas");
 const form = document.getElementById("nuevaCartaForm");
 const alertBox = document.getElementById("crearCartaAlert");
+// Si al Radicar falta un campo obligatorio, el navegador frenaba el envío con
+// un globo junto al campo, que a veces quedaba fuera de la vista: parecía que
+// Radicar no hacía nada. Ahora se dice cuál falta y se lleva la vista a él.
+let avisoCampoMostrado = false;
+form.addEventListener("invalid", (e) => {
+  if (avisoCampoMostrado) return;
+  avisoCampoMostrado = true;
+  setTimeout(() => { avisoCampoMostrado = false; }, 0);
+  const campo = e.target;
+  const etiqueta = (campo.id && form.querySelector(`label[for="${campo.id}"]`)?.textContent.trim()) || campo.placeholder || "un campo obligatorio";
+  campo.scrollIntoView({ behavior: "smooth", block: "center" });
+  mostrarAlerta(`No se radicó: falta completar «${etiqueta}».`, "error");
+}, true);
 const crearBtn = document.getElementById("crearCartaBtn");
 const descargarBtn = document.getElementById("descargarCartaBtn");
 const nuevaCartaBtn = document.getElementById("nuevaCartaBtn");
@@ -41,8 +54,11 @@ let cartaIdParaSubirWord = null;
 
 // Última carta guardada con el contenido actual; "Descargar" la usa sin volver a guardar.
 let cartaGuardadaActual = null;
+// «Descargar borrador» mientras la carta no esté radicada: el PDF sale sin
+// número de radicado y antes era fácil confundirlo con el radicado.
 function actualizarDescargarBtn() {
   descargarBtn.disabled = !cartaGuardadaActual;
+  descargarBtn.textContent = cartaGuardadaActual && !cartaGuardadaActual.radicado ? "Descargar borrador" : "Descargar";
 }
 
 // ---- Estados de una carta ----
@@ -1124,8 +1140,7 @@ requireAuth(async (user) => {
     } catch (err) {
       mostrarAlerta(err.message || "No se pudo descargar la carta.", "error");
     } finally {
-      descargarBtn.disabled = false;
-      descargarBtn.textContent = "Descargar";
+      actualizarDescargarBtn();
     }
   });
 
