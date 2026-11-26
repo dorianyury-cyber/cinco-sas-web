@@ -8,6 +8,7 @@ import { generarInformeMensual } from "./ip-informe-docx.js";
 import { generarInformeMensualPDF } from "./ip-informe-pdf.js";
 import { claveSeccion, fotosDelContrato, construirInforme } from "./ip-informe-contenido.js";
 import { montarEditorAdicional } from "./ip-informe-adicional.js";
+import { montarReplicar } from "./ip-informe-replicar.js";
 
 // Secciones que no forman parte del informe clásico: por defecto entran
 // solo si el contrato ya tiene información en ellas.
@@ -81,7 +82,7 @@ async function iniciar({ user, perfil, contrato }) {
   const casilla = (clave) => `<input type="checkbox" class="ip-chk-seccion" data-clave="${esc(clave)}" ${seleccion.has(clave) ? "checked" : ""} title="Incluir en el informe">`;
   // Contenido adicional por capítulo (párrafos, subtítulos e imágenes que el
   // informe no saca de los módulos): ver ip-informe-adicional.js.
-  const editorAdicional = montarEditorAdicional({ contrato, user, perfil, alGuardar: () => pintar() });
+  const editorAdicional = montarEditorAdicional({ contrato, user, perfil, alGuardar: async () => { pintar(); await replicar.recargar(); replicar.pintarAviso(); } });
   const capsAdicional = { intro: "Introducción", ...Object.fromEntries(CAPITULOS.map((c) => [c.id, `${c.numero}. ${c.label}`])) };
   // Dónde cae el capítulo en el informe tal como está marcado (número del
   // capítulo, cuántos subtítulos N.x ya trae y cuántas tablas y figuras van
@@ -282,11 +283,23 @@ async function iniciar({ user, perfil, contrato }) {
   });
   ponerRadicadoDelMes();
 
-  selMes.addEventListener("change", async () => { cargarFotosSel(); await editorAdicional.cargarMes(selMes.value); pintar(); pintarFotos(); ponerRadicadoDelMes(); });
+  // Replicar el informe de otro mes: copia el contenido adicional al mes elegido.
+  const replicar = montarReplicar({
+    contrato, user, perfil, selMes, capitulos: capsAdicional,
+    alTerminar: async ({ origen, destino, n, caps }) => {
+      await editorAdicional.cargarMes(destino);
+      pintar();
+      replicar.pintarAviso();
+      mostrarAlerta(alerta, `Se copiaron ${n} bloque(s) de ${caps} capítulo(s) de ${mesLargo(origen)} a ${mesLargo(destino)}. Ahora abre «Contenido adicional» en cada capítulo y actualiza cifras, fechas y conclusiones; las tablas de los módulos ya salen con los datos de ${mesLargo(destino)}.`, "success");
+    }
+  });
+  document.getElementById("replicarBtn").addEventListener("click", () => replicar.abrir());
+  selMes.addEventListener("change", async () => { cargarFotosSel(); await editorAdicional.cargarMes(selMes.value); pintar(); pintarFotos(); ponerRadicadoDelMes(); replicar.pintarAviso(); });
   cargarFotosSel();
-  await editorAdicional.cargarMes(selMes.value);
+  await Promise.all([editorAdicional.cargarMes(selMes.value), replicar.recargar()]);
   pintar();
   pintarFotos();
+  replicar.pintarAviso();
   // Acceso directo desde el menú lateral (informe.html?adicional=capId):
   // abre de una vez el contenido adicional de ese capítulo.
   const capPedido = new URLSearchParams(location.search).get("adicional");

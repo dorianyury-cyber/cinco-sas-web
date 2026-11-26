@@ -29,11 +29,13 @@
         <button type="button" class="btn" id="generarInformeBtn">📄 Word</button>
       </div>
       <div class="alert" id="informeAlerta"></div>
+      <div class="card ip-replicar-aviso" id="replicarAviso" hidden></div>
       <div class="card ip-barra ip-barra-centro ip-barra-seleccion">
         <strong>Contenido del informe:</strong>
         <span class="text-muted" id="informeConteo"></span>
         <button type="button" class="btn secondary" id="seleccionTodoBtn">Marcar todo</button>
         <button type="button" class="btn secondary" id="seleccionNadaBtn">Desmarcar todo</button>
+        <button type="button" class="btn secondary" id="replicarBtn" title="Copia al mes elegido los textos, tablas y figuras del «Contenido adicional» de otro mes, para no empezar de cero">📋 Replicar de otro mes</button>
         <span class="text-muted ip-ayuda-inline">Marca las casillas de lo que quieres incluir. La casilla junto al título incluye o quita el capítulo completo.</span>
       </div>
       <div id="informeContenido"><div class="card"><p class="text-muted ip-sin-margen">Cargando la información del contrato…</p></div></div>
@@ -74,6 +76,29 @@
       <div class="ip-adicional-botones">
         <button type="button" class="btn" id="adicionalGuardarBtn">Guardar</button>
         <button type="button" class="btn secondary" id="adicionalCerrarBtn">Cancelar</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- Replicar el informe de otro mes (ip-informe-replicar.js) -->
+  <div class="modal-backdrop" id="replicarModal">
+    <div class="modal ip-replicar-modal">
+      <h2>📋 Replicar el informe de otro mes</h2>
+      <p class="text-muted ip-ayuda">Copia el <strong>contenido adicional</strong> (textos, títulos, tablas, figuras y firmas) al informe de <strong id="replicarDestino"></strong>. Las tablas y cifras que salen de los módulos no se copian: el aplicativo ya las toma del mes nuevo. Las secciones marcadas se conservan.</p>
+      <div class="ip-replicar-fila"><label for="replicarOrigen">Copiar desde</label><select id="replicarOrigen"></select></div>
+      <p class="ip-replicar-sub">Capítulos a copiar</p>
+      <div id="replicarCapitulos" class="ip-replicar-lista"></div>
+      <div id="replicarSiExiste" class="ip-replicar-fila" hidden>
+        <span>Si el capítulo ya tiene contenido en el mes nuevo:</span>
+        <label class="ip-replicar-opcion"><input type="radio" name="replicarModo" value="agregar" checked> Dejarlo y agregar lo copiado al final</label>
+        <label class="ip-replicar-opcion"><input type="radio" name="replicarModo" value="reemplazar"> Reemplazarlo por lo copiado</label>
+      </div>
+      <label class="ip-replicar-fila ip-replicar-opcion"><input type="checkbox" id="replicarCambiarMes" checked> <span id="replicarCambiarMesTexto"></span></label>
+      <p class="ip-replicar-nota">Después de copiar, abre el «Contenido adicional» de cada capítulo y actualiza lo que cambió en el mes: cifras, porcentajes, fechas, fotos y conclusiones.</p>
+      <div class="alert" id="replicarAlerta"></div>
+      <div class="ip-adicional-botones">
+        <button type="button" class="btn" id="replicarCopiarBtn">Copiar al mes del informe</button>
+        <button type="button" class="btn secondary" id="replicarCerrarBtn">Cancelar</button>
       </div>
     </div>
   </div>
