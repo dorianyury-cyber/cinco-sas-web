@@ -125,6 +125,9 @@ export async function construirInforme({ contrato, ym, datos, elaboradoPor, carg
   // quita al soltar ese contenido (capitulo → soltar): ya no está vacío.
   let vaciosNumeral = [];
   const notaVacia = (texto) => { const bl = { tipo: "parrafo", texto, nota: true }; b.push(bl); vaciosNumeral.push(bl); };
+  // Igual, pero en texto normal: frases como «No se presentaron incidentes…»
+  // que son afirmación del informe, y que sobran si la interventoría escribe la suya.
+  const PVacio = (texto) => { const bl = { tipo: "parrafo", texto: String(texto ?? "") }; b.push(bl); vaciosNumeral.push(bl); };
   const tabla = (encabezados, filas, opciones = {}, vacio) => {
     if (filas.length) b.push({ tipo: "tabla", encabezados, filas: filas.map((f) => f.map((v) => String(v ?? ""))), ...opciones });
     else notaVacia(vacio || "No se registró información para este periodo.");
@@ -371,7 +374,7 @@ export async function construirInforme({ contrato, ym, datos, elaboradoPor, carg
     ["accidentes", () => {
       H2("Accidentalidad");
       const accMes = del("accidentes");
-      if (!accMes.length) P(`El contratista ${contrato.contratista || ""} no presenta accidentes ni incidentes de trabajo durante el periodo reportado.`);
+      if (!accMes.length) PVacio(`El contratista ${contrato.contratista || ""} no presenta accidentes ni incidentes de trabajo durante el periodo reportado.`);
       else tabla(["Fecha", "Tipo", "Persona", "Descripción", "Días incap.", "Investigado"], accMes.map((a) => [fecha(a.fecha), a.tipo, personaNombre(a.persona), a.descripcion, String(a.diasIncapacidad || 0), a.investigado || "-"]), { titulo: "Accidentes e incidentes del periodo", tam: 15 });
       // La tabla «Indicadores de accidentalidad» por mes ya no sale (ver arriba).
     }],
@@ -411,8 +414,10 @@ export async function construirInforme({ contrato, ym, datos, elaboradoPor, carg
     ["incidentesamb", () => {
       H2("Incidentes ambientales");
       const incAmb = del("incidentesamb");
+      // notaVacia (no P): si la interventoría escribe su propia observación en
+      // este numeral, la frase automática se quita y no queda doble.
       if (incAmb.length) tabla(["Fecha", "Descripción", "Acción", "Estado"], incAmb.map((r) => [fecha(r.fecha), r.descripcion, r.accion || "-", r.estado || "-"]), { titulo: "Incidentes ambientales", tam: 15 });
-      else P("No se presentaron incidentes ambientales durante el periodo reportado.");
+      else PVacio("No se presentaron incidentes ambientales durante el periodo reportado.");
     }],
     ["capacitaciones:ambiental", () => {
       H2("Capacitaciones realizadas con la gestión ambiental");

@@ -436,7 +436,12 @@ export async function generarInformePDF(informe) {
     const tokens = [];
     runs.forEach((run) => {
       if (run.salto) { tokens.push({ salto: true }); return; }
-      run.texto.split(/(\s+)/).filter((p) => p !== "").forEach((palabra) => {
+      // Un texto que es solo espacios con saltos de línea (los que trae el
+      // HTML pegado de Word entre párrafos) no se ve en el editor: tampoco
+      // debe volverse un renglón en blanco en el PDF. Dentro del texto, el
+      // salto de línea del código HTML vale como un espacio.
+      if (/^\s*$/.test(run.texto) && /[\r\n]/.test(run.texto)) return;
+      run.texto.replace(/[\r\n]+/g, " ").split(/(\s+)/).filter((p) => p !== "").forEach((palabra) => {
         tokens.push({ texto: palabra, negrita: run.negrita, cursiva: run.cursiva, color: run.color, alineacion: run.alineacion });
       });
     });
@@ -598,6 +603,7 @@ export async function generarInformePDF(informe) {
   // «DESCRIPCIÓN» con el nombre y, en cursiva, la fuente (pie de foto). Va
   // centrada, con el ancho del «Tamaño en el informe», y sigue contando en
   // la Lista de figuras.
+  const FIGURA_ALTO_MIN = 40;
   async function dibujarFiguraFicha(bloque, img) {
     const numero = graficosEntradas.length + 1;
     const escala = Math.min(100, Math.max(30, bloque.tamano || 85)) / 100;
@@ -616,6 +622,17 @@ export async function generarInformePDF(informe) {
     const altoMax = Math.max(50, margenInferior - margenSuperior - 16 - altoCab - altoDesc - pad * 2);
     let w = anchoMax, h = w * (img.alto / img.ancho);
     if (h > altoMax) { h = altoMax; w = h * (img.ancho / img.alto); }
+    // Si la ficha no cabe en lo que queda de la hoja, antes de saltar de
+    // página se intenta achicar la imagen (hasta un 65 % y nunca a menos de
+    // FIGURA_ALTO_MIN mm de alto) para ocupar ese espacio: saltar dejaba un hueco en blanco
+    // grande entre dos figuras seguidas, que en el editor no se ve (pedido de
+    // Nataly, 2026-11-27).
+    const fijo = altoCab + 0.6 + pad * 2 + altoDesc;
+    const disponible = margenInferior - y - 8;
+    if (y > margenSuperior + 1 && fijo + h > disponible) {
+      const h2 = disponible - fijo;
+      if (h2 >= Math.max(FIGURA_ALTO_MIN, h * 0.35)) { w = w * (h2 / h); h = h2; }
+    }
     const altoMarco = h + pad * 2;
     const altoFicha = altoCab + 0.6 + altoMarco + altoDesc;
     saltoSiNoCabe(altoFicha + 8);
@@ -906,12 +923,18 @@ export async function generarInformePDF(informe) {
     // ellas — así una celda combinada verticalmente no queda con el texto
     // recortado.
     const alturaFilas = new Array(numFilas).fill(0);
+    // Cada celda se mide con la MISMA fuente con que se dibuja (negrilla en la
+    // fila 0 y en las celdas marcadas en negrilla, ver dibujarFila): antes solo
+    // la fila 0 se medía en negrilla, y un encabezado de dos filas pegado de
+    // Word (segunda fila en negrilla) ocupaba más líneas de las medidas y el
+    // texto se montaba sobre la fila de abajo.
+    const fuenteCelda = (fi, ci) => doc.setFont("helvetica", fi === 0 || celdaNegrita(negritas, fi, ci) ? "bold" : "normal");
     filas.forEach((fila, fi) => {
-      doc.setFont("helvetica", fi === 0 ? "bold" : "normal");
       for (let ci = 0; ci < numCols; ci++) {
         const info = celdaCombinada(merges, fi, ci);
         if (info && !info.esAncla) continue;
         if (info && info.merge.filas > 1) continue;
+        fuenteCelda(fi, ci);
         const ancho = info ? sumaRango(anchos, ci, info.merge.cols) : anchos[ci];
         const lineas = doc.splitTextToSize(String(fila[ci] || ""), ancho - padding * 2);
         const alto = lineas.length * pasoLinea + padding * 2;
@@ -920,7 +943,7 @@ export async function generarInformePDF(informe) {
     });
     for (let fi = 0; fi < numFilas; fi++) if (!alturaFilas[fi]) alturaFilas[fi] = pasoLinea + padding * 2;
     merges.filter((m) => m.filas > 1).forEach((m) => {
-      doc.setFont("helvetica", m.fila === 0 ? "bold" : "normal");
+      fuenteCelda(m.fila, m.col);
       const ancho = sumaRango(anchos, m.col, m.cols);
       const lineas = doc.splitTextToSize(String(filas[m.fila][m.col] || ""), ancho - padding * 2);
       const altoNecesario = lineas.length * pasoLinea + padding * 2;
@@ -1134,7 +1157,18 @@ export async function generarInformePDF(informe) {
     y += altoNombre + altoCargo + 6;
   }
 
-  for (const bloque of informe.bloques || []) {
+  // Un título nunca queda solo al pie de la hoja: antes de dibujarlo se
+  // reserva también el comienzo de lo que le sigue (una figura en su tamaño
+  // mínimo, el título y encabezado de una tabla o un par de renglones).
+  const lista = informe.bloques || [];
+  const reservaSiguiente = (sig) => !sig ? 0
+    : sig.tipo === "imagen" ? FIGURA_ALTO_MIN + 32
+    : sig.tipo === "tabla" ? 26
+    : sig.tipo === "galeria" ? 70
+    : /^titulo/.test(sig.tipo) ? lineHeight * 3
+    : lineHeight * 2.5;
+  for (const [bi, bloque] of lista.entries()) {
+    if (/^titulo[2-4]$/.test(bloque.tipo)) saltoSiNoCabe(lineHeight * 2.4 + reservaSiguiente(lista[bi + 1]));
     if (bloque.tipo === "titulo1") dibujarTitulo(1, bloque.texto);
     else if (bloque.tipo === "titulo2") dibujarTitulo(2, bloque.texto);
     else if (bloque.tipo === "titulo3") dibujarTitulo(3, bloque.texto);
