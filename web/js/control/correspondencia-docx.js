@@ -355,6 +355,13 @@ export async function generarCartaDocxBlob(datos) {
   cuerpo.push(new Paragraph({ children: [new TextRun({ text: datos.firmaNombre || "", bold: true, size: 21 })] }));
   if (datos.firmaCargo) cuerpo.push(new Paragraph({ children: [new TextRun({ text: datos.firmaCargo, size: 19 })] }));
   cuerpo.push(new Paragraph({ children: [new TextRun({ text: "Cinco S.A.S.", size: 19 })] }));
+  // Firmantes adicionales (ver correspondencia-pdf.js): debajo, con espacio para firmar a mano.
+  for (const f of (Array.isArray(datos.firmantesAdicionales) ? datos.firmantesAdicionales : []).filter((x) => x && x.nombre)) {
+    cuerpo.push(new Paragraph({ text: "" }), new Paragraph({ text: "" }), new Paragraph({ text: "" }));
+    cuerpo.push(new Paragraph({ children: [new TextRun({ text: f.nombre, bold: true, size: 21 })] }));
+    if (f.cargo) cuerpo.push(new Paragraph({ children: [new TextRun({ text: f.cargo, size: 19 })] }));
+    cuerpo.push(new Paragraph({ children: [new TextRun({ text: "Cinco S.A.S.", size: 19 })] }));
+  }
   }
 
   const documento = new Document({

@@ -131,6 +131,16 @@ function hoyISO() {
 
 // ---- editor de bloques (texto / imagen, reordenables) ----
 let bloques = [{ tipo: "texto", texto: "" }];
+// Firmantes además de quien firma en el formulario (ej. el analista que elaboró el oficio junto con
+// el administrador del contrato). Llegan por el JSON importado y se guardan con la carta; el PDF y el
+// Word los ponen en columna al lado de la firma principal, con el espacio para firmar a mano.
+let firmantesAdicionales = [];
+function normalizarFirmantes(lista) {
+  return (Array.isArray(lista) ? lista : [])
+    .map((f) => ({ nombre: String(f?.nombre || "").trim(), cargo: String(f?.cargo || "").trim() }))
+    .filter((f) => f.nombre)
+    .slice(0, 2);
+}
 
 function redimensionarImagen(file) {
   return new Promise((resolve, reject) => {
@@ -472,6 +482,7 @@ function importarCartaJson(texto) {
   document.getElementById("asunto").value = datos.asunto;
   document.getElementById("firmaNombre").value = datos.firmaNombre || "";
   document.getElementById("firmaCargo").value = datos.firmaCargo || "";
+  firmantesAdicionales = normalizarFirmantes(datos.firmantesAdicionales);
   const cod = String(datos.contratoCodigo || "").trim();
   const opcion = cod ? [...selectContrato.options].find((o) => o.textContent.includes(cod)) : null;
   selectContrato.value = opcion ? opcion.value : "";
@@ -480,7 +491,7 @@ function importarCartaJson(texto) {
   document.getElementById("importarCartaTexto").value = "";
   document.getElementById("importarCartaTexto").closest("details").open = false;
   document.getElementById("nuevaCartaDetails").open = true;
-  mostrarAlerta(`Carta importada con ${nuevos.length} bloques${cod && !opcion ? ` — no encontré el contrato «${cod}»: elígelo en «Contrato relacionado»` : ""}. Revísala con «Visualizar»; luego «Guardar borrador», «Radicar» o, si estás corrigiendo una carta radicada, «Guardar cambios».`, "ok");
+  mostrarAlerta(`Carta importada con ${nuevos.length} bloques${firmantesAdicionales.length ? ` y ${firmantesAdicionales.length + 1} firmantes (${[document.getElementById("firmaNombre").value, ...firmantesAdicionales.map((f) => f.nombre)].join(" y ")})` : ""}${cod && !opcion ? ` — no encontré el contrato «${cod}»: elígelo en «Contrato relacionado»` : ""}. Revísala con «Visualizar»; luego «Guardar borrador», «Radicar» o, si estás corrigiendo una carta radicada, «Guardar cambios».`, "ok");
 }
 document.getElementById("importarCartaBtn").addEventListener("click", () => {
   const texto = document.getElementById("importarCartaTexto").value.trim();
@@ -538,6 +549,7 @@ document.getElementById("vistaPreviaBtn").addEventListener("click", async () => 
       asunto: document.getElementById("asunto").value,
       firmaNombre: document.getElementById("firmaNombre").value,
       firmaCargo: document.getElementById("firmaCargo").value,
+      firmantesAdicionales: modoActual() === "documento" ? [] : firmantesAdicionales,
       fecha: cartaEditando?.fecha || hoyISO(),
       radicado: cartaEditando?.radicado ? `${cartaEditando.radicado} (vista previa sin guardar)` : "BORRADOR — sin radicar",
       bloques: bloquesPreview
@@ -832,6 +844,7 @@ function cargarCartaEnFormulario(c) {
   document.getElementById("asunto").value = c.asunto || "";
   document.getElementById("firmaNombre").value = c.firmaNombre || "";
   document.getElementById("firmaCargo").value = c.firmaCargo || "";
+  firmantesAdicionales = normalizarFirmantes(c.firmantesAdicionales);
   selectContrato.value = c.contratoId || "";
   bloques = (c.bloques || []).map((b) => {
     if (b.tipo === "tabla") return tablaParaEditar(b);
@@ -855,6 +868,7 @@ function limpiarFormulario() {
   form.reset();
   document.getElementById("ciudad").value = "Neiva";
   bloques = [{ tipo: "texto", texto: "" }];
+  firmantesAdicionales = [];
   cartaEditando = null;
   cartaGuardadaActual = null;
   aplicarModo();
@@ -953,7 +967,8 @@ requireAuth(async (user) => {
       ciudad: document.getElementById("ciudad").value || "Neiva",
       asunto: document.getElementById("asunto").value,
       firmaNombre: esDocumento ? "" : document.getElementById("firmaNombre").value,
-      firmaCargo: esDocumento ? "" : document.getElementById("firmaCargo").value
+      firmaCargo: esDocumento ? "" : document.getElementById("firmaCargo").value,
+      firmantesAdicionales: esDocumento ? [] : firmantesAdicionales
     };
   };
 

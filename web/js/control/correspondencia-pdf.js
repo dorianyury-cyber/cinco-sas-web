@@ -574,13 +574,36 @@ export async function generarCartaPDF(datos) {
   }
   // Montada: el nombre se escribe sobre la parte baja de la firma, como al firmar encima del nombre.
   y += sobreLinea ? 1.5 + altoFirma * (1 - FIRMA_SOLAPE) + 3 : altoFirma + 3;
-  doc.setFont("helvetica", "bold");
-  doc.text(datos.firmaNombre || "", margenX, y);
-  y += 5;
-  doc.setFont("helvetica", "normal");
-  doc.setFontSize(9.5);
-  if (datos.firmaCargo) { doc.text(datos.firmaCargo, margenX, y); y += 5; }
-  doc.text("Cinco S.A.S.", margenX, y);
+  // Firmantes adicionales (ej. el analista que elaboró el oficio): en columnas a la derecha de la firma
+  // principal, a la misma altura del nombre, dejando arriba el espacio para firmar a mano.
+  const extras = Array.isArray(datos.firmantesAdicionales) ? datos.firmantesAdicionales.filter((f) => f && f.nombre) : [];
+  const anchoCol = anchoUtil / (extras.length + 1);
+  const yNombre = y;
+  const bloqueFirmante = (x, nombre, cargo) => {
+    let yy = yNombre;
+    doc.setFont("helvetica", "bold");
+    doc.setFontSize(10.5);
+    doc.text(doc.splitTextToSize(nombre || "", anchoCol - 4), x, yy);
+    yy += 5 * doc.splitTextToSize(nombre || "", anchoCol - 4).length;
+    doc.setFont("helvetica", "normal");
+    doc.setFontSize(9.5);
+    if (cargo) {
+      const lineas = extras.length ? doc.splitTextToSize(cargo, anchoCol - 4) : [cargo];
+      doc.text(lineas, x, yy);
+      yy += 5 * lineas.length;
+    }
+    doc.text("Cinco S.A.S.", x, yy);
+    return yy;
+  };
+  let yFin = bloqueFirmante(margenX, datos.firmaNombre, datos.firmaCargo);
+  extras.forEach((f, i) => {
+    const x = margenX + anchoCol * (i + 1);
+    doc.setDrawColor(150, 150, 150);
+    doc.setLineWidth(0.2);
+    doc.line(x, yNombre - 4.5, x + Math.min(60, anchoCol - 8), yNombre - 4.5);
+    yFin = Math.max(yFin, bloqueFirmante(x, f.nombre, f.cargo));
+  });
+  y = yFin;
   }
 
   // ---- pie de página (todas las páginas): franja gris clara con
