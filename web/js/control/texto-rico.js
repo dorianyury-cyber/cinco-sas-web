@@ -239,6 +239,8 @@ export function crearCampoTextoRico({ valor, placeholder, onInput, alPegarTabla 
 // no los tiene y saldrían en blanco en el PDF.
 export const MARCADORES_VINETA = ["•", "o", "-"];
 
+const SOLO_ESPACIOS = /^[ \t\r\n]+$/; // sin &nbsp;, que sí se ve
+const BLOQUES = new Set(["UL", "OL", "LI", "DIV", "P", "TABLE", "H1", "H2", "H3", "H4", "BLOCKQUOTE"]);
 export function parsearHtmlARuns(html) {
   if (!html) return [];
   const raiz = document.createElement("div");
@@ -247,10 +249,22 @@ export function parsearHtmlARuns(html) {
 
   function caminar(nodo, estilo, nivel) {
     if (nodo.nodeType === Node.TEXT_NODE) {
-      if (nodo.textContent) runs.push({ texto: nodo.textContent, ...estilo });
+      // Espacios sueltos entre bloques (ej. entre dos listas, o al inicio de
+      // una línea antes de otro bloque) no se ven en el editor: tampoco deben
+      // volverse un renglón en blanco en el PDF/Word. El &nbsp; sí cuenta.
+      const t = nodo.textContent;
+      if (!t) return;
+      if (SOLO_ESPACIOS.test(t) && (!runs.length || runs[runs.length - 1].salto)) {
+        const sig = nodo.nextSibling;
+        if (!sig || (sig.nodeType === Node.ELEMENT_NODE && BLOQUES.has(sig.tagName))) return;
+      }
+      runs.push({ texto: t, ...estilo });
       return;
     }
     if (nodo.nodeType !== Node.ELEMENT_NODE) return;
+    // Un <div></div> o <p></p> sin nada adentro (ni texto ni <br>) mide cero en
+    // el editor (queda así entre dos listas, p. ej.): no es una línea en blanco.
+    if ((nodo.tagName === "DIV" || nodo.tagName === "P") && !nodo.querySelector("br, img, li") && SOLO_ESPACIOS.test(nodo.textContent || " ")) return;
     // Un <br> se dibuja dentro del párrafo que lo contiene, así que hereda
     // la alineación de ESE párrafo (estilo.alineacion), no la trae propia.
     if (nodo.tagName === "BR") { runs.push({ salto: true, alineacion: estilo.alineacion }); return; }
@@ -319,9 +333,13 @@ export function parsearHtmlARuns(html) {
     // Si el último hijo fue una sub-lista, ella ya cerró su último ítem con
     // su propio salto — no duplicarlo (dejaría una línea en blanco antes
     // del siguiente ítem del nivel superior).
-    const ultimo = hijos[hijos.length - 1];
+    // Igual si el ítem ya terminó en un <br> (Chrome suele dejar uno al final
+    // de la viñeta y en el editor no se ve): ese <br> ya es el fin de línea;
+    // otro salto dejaba un renglón en blanco entre dos viñetas en el PDF.
+    const ultimo = [...hijos].reverse().find((h) => !(h.nodeType === Node.TEXT_NODE && SOLO_ESPACIOS.test(h.textContent || " ")));
     const terminaEnSublista = ultimo?.nodeType === Node.ELEMENT_NODE && (ultimo.tagName === "UL" || ultimo.tagName === "OL");
-    if (!terminaEnSublista) runs.push({ salto: true, alineacion: estilo.alineacion });
+    const yaCerro = runs.length && runs[runs.length - 1].salto;
+    if (!terminaEnSublista && !yaCerro) runs.push({ salto: true, alineacion: estilo.alineacion });
   }
 
   raiz.childNodes.forEach((hijo) => caminar(hijo, {}, 0));
