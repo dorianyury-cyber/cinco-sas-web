@@ -697,13 +697,36 @@ async function importarInformeDesdeJson(textoJson) {
     return;
   }
 
-  // Importar siempre arranca un informe nuevo: después de guardar, el
-  // formulario se queda en edición sobre el informe recién guardado, y si
-  // no se sale de ahí el "Guardar" pisaba ese informe (mismo radicado) con
-  // el contenido importado — pasó en producción con dos RD seguidos.
-  limpiarFormulario();
+  // Si hay un informe abierto en edición, se pregunta explícitamente qué
+  // hacer, nombrando su radicado. Antes importar siempre arrancaba uno nuevo
+  // porque, al quedar el formulario en edición sobre el informe recién
+  // guardado, el "Guardar" pisaba ese informe sin que el usuario lo notara
+  // (pasó con dos RD seguidos); y al revés, quien abría un informe radicado
+  // para corregirlo con el JSON terminaba creando otro radicado (IC-2026-004).
+  let reemplazar = false;
+  if (informeIdEnEdicion.value) {
+    const rad = informeGuardadoActual?.radicado || "el informe abierto";
+    const tit = informeGuardadoActual?.titulo ? ` — ${informeGuardadoActual.titulo}` : "";
+    reemplazar = window.confirm(
+      `Tienes abierto en edición ${rad}${tit}.\n\n` +
+      `¿Reemplazar su contenido con el del JSON, conservando el radicado ${rad}?\n` +
+      `(El cambio se aplica al pulsar «Guardar cambios».)\n\n` +
+      `Aceptar: reemplazar y conservar ${rad}.\nCancelar: ver la otra opción.`
+    );
+    if (!reemplazar && !window.confirm(
+      `¿Crear entonces un informe NUEVO con el contenido del JSON?\n\n` +
+      `Al guardarlo tomará un radicado nuevo y ${rad} quedará como está.\n\n` +
+      `Aceptar: crear uno nuevo.\nCancelar: no importar nada.`
+    )) return;
+  }
+
+  if (!reemplazar) limpiarFormulario();
   if (datos.titulo) document.getElementById("titulo").value = datos.titulo;
-  if (datos.tipoInforme) document.getElementById("tipoInforme").value = datos.tipoInforme;
+  // Al reemplazar se conserva el tipo: el prefijo del radicado (IG, IC, RD…)
+  // depende de él y el radicado no cambia.
+  const tipoActual = document.getElementById("tipoInforme").value;
+  const tipoIgnorado = reemplazar && datos.tipoInforme && datos.tipoInforme !== tipoActual;
+  if (datos.tipoInforme && !reemplazar) document.getElementById("tipoInforme").value = datos.tipoInforme;
   if (datos.portada) document.getElementById("portada").value = datos.portada;
   if (datos.mes) document.getElementById("mes").value = datos.mes;
   if (datos.firmaNombre) document.getElementById("firmaNombre").value = datos.firmaNombre;
@@ -714,7 +737,18 @@ async function importarInformeDesdeJson(textoJson) {
   document.getElementById("importarJsonTexto").value = "";
   document.getElementById("importarJsonTexto").closest("details").open = false;
   const numImagenes = bloques.filter((b) => b.tipo === "imagen").length;
-  mostrarAlerta(`Se cargaron ${bloques.length} bloques${numImagenes ? ` (${numImagenes} imágenes)` : ""} — falta elegir el "Contrato relacionado" y revisar antes de generar.`, "ok");
+  const resumen = `Se cargaron ${bloques.length} bloques${numImagenes ? ` (${numImagenes} imágenes)` : ""}`;
+  if (reemplazar) {
+    const rad = informeGuardadoActual?.radicado || "el informe";
+    // Lo guardado ya no coincide con lo que se ve: "Descargar" se habilita
+    // de nuevo al guardar, para no bajar la versión anterior por error.
+    informeGuardadoActual = null;
+    actualizarDescargarBtn();
+    mostrarAlerta(`${resumen} sobre ${rad}. Revisa y pulsa «Guardar cambios» para aplicarlos; el radicado no cambia.` +
+      (tipoIgnorado ? " El tipo de informe del JSON se ignoró para no cambiar el prefijo del radicado." : ""), "ok");
+  } else {
+    mostrarAlerta(`${resumen} — falta elegir el "Contrato relacionado" y revisar antes de generar.`, "ok");
+  }
 }
 
 // ---- listado ----
